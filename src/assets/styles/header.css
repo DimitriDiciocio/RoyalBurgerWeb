@@ -159,6 +159,16 @@ header {
         }
       }
 
+      & .pontos-royal:hover i,
+      & .pontos-royal:hover p{
+        color: #d8aa00;
+      }
+
+      & .pontos-royal:active i,
+      & .pontos-royal:active p{
+        color: #ffdb58;
+      }
+
       & .endereco{
         display: flex;
         align-items: center;
