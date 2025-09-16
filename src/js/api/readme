@@ -1,0 +1,38 @@
+api (js/src/js/api)
+O que é: camada de acesso HTTP à API Flask. Centraliza baseURL, headers, token e funções por recurso (auth, users, items, orders, etc.).
+O que colocar:
+api.js: cliente base (baseURL, fetch wrapper, tratamento de erro, Authorization).
+auth.js: login, logout, refresh, guardar/ler token.
+user.js: CRUD de usuários e perfis.
+items.js: CRUD de itens do cardápio, busca por categoria, destaque.
+orders.js: criação e acompanhamento de pedidos.
+Quando usar: toda chamada à API deve passar por aqui; a UI não faz fetch direto.
+Como usar:
+
+Importar funções específicas no módulo ui da página.
+Tratar erros de rede de forma genérica em api.js e retornar erros já normalizados.
+
+Exemplos rápidos:
+// api.js
+export const API_URL = window.env?.API_URL || "http://localhost:5000";
+export async function http(path, options = {}) {
+const token = localStorage.getItem("token");
+const headers = { "Content-Type": "application/json", ...(token ? { Authorization: Bearer ${token} } : {}) };
+const res = await fetch(${API_URL}${path}, { headers, ...options });
+if (!res.ok) throw await res.json().catch(() => ({ message: "Erro na API" }));
+return res.json();
+}
+
+// auth.js
+import { http } from "./api.js";
+export async function login(email, senha) {
+const data = await http("/auth/login", { method: "POST", body: JSON.stringify({ email, senha }) });
+localStorage.setItem("token", data.token);
+return data;
+}
+export function logout() { localStorage.removeItem("token"); }
+
+// user.js
+import { http } from "./api.js";
+export const listUsers = () => http("/users");
+export const createUser = (payload) => http("/users", { method: "POST", body: JSON.stringify(payload) });

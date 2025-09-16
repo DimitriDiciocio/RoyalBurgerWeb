@@ -1,0 +1,16 @@
+:root {
+    --color-primary: #FFC700;
+    --color-secondary: #FF0000;
+    --color-tertiary: #3D1807;
+    --color-quaternary: #F95A00;
+    --color-texto-white: #FFFFFF;
+    --color-texto-black: #101010;
+    --color-texto-light: #525252;
+    --color-texto-erased: #888888;
+    --cor-div-primary: #FFFFFF;
+    --cor-div-secondary: #101010;
+    --color-background: #F6F6F6;
+    --box-shadow: 0px 1px rgba(0,0,0,0.15);
+    --border-radius: 10px;
+  }
+  

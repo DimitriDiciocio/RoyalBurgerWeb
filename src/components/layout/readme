@@ -1,0 +1,15 @@
+layout
+O que é: partes estruturais do site (header, footer, nav) em HTML puro para inclusão em múltiplas páginas.
+O que colocar: header.html, footer.html e quaisquer shells de layout (ex.: sidebar.html). Sem scripts dentro; no máximo
+data-attributes para a UI.
+Quando usar: toda página deve incluir header e footer a partir daqui para manter consistência e evitar duplicação.
+Como usar:
+
+Em cada page, após o carregamento do DOM, busque e injete o layout:
+
+$("#header").load("/src/components/layout/header.html")
+
+$("#footer").load("/src/components/layout/footer.html")
+
+Estilos vivem em assets/styles e comportamentos (menus, estado logado) ficam em ui/header.js.
+Dica: mantenha IDs/classes estáveis para que ui/header.js encontre e controle os elementos.

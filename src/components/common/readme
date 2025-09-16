@@ -1,0 +1,19 @@
+common
+O que é: fragmentos HTML reutilizáveis pequenos (ex.: card de produto, modal genérico, badge de status).
+O que colocar: arquivos .html com blocos independentes e documentados via comentários indicando quais dados esperam
+(ex.: data-nome, data-preco).
+Quando usar: sempre que o mesmo bloco visual se repetir em 3+ páginas ou for parte de um padrão de UI recorrente.
+Como usar:
+
+Crie common/card-item.html contendo apenas a marcação do card.
+Nas páginas, carregue o HTML via jQuery (fetch/$.get) e injete no DOM, preenchendo dados por JS da pasta ui.
+
+Não escreva lógica de rede aqui; apenas marcação e classes de estilo.
+
+Exemplo de conteúdo:
+
+<!-- card-item.html -->
+<div class="card-item" data-id=""> <img class="card-item__img" src="" alt="">
+    <h3 class="card-item__title"></h3>
+    <p class="card-item__price"></p> <button class="card-item__add">Adicionar</button>
+</div>

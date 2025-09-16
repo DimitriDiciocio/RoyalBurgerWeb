@@ -1,0 +1,49 @@
+ui(js / src / js / ui)
+O que é: scripts de comportamento por página e utilidades de interface.Orquestram DOM, eventos e chamam a camada api.
+O que colocar:
+Um arquivo por página: inicio.js, login.js, item.js, etc.
+    header.js: controla interações do header(exibir usuário, menu, logout).
+        utils.js: funções utilitárias genéricas que podem ser usadas em qualquer lugar do sistema(formatar preço, masks, feedback / alerts).
+
+Quando usar: sempre que precisar manipular a página, carregar dados na tela, ligar eventos de clique, validações e montar componentes vindos de common / layout.
+Como usar:
+
+No HTML da página, importe apenas o script ui correspondente e os módulos de api que ele precisar.
+Dentro do script, espere o DOM pronto, busque dados via api, preencha os elementos e registre eventos.
+Exemplos rápidos:
+
+// utils.js
+export const formatPrice = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
+// login.js
+import { login } from "../api/auth.js";
+$(async function () {
+    $("#form-login").on("submit", async (e) => {
+        e.preventDefault();
+        const email = $("#email").val();
+        const senha = $("#senha").val();
+        try {
+            await login(email, senha);
+            window.location.href = "index.html";
+        } catch (err) {
+            alert(err.message || "Falha no login");
+        }
+    });
+});
+
+// inicio.js
+import { listItems } from "../api/items.js";
+import { formatPrice } from "./utils.js";
+$(async function () {
+    const itens = await listItems();
+    const container = $("#lista-itens");
+    for (const it of itens) {
+        // Ex.: carregar parcial common/card-item.html, clonar e preencher
+        const $card = $(<div class="card-item"> <img class="card-item__img" /> <h3 class="card-item__title"></h3> <p class="card-item__price"></p> <button class="card-item__add">Adicionar</button> </div>);
+        $card.find(".card-item__img").attr("src", it.img);
+        $card.find(".card-item__title").text(it.nome);
+        $card.find(".card-item__price").text(formatPrice(it.preco));
+        container.append($card);
+    }
+});
+
