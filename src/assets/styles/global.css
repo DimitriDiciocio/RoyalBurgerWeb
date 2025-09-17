@@ -42,6 +42,9 @@ main{
                 background-position: bottom center;
                 object-fit: cover; 
                 flex-shrink: 0;
+                user-drag: none;
+                user-select: none;
+                -webkit-user-drag: none;
             }
         }
 
