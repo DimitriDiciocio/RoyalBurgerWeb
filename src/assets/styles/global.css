@@ -76,15 +76,14 @@ main{
         }
     }
 
-
     & .mostruario-horizontal{
         padding: 30px 0px;
 
-        & .descricao{
+        & .titulo{
             font-size: 24px;
         }
 
-        & .subdescricao{
+        & .subtitulo{
             color: var(--color-texto-erased);
             font-size: 14px;
 
@@ -152,6 +151,103 @@ main{
             }
         }
         
+    }
+
+    & .mostruario-vertical{
+        & .categoias{
+            max-width: 100%;
+            overflow-x: auto;
+            scrollbar-width: none;
+            margin-bottom: 20px;
+
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 30px;
+
+            & i{
+                font-size: 30px;
+                padding: 5px 10px;
+                color: var(--color-texto-black);
+                cursor: pointer;
+            }
+
+            & p{
+                font-size: 24px;
+                padding: 5px 10px;
+                color: var(--color-texto-erased);
+                cursor: pointer;
+                transition: background-color 0.3s ease;
+                white-space: nowrap;
+            }
+
+            & p:hover{
+                font-weight: 500;
+                border-bottom: 2px solid var(--color-texto-erased);
+            }
+
+            & .selecionado{
+                color: var(--color-texto-black);
+                font-weight: 500;
+                border-bottom: 2.5px solid var(--color-texto-black);
+            }
+        }
+
+        & .rolagem-infinita{
+            & .dupla{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 20px;
+
+                & #ficha-produto{
+                    display: flex;
+                    border-radius: 5px;
+                    background-color: var(--cor-div-primary);
+                    width: 670px;
+                    box-shadow: 0px 1px 6px rgba(0,0,0,0.15);
+
+                    & #foto{
+                        width: 170px;
+                        height: 170px;
+                        background-repeat: no-repeat;
+                        background-size: cover; 
+                        object-fit: cover;
+                        background-position: bottom center;
+                        border-radius: 5px 0px 0px 5px;
+                    }
+
+                    & .informa{
+                        padding: 15px 15px;
+                        height: 170px;
+
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: space-between;
+
+                        & #nome{
+                            font-size: 20px;
+                            color: var(--color-texto-black);
+                        }
+
+                        & #descricao{
+                            font-size: 16px;
+                            color: var(--color-texto-erased)
+                        }
+
+                        & #preco{
+                            font-size: 16px;
+                            color: var(--color-texto-black);
+                        }
+
+                        & #tempo{
+                            font-size: 14px;
+                            color: var(--color-texto-erased)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

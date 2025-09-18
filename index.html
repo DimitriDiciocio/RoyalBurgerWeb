@@ -26,7 +26,7 @@
   <div id="header-container"></div>
 
   <main>
-    <div class="carrossel">
+    <section class="carrossel">
       <div class="imagens">
           <img src="src/assets/img/1.png" alt="Imagem 1">
           <img src="src/assets/img/2.png" alt="Imagem 2">
@@ -41,11 +41,11 @@
       </div>
 
        <script src="src/js/ui/carrossel.js"></script>
-    </div>
+    </section>
 
-    <div class="mostruario-horizontal">
-      <p class="descricao">Os mais pedidos</p>
-      <p class="subdescricao">Essa oferta expira em <span>00</span>:<span>00</span>:<span>00</span></p>
+    <section class="mostruario-horizontal">
+      <p class="titulo">Os mais pedidos</p>
+      <p class="subtitulo">Essa oferta expira em <span>00</span>:<span>00</span>:<span>00</span></p>
 
       <div class="rolagem">
         <div id="ficha-produto">
@@ -63,11 +63,95 @@
         </div>
       </div>
 
-    </div>
+    </section>
 
-    <div class="mostruario-vertical">
+    <section class="mostruario-vertical">
+      <div class="categoias">
+        <i class="fa-solid fa-bars"></i>
 
-    </div>
+        <p class="selecionado" id="categoria1">Mais vendidos</p>
+        <p id="categoria2">Classicos</p>
+        <p id="categoria3">Combos Royal</p>
+        <p id="categoria4">Vegetarianos</p>
+        <p id="categoria5">Veganos</p>
+        <p id="categoria6">Porções</p>
+        <p id="categoria7">Complementos</p>
+        <p id="categoria8">Bebidas</p>
+        <p id="categoria9">Sobremesas</p>
+      </div>
+
+      <div class="rolagem-infinita">
+        <div id="secao-cat-1">
+          <div class="dupla">
+
+            <a><div id="ficha-produto">
+              <img src="src/assets/img/tudo.jpeg" alt="x-tudo" id="foto">
+              <div class="informa">
+                <div>
+                  <p id="nome">X-Tudão</p>
+                  <p id="descricao">Descrição rápida...</p>
+                </div>
+                <div>
+                  <p id="preco">R$ 50,00</p>
+                  <p id="tempo">40 - 50 min • R$ 5,00</p>
+                </div>
+              </div>
+            </div></a>
+
+            <a><div id="ficha-produto">
+              <img src="src/assets/img/tudo.jpeg" alt="x-tudo" id="foto">
+              <div class="informa">
+                <div>
+                  <p id="nome">X-Tudão</p>
+                  <p id="descricao">Descrição rápida...</p>
+                </div>
+                <div>
+                  <p id="preco">R$ 50,00</p>
+                  <p id="tempo">40 - 50 min • R$ 5,00</p>
+                </div>
+              </div>
+            </div></a>
+
+          </div>
+
+          <div class="dupla">
+
+            <a><div id="ficha-produto">
+              <img src="src/assets/img/tudo.jpeg" alt="x-tudo" id="foto">
+              <div class="informa">
+                <div>
+                  <p id="nome">X-Tudão</p>
+                  <p id="descricao">Descrição rápida...</p>
+                </div>
+                <div>
+                  <p id="preco">R$ 50,00</p>
+                  <p id="tempo">40 - 50 min • R$ 5,00</p>
+                </div>
+              </div>
+            </div></a>
+
+            <a><div id="ficha-produto">
+              <img src="src/assets/img/tudo.jpeg" alt="x-tudo" id="foto">
+              <div class="informa">
+                <div>
+                  <p id="nome">X-Tudão</p>
+                  <p id="descricao">Descrição rápida...</p>
+                </div>
+                <div>
+                  <p id="preco">R$ 50,00</p>
+                  <p id="tempo">40 - 50 min • R$ 5,00</p>
+                </div>
+              </div>
+            </div></a>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <script src="src/js/ui/cardapio.js"></script>
+    </section>
 
     
   </main>
