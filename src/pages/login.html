@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Royal Burguer - Login</title>
-    <link rel="icon" href="src/assets/svg/logo.svg">
+    <link rel="icon" href="../assets/svg/logo.svg">
     <!-- css -->
-    <link rel="stylesheet" href="src/assets/styles/header.css">
-    <link rel="stylesheet" href="src/assets/styles/global.css">
-    <link rel="stylesheet" href="src/assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
     <!-- js sistema -->
     <script src="src/js/utils.js" type="module" defer>
 
@@ -17,15 +17,51 @@
     <script src="src/js/ui/usuario.js" type="module" defer>
 
     </script>
-    <script src="src/js/ui/header.js" type="module" defer>
+    <script src="../js/ui/header.js" type="module" defer>
 
     </script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
-
 <body>
+    <!-- importara header -->
+  <div id="header-container"></div>
+
+  <main class="page-login">
+    <div>
+        <i class="fa-solid fa-chevron-left"></i>
+    </div>
+
+    <section>
+        <form class="quadro-log-cad">
+            <p class="titulo">Digite o seu <br> e-mail e senha</p>
+
+            <div class="inputs">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" autocomplete="off">
+            </div>
+
+            <div class="inputs">
+                <label for="senha">Senha</label>
+                <input type="password" id="senha" name="senha" required autocomplete="off">
+                <i class="fa-solid fa-eye-slash"></i>
+            </div>
+
+            <div class="navegue">
+                <a href="">Esqueceu a senha?</a>
+                <a href="">Ainda não tem uma conta? <span> Cadastre-se já!</span></a>
+            </div>
+
+            <div>
+                <button class="botao">Entrar</button>
+            </div>
+        </form>
+    </section>
+  </main>
+
+  <!-- importare footer -->
+  <div id="footer-container"></div>
 
 </body>
 
