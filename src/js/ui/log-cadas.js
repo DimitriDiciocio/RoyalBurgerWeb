@@ -1,30 +1,43 @@
 $(document).ready(function() {
-    const $form = $('.quadro-log-cad');
-    const $emailInput = $('#email');
-    const $senhaInput = $('#senha');
-    const $botaoEntrar = $form.find('button.botao'); // Seleciona o botão dentro do formulário
-    const $iconeOlho = $form.find('.fa-solid.fa-eye-slash'); // O ícone do olho
 
-    // --- 1. Ativar/Desativar Botão "Entrar" ---
+    // --- Funcionalidade 1: Ativar/Desativar Botão "Entrar/Cadastrar" de forma genérica ---
+    function configurarAtivacaoBotao($form) {
+        const $inputsObrigatorios = $form.find('input[required], select[required], textarea[required]');
+        const $botaoAcao = $form.find('button.botao');
 
-    // Função para verificar se todos os inputs obrigatórios estão preenchidos
-    function verificarInputsPreenchidos() {
-        const emailPreenchido = $emailInput.val().trim() !== '';
-        const senhaPreenchida = $senhaInput.val().trim() !== '';
+        function verificarTodosInputsPreenchidos() {
+            let todosPreenchidos = true;
+            $inputsObrigatorios.each(function() {
+                if ($(this).val().trim() === '') {
+                    todosPreenchidos = false;
+                    return false; // Sai do loop .each()
+                }
+            });
 
-        if (emailPreenchido && senhaPreenchida) {
-            $botaoEntrar.removeClass('inativo');
-        } else {
-            $botaoEntrar.addClass('inativo');
+            if (todosPreenchidos) {
+                $botaoAcao.removeClass('inativo');
+            } else {
+                $botaoAcao.addClass('inativo');
+            }
         }
+
+        // Adiciona o evento 'input' a todos os campos obrigatórios
+        $inputsObrigatorios.on('input change', verificarTodosInputsPreenchidos);
+
+        // Chama a função uma vez ao carregar a página para definir o estado inicial do botão
+        verificarTodosInputsPreenchidos();
     }
 
-    // Adiciona o evento 'input' para verificar o preenchimento em tempo real
-    $emailInput.on('input', verificarInputsPreenchidos);
-    $senhaInput.on('input', verificarInputsPreenchidos);
+    // Aplica a funcionalidade a todos os formulários com a classe 'quadro-log-cad'
+    // (Útil se você tiver mais de um formulário desse tipo na mesma página, embora incomum para login/cadastro)
+    $('.quadro-log-cad').each(function() {
+        configurarAtivacaoBotao($(this));
+    });
 
-    // Chama a função uma vez ao carregar a página para definir o estado inicial do botão
-    verificarInputsPreenchidos();
+
+    const $form = $('.quadro-log-cad');
+    const $senhaInput = $('#senha');
+    const $iconeOlho = $form.find('.fa-solid.fa-eye-slash'); // O ícone do olho
 
     // --- 2. Alternar Visibilidade da Senha ---
 

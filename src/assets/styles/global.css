@@ -329,6 +329,12 @@ main{
             }
         }
 
+        & .instrucao{
+            color: var(--color-texto-erased);
+            font-size: 13px;
+            margin-left: 30px;
+        }
+
         & .botao{
             background-color: var(--color-primary);
             color: var(--color-texto-black);
