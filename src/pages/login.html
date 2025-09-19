@@ -24,11 +24,11 @@
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
-<body>
+<body class="page-login">
     <!-- importara header -->
   <div id="header-container"></div>
 
-  <main class="page-login">
+  <main>
     <div>
         <i class="fa-solid fa-chevron-left"></i>
     </div>
@@ -39,7 +39,7 @@
 
             <div class="inputs">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email" autocomplete="off">
+                <input type="email" id="email" name="email" required autocomplete="off">
             </div>
 
             <div class="inputs">
@@ -54,9 +54,11 @@
             </div>
 
             <div>
-                <button class="botao">Entrar</button>
+                <button class="botao inativo">Entrar</button>
             </div>
         </form>
+
+        <script src="../js/ui/log-cadas.js"></script>
     </section>
   </main>
 

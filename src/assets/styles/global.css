@@ -342,6 +342,19 @@ main{
             align-items: center;
             justify-content: center;
         }
+
+        & .botao:hover{
+            background-color: #f7d660;
+        }
+
+        & .botao:active{
+            background-color: #d2a400;
+        }
+
+        & .botao.inativo{
+            background-color: #D6D6D6;
+            cursor: not-allowed;
+        }
             
     }
 }
