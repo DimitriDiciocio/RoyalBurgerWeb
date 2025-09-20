@@ -1,31 +1,30 @@
 <!-- Header do site -->
 <header>
     <div class="navegacao">
-        <img src="src/assets/svg/logo.svg" alt="logo">
+        <img src="../../assets/svg/logo.svg" alt="logo" class="logo">
 
-        <nav>
-            <a href="/index.html">Início</a>
-            <a href="/src/pages/clube-royal.html">Clube Royal</a>
-            <a href="/src/pages/pedidos.html">Pedidos</a>
+        <nav class="nav-menu" id="nav-menu">
+            <a href="../../index.html">Início</a>
+            <a href="../pages/clube-royal.html" class="nav-logged-only">Clube Royal</a>
+            <a href="../pages/pedidos.html" class="nav-logged-only">Pedidos</a>
             <!-- <a href="">Painel Administrativo</a> -->
-            <a href="">Contato</a>
-            <!-- <a href="/src/pages/login.html">Login</a> -->
+            <a href="#contato">Contato</a>
         </nav>
     </div>
 
-    <div id="login-header" style="display: none;">
+    <div id="login-header" style="display: flex;">
         <div id="login">
-            <a>Criar Conta</a>
+            <a href="../pages/cadastro.html">Criar Conta</a>
 
             <div class="sep"></div>
 
-            <a href="../../pages/login.html">
+            <a href="../pages/login.html">
                 <button>Entrar</button>
             </a>
         </div>
     </div>
 
-    <div id="user-header" style="display: flex">
+    <div id="user-header" style="display: none">
         <div id="user">
 
             <div class="cesta" id="cesta">

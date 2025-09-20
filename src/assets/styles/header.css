@@ -18,7 +18,7 @@
   --cor-div-primary: #FFFFFF;
   --cor-div-secondary: #101010;
   --color-background: #F6F6F6;
-  --box-shadow: 0px 1px rgba(0, 0, 0, 0.15);
+  --box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.15);
   --border-radius: 10px;
 }
 
@@ -32,6 +32,7 @@ header {
   align-items: center;
   padding: 10px 26px;
   box-shadow: var(--box-shadow);
+  transition: all 0.3s ease;
 
   & .navegacao {
     display: flex;
@@ -209,4 +210,70 @@ header {
       }
     }
   }
+}
+
+/* Estilos para diferentes estados do header */
+
+/* Header na página de login/cadastro - apenas logo centralizada */
+header.header-login {
+  justify-content: center;
+  
+  & .navegacao {
+    justify-content: center;
+    
+    & .nav-menu {
+      display: none !important;
+    }
+  }
+  
+  & #login-header,
+  & #user-header {
+    display: none !important;
+  }
+}
+
+/* Header para usuário logado - mostrar todos os itens */
+header.header-logged-in {
+  & .nav-menu {
+    display: flex !important;
+  }
+  
+  & .nav-logged-only {
+    display: block !important;
+  }
+  
+  & #login-header {
+    display: none !important;
+  }
+  
+  & #user-header {
+    display: flex !important;
+  }
+}
+
+/* Header para usuário não logado - esconder links específicos */
+header.header-logged-out {
+  & .nav-menu {
+    display: flex !important;
+  }
+  
+  & .nav-logged-only {
+    display: none !important;
+  }
+  
+  & #login-header {
+    display: flex !important;
+  }
+  
+  & #user-header {
+    display: none !important;
+  }
+}
+
+/* Transições suaves para elementos do header */
+.nav-menu,
+#login-header,
+#user-header,
+.nav-logged-only {
+  transition: all 0.3s ease;
 }

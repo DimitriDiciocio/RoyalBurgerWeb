@@ -12,69 +12,59 @@
     <link rel="stylesheet" href="../assets/styles/footer.css">
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
     <!-- js sistema -->
-    <script src="src/js/utils.js" type="module" defer>
-
-    </script>
-    <script src="src/js/ui/usuario.js" type="module" defer>
-
-    </script>
-    <script src="../js/ui/header.js" type="module" defer>
-
-    </script>
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/footer.js" type="module" defer></script>
+    <script src="../js/ui/log-cadas.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
+
 <body class="page-login">
     <!-- importara header -->
-  <div id="header-container"></div>
+    <div id="header-container"></div>
 
-  <div id="mensagem-erro">
-    <div class="alerta-erro">
-        <i class="fa-solid fa-x"></i>
-        <div>
-            <p class="errao">Erro</p>
-            <p class="motivo">Motivo do erro</p>
+    <main>
+        <div class="div-back">
+            <a href="../../index.html" style="color: inherit; text-decoration: none;"
+                title="Voltar para página inicial">
+                <i class="fa-solid fa-chevron-left"></i>
+            </a>
         </div>
-    </div>
-  </div>
 
-  <main>
-    <div>
-        <i class="fa-solid fa-chevron-left"></i>
-    </div>
+        <section>
+            <form class="form-login">
+                <h4 class="title">Digite o seu e-mail e senha</h4>
 
-    <section>
-        <form class="quadro-log-cad">
-            <p class="titulo">Digite o seu <br> e-mail e senha</p>
+                <div class="div-input">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" name="email" required autocomplete="off">
+                </div>
 
-            <div class="inputs">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required autocomplete="off">
-            </div>
+                <div class="div-button-forgotpassword">
+                    <div class="div-input">
+                        <label for="senha">Senha</label>
+                        <input type="password" id="senha" name="senha" required autocomplete="off">
+                        <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
+                            style="display: none;"></i>
+                    </div>
+                    <p id="forgot-password">Esqueceu a senha?</p>
 
-            <div class="inputs">
-                <label for="senha">Senha</label>
-                <input type="password" id="senha" name="senha" required autocomplete="off">
-                <i class="fa-solid fa-eye-slash"></i>
-            </div>
+                    <p class="texto-pergunta">Ainda não tem uma conta? <a href="cadastro.html"
+                            class="link-redirect">Cadastre-se já!</a></p>
+                </div>
 
-            <div class="navegue">
-                <a href="">Esqueceu a senha?</a>
-                <a href="cadastro.html">Ainda não tem uma conta? <span> Cadastre-se já!</span></a>
-            </div>
+                <div class="divButtonSubmit">
+                    <button id="btn-entrar" class="btn-acao inativo">Entrar</button>
+                </div>
+            </form>
+        </section>
+    </main>
 
-            <div>
-                <button class="botao inativo">Entrar</button>
-            </div>
-        </form>
-
-        <script src="../js/ui/log-cadas.js"></script>
-    </section>
-  </main>
-
-  <!-- importare footer -->
-  <div id="footer-container"></div>
+    <!-- importare footer -->
+    <div id="footer-container"></div>
 
 </body>
 

@@ -1,60 +1,204 @@
-$(document).ready(function() {
+// Importar a função utilitária
+import { gerenciarEstadoInputs, inicializarGerenciamentoInputs } from '../utils.js';
+
+// Aguardar o DOM estar pronto
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Inicializar gerenciamento de inputs ---
+    inicializarGerenciamentoInputs();
 
     // --- Funcionalidade 1: Ativar/Desativar Botão "Entrar/Cadastrar" de forma genérica ---
-    function configurarAtivacaoBotao($form) {
-        const $inputsObrigatorios = $form.find('input[required], select[required], textarea[required]');
-        const $botaoAcao = $form.find('button.botao');
+    function configurarAtivacaoBotao(form) {
+        const inputsObrigatorios = form.querySelectorAll('input[required], select[required], textarea[required]');
+        const botaoAcao = form.querySelector('button.btn-acao');
 
         function verificarTodosInputsPreenchidos() {
             let todosPreenchidos = true;
-            $inputsObrigatorios.each(function() {
-                if ($(this).val().trim() === '') {
+            
+            // Verificar se todos os campos obrigatórios estão preenchidos
+            inputsObrigatorios.forEach(input => {
+                if (input.value.trim() === '') {
                     todosPreenchidos = false;
-                    return false; // Sai do loop .each()
                 }
             });
 
+            // Verificação adicional para cadastro - senhas devem coincidir
+            const senha = document.getElementById('senha');
+            const confirmaSenha = document.getElementById('confirma-senha');
+            if (senha && confirmaSenha) {
+                if (senha.value !== confirmaSenha.value || senha.value.trim() === '' || confirmaSenha.value.trim() === '') {
+                    todosPreenchidos = false;
+                }
+            }
+
+            // Atualizar estado do botão
             if (todosPreenchidos) {
-                $botaoAcao.removeClass('inativo');
+                botaoAcao.classList.remove('inativo');
+                botaoAcao.disabled = false;
             } else {
-                $botaoAcao.addClass('inativo');
+                botaoAcao.classList.add('inativo');
+                botaoAcao.disabled = true;
             }
         }
 
         // Adiciona o evento 'input' a todos os campos obrigatórios
-        $inputsObrigatorios.on('input change', verificarTodosInputsPreenchidos);
+        inputsObrigatorios.forEach(input => {
+            input.addEventListener('input', verificarTodosInputsPreenchidos);
+            input.addEventListener('change', verificarTodosInputsPreenchidos);
+        });
 
         // Chama a função uma vez ao carregar a página para definir o estado inicial do botão
         verificarTodosInputsPreenchidos();
     }
 
-    // Aplica a funcionalidade a todos os formulários com a classe 'quadro-log-cad'
-    // (Útil se você tiver mais de um formulário desse tipo na mesma página, embora incomum para login/cadastro)
-    $('.quadro-log-cad').each(function() {
-        configurarAtivacaoBotao($(this));
+    // Aplica a funcionalidade a todos os formulários com a classe 'form-login'
+    document.querySelectorAll('.form-login').forEach(form => {
+        configurarAtivacaoBotao(form);
     });
-
-
-    const $form = $('.quadro-log-cad');
-    const $senhaInput = $('#senha');
-    const $iconeOlho = $form.find('.fa-solid.fa-eye-slash'); // O ícone do olho
 
     // --- 2. Alternar Visibilidade da Senha ---
+    function configurarToggleSenha(input, mostrar, ocultar) {
+        mostrar.addEventListener('click', function() {
+            input.type = 'text';
+            mostrar.style.display = 'none';
+            ocultar.style.display = 'flex';
+        });
 
-    $iconeOlho.on('click', function() {
-        // Verifica o tipo atual do input de senha
-        const tipoAtual = $senhaInput.attr('type');
+        ocultar.addEventListener('click', function() {
+            input.type = 'password';
+            mostrar.style.display = 'flex';
+            ocultar.style.display = 'none';
+        });
+    }
 
-        if (tipoAtual === 'password') {
-            // Se for 'password', muda para 'text' (visível)
-            $senhaInput.attr('type', 'text');
-            // Altera o ícone de olho fechado para olho aberto
-            $(this).removeClass('fa-eye-slash').addClass('fa-eye');
-        } else {
-            // Se for 'text', muda para 'password' (escondida)
-            $senhaInput.attr('type', 'password');
-            // Altera o ícone de olho aberto para olho fechado
-            $(this).removeClass('fa-eye').addClass('fa-eye-slash');
-        }
-    });
+    // Configurar toggle para senha principal
+    const senhaInput = document.getElementById('senha');
+    const mostrarSenha = document.getElementById('mostrarSenha');
+    const ocultarSenha = document.getElementById('ocultarSenha');
+    
+    if (senhaInput && mostrarSenha && ocultarSenha) {
+        configurarToggleSenha(senhaInput, mostrarSenha, ocultarSenha);
+    }
+
+    // Configurar toggle para confirmar senha
+    const confirmaSenhaInput = document.getElementById('confirma-senha');
+    const mostrarConfirmaSenha = document.getElementById('mostrarConfirmaSenha');
+    const ocultarConfirmaSenha = document.getElementById('ocultarConfirmaSenha');
+    
+    if (confirmaSenhaInput && mostrarConfirmaSenha && ocultarConfirmaSenha) {
+        configurarToggleSenha(confirmaSenhaInput, mostrarConfirmaSenha, ocultarConfirmaSenha);
+    }
+
+    // --- 3. Validação Visual da Senha Forte ---
+    function validarSenhaForte(senha) {
+        const requisitos = {
+            maiuscula: /[A-Z]/.test(senha),
+            numero: /\d/.test(senha),
+            especial: /[!@#$%^&*(),.?":{}|<>]/.test(senha),
+            tamanho: senha.length >= 8
+        };
+
+        // Atualizar visual dos requisitos
+        const reqMaiuscula = document.getElementById('req-maiuscula');
+        const reqNumero = document.getElementById('req-numero');
+        const reqEspecial = document.getElementById('req-especial');
+        const reqTamanho = document.getElementById('req-tamanho');
+
+        if (reqMaiuscula) reqMaiuscula.classList.toggle('valid', requisitos.maiuscula);
+        if (reqNumero) reqNumero.classList.toggle('valid', requisitos.numero);
+        if (reqEspecial) reqEspecial.classList.toggle('valid', requisitos.especial);
+        if (reqTamanho) reqTamanho.classList.toggle('valid', requisitos.tamanho);
+
+        return Object.values(requisitos).every(req => req);
+    }
+
+    // Função para revalidar botões quando senhas mudarem
+    function revalidarBotoes() {
+        document.querySelectorAll('.form-login').forEach(form => {
+            const botaoAcao = form.querySelector('button.btn-acao');
+            if (botaoAcao) {
+                const inputsObrigatorios = form.querySelectorAll('input[required], select[required], textarea[required]');
+                let todosPreenchidos = true;
+                
+                inputsObrigatorios.forEach(input => {
+                    if (input.value.trim() === '') {
+                        todosPreenchidos = false;
+                    }
+                });
+
+                // Verificação adicional para cadastro - senhas devem coincidir
+                const senha = document.getElementById('senha');
+                const confirmaSenha = document.getElementById('confirma-senha');
+                if (senha && confirmaSenha) {
+                    if (senha.value !== confirmaSenha.value || senha.value.trim() === '' || confirmaSenha.value.trim() === '') {
+                        todosPreenchidos = false;
+                    }
+                }
+
+                if (todosPreenchidos) {
+                    botaoAcao.classList.remove('inativo');
+                    botaoAcao.disabled = false;
+                } else {
+                    botaoAcao.classList.add('inativo');
+                    botaoAcao.disabled = true;
+                }
+            }
+        });
+    }
+
+    // Aplicar validação quando a senha for digitada
+    if (senhaInput) {
+        senhaInput.addEventListener('input', function() {
+            const senha = this.value;
+            validarSenhaForte(senha);
+            
+            // Verificar se as senhas coincidem
+            const confirmaSenha = document.getElementById('confirma-senha');
+            if (confirmaSenha) {
+                const confirmaSenhaValue = confirmaSenha.value;
+                if (confirmaSenhaValue && senha !== confirmaSenhaValue) {
+                    confirmaSenha.style.borderColor = '#dc3545';
+                } else {
+                    confirmaSenha.style.borderColor = '#e0e1e4';
+                }
+            }
+            
+            // Revalidar botões
+            revalidarBotoes();
+        });
+    }
+
+    // Verificar coincidência de senhas
+    if (confirmaSenhaInput) {
+        confirmaSenhaInput.addEventListener('input', function() {
+            const senha = document.getElementById('senha')?.value || '';
+            const confirmaSenha = this.value;
+            
+            if (confirmaSenha && senha !== confirmaSenha) {
+                this.style.borderColor = '#dc3545';
+            } else {
+                this.style.borderColor = '#e0e1e4';
+            }
+            
+            // Revalidar botões
+            revalidarBotoes();
+        });
+    }
+
+    // --- 4. Máscara para telefone ---
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function() {
+            let value = this.value.replace(/\D/g, '');
+            if (value.length >= 11) {
+                value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            } else if (value.length >= 7) {
+                value = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+            } else if (value.length >= 3) {
+                value = value.replace(/(\d{2})(\d{0,5})/, '($1) $2');
+            }
+            this.value = value;
+        });
+    }
+
+    // --- 5. Animações dos labels são gerenciadas pela função utilitária ---
 });
