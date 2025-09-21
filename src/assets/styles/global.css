@@ -500,12 +500,12 @@ main{
     & .informa{
         display: flex;
         justify-content: space-between;
-        margin-top: 50px;
+        padding: 50px 20px;
 
         & .esquerda{
             & img{
                 height: 480px;
-                width: 580px;
+                width: 550px;
                 background-repeat: no-repeat;
                 background-size: cover; 
                 object-fit: cover;
@@ -593,7 +593,7 @@ main{
         }
 
         & .direita{
-            padding-right: 100px;
+            padding: 0px 50px;
             width: 780px;
 
             & #nome-produto{
@@ -623,7 +623,6 @@ main{
                     overflow-y: scroll;
                     scrollbar-width: none;
                     -ms-overflow-style: none; 
-                    padding: 0px 10px;
                     height: 200px;
 
 
@@ -631,7 +630,7 @@ main{
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
-                        padding: 10px 0px;
+                        padding: 10px;
                         border-bottom: 0.5px solid #D9D9D9;
                         border-top: 0.5px solid #D9D9D9;
 
@@ -684,7 +683,8 @@ main{
                     font-size: 14px;
                     border-radius: 8px;
                     padding: 5px 25px;
-                    margin-top: 20px;
+                    margin: 20px 0px;
+                    cursor: pointer;
 
                     display: flex;
                     justify-self: center;
@@ -740,6 +740,7 @@ main{
 
                 & input {
                     width: 100%;
+                    height: 80px;
                     padding: 12px;
                     font-size: 0.9rem;
                     border: 2px #e0e1e4 solid;
@@ -767,7 +768,7 @@ main{
                     font-size: 12px;
                     position: absolute;
                     right: 10px;
-                    top: -40%;
+                    top: -25%;
                 }
             }
 
