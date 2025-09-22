@@ -5,44 +5,48 @@
     width: 8px;
     height: 10px;
 }
+
 ::-webkit-scrollbar-track {
-    background: transparent; 
+    background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-    background: #D9D9D9; 
+    background: #D9D9D9;
     border-radius: 2px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-    background: #c4c4c4; 
+    background: #c4c4c4;
 }
 
 
-main{
+main {
     padding: 68px 60px 0px 60px;
     background-color: var(--color-background);
 }
 
-.page-inicio{
+.page-inicio {
     & .carrossel {
         width: 100%;
-        margin-top: 20px;
+        margin-top: 60px;
+        margin-bottom: 40px;
         overflow: hidden;
-        border-radius: 8px;
+        border-radius: 20px;
         box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.255);
         position: relative;
 
-        & .imagens{
+        & .imagens {
             display: flex;
             transition: transform 0.5s ease-in-out;
 
-            & img{
+            & img {
                 width: 100%;
                 height: 100%;
                 background-repeat: no-repeat;
-                background-size: cover; 
+                background-size: cover;
                 object-fit: cover;
                 background-position: bottom center;
-                object-fit: cover; 
+                object-fit: cover;
                 flex-shrink: 0;
                 user-select: none;
                 user-select: none;
@@ -56,7 +60,7 @@ main{
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 10px; 
+            gap: 10px;
             z-index: 10;
 
             & .indicador {
@@ -78,25 +82,25 @@ main{
         }
     }
 
-    & .mostruario-horizontal{
+    & .mostruario-horizontal {
         padding: 30px 0px;
 
-        & .titulo{
+        & .titulo {
             font-size: 24px;
         }
 
-        & .subtitulo{
+        & .subtitulo {
             color: var(--color-texto-erased);
             font-size: 14px;
 
-            & span{
+            & span {
                 background-color: #FBDE7B;
                 color: var(--color-tertiary);
                 border-radius: 2px;
             }
         }
 
-        & .rolagem{
+        & .rolagem {
             max-width: 100%;
             overflow-x: auto;
             scrollbar-width: none;
@@ -107,22 +111,22 @@ main{
             flex-direction: row;
             gap: 25px;
 
-            & #ficha-produto{
+            & #ficha-produto {
                 background-color: var(--color-texto-white);
                 border-radius: 5px;
-                box-shadow: 0px 1px 6px rgba(0,0,0,0.15);
+                box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.15);
 
-                & #foto{
+                & #foto {
                     width: 250px;
                     height: 140px;
                     background-repeat: no-repeat;
-                    background-size: cover; 
+                    background-size: cover;
                     object-fit: cover;
                     background-position: bottom center;
                     border-radius: 5px 5px 0px 0px;
                 }
 
-                & .informa{
+                & .informa {
                     padding: 5px 15px;
                     height: 170px;
 
@@ -130,33 +134,33 @@ main{
                     flex-direction: column;
                     justify-content: space-between;
 
-                    & #nome{
+                    & #nome {
                         font-size: 20px;
                         color: var(--color-texto-black);
                     }
 
-                    & #descricao{
+                    & #descricao {
                         font-size: 16px;
                         color: var(--color-texto-erased)
                     }
 
-                    & #preco{
+                    & #preco {
                         font-size: 16px;
                         color: var(--color-texto-black);
                     }
 
-                    & #tempo{
+                    & #tempo {
                         font-size: 14px;
                         color: var(--color-texto-erased)
                     }
                 }
             }
         }
-        
+
     }
 
-    & .mostruario-vertical{
-        & .categoias{
+    & .mostruario-vertical {
+        & .categoias {
             max-width: 100%;
             overflow-x: auto;
             scrollbar-width: none;
@@ -167,14 +171,14 @@ main{
             align-items: center;
             gap: 30px;
 
-            & i{
+            & i {
                 font-size: 30px;
                 padding: 5px 10px;
                 color: var(--color-texto-black);
                 cursor: pointer;
             }
 
-            & p{
+            & p {
                 font-size: 24px;
                 padding: 5px 10px;
                 color: var(--color-texto-erased);
@@ -183,43 +187,43 @@ main{
                 white-space: nowrap;
             }
 
-            & p:hover{
+            & p:hover {
                 font-weight: 500;
                 border-bottom: 2px solid var(--color-texto-erased);
             }
 
-            & .selecionado{
+            & .selecionado {
                 color: var(--color-texto-black);
                 font-weight: 500;
                 border-bottom: 2.5px solid var(--color-texto-black);
             }
         }
 
-        & .rolagem-infinita{
-            & .dupla{
+        & .rolagem-infinita {
+            & .dupla {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 padding-bottom: 20px;
 
-                & #ficha-produto{
+                & #ficha-produto {
                     display: flex;
                     border-radius: 5px;
                     background-color: var(--cor-div-primary);
                     width: 670px;
-                    box-shadow: 0px 1px 6px rgba(0,0,0,0.15);
+                    box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.15);
 
-                    & #foto{
+                    & #foto {
                         width: 170px;
                         height: 170px;
                         background-repeat: no-repeat;
-                        background-size: cover; 
+                        background-size: cover;
                         object-fit: cover;
                         background-position: bottom center;
                         border-radius: 5px 0px 0px 5px;
                     }
 
-                    & .informa{
+                    & .informa {
                         padding: 15px 15px;
                         height: 170px;
 
@@ -227,22 +231,22 @@ main{
                         flex-direction: column;
                         justify-content: space-between;
 
-                        & #nome{
+                        & #nome {
                             font-size: 20px;
                             color: var(--color-texto-black);
                         }
 
-                        & #descricao{
+                        & #descricao {
                             font-size: 16px;
                             color: var(--color-texto-erased)
                         }
 
-                        & #preco{
+                        & #preco {
                             font-size: 16px;
                             color: var(--color-texto-black);
                         }
 
-                        & #tempo{
+                        & #tempo {
                             font-size: 14px;
                             color: var(--color-texto-erased)
                         }
@@ -253,7 +257,7 @@ main{
     }
 }
 
-.page-login{
+.page-login {
     main {
         background-color: var(--color-background);
         min-height: 100vh;
@@ -265,7 +269,7 @@ main{
         padding: 0;
     }
 
-    .div-back{
+    .div-back {
         position: absolute;
         top: 90px;
         left: 30px;
@@ -370,7 +374,7 @@ main{
             z-index: 99;
             font-size: 1.1rem;
             color: var(--color-texto-erased);
-            
+
             &:hover {
                 color: var(--color-texto-black);
             }
@@ -428,7 +432,7 @@ main{
         font-size: 0.95rem;
         font-weight: 600;
         text-decoration: none;
-        
+
         &:hover {
             text-decoration: underline;
         }
@@ -496,25 +500,25 @@ main{
         }
     }
 
-    @media (max-width: 1440px) { 
+    @media (max-width: 1440px) {
         /* não precisou, mas esse serão os tamanhos de responsividade */
     }
 
-    @media (max-width: 1280px) { 
+    @media (max-width: 1280px) {
         /* não precisou, mas esse serão os tamanhos de responsividade */
     }
 
-    @media (max-width: 1024px) { 
+    @media (max-width: 1024px) {
         /* não precisou, mas esse serão os tamanhos de responsividade */
     }
 
-    @media (max-width: 768px) { 
+    @media (max-width: 768px) {
         main {
             min-height: 90vh;
             gap: 10px;
         }
 
-        .div-back{
+        .div-back {
             top: 90px;
             left: 30px;
             font-size: 1.1rem;
@@ -641,13 +645,13 @@ main{
         }
     }
 
-    @media (max-width: 480px) { 
+    @media (max-width: 480px) {
         main {
             min-height: 90vh;
             gap: 10px;
         }
 
-        .div-back{
+        .div-back {
             top: 90px;
             left: 30px;
             font-size: 1.1rem;
@@ -783,35 +787,35 @@ main{
         justify-content: space-between;
         padding: 50px 20px;
 
-        & .esquerda{
-            & img{
+        & .esquerda {
+            & img {
                 height: 480px;
                 width: 550px;
                 background-repeat: no-repeat;
-                background-size: cover; 
+                background-size: cover;
                 object-fit: cover;
                 background-position: bottom center;
                 border-radius: 5px;
             }
 
-            & .area-adicionar{
+            & .area-adicionar {
                 margin-top: 10px;
 
-                & .valor{
+                & .valor {
                     color: var(--color-texto-light);
                     font-size: 16px;
                     display: flex;
                     align-items: flex-end;
                     margin-left: 20px;
 
-                    & span{
+                    & span {
                         color: var(--color-texto-black);
                         font-size: 20px;
                         padding-left: 5px;
                     }
                 }
 
-                & .quadro{
+                & .quadro {
                     background-color: var(--cor-div-primary);
                     padding: 17px 20px;
                     display: flex;
@@ -820,7 +824,7 @@ main{
                     box-shadow: var(--box-shadow);
                     border-radius: var(--border-radius);
 
-                    & .quantidade{
+                    & .quantidade {
                         background-color: #ECECEC;
                         border-radius: 5px;
                         padding: 5px 10px;
@@ -829,28 +833,28 @@ main{
                         justify-content: space-between;
                         align-items: center;
 
-                        & i{
+                        & i {
                             font-size: 10px;
                             color: var(--color-secondary);
                             cursor: pointer;
 
-                            &:hover{
-                                color:#be0000;
+                            &:hover {
+                                color: #be0000;
                             }
                         }
 
-                        & p{
+                        & p {
                             font-size: 14px;
                             color: var(--color-texto-black);
                         }
                     }
 
-                    & #valor{
+                    & #valor {
                         font-size: 18px;
                         color: var(--color-texto-black)
                     }
 
-                    & button{
+                    & button {
                         background-color: var(--color-primary);
                         color: var(--color-texto-black);
                         border-radius: 5px;
@@ -873,41 +877,41 @@ main{
             }
         }
 
-        & .direita{
+        & .direita {
             padding: 0px 50px;
             width: 780px;
 
-            & #nome-produto{
+            & #nome-produto {
                 font-size: 60px;
                 font-weight: normal;
             }
 
-            & #descricao-produto{
+            & #descricao-produto {
                 font-size: 14px;
                 color: var(--color-texto-light);
                 padding-right: 60px;
             }
 
-            & .monte{
+            & .monte {
                 margin-top: 20px;
                 border-top: 1px solid var(--color-texto-erased);
                 border-bottom: 1px solid var(--color-texto-erased);
                 padding: 10px 0px;
 
-                & p{
+                & p {
                     color: var(--color-texto-black);
                     font-size: 26px;
                     margin-bottom: 10px;
                 }
 
-                & .rolagem{
+                & .rolagem {
                     overflow-y: scroll;
                     scrollbar-width: none;
-                    -ms-overflow-style: none; 
+                    -ms-overflow-style: none;
                     height: 200px;
 
 
-                    & .item{
+                    & .item {
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
@@ -915,14 +919,14 @@ main{
                         border-bottom: 0.5px solid #D9D9D9;
                         border-top: 0.5px solid #D9D9D9;
 
-                        & .item-adicional{
+                        & .item-adicional {
                             font-size: 14px;
                             color: var(--color-texto-black);
                         }
 
-                        & img{
+                        & img {
                             background-repeat: no-repeat;
-                            background-size: cover; 
+                            background-size: cover;
                             object-fit: cover;
                             background-position: bottom center;
                             border-radius: 5px;
@@ -930,7 +934,7 @@ main{
                             height: 40px;
                         }
 
-                        & .quantidade{
+                        & .quantidade {
                             background-color: #ECECEC;
                             border-radius: 5px;
                             padding: 5px 10px;
@@ -939,17 +943,17 @@ main{
                             justify-content: space-between;
                             align-items: center;
 
-                            & i{
+                            & i {
                                 font-size: 10px;
                                 color: var(--color-secondary);
                                 cursor: pointer;
 
-                                &:hover{
-                                    color:#be0000;
+                                &:hover {
+                                    color: #be0000;
                                 }
                             }
 
-                            & p{
+                            & p {
                                 font-size: 14px;
                                 color: var(--color-texto-black);
                             }
@@ -957,7 +961,7 @@ main{
                     }
                 }
 
-                & button{
+                & button {
                     background-color: var(--color-texto-black);
                     color: var(--color-texto-white);
                     border: none;
@@ -971,17 +975,17 @@ main{
                     justify-self: center;
                     align-items: center;
 
-                    &:hover{
+                    &:hover {
                         background-color: rgb(55, 55, 55);
                     }
 
-                    &:active{
+                    &:active {
                         background-color: rgb(147, 147, 147);
                     }
                 }
             }
 
-            & .observacao{
+            & .observacao {
                 height: fit-content;
                 display: flex;
                 flex-direction: column;
@@ -1043,7 +1047,7 @@ main{
                     z-index: 3;
                 }
 
-                & .limite{
+                & .limite {
                     color: var(--color-texto-erased);
                     font-weight: 400;
                     font-size: 12px;

@@ -1,5 +1,7 @@
 // Importar a função utilitária
 import { gerenciarEstadoInputs, inicializarGerenciamentoInputs } from '../utils.js';
+import { loginWithEmailAndPassword } from '../api/auth.js';
+import { registerCustomer } from '../api/user.js';
 
 // Aguardar o DOM estar pronto
 document.addEventListener('DOMContentLoaded', function() {
@@ -201,4 +203,77 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- 5. Animações dos labels são gerenciadas pela função utilitária ---
+    
+    // --- 6. Integração com API: Login e Cadastro ---
+    function normalizarTelefone(valor) {
+        return (valor || '').replace(/\D/g, '');
+    }
+
+    function exibirMensagem(msg, tipo = 'erro') {
+        // Tenta usar um container padronizado, senão alerta
+        let container = document.querySelector('.mensagens-container');
+        if (!container) {
+            alert(msg);
+            return;
+        }
+        const div = document.createElement('div');
+        div.className = `mensagem ${tipo}`;
+        div.textContent = msg;
+        container.appendChild(div);
+        setTimeout(() => div.remove(), 5000);
+    }
+
+    const form = document.querySelector('form.form-login');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const nome = document.getElementById('nome')?.value?.trim();
+            const email = document.getElementById('email')?.value?.trim();
+            const senha = document.getElementById('senha')?.value || '';
+            const confirma = document.getElementById('confirma-senha')?.value || '';
+            const nascimento = document.getElementById('nascimento')?.value?.trim();
+            const telefone = normalizarTelefone(document.getElementById('telefone')?.value || '');
+
+            const isCadastro = Boolean(nome || nascimento || telefone || document.getElementById('confirma-senha'));
+
+            try {
+                if (isCadastro) {
+                    // Cadastro
+                    const payload = {
+                        full_name: nome,
+                        email,
+                        password: senha,
+                        password_confirmation: confirma,
+                        date_of_birth: nascimento,
+                        phone: telefone
+                    };
+                    const resp = await registerCustomer(payload);
+                    exibirMensagem(resp?.message || 'Conta criada com sucesso!', 'sucesso');
+                    // Redireciona para login
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 800);
+                } else {
+                    // Login
+                    if (!email || !senha) return;
+                    const resp = await loginWithEmailAndPassword({ email, password: senha });
+                    const userResp = resp?.user || null;
+                    const nomeUsuario = userResp?.full_name || userResp?.name || '';
+                    exibirMensagem(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, 'sucesso');
+                    // Atualiza header imediatamente com dados do usuário (fallback para e-mail quando não vier user)
+                    try {
+                        const fallbackUser = userResp || { email };
+                        window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
+                    } catch (_e) {}
+                    setTimeout(() => {
+                        window.location.href = '../../index.html';
+                    }, 600);
+                }
+            } catch (err) {
+                const msg = err?.payload?.error || err?.message || 'Ocorreu um erro.';
+                exibirMensagem(msg, 'erro');
+            }
+        });
+    }
 });
