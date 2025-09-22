@@ -12,8 +12,8 @@ export async function registerCustomer({ full_name, email, password, password_co
     });
 }
 
-export async function getMyCustomer(userId) {
-    return apiRequest(`${CUSTOMER_BASE}/${userId}`, { method: 'GET' });
+export async function getMyCustomer() {
+    return apiRequest(`${CUSTOMER_BASE}/profile`, { method: 'GET' });
 }
 
 export async function updateMyCustomer(userId, payload) {
