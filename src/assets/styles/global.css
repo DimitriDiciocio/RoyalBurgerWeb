@@ -776,7 +776,6 @@ main{
 
 }
 
-
 .page-detalhe{
 
     & .informa{
@@ -1054,6 +1053,86 @@ main{
                 }
             }
 
+        }
+    }
+}
+
+.page-dados-conta{
+
+    & main{
+        padding: 66px 0px 0px 0px;
+        position: relative;
+        
+        & .banner{
+            background-repeat: no-repeat;
+            background-size: cover; 
+            object-fit: cover;
+            background-position: bottom center;
+            width: 100%;
+            height: 100%;
+        }
+
+        & .absolute{
+            position: absolute;
+            display: flex;
+            justify-content: space-between;
+
+            padding: 0px 60px;
+
+            & .navegacao{
+                width: 210px;
+
+                & .quadro-navegacao{
+                    background-color: var(--cor-div-primary);
+                    padding: 50px 20px 0px 20px;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: var(--box-shadow);
+                    border-radius: var(--border-radius);
+                    position: relative;
+
+                    & .perfil{
+                        background-color: var(--color-texto-black);
+                        color: var(--color-texto-white);
+                        border: 3.5px solid var(--cor-div-primary);
+                        border-radius: 50px;
+                        font-weight: bold;
+                        font-size: 37px;
+                        height: 80px;
+                        width: 80px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        justify-self: center;
+                        user-select: none;
+                        position: absolute;
+                        top: -10%;
+                    }
+
+                    & .nome{
+                        justify-self: center;
+                        font-size: 24px;
+                        text-align: center;
+                        padding-bottom: 10px;
+                        border-bottom: 1px solid #D9D9D9;
+                    }
+
+                    & .navega{
+                        display: flex;
+                        flex-direction: column;
+                        padding: 20px 5px;
+                        gap: 20px;
+
+                        & div{
+                            display: flex;
+                            align-items: center;
+                            color: var(--color-texto-light);
+                            font-size: 14px;
+                            gap: 10px
+                        }
+                    }
+                }
+            }
         }
     }
 }
