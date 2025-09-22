@@ -1074,6 +1074,9 @@ main {
             background-position: bottom center;
             width: 100%;
             height: 100%;
+            user-select: none;
+            user-select: none;
+            -webkit-user-drag: none;
         }
 
         & .absolute{
@@ -1186,6 +1189,7 @@ main {
                         justify-content: center;
                         align-items: center;
 
+                        gap: 10px;
                         font-size: 20px;
                         color: var(--color-primary);
                     }
