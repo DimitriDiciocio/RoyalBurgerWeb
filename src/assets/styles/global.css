@@ -1077,14 +1077,21 @@ main {
         }
 
         & .absolute{
-            position: absolute;
             display: flex;
+            flex-direction: row;
             justify-content: space-between;
-
+            top: 290px;
             padding: 0px 60px;
+            margin-top: -78px;
+            max-width: 1400px;
+            margin: -94px auto;
+            width: 95%;
 
             & .navegacao{
-                width: 210px;
+                width: 250px;
+                display: flex;
+                flex-direction: column;
+                gap: 30px;
 
                 & .quadro-navegacao{
                     background-color: var(--cor-div-primary);
@@ -1116,6 +1123,7 @@ main {
                     & .nome{
                         justify-self: center;
                         font-size: 24px;
+                        font-weight: 600;
                         text-align: center;
                         padding-bottom: 10px;
                         border-bottom: 1px solid #D9D9D9;
@@ -1130,9 +1138,251 @@ main {
                         & div{
                             display: flex;
                             align-items: center;
-                            color: var(--color-texto-light);
+                            color: var(--color-texto-erased);
                             font-size: 14px;
-                            gap: 10px
+                            gap: 10px;
+                            cursor: pointer;
+
+                            &:hover{
+                                color: var(--color-texto-light);
+                            }
+                        }
+
+                        & div.select{
+                            color: var(--color-texto-black);
+                        }
+
+                    }
+                }
+
+                & .quadro-pontos-royal{
+                    background-color: var(--cor-div-primary);
+                    padding: 10px 20px;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: var(--box-shadow);
+                    border-radius: var(--border-radius);
+                    position: relative;
+                    gap: 10px;
+                
+                    & .fa-circle-info{
+                        color: var(--color-texto-erased);
+                        font-size: 14px;
+                        display: flex;
+                        justify-content: end;
+                    }
+
+                    & .txt1{
+                        font-size: 14px;
+                        font-weight: 600;
+
+                        display: flex;
+                        justify-content: center;
+                    }
+
+                    & .pontos{
+                        display: flex;
+                        flex-direction: row;
+                        justify-content: center;
+                        align-items: center;
+
+                        font-size: 20px;
+                        color: var(--color-primary);
+                    }
+
+                    & .txt2{
+                        font-size: 14px;
+                        font-weight: 200;
+                        text-align: center;
+
+                        & span{
+                            font-weight: 600;
+                        }
+                    }
+                }
+            }
+
+            & #dados-user, #enderecos, #config{
+                width: 1000px;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+
+                & .quadro-info{
+                    background-color: var(--cor-div-primary);
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: var(--box-shadow);
+                    border-radius: var(--border-radius);
+                    position: relative;
+
+                    & .tema{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 20px 40px;
+
+                        & .tirulo{
+                            font-size: 16px;
+                            color: var(--color-texto-black);
+                            font-weight: 600;
+                        }
+
+                        & .edita{
+                            font-size: 16px;
+                            color: var(--color-primary);
+                            cursor: pointer;
+
+                            &:hover {
+                                color: #f7d660;
+                            }
+
+                            &:active {
+                                color: #d2a400;
+                            }
+                        }
+                    }
+
+                    & .info{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 20px 40px;
+                        border-top: 1px solid #D9D9D9;
+
+                        & .label{
+                            color: var(--color-texto-erased);
+                            font-size: 16px;
+                        }
+
+                        & .cont{
+                            color: var(--color-texto-black);
+                            font-size: 16px;
+                        }
+
+                        & i{
+                            color: var(--color-texto-light);
+                            font-size: 16px;
+                        }
+                    }
+
+                    & .info-checa{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 15px 40px;
+                        border-top: 1px solid #D9D9D9;
+
+                        & .titulo{
+                            color: var(--color-texto-black);
+                            font-size: 16px;
+                        }
+
+                        & .descricao{
+                            color: var(--color-texto-erased);
+                            font-size: 14px;
+                        }
+
+                        & .checa {
+                            position: relative;
+                            display: inline-block;
+                            width: 50px;
+                            height: 28px;
+
+                            input {
+                                opacity: 0;
+                                width: 0;
+                                height: 0;
+                            }
+
+                            .bolinha {
+                                position: absolute;
+                                cursor: pointer;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                background-color: #ccc;
+                                border-radius: 34px;
+                                transition: .4s;
+
+                                &::before {
+                                position: absolute;
+                                content: "";
+                                height: 22px;
+                                width: 22px;
+                                left: 3px;
+                                bottom: 3px;
+                                background-color: white;
+                                border-radius: 50%;
+                                transition: .4s;
+                                }
+                            }
+
+                            input:checked + .bolinha {
+                                background-color: var(--color-primary);
+                            }
+
+                            input:checked + .bolinha::before {
+                                transform: translateX(22px);
+                            }
+                        }
+
+                        & .edita{
+                            font-size: 16px;
+                            color: var(--color-primary);
+                            cursor: pointer;
+
+                            &:hover {
+                                color: #f7d660;
+                            }
+
+                            &:active {
+                                color: #d2a400;
+                            }
+                        }
+                    } 
+                }
+
+                & .logout{
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    margin-top: 20px;
+                    gap: 10px;
+
+                    & button{
+                        background-color: var(--color-secondary);
+                        color: var(--color-texto-white);
+                        border: none;
+                        font-weight: 600;
+                        font-size: 16px;
+                        border-radius: 8px;
+                        padding: 5px 75px;
+                        cursor: pointer;
+
+                        &:hover{
+                            background-color: #ff4545;
+                        }
+
+                        &:active{
+                            background-color: #cb0000;
+                        }
+                    }
+
+                    & p{
+                        color: var(--color-secondary);
+                        font-weight: 600;
+                        text-decoration: underline;
+                        cursor: pointer;
+
+                        &:hover{
+                            color: #ff4545;
+                        }
+
+                        &:active{
+                            color: #cb0000;
                         }
                     }
                 }
@@ -1140,4 +1390,9 @@ main {
         }
     }
 }
+
+
+
+
+
 
