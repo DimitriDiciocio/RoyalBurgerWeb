@@ -28,6 +28,14 @@ export async function deleteAccountPermanent() {
     return apiRequest(`${CUSTOMER_BASE}/delete-account`, { method: 'DELETE' });
 }
 
+// Verifica a senha do cliente autenticado (etapa de confirmação)
+export async function verifyMyPassword(password) {
+    return apiRequest(`${CUSTOMER_BASE}/me/verify-password`, {
+        method: 'POST',
+        body: { password }
+    });
+}
+
 // Endereços
 export async function addAddress(userId, payload) {
     return apiRequest(`${CUSTOMER_BASE}/${userId}/addresses`, { method: 'POST', body: payload });
