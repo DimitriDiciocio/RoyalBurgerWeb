@@ -1,9 +1,31 @@
 import { logout } from "../api/auth.js";
 import { deleteMyCustomer, getMyCustomer } from "../api/user.js";
 import { getStoredUser, logoutLocal } from "../api/api.js";
-import { showConfirm, toastFromApiError, toastFromApiSuccess } from "./alerts.js";
+import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage } from "./alerts.js";
 
 $(document).ready(function(){
+
+    // ====== Guarda de rota: somente clientes podem acessar esta página ======
+    try {
+        const u = getStoredUser();
+        const role = u && (u.role || u.user_role || u.type);
+        const isCustomer = String(role || '').toLowerCase() === 'customer';
+        if (!isCustomer) {
+            setFlashMessage({
+                type: 'info',
+                title: 'Acesso restrito',
+                message: 'Você precisa estar logado como cliente para acessar seus dados.'
+            });
+            // Redireciona para a página inicial relativa a partir de src/pages/
+            window.location.href = '../../index.html';
+            return;
+        }
+    } catch (_e) {
+        // Em qualquer falha, proteger a rota
+        setFlashMessage({ type: 'info', title: 'Acesso restrito', message: 'Faça login como cliente para continuar.' });
+        window.location.href = '../../index.html';
+        return;
+    }
 
     // mostra "dados da conta" ao entrar
     $("#dados-user").show();

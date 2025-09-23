@@ -177,3 +177,33 @@ export function toastFromApiSuccess(resp, fallback = 'Operação realizada com s
 }
 
 
+// ====== Flash message entre páginas ======
+const FLASH_STORAGE_KEY = 'rb.flash';
+
+export function setFlashMessage({ message = '', type = 'info', title = '' } = {}) {
+    try {
+        localStorage.setItem(FLASH_STORAGE_KEY, JSON.stringify({ message, type, title }));
+    } catch (_e) {}
+}
+
+export function tryShowFlashFromStorage() {
+    let raw = null;
+    try { raw = localStorage.getItem(FLASH_STORAGE_KEY); } catch (_e) { raw = null; }
+    if (!raw) return;
+    try { localStorage.removeItem(FLASH_STORAGE_KEY); } catch (_e) {}
+    try {
+        const data = JSON.parse(raw);
+        const { message = '', type = 'info', title = '' } = data || {};
+        if (!message) return;
+        if (type === 'error') {
+            showErrorBar(title || 'Erro', message);
+        } else {
+            showActionModal({ type, message, confirmText: 'OK', cancelText: 'Fechar' });
+        }
+    } catch (_e) {}
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', tryShowFlashFromStorage);
+}
+
