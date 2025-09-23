@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } catch (_e) {}
                     setTimeout(() => {
                         window.location.href = '../../index.html';
-                    }, 600);
+                    }, 1200);
                 }
             } catch (err) {
                 toastFromApiError(err);

@@ -1,31 +1,39 @@
 
 /* ------------------------------------- ALERTA DE ERRO ---------------------------- */
-.alerta-erro{
+.modelo-erro-modal{
     background-color: #FDEEEE;
-    border: 2px solid #EB5757;
-    border-left-width: 8px;
-    border-radius: 0px 20px 20px 0px;
-    padding: 15px 60px 15px 30px;
-    max-width: 50%;
-    gap: 20px;
-
+    border-left: 5px solid #EB5757;
+    border-radius: 12px 0px 0px 12px;
+    padding: 12px;
+    max-width: 640px;
+    gap: 14px;
     display: flex;
     align-items: center;
     position: fixed;
-    z-index: 101;
-
-    & i{
-        font-size: 30px;
-        color: #EB5757;
-    }
-
-    & .errao{
-        font-weight: 600;
-    }
-
-    & .motivo{
-        font-weight: 400;
-    }
+    top: 24px;
+    right: 0px;
+    z-index: 1010;
+    box-shadow: 0 10px 30px rgba(235, 87, 87, 0.15);
+}
+.modelo-erro-modal i{
+    font-size: 18px;
+    color: #EB5757;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fde3e3;
+}
+.modelo-erro-modal .errao{
+    font-weight: 700;
+    color: #b83535;
+    margin-bottom: 2px;
+}
+.modelo-erro-modal .motivo{
+    font-weight: 400;
+    color: #7a1e1e;
 }
 
 /* ====== Toasts ====== */
@@ -103,7 +111,7 @@
 .rb-confirm-overlay{
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.45);
+    background: rgba(0,0,0,0.25);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -148,3 +156,83 @@
 .rb-confirm .rb-btn-confirm.warning{ background: #f2994a; }
 .rb-confirm .rb-btn-confirm.error{ background: #eb5757; }
 .rb-confirm .rb-btn-confirm.success{ background: #27ae60; }
+
+/* ====== Modal base (modelo-alert) ====== */
+.modelo-alert-modal{
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+.modelo-alert-modal .modal-o{
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+}
+.modelo-alert-modal .modelo-msg-body{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -58%);
+    width: min(92vw, 420px);
+    background: #FFFFFF;
+    color: #f7f7f7;
+    border-radius: 10px;
+    padding: 22px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    justify-content: center;
+}
+.modelo-alert-modal .modelo-msg-footer{
+    position: absolute;
+    top: calc(50% + 140px);
+    left: 50%;
+    transform: translate(-50%, -58%);
+    width: min(92vw, 420px);
+    background: #1c1c1c;
+    border-radius: 0 0 14px 14px;
+    padding: 12px 16px 16px 16px;
+}
+.modelo-alert-modal .icon-msg{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.modelo-alert-modal .icon-msg img{ width: 38px; height: 38px; }
+.modelo-alert-modal .icon-msg i{ font-size: 25px; width: 60px; height: 60px; border-radius: 15px; display: inline-flex; align-items: center; justify-content: center; }
+.modelo-alert-modal .icon-msg-delete i{ color: #EB5757; background: rgba(235, 87, 87, 0.15); }
+.modelo-alert-modal .icon-msg-sucess i{ color: #27ae60; background: rgba(39, 174, 96, 0.15); }
+.modelo-alert-modal .icon-msg-aviso i{ color: #f2c94c; background: rgba(242, 201, 76, 0.18); }
+.modelo-alert-modal .icon-msg-info i{ color: #2d9cdb; background: rgba(45, 156, 219, 0.15); }
+.modelo-alert-modal .icon-msg-delete-text p,
+.modelo-alert-modal .icon-msg-sucess-text p,
+.modelo-alert-modal .icon-msg-aviso-text p,
+.modelo-alert-modal .icon-msg-info-text p{
+    margin-top: 14px;
+    color: var(--color-texto-black);
+    font-size: 1.2rem;
+}
+.modelo-alert-modal .bnt{
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    gap: 12px;
+}
+.modelo-alert-modal .bnt button{
+    padding: 15px;
+    border-radius: 10px;
+    width: 100%;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+.modelo-alert-modal .bnt .cancelar{ background: #f2f2f2; color: #333; }
+.modelo-alert-modal .bnt .confirmar{ background: #2d9cdb; color: #fff; }
+
+/* variantes opcionais para confirmar */
+.modelo-alert-modal.delete .bnt .confirmar{ background: #EB5757; }
+.modelo-alert-modal.success .bnt .confirmar{ background: #27ae60; }
+.modelo-alert-modal.warning .bnt .confirmar{ background: #f2994a; }
+.modelo-alert-modal.info .bnt .confirmar{ background: #2d9cdb; }

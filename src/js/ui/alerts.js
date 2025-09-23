@@ -9,6 +9,138 @@ const ICONS_BY_TYPE = {
     info: '<i class="fa-solid fa-circle-info"></i>'
 };
 
+// ====== MODELOS (HTML) ======
+function ensureMessageModels() {
+    let errorBar = document.querySelector('.modelo-erro-modal');
+    let alertModal = document.querySelector('.modelo-alert-modal');
+
+    if (!errorBar) {
+        errorBar = document.createElement('div');
+        errorBar.className = 'modelo-erro-modal';
+        errorBar.style.display = 'none';
+        errorBar.innerHTML = `
+            <i class="fa-solid fa-x"></i>
+            <div>
+                <p class="errao">Erro</p>
+                <p class="motivo">Ocorreu um erro.</p>
+            </div>
+        `;
+        document.body.appendChild(errorBar);
+    }
+
+    if (!alertModal) {
+        alertModal = document.createElement('div');
+        alertModal.className = 'modelo-alert-modal';
+        alertModal.style.display = 'none';
+        alertModal.innerHTML = `
+            <div class="modal-o"></div>
+            <div class="modelo-msg-body">
+                <div class="icon-msg">
+                    <img src="../assets/svg/logo.svg" alt="logo-royal-burguer">
+                    <div class="icon-msg-delete" style="display:none">
+                        <i class="fa-solid fa-trash"></i>
+                        <div class="icon-msg-delete-text"><p></p></div>
+                    </div>
+                    <div class="icon-msg-sucess" style="display:none">
+                        <i class="fa-solid fa-check"></i>
+                        <div class="icon-msg-sucess-text"><p></p></div>
+                    </div>
+                    <div class="icon-msg-aviso" style="display:none">
+                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        <div class="icon-msg-aviso-text"><p></p></div>
+                    </div>
+                    <div class="icon-msg-info" style="display:none">
+                        <i class="fa-solid fa-info-circle"></i>
+                        <div class="icon-msg-info-text"><p></p></div>
+                    </div>
+                </div>
+                <div class="bnt">
+                    <button class="cancelar">Cancelar</button>
+                    <button class="confirmar">Confirmar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(alertModal);
+    }
+
+    return { errorBar, alertModal };
+}
+
+// ====== API: Mostrar faixa de erro ======
+export function showErrorBar(title = 'Erro', message = 'Ocorreu um erro.', { autoClose = DEFAULT_AUTO_CLOSE_MS } = {}) {
+    const { errorBar } = ensureMessageModels();
+    const titleEl = errorBar.querySelector('.errao');
+    const msgEl = errorBar.querySelector('.motivo');
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    errorBar.style.display = 'flex';
+    if (autoClose && Number.isFinite(autoClose)) {
+        setTimeout(() => { errorBar.style.display = 'none'; }, autoClose);
+    }
+    return { close: () => errorBar && (errorBar.style.display = 'none') };
+}
+
+// ====== API: Modal de ação (não erro) ======
+export function showActionModal({ type = 'info', message = '', confirmText = 'Confirmar', cancelText = 'Cancelar' } = {}) {
+    const { alertModal } = ensureMessageModels();
+
+    // Esconde todos ícones/legendas
+    alertModal.querySelectorAll('.icon-msg-delete, .icon-msg-sucess, .icon-msg-aviso, .icon-msg-info').forEach(el => el.style.display = 'none');
+    let blockSelector = '.icon-msg-info';
+    if (type === 'success') blockSelector = '.icon-msg-sucess';
+    else if (type === 'warning') blockSelector = '.icon-msg-aviso';
+    else if (type === 'delete' || type === 'error-delete') blockSelector = '.icon-msg-delete';
+    const block = alertModal.querySelector(blockSelector);
+    if (block) {
+        const p = block.querySelector('p');
+        if (p) p.textContent = message || '';
+        block.style.display = '';
+    }
+
+    // Botões
+    const btnCancel = alertModal.querySelector('.cancelar');
+    const btnConfirm = alertModal.querySelector('.confirmar');
+    if (btnCancel) btnCancel.textContent = cancelText || 'Cancelar';
+    if (btnConfirm) btnConfirm.textContent = confirmText || 'Confirmar';
+
+    // Estilização por variante via classe
+    alertModal.classList.remove('delete','success','warning','info');
+    alertModal.classList.add(type === 'delete' ? 'delete' : type);
+
+    // Regras de visibilidade: em success e info, esconder o cancelar
+    if (btnCancel) {
+        if (type === 'success' || type === 'info') {
+            btnCancel.style.display = 'none';
+        } else {
+            btnCancel.style.display = '';
+        }
+    }
+
+    alertModal.style.display = 'block';
+
+    return new Promise(resolve => {
+        const close = (result) => {
+            alertModal.style.display = 'none';
+            resolve(result);
+        };
+        const overlay = alertModal.querySelector('.modal-o');
+        const onOverlay = (e) => { if (e.target === overlay) { cleanup(); close(false); } };
+        const onCancel = () => { cleanup(); close(false); };
+        const onConfirm = () => { cleanup(); close(true); };
+
+        function cleanup(){
+            if (overlay) overlay.removeEventListener('click', onOverlay);
+            if (btnCancel) btnCancel.removeEventListener('click', onCancel);
+            if (btnConfirm) btnConfirm.removeEventListener('click', onConfirm);
+        }
+
+        if (overlay) overlay.addEventListener('click', onOverlay);
+        if (btnCancel) btnCancel.addEventListener('click', onCancel);
+        if (btnConfirm) btnConfirm.addEventListener('click', onConfirm);
+    });
+}
+
+// ====== Compat: manter API antiga, mas delegar para os novos modais ======
 function ensureToastContainer() {
     let container = document.querySelector('.rb-toasts-container');
     if (!container) {
@@ -19,102 +151,29 @@ function ensureToastContainer() {
     return container;
 }
 
-export function showToast(message, { type = 'info', title, autoClose = DEFAULT_AUTO_CLOSE_MS, actions = [] } = {}) {
-    const container = ensureToastContainer();
-
-    const toast = document.createElement('div');
-    toast.className = `rb-toast ${type}`;
-
-    const iconHtml = ICONS_BY_TYPE[type] || ICONS_BY_TYPE.info;
-    const titleHtml = title ? `<div class="rb-toast-title">${title}</div>` : '';
-    const actionsHtml = Array.isArray(actions) && actions.length
-        ? `<div class="rb-toast-actions">${actions.map(a => `<button class="rb-toast-action" data-action-id="${a.id || ''}">${a.label}</button>`).join('')}</div>`
-        : '';
-
-    toast.innerHTML = `
-        <div class="rb-toast-icon">${iconHtml}</div>
-        <div class="rb-toast-content">
-            ${titleHtml}
-            <div class="rb-toast-message">${message}</div>
-            ${actionsHtml}
-        </div>
-        <button class="rb-toast-close" aria-label="Fechar">&times;</button>
-    `;
-
-    const close = () => {
-        toast.classList.add('closing');
-        toast.addEventListener('animationend', () => toast.remove(), { once: true });
-    };
-
-    toast.querySelector('.rb-toast-close').addEventListener('click', close);
-
-    if (Array.isArray(actions)) {
-        toast.querySelectorAll('.rb-toast-action').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.getAttribute('data-action-id');
-                const action = actions.find(a => (a.id || '') === id);
-                if (action && typeof action.onClick === 'function') {
-                    action.onClick(close);
-                }
-            });
-        });
+export function showToast(message, { type = 'info', title, autoClose = DEFAULT_AUTO_CLOSE_MS } = {}) {
+    if (type === 'error') {
+        return showErrorBar(title || 'Erro', message, { autoClose });
     }
-
-    container.appendChild(toast);
-
-    if (autoClose && Number.isFinite(autoClose)) {
-        setTimeout(close, autoClose);
-    }
-
-    return { close };
+    // Para compatibilidade, mensagens não-erro vão para o modal de ação,
+    // com botão único Confirmar.
+    showActionModal({ type, message, confirmText: 'Confirmar', cancelText: 'Fechar' });
+    return { close: () => {} };
 }
 
 export function showConfirm({ title = 'Confirmação', message = 'Deseja continuar?', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = {}) {
-    return new Promise(resolve => {
-        let overlay = document.querySelector('.rb-confirm-overlay');
-        if (overlay) overlay.remove();
-        overlay = document.createElement('div');
-        overlay.className = 'rb-confirm-overlay';
-
-        const modal = document.createElement('div');
-        modal.className = `rb-confirm ${type}`;
-        modal.innerHTML = `
-            <div class="rb-confirm-header">
-                <div class="rb-confirm-icon">${ICONS_BY_TYPE[type] || ICONS_BY_TYPE.info}</div>
-                <div class="rb-confirm-title">${title}</div>
-                <button class="rb-confirm-close" aria-label="Fechar">&times;</button>
-            </div>
-            <div class="rb-confirm-message">${message}</div>
-            <div class="rb-confirm-actions">
-                <button class="rb-btn rb-btn-cancel">${cancelText}</button>
-                <button class="rb-btn rb-btn-confirm ${type}">${confirmText}</button>
-            </div>
-        `;
-
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-
-        const cleanup = () => overlay.remove();
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                cleanup();
-                resolve(false);
-            }
-        });
-        modal.querySelector('.rb-confirm-close').addEventListener('click', () => { cleanup(); resolve(false); });
-        modal.querySelector('.rb-btn-cancel').addEventListener('click', () => { cleanup(); resolve(false); });
-        modal.querySelector('.rb-btn-confirm').addEventListener('click', () => { cleanup(); resolve(true); });
-    });
+    // Usa o modal de ação padronizado
+    return showActionModal({ type: type === 'error' ? 'warning' : type, message, confirmText, cancelText });
 }
 
 export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
     const msg = (err && (err.payload?.error || err.payload?.message || err.message)) || fallback;
-    return showToast(msg, { type: 'error', title: 'Erro' });
+    return showErrorBar('Erro', msg);
 }
 
 export function toastFromApiSuccess(resp, fallback = 'Operação realizada com sucesso.') {
     const msg = (resp && (resp.message || resp.msg)) || fallback;
-    return showToast(msg, { type: 'success', title: 'Sucesso' });
+    return showActionModal({ type: 'success', message: msg, confirmText: 'OK', cancelText: 'Fechar' });
 }
 
 
