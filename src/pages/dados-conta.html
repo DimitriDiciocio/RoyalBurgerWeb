@@ -2,233 +2,399 @@
 <html lang="pt-BR">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Royal Burguer</title>
-  <link rel="icon" href="../assets/svg/logo.svg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
 
-  <!-- css -->
-  <link rel="stylesheet" href="../assets/styles/header.css">
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
     <link rel="stylesheet" href="../assets/styles/global.css">
     <link rel="stylesheet" href="../assets/styles/footer.css">
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
-  <!-- js sistema -->
-  <script src="../js/utils.js" type="module" defer></script>
+    <link rel="stylesheet" href="../assets/styles/modal.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
     <script src="../js/ui/header.js" type="module" defer></script>
     <script src="../js/ui/footer.js" type="module" defer></script>
-  <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/dados.js" type="module" defer></script>
-  <!-- js complementares -->
-  <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 
 <body class="page-dados-conta">
-  <!-- importara header -->
-  <div id="header-container"></div>
+    <!-- importara header -->
+    <div id="header-container"></div>
 
-  <main>
-    <img class="banner" src="../assets/img/banner-conta.png" alt="">
+    <main>
+        <img class="banner" src="../assets/img/banner-conta.png" alt="">
 
-    <div class="espaco-branco"></div>
+        <div class="espaco-branco"></div>
 
-    <div class="absolute">
-        <section class="navegacao">
+        <div class="absolute">
+            <section class="navegacao">
 
-            <div class="quadro-navegacao">
-                <div>
-                    <p class="perfil">YB</p>
-                    <p class="nome">Ygor Brocha</p>
+                <div class="quadro-navegacao">
+                    <div>
+                        <p class="perfil">YB</p>
+                        <p class="nome">Ygor Brocha</p>
+                    </div>
+
+                    <div class="navega">
+                        <div>
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <p>Ver cardápio</p>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-user"></i>
+                            <p>Dados da conta</p>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-receipt"></i>
+                            <p>Ver pedidos</p>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-location-dot"></i>
+                            <p>Endereços</p>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-crown"></i>
+                            <p>Ver pontos</p>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-gear"></i>
+                            <p>Configurações</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="navega">
-                    <div>
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <p>Ver cardápio</p>
-                    </div>
+                <div class="quadro-pontos-royal">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <p class="txt1">Seus pontos</p>
 
-                    <div>
-                        <i class="fa-solid fa-user"></i>
-                        <p>Dados da conta</p>
-                    </div>
-
-                    <div>
-                        <i class="fa-solid fa-receipt"></i>
-                        <p>Ver pedidos</p>
-                    </div>
-
-                    <div>
-                        <i class="fa-solid fa-location-dot"></i>
-                        <p>Endereços</p>
-                    </div>
-
-                    <div>
+                    <div class="pontos">
                         <i class="fa-solid fa-crown"></i>
-                        <p>Ver pontos</p>
+                        <p>200</p>
                     </div>
 
-                    <div>
-                        <i class="fa-solid fa-gear"></i>
-                        <p>Configurações</p>
+                    <p class="txt2">Faltam <span>XX</span> dias para seus pontos expirarem</p>
+                </div>
+            </section>
+
+            <section id="dados-user">
+                <div class="quadro-info">
+                    <div class="tema">
+                        <p class="tirulo">Informações do usuário</p>
+                        <p class="edita">Editar Informações do perfil</p>
                     </div>
-                </div>
-            </div>
 
-            <div class="quadro-pontos-royal">
-                <i class="fa-solid fa-circle-info"></i>
-                <p class="txt1">Seus pontos</p>
+                    <div class="info">
+                        <p class="label">Nome Completo*</p>
+                        <p class="cont">Ygor Birochi da Fonseca Ataniel</p>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
 
-                <div class="pontos">
-                    <i class="fa-solid fa-crown"></i>
-                    <p>200</p>
-                </div>
+                    <div class="info">
+                        <p class="label">CPF</p>
+                        <p class="cont">000.000.000-11</p>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
 
-                <p class="txt2">Faltam <span>XX</span> dias para seus pontos expirarem</p>
-            </div>
-        </section>
-
-        <section id="dados-user">
-            <div class="quadro-info">
-                <div class="tema">
-                    <p class="tirulo">Informações do usuário</p>
-                    <p class="edita">Editar Informações do perfil</p>
-                </div>
-
-                <div class="info">
-                    <p class="label">Nome Completo*</p>
-                    <p class="cont">Ygor Birochi da Fonseca Ataniel</p>
-                    <i class="fa-solid fa-chevron-down"></i>
-                </div>
-
-                <div class="info">
-                    <p class="label">CPF</p>
-                    <p class="cont">000.000.000-11</p>
-                    <i class="fa-solid fa-chevron-down"></i>
-                </div>
-
-                <div class="info">
-                    <p class="label">Data de nascimento*</p>
-                    <p class="cont">19/07/2007</p>
-                    <i class="fa-solid fa-chevron-down"></i>
-                </div>
-            </div>
-
-            <div class="quadro-info">
-                <div class="tema">
-                    <p class="tirulo">Informações de contato</p>
-                    <p class="edita">Editar Informações de contato</p>
-                </div>
-
-                <div class="info">
-                    <p class="label">E-mail*</p>
-                    <p class="cont">ybirochi123456@gmail.com</p>
-                    <i class="fa-solid fa-chevron-down"></i>
-                </div>
-
-                <div class="info">
-                    <p class="label">Telefone*</p>
-                    <p class="cont">(00)00000-0000</p>
-                    <i class="fa-solid fa-chevron-down"></i>
-                </div>
-            </div>
-        </section>
-
-        <section id="enderecos" style="display: none;">
-            <div class="quadro-endereco">
-                <div style="display: flex; align-items: center; gap: 20px">
-                    <i class="fa-solid fa-location-dot"></i>
-
-                    <div>
-                        <p class="titulo">R. Nome da Rua, 1000</p>
-                        <p class="descricao">Bairro - Complemento</p>
+                    <div class="info">
+                        <p class="label">Data de nascimento*</p>
+                        <p class="cont">19/07/2007</p>
+                        <i class="fa-solid fa-chevron-down"></i>
                     </div>
                 </div>
 
-                <p class="edita">Editar endereço</p>
-            </div>
-
-            <div class="adiciona-ende">
-                <button>Adicionar um novo endereço</button>
-            </div>
-            
-        </section>
-
-        <section id="config" style="display: none;">
-            <div class="quadro-info">
-                <div class="tema">
-                    <p class="tirulo">Gerenciar Notificações</p>
-                </div>
-
-                <div class="info-checa">
-                    <div>
-                        <p class="titulo">Comunicações de pedidos</p>
-                        <p class="descricao">Irá receber notificações informando as etapas do seu pedido</p>
+                <div class="quadro-info">
+                    <div class="tema">
+                        <p class="tirulo">Informações de contato</p>
+                        <p class="edita">Editar Informações de contato</p>
                     </div>
 
-                    <label class="checa">
+                    <div class="info">
+                        <p class="label">E-mail*</p>
+                        <p class="cont">ybirochi123456@gmail.com</p>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+
+                    <div class="info">
+                        <p class="label">Telefone*</p>
+                        <p class="cont">(00)00000-0000</p>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
+            </section>
+
+            <section id="enderecos" style="display: none;">
+                <div class="quadro-endereco">
+                    <div style="display: flex; align-items: center; gap: 20px">
+                        <i class="fa-solid fa-location-dot"></i>
+
+                        <div>
+                            <p class="titulo">R. Nome da Rua, 1000</p>
+                            <p class="descricao">Bairro - Complemento</p>
+                        </div>
+                    </div>
+
+                    <p class="edita">Editar endereço</p>
+                </div>
+
+                <div class="adiciona-ende">
+                    <button>Adicionar um novo endereço</button>
+                </div>
+
+            </section>
+
+            <section id="config" style="display: none;">
+                <div class="quadro-info">
+                    <div class="tema">
+                        <p class="tirulo">Gerenciar Notificações</p>
+                    </div>
+
+                    <div class="info-checa">
+                        <div>
+                            <p class="titulo">Comunicações de pedidos</p>
+                            <p class="descricao">Irá receber notificações informando as etapas do seu pedido</p>
+                        </div>
+
+                        <label class="checa">
+                            <input type="checkbox">
+                            <span class="bolinha"></span>
+                        </label>
+                    </div>
+
+                    <div class="info-checa">
+                        <div>
+                            <p class="titulo">Comunicações de promoções</p>
+                            <p class="descricao">Irá receber notificações informando as últimas promoções</p>
+                        </div>
+
+                        <label class="checa">
+                            <input type="checkbox">
+                            <span class="bolinha"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="quadro-info">
+                    <div class="tema">
+                        <p class="tirulo">Gerenciar segurança</p>
+                    </div>
+
+                    <div class="info-checa">
+                        <div>
+                            <p class="titulo">Verificação em duas etapas</p>
+                            <p class="descricao">Adicione um método de verificação adicional além da sua senha</p>
+                        </div>
+
+                        <label class="checa">
+                            <input type="checkbox">
+                            <span class="bolinha"></span>
+                        </label>
+                    </div>
+
+                    <div class="info-checa">
+                        <div>
+                            <p class="titulo">Alterar senha</p>
+                            <p class="descricao">Troque sua senha atual por uma nova e mais segura</p>
+                        </div>
+
+                        <p class="edita">Alterar senha</p>
+                    </div>
+
+                    <div class="info-checa">
+                        <div>
+                            <p class="titulo">Verificar email</p>
+                            <p class="descricao">Verifique eu email para uma melhor experiência e segurança</p>
+                        </div>
+
+                        <p class="edita">Verificar email</p>
+                    </div>
+                </div>
+
+                <div class="logout">
+                    <button>Sair da conta</button>
+                    <p>Excluir conta</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- MODAIS -->
+        <div id="editar-info-user" class="modal" style="display: none;">
+            <div class="div-overlay"></div>
+
+            <div class="modal-contet">
+                <div class="header">
+                    <i class="fa-solid fa-xmark"></i>
+                    <p class="titulo">Editar dados</p>
+                    <p class="descricao">Campos com (*) são obrigatórios</p>
+                </div>
+
+                <div class="main">
+                    <div class="div-input">
+                        <label for="nome">Nome Completo*</label>
+                        <input type="text" id="nome" name="nome" required autocomplete="off">
+                    </div>
+
+                    <div style="display: flex; flex-direction: row; gap: 10px">
+                        <div class="div-input">
+                            <label for="cpf">CPF</label>
+                            <input type="number" id="cpf" name="cpf" required autocomplete="off">
+                        </div>
+                        <div class="div-input">
+                            <label for="nascimento">Data de nascimento*</label>
+                            <input type="date" id="nascimento" name="nascimento" required autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <button>Confirmar</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="editar-info-contato" class="modal" style="display: none;">
+            <div class="div-overlay"></div>
+
+            <div class="modal-contet">
+                <div class="header">
+                    <i class="fa-solid fa-xmark"></i>
+                    <p class="titulo">Editar dados</p>
+                    <p class="descricao">Campos com (*) são obrigatórios</p>
+                </div>
+
+                <div class="main">
+                    <div class="div-input">
+                        <label for="email">Email*</label>
+                        <input type="email" id="email" name="email" required autocomplete="off">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="telefone">Telefone*</label>
+                        <input type="number" id="telefone" name="telefone" required autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <button>Confirmar</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="editar-endereco" class="modal" style="display: none;">
+            <div class="div-overlay"></div>
+
+            <div class="modal-contet">
+                <div class="header">
+                    <i class="fa-solid fa-xmark"></i>
+                    <p class="titulo">Editar endereço</p>
+                    <p class="descricao">Campos com (*) são obrigatórios</p>
+                </div>
+
+                <div class="main">
+                    <div class="div-input">
+                        <label for="rua">Rua*</label>
+                        <input type="text" id="rua" name="rua" required autocomplete="off">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="bairro">Bairro*</label>
+                        <input type="text" id="bairro" name="bairro" required autocomplete="off">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="numero">Número*</label>
+                        <input type="number" id="numero" name="numero" required autocomplete="off">
+                    </div>
+
+                    <div class="div-checa">
                         <input type="checkbox">
-                        <span class="bolinha"></span>
-                    </label>
-                </div>
-
-                <div class="info-checa">
-                    <div>
-                        <p class="titulo">Comunicações de promoções</p>
-                        <p class="descricao">Irá receber notificações informando as últimas promoções</p>
+                        <label>Endereço sem número</label>
                     </div>
 
-                    <label class="checa">
+                    <div class="div-input">
+                        <label for="complemento">Complemento*</label>
+                        <input type="text" id="complemento" name="complemento" required autocomplete="off">
+                    </div>
+
+                    <div class="div-checa">
                         <input type="checkbox">
-                        <span class="bolinha"></span>
-                    </label>
+                        <label>Endereço sem complemento</label>
+                    </div>
                 </div>
+                
+                <div class="footer">
+                    <button>Confirmar</button>
+                </div>
+
             </div>
+        </div>
 
-            <div class="quadro-info">
-                <div class="tema">
-                    <p class="tirulo">Gerenciar segurança</p>
+        <div id="adicionar-endereco" class="modal" style="display: flex;">
+            <div class="div-overlay"></div>
+
+            <div class="modal-contet">
+                <div class="header">
+                    <i class="fa-solid fa-xmark"></i>
+                    <p class="titulo">Adicionar endereço</p>
+                    <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
 
-                <div class="info-checa">
-                    <div>
-                        <p class="titulo">Verificação em duas etapas</p>
-                        <p class="descricao">Adicione um método de verificação adicional além da sua senha</p>
+                <div class="main">
+                    <div class="div-input">
+                        <label for="rua">Rua*</label>
+                        <input type="text" id="rua" name="rua" required autocomplete="off">
                     </div>
 
-                    <label class="checa">
+                    <div class="div-input">
+                        <label for="bairro">Bairro*</label>
+                        <input type="text" id="bairro" name="bairro" required autocomplete="off">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="numero">Número*</label>
+                        <input type="number" id="numero" name="numero" required autocomplete="off">
+                    </div>
+
+                    <div class="div-checa">
                         <input type="checkbox">
-                        <span class="bolinha"></span>
-                    </label>
-                </div>
-
-                <div class="info-checa">
-                    <div>
-                        <p class="titulo">Alterar senha</p>
-                        <p class="descricao">Troque sua senha atual por uma nova e mais segura</p>
+                        <label>Endereço sem número</label>
                     </div>
 
-                    <p class="edita">Alterar senha</p>
-                </div>
-
-                <div class="info-checa">
-                    <div>
-                        <p class="titulo">Verificar email</p>
-                        <p class="descricao">Verifique eu email para uma melhor experiência e segurança</p>
+                    <div class="div-input">
+                        <label for="complemento">Complemento*</label>
+                        <input type="text" id="complemento" name="complemento" required autocomplete="off">
                     </div>
 
-                    <p class="edita">Verificar email</p>
+                    <div class="div-checa">
+                        <input type="checkbox">
+                        <label>Endereço sem complemento</label>
+                    </div>
                 </div>
-            </div>
+                
+                <div class="footer">
+                    <button>Confirmar</button>
+                </div>
 
-            <div class="logout">
-                <button>Sair da conta</button>
-                <p>Excluir conta</p>
             </div>
-        </section>
-    </div>
-  </main>
-  <!-- importare footer -->
-  <div id="footer-container"></div>
+        </div>
+
+
+    </main>
+    <!-- importare footer -->
+    <div id="footer-container"></div>
 </body>
 
 </html>
