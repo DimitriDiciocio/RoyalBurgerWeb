@@ -1064,7 +1064,7 @@ main {
 .page-dados-conta{
 
     & main{
-        padding: 66px 0px 0px 0px;
+        padding: 66px 0px 150px 0px;
         position: relative;
         
         & .banner{

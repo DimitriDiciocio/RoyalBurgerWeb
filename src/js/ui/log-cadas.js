@@ -1,5 +1,6 @@
 // Importar a função utilitária
 import { gerenciarEstadoInputs, inicializarGerenciamentoInputs } from '../utils.js';
+import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
 import { loginWithEmailAndPassword } from '../api/auth.js';
 import { registerCustomer } from '../api/user.js';
 
@@ -210,17 +211,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function exibirMensagem(msg, tipo = 'erro') {
-        // Tenta usar um container padronizado, senão alerta
-        let container = document.querySelector('.mensagens-container');
-        if (!container) {
-            alert(msg);
-            return;
-        }
-        const div = document.createElement('div');
-        div.className = `mensagem ${tipo}`;
-        div.textContent = msg;
-        container.appendChild(div);
-        setTimeout(() => div.remove(), 5000);
+        const map = { erro: 'error', sucesso: 'success', aviso: 'warning', info: 'info' };
+        const t = map[tipo] || 'info';
+        showToast(msg, { type: t });
     }
 
     const form = document.querySelector('form.form-login');
@@ -249,7 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         phone: telefone
                     };
                     const resp = await registerCustomer(payload);
-                    exibirMensagem(resp?.message || 'Conta criada com sucesso!', 'sucesso');
+                    toastFromApiSuccess(resp, 'Conta criada com sucesso!');
                     // Redireciona para login
                     setTimeout(() => {
                         window.location.href = 'login.html';
@@ -260,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const resp = await loginWithEmailAndPassword({ email, password: senha });
                     const userResp = resp?.user || null;
                     const nomeUsuario = userResp?.full_name || userResp?.name || '';
-                    exibirMensagem(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, 'sucesso');
+                    showToast(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, { type: 'success', title: 'Login' });
                     // Atualiza header imediatamente com dados do usuário (fallback para e-mail quando não vier user)
                     try {
                         const fallbackUser = userResp || { email };
@@ -271,8 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 600);
                 }
             } catch (err) {
-                const msg = err?.payload?.error || err?.message || 'Ocorreu um erro.';
-                exibirMensagem(msg, 'erro');
+                toastFromApiError(err);
             }
         });
     }

@@ -155,6 +155,18 @@ function configureHeader() {
     if (conta) {
       const tamanho = 36;
       conta.innerHTML = gerarIconeUsuario(user || '', tamanho);
+      // Torna o ícone da conta clicável para ir aos dados da conta
+      try {
+        conta.style.cursor = 'pointer';
+        conta.setAttribute('title', 'Dados da conta');
+        conta.onclick = () => {
+          const path = getDadosContaPath();
+          const isAlreadyOnDados = /dados-conta\.html(\?.*)?(#.*)?$/.test(window.location.pathname);
+          if (!isAlreadyOnDados) {
+            window.location.href = path;
+          }
+        };
+      } catch (_e) {}
     }
   } else {
     // Usuário não logado: esconder links de Clube Royal e Pedidos
@@ -294,6 +306,21 @@ function fixPaths() {
       }
     }
   });
+}
+
+// Retorna o caminho correto para a página de dados da conta, baseado na página atual
+function getDadosContaPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
+  const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
+
+  if (isInPagesFolder) {
+    return 'dados-conta.html';
+  } else if (isInSrcFolder) {
+    return 'pages/dados-conta.html';
+  } else {
+    return 'src/pages/dados-conta.html';
+  }
 }
 
 // Função para obter o caminho correto do header baseado na página atual

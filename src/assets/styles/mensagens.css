@@ -27,3 +27,124 @@
         font-weight: 400;
     }
 }
+
+/* ====== Toasts ====== */
+.rb-toasts-container{
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.rb-toast{
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background-color: #ffffff;
+    color: #101010;
+    border-radius: 10px;
+    padding: 12px 14px;
+    min-width: 280px;
+    max-width: 420px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border-left: 6px solid #c4c4c4;
+    animation: rbToastIn 200ms ease-out;
+}
+
+.rb-toast.closing{
+    animation: rbToastOut 180ms ease-in forwards;
+}
+
+@keyframes rbToastIn{
+    from{ transform: translateY(-8px); opacity: 0; }
+    to{ transform: translateY(0); opacity: 1; }
+}
+
+@keyframes rbToastOut{
+    from{ transform: translateY(0); opacity: 1; }
+    to{ transform: translateY(-6px); opacity: 0; }
+}
+
+.rb-toast .rb-toast-icon i{ font-size: 20px; }
+.rb-toast .rb-toast-title{ font-weight: 600; margin-bottom: 2px; }
+.rb-toast .rb-toast-message{ font-size: 14px; color: #333; }
+.rb-toast .rb-toast-actions{ margin-top: 10px; display: flex; gap: 8px; }
+.rb-toast .rb-toast-action{
+    background: #f2f2f2;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.rb-toast .rb-toast-action:hover{ background: #e8e8e8; }
+.rb-toast .rb-toast-close{
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    color: #666;
+    cursor: pointer;
+}
+
+/* variants */
+.rb-toast.success{ border-left-color: #27ae60; }
+.rb-toast.success .rb-toast-icon i{ color: #27ae60; }
+.rb-toast.error{ border-left-color: #eb5757; }
+.rb-toast.error .rb-toast-icon i{ color: #eb5757; }
+.rb-toast.warning{ border-left-color: #f2994a; }
+.rb-toast.warning .rb-toast-icon i{ color: #f2994a; }
+.rb-toast.info{ border-left-color: #2d9cdb; }
+.rb-toast.info .rb-toast-icon i{ color: #2d9cdb; }
+
+/* ====== Confirm modal ====== */
+.rb-confirm-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.rb-confirm{
+    width: min(92vw, 420px);
+    background: #ffffff;
+    color: #101010;
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.24);
+    padding: 14px 16px 16px 16px;
+}
+
+.rb-confirm .rb-confirm-header{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.rb-confirm .rb-confirm-title{ font-weight: 600; font-size: 16px; }
+.rb-confirm .rb-confirm-icon i{ font-size: 20px; }
+.rb-confirm .rb-confirm-close{
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: #666;
+    cursor: pointer;
+}
+.rb-confirm .rb-confirm-message{ margin-top: 10px; color: #333; font-size: 14px; }
+.rb-confirm .rb-confirm-actions{ display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.rb-confirm .rb-btn{
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+}
+.rb-confirm .rb-btn-cancel{ background: #f2f2f2; color: #333; }
+.rb-confirm .rb-btn-cancel:hover{ background: #e8e8e8; }
+.rb-confirm .rb-btn-confirm{ background: #2d9cdb; color: #fff; }
+.rb-confirm .rb-btn-confirm.warning{ background: #f2994a; }
+.rb-confirm .rb-btn-confirm.error{ background: #eb5757; }
+.rb-confirm .rb-btn-confirm.success{ background: #27ae60; }
