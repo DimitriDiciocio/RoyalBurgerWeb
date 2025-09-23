@@ -198,6 +198,16 @@
         color: var(--color-texto-erased);
         margin-left: 30px;
       }
+
+      & p{
+        color: var(--color-texto-erased);
+        font-size: 14px;
+        margin-bottom: 10px;
+
+        & span{
+          text-decoration: underline;
+        }
+      }
     }
 
     & .footer{
