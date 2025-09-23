@@ -193,6 +193,11 @@
           color: #888888;
         }
       }
+
+      & li{
+        color: var(--color-texto-erased);
+        margin-left: 30px;
+      }
     }
 
     & .footer{

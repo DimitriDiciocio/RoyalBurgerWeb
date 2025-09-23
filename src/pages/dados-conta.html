@@ -342,7 +342,7 @@
             </div>
         </div>
 
-        <div id="adicionar-endereco" class="modal" style="display: flex;">
+        <div id="adicionar-endereco" class="modal" style="display: none">
             <div class="div-overlay"></div>
 
             <div class="modal-contet">
@@ -381,6 +381,56 @@
                     <div class="div-checa">
                         <input type="checkbox">
                         <label>Endereço sem complemento</label>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <button>Confirmar</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="alterar-senha" class="modal" style="display: none;">
+            <div class="div-overlay"></div>
+
+            <div class="modal-contet">
+                <div class="header">
+                    <i class="fa-solid fa-xmark"></i>
+                    <p class="titulo">Adicionar endereço</p>
+                    <p class="descricao">Campos com (*) são obrigatórios</p>
+                </div>
+
+                <div class="main">
+                    <div class="div-input">
+                        <label for="senha">Senha atual</label>
+                        <input type="password" id="senha" name="senha" required autocomplete="off">
+                        <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true" style="display: none;"></i>
+                    </div>
+
+                    <div class="div-input">
+                        <label for="senha">Senha nova</label>
+                        <input type="password" id="senha" name="senha" required autocomplete="off">
+                        <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true" style="display: none;"></i>
+                    </div>
+
+                    <div class="password-requirements">
+                        <ul class="instrucao">
+                            <li id="req-maiuscula">1 Letra em maiúsculo</li>
+                            <li id="req-numero">1 Dígito numérico</li>
+                            <li id="req-especial">1 Caractere especial</li>
+                            <li id="req-tamanho">8 Dígitos</li>
+                        </ul>
+                    </div>
+
+                    <div class="div-input">
+                        <label for="confirma-senha">Confirmar senha</label>
+                        <input type="password" id="confirma-senha" name="confirma-senha" required autocomplete="off">
+                        <i class="fa-solid fa-eye" id="mostrarConfirmaSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarConfirmaSenha" aria-hidden="true"
+                            style="display: none;"></i>
                     </div>
                 </div>
                 
