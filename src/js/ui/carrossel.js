@@ -1,4 +1,4 @@
-$(document).ready(function() {
+$(document).ready(function () {
     const carrosselImagens = $('.carrossel .imagens');
     const imagens = $('.carrossel .imagens img');
     const carrosselIndicadores = $('.carrossel .indicadores');
@@ -30,7 +30,7 @@ $(document).ready(function() {
                 .addClass('indicador')
                 .attr('data-indice', i);
 
-            indicador.on('click', function() {
+            indicador.on('click', function () {
                 indiceImagemAtual = parseInt($(this).attr('data-indice'));
                 mostrarImagem();
                 reiniciarTemporizador();
@@ -42,7 +42,7 @@ $(document).ready(function() {
     }
 
     function atualizarIndicadores() {
-        $(indicadores).each(function(idx, elemento) {
+        $(indicadores).each(function (idx, elemento) {
             if (idx === indiceImagemAtual) {
                 $(elemento).addClass('ativo');
             } else {

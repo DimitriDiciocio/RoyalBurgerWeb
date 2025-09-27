@@ -2,13 +2,6 @@
 
 const DEFAULT_AUTO_CLOSE_MS = 4000;
 
-const ICONS_BY_TYPE = {
-    success: '<i class="fa-solid fa-circle-check"></i>',
-    error: '<i class="fa-solid fa-circle-xmark"></i>',
-    warning: '<i class="fa-solid fa-triangle-exclamation"></i>',
-    info: '<i class="fa-solid fa-circle-info"></i>'
-};
-
 // ====== MODELOS (HTML) ======
 function ensureMessageModels() {
     let errorBar = document.querySelector('.modelo-erro-modal');
@@ -36,7 +29,7 @@ function ensureMessageModels() {
             <div class="modal-o"></div>
             <div class="modelo-msg-body">
                 <div class="icon-msg">
-                    <img src="../assets/svg/logo.svg" alt="logo-royal-burguer">
+                    <img alt="logo-royal-burguer">
                     <div class="icon-msg-delete" style="display:none">
                         <i class="fa-solid fa-trash"></i>
                         <div class="icon-msg-delete-text"><p></p></div>
@@ -62,6 +55,39 @@ function ensureMessageModels() {
         `;
         document.body.appendChild(alertModal);
     }
+
+    // Ajusta o src da logo dinamicamente
+    try {
+        const logoImg = alertModal.querySelector('.icon-msg img');
+        if (logoImg) {
+            const computeLogo = (typeof window !== 'undefined' && typeof window.getLogoSvgPath === 'function')
+                ? window.getLogoSvgPath
+                : (() => {
+                    const currentPath = window.location.pathname;
+                    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
+                    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
+                    if (isInPagesFolder && isInSrcFolder) return '../../src/assets/svg/logo.svg';
+                    if (isInPagesFolder) return '../../assets/svg/logo.svg';
+                    if (isInSrcFolder) return '../assets/svg/logo.svg';
+                    return 'src/assets/svg/logo.svg';
+                });
+            logoImg.src = computeLogo();
+            // fallback em caso de erro
+            const alternatives = [
+                '../assets/svg/logo.svg',
+                '../../assets/svg/logo.svg',
+                'src/assets/svg/logo.svg',
+                './src/assets/svg/logo.svg',
+                './assets/svg/logo.svg'
+            ];
+            let idx = 0;
+            logoImg.onerror = () => {
+                if (idx < alternatives.length) {
+                    logoImg.src = alternatives[idx++];
+                }
+            };
+        }
+    } catch (_e) { }
 
     return { errorBar, alertModal };
 }
@@ -104,7 +130,7 @@ export function showActionModal({ type = 'info', message = '', confirmText = 'Co
     if (btnConfirm) btnConfirm.textContent = confirmText || 'Confirmar';
 
     // Estilização por variante via classe
-    alertModal.classList.remove('delete','success','warning','info');
+    alertModal.classList.remove('delete', 'success', 'warning', 'info');
     alertModal.classList.add(type === 'delete' ? 'delete' : type);
 
     // Regras de visibilidade: em success e info, esconder o cancelar
@@ -128,7 +154,7 @@ export function showActionModal({ type = 'info', message = '', confirmText = 'Co
         const onCancel = () => { cleanup(); close(false); };
         const onConfirm = () => { cleanup(); close(true); };
 
-        function cleanup(){
+        function cleanup() {
             if (overlay) overlay.removeEventListener('click', onOverlay);
             if (btnCancel) btnCancel.removeEventListener('click', onCancel);
             if (btnConfirm) btnConfirm.removeEventListener('click', onConfirm);
@@ -158,7 +184,7 @@ export function showToast(message, { type = 'info', title, autoClose = DEFAULT_A
     // Para compatibilidade, mensagens não-erro vão para o modal de ação,
     // com botão único Confirmar.
     showActionModal({ type, message, confirmText: 'Confirmar', cancelText: 'Fechar' });
-    return { close: () => {} };
+    return { close: () => { } };
 }
 
 export function showConfirm({ title = 'Confirmação', message = 'Deseja continuar?', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'warning' } = {}) {
@@ -183,14 +209,14 @@ const FLASH_STORAGE_KEY = 'rb.flash';
 export function setFlashMessage({ message = '', type = 'info', title = '' } = {}) {
     try {
         localStorage.setItem(FLASH_STORAGE_KEY, JSON.stringify({ message, type, title }));
-    } catch (_e) {}
+    } catch (_e) { }
 }
 
 export function tryShowFlashFromStorage() {
     let raw = null;
     try { raw = localStorage.getItem(FLASH_STORAGE_KEY); } catch (_e) { raw = null; }
     if (!raw) return;
-    try { localStorage.removeItem(FLASH_STORAGE_KEY); } catch (_e) {}
+    try { localStorage.removeItem(FLASH_STORAGE_KEY); } catch (_e) { }
     try {
         const data = JSON.parse(raw);
         const { message = '', type = 'info', title = '' } = data || {};
@@ -200,7 +226,7 @@ export function tryShowFlashFromStorage() {
         } else {
             showActionModal({ type, message, confirmText: 'OK', cancelText: 'Fechar' });
         }
-    } catch (_e) {}
+    } catch (_e) { }
 }
 
 if (typeof document !== 'undefined') {

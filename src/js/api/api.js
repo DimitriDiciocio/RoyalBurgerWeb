@@ -26,7 +26,7 @@ export const API_BASE_URL = (() => {
             // 3) Caso contrário, usa a própria origem
             return origin || 'http://127.0.0.1:5000';
         }
-    } catch (_e) {}
+    } catch (_e) { }
     // Fallback
     return 'http://127.0.0.1:5000';
 })();

@@ -1,12 +1,12 @@
- import { apiRequest, setStoredToken, setStoredUser, logoutLocal } from './api.js';
- 
- // Endpoints de autenticação
- // Ajuste os caminhos conforme seu backend Flask
- const AUTH_ROUTES = {
-     login: '/api/users/login',
-     logout: '/api/users/logout',
+import { apiRequest, setStoredToken, setStoredUser, logoutLocal } from './api.js';
+
+// Endpoints de autenticação
+// Ajuste os caminhos conforme seu backend Flask
+const AUTH_ROUTES = {
+    login: '/api/users/login',
+    logout: '/api/users/logout',
     me: '/api/users/profile'
- };
+};
 
 export async function loginWithEmailAndPassword({ email, password }) {
     const data = await apiRequest(AUTH_ROUTES.login, {
@@ -27,7 +27,7 @@ export async function loginWithEmailAndPassword({ email, password }) {
         try {
             const me = await fetchMe();
             if (me) setStoredUser(me);
-        } catch (_e) {}
+        } catch (_e) { }
     }
     return data;
 }
@@ -44,4 +44,3 @@ export async function logout() {
     }
     logoutLocal();
 }
-

@@ -18,7 +18,7 @@
   --cor-div-primary: #FFFFFF;
   --cor-div-secondary: #101010;
   --color-background: #F6F6F6;
-  --box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.15);
+  --box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.255);
   --border-radius: 10px;
 }
 
@@ -45,7 +45,16 @@ header {
       user-drag: none;
       user-select: none;
       -webkit-user-drag: none;
+    }
 
+    & .hamburger-btn {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--color-texto-black);
+      font-size: 22px;
+      margin-right: 10px;
+      cursor: pointer;
     }
 
     & a {
@@ -55,11 +64,11 @@ header {
     }
   }
 
-  & #login-header{
+  & #login-header {
     display: flex;
     justify-content: space-between;
 
-    & #login{
+    & #login {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -70,13 +79,13 @@ header {
         font-size: 14px;
       }
 
-      & .sep{
+      & .sep {
         width: 1px;
         height: 100%;
         background-color: #D9D9D9;
       }
 
-      & button{
+      & button {
         background-color: var(--color-texto-black);
         color: var(--color-texto-white);
         border: none;
@@ -85,27 +94,27 @@ header {
         padding: 5px 25px;
       }
 
-      & button:hover{
+      & button:hover {
         background-color: rgb(55, 55, 55);
       }
 
-      & button:active{
+      & button:active {
         background-color: rgb(147, 147, 147);
       }
     }
   }
 
-  & #user-header{
+  & #user-header {
     display: flex;
     justify-content: space-between;
 
-    & #user{
+    & #user {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 20px;
 
-      & .cesta{
+      & .cesta {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -115,86 +124,86 @@ header {
         cursor: pointer;
         user-select: none;
 
-        & i{
+        & i {
           font-size: 14px;
           color: var(--color-texto-black);
           margin-right: 10px;
         }
 
-        & .total{
+        & .total {
           font-size: 8px;
           font-weight: bolder;
           color: var(--color-texto-light);
         }
 
-        & .valor{
+        & .valor {
           display: flex;
           align-items: center;
 
-          & #preco{
+          & #preco {
             font-size: 8px;
           }
 
-          & #itens{
+          & #itens {
             font-size: 8px;
             color: var(--color-texto-erased);
           }
         }
       }
 
-      & .pontos-royal{
+      & .pontos-royal {
         display: flex;
         align-items: center;
         user-select: none;
         cursor: pointer;
 
-        & i{
+        & i {
           color: var(--color-primary);
           font-size: 14px;
           margin-right: 5px;
         }
 
-        & p{
+        & p {
           color: var(--color-primary);
           font-size: 14px;
         }
       }
 
       & .pontos-royal:hover i,
-      & .pontos-royal:hover p{
+      & .pontos-royal:hover p {
         color: #d8aa00;
       }
 
       & .pontos-royal:active i,
-      & .pontos-royal:active p{
+      & .pontos-royal:active p {
         color: #ffdb58;
       }
 
-      & .endereco{
+      & .endereco {
         display: flex;
         align-items: center;
         cursor: pointer;
 
-        & i{
+        & i {
           color: var(--color-texto-black);
           font-size: 14px;
           user-select: none;
         }
 
-        & p{
+        & p {
           color: var(--color-texto-erased);
           font-size: 14px;
           margin: 0px 5px;
         }
       }
 
-      & .sep{
+      & .sep {
         width: 1px;
         height: 100%;
         background-color: #D9D9D9;
       }
 
-      & .conta{
+      & .conta {
         color: var(--color-texto-white);
         font-weight: bold;
         font-size: 17px;
@@ -215,15 +224,15 @@ header {
 /* Header na página de login/cadastro - apenas logo centralizada */
 header.header-login {
   justify-content: center;
-  
+
   & .navegacao {
     justify-content: center;
-    
+
     & .nav-menu {
       display: none !important;
     }
   }
-  
+
   & #login-header,
   & #user-header {
     display: none !important;
@@ -235,15 +244,15 @@ header.header-logged-in {
   & .nav-menu {
     display: flex !important;
   }
-  
+
   & .nav-logged-only {
     display: block !important;
   }
-  
+
   & #login-header {
     display: none !important;
   }
-  
+
   & #user-header {
     display: flex !important;
   }
@@ -254,15 +263,15 @@ header.header-logged-out {
   & .nav-menu {
     display: flex !important;
   }
-  
+
   & .nav-logged-only {
     display: none !important;
   }
-  
+
   & #login-header {
     display: flex !important;
   }
-  
+
   & #user-header {
     display: none !important;
   }
@@ -274,4 +283,130 @@ header.header-logged-out {
 #user-header,
 .nav-logged-only {
   transition: all 0.3s ease;
+}
+
+/* Modal de navegação (hambúrguer) */
+.nav-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 9999;
+}
+
+.nav-modal.open {
+  display: block;
+}
+
+.nav-modal .nav-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+}
+
+.nav-modal .nav-modal-dialog {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 85%;
+  max-width: 360px;
+  background: var(--cor-div-primary);
+  box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  transform: translateX(100%);
+  transition: transform .25s ease;
+}
+
+.nav-modal.open .nav-modal-dialog {
+  transform: translateX(0);
+}
+
+.nav-modal .nav-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-modal .logo-modal {
+  height: 36px;
+}
+
+.nav-modal .nav-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.nav-modal .nav-modal-links {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 6px;
+}
+
+.nav-modal .nav-modal-links a {
+  color: var(--color-texto-black);
+  font-size: 16px;
+}
+
+.nav-modal .nav-modal-auth {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Responsivo do header: priorizar quebras de linha */
+@media (max-width: 1024px) {
+  header {
+    padding: 10px 16px;
+  }
+
+  header .navegacao {
+    flex-wrap: wrap;
+  }
+
+  header .navegacao .hamburger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  header .nav-menu {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    padding: 8px 12px;
+  }
+
+  header .navegacao img {
+    height: 40px;
+    margin-right: 10px;
+  }
+
+  header #user-header #user {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  header #user-header #user .cesta {
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-modal .nav-modal-dialog {
+    width: 100%;
+    max-width: none;
+  }
+
+  header #login-header #login {
+    gap: 12px;
+  }
 }

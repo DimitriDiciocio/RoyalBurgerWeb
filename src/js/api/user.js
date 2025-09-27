@@ -1,8 +1,8 @@
- import { apiRequest } from './api.js';
- 
- // Endpoints do CRUD de cliente
- // Conforme o blueprint customer_bp em Flask
- const CUSTOMER_BASE = '/api/customers';
+import { apiRequest } from './api.js';
+
+// Endpoints do CRUD de cliente
+// Conforme o blueprint customer_bp em Flask
+const CUSTOMER_BASE = '/api/customers';
 
 export async function registerCustomer({ full_name, email, password, password_confirmation, date_of_birth, phone }) {
     return apiRequest(`${CUSTOMER_BASE}/`, {
@@ -52,4 +52,3 @@ export async function updateAddress(addressId, payload) {
 export async function deleteAddress(addressId) {
     return apiRequest(`${CUSTOMER_BASE}/addresses/${addressId}`, { method: 'DELETE' });
 }
-

@@ -3,7 +3,7 @@ import { deleteMyCustomer, getMyCustomer } from "../api/user.js";
 import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage } from "./alerts.js";
 
-$(document).ready(function(){
+$(document).ready(function () {
 
     // ====== Guarda de rota: somente clientes podem acessar esta página ======
     try {
@@ -35,7 +35,7 @@ $(document).ready(function(){
     $(".navega div:contains('Dados da conta')").addClass("select");
 
     // clique nos botões
-    $(".navega div").click(function(){
+    $(".navega div").click(function () {
 
         let texto = $(this).find("p").text().trim();
 
@@ -47,13 +47,13 @@ $(document).ready(function(){
         $("#dados-user, #enderecos, #config").hide();
 
         // verifica qual botão foi clicado
-        if(texto === "Dados da conta"){
+        if (texto === "Dados da conta") {
             $("#dados-user").show();
         }
-        else if(texto === "Endereços"){
+        else if (texto === "Endereços") {
             $("#enderecos").show();
         }
-        else if(texto === "Configurações"){
+        else if (texto === "Configurações") {
             $("#config").show();
         }
     });

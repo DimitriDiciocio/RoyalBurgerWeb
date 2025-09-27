@@ -13,18 +13,19 @@
     <link rel="stylesheet" href="../assets/styles/footer.css">
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
     <link rel="stylesheet" href="../assets/styles/modal.css">
+    <link rel="stylesheet" href="../assets/styles/usuario-perfil.css">
     <!-- js sistema -->
     <script src="../js/utils.js" type="module" defer></script>
     <script src="../js/ui/header.js" type="module" defer></script>
-    <script src="../js/ui/footer.js" type="module" defer></script>
     <script src="../js/ui/alerts.js" type="module" defer></script>
-    <script src="../js/ui/dados.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/usuario-perfil.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 
-<body class="page-dados-conta">
+<body>
     <!-- importara header -->
     <div id="header-container"></div>
 
@@ -256,7 +257,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="footer">
                     <button>Confirmar</button>
                 </div>
@@ -285,7 +286,7 @@
                         <input type="number" id="telefone" name="telefone" required autocomplete="off">
                     </div>
                 </div>
-                
+
                 <div class="footer">
                     <button>Confirmar</button>
                 </div>
@@ -334,7 +335,7 @@
                         <label>Endereço sem complemento</label>
                     </div>
                 </div>
-                
+
                 <div class="footer">
                     <button>Confirmar</button>
                 </div>
@@ -383,7 +384,7 @@
                         <label>Endereço sem complemento</label>
                     </div>
                 </div>
-                
+
                 <div class="footer">
                     <button>Confirmar</button>
                 </div>
@@ -406,14 +407,16 @@
                         <label for="senha">Senha atual</label>
                         <input type="password" id="senha" name="senha" required autocomplete="off">
                         <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
-                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true" style="display: none;"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
+                            style="display: none;"></i>
                     </div>
 
                     <div class="div-input">
                         <label for="senha">Senha nova</label>
                         <input type="password" id="senha" name="senha" required autocomplete="off">
                         <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
-                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true" style="display: none;"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
+                            style="display: none;"></i>
                     </div>
 
                     <div class="password-requirements">
@@ -433,7 +436,7 @@
                             style="display: none;"></i>
                     </div>
                 </div>
-                
+
                 <div class="footer">
                     <button>Confirmar</button>
                 </div>
@@ -456,7 +459,7 @@
                     <p>
                         Irá chegar um código de verificação de 6 dígitos no email 
                         <span>email.exemplo@gmail.com</span>. <br>
-                        Insira esse código no campo abaixo para verificar seu email 
+                        Insira esse código no campo abaixo para verificar seu email
                         e ter uma melhor experiência e segurança.
                     </p>
 
@@ -468,7 +471,7 @@
                             style="display: none;"></i>
                     </div>
                 </div>
-                
+
                 <div class="footer">
                     <button>Confirmar</button>
                 </div>

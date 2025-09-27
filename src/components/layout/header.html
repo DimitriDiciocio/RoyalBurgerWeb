@@ -2,6 +2,9 @@
 <header>
     <div class="navegacao">
         <img src="../../assets/svg/logo.svg" alt="logo" class="logo">
+        <button class="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="nav-modal">
+            <i class="fa-solid fa-bars"></i>
+        </button>
 
         <nav class="nav-menu" id="nav-menu">
             <a href="../../index.html">Início</a>
@@ -58,3 +61,27 @@
     </div>
 
 </header>
+
+<!-- Modal de navegação (hambúrguer) -->
+<div id="nav-modal" class="nav-modal" aria-hidden="true">
+    <div class="nav-modal-overlay"></div>
+    <div class="nav-modal-dialog" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="nav-modal-header">
+            <img src="../../assets/svg/logo.svg" alt="logo" class="logo-modal">
+            <button class="nav-modal-close" aria-label="Fechar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <nav class="nav-modal-links">
+            <a href="../../index.html">Início</a>
+            <a href="../pages/clube-royal.html" class="nav-logged-only">Clube Royal</a>
+            <a href="../pages/pedidos.html" class="nav-logged-only">Pedidos</a>
+            <a href="#contato">Contato</a>
+            <div class="nav-modal-auth">
+                <a href="../pages/cadastro.html">Criar Conta</a>
+                <a href="../pages/login.html">Entrar</a>
+            </div>
+        </nav>
+    </div>
+    
+</div>

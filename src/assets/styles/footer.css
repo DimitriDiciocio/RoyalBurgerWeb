@@ -1,18 +1,26 @@
+* {
+  margin: 0;
+  padding: 0;
+  text-decoration: none;
+  box-sizing: border-box;
+  font-family: Poppins;
+}
+
 :root {
-    --color-primary: #FFC700;
-    --color-secondary: #FF0000;
-    --color-tertiary: #3D1807;
-    --color-quaternary: #F95A00;
-    --color-texto-white: #FFFFFF;
-    --color-texto-black: #101010;
-    --color-texto-light: #525252;
-    --color-texto-erased: #888888;
-    --cor-div-primary: #FFFFFF;
-    --cor-div-secondary: #101010;
-    --color-background: #F6F6F6;
-    --box-shadow: 0px 1px rgba(0,0,0,0.15);
-    --border-radius: 10px;
-  }
+  --color-primary: #FFC700;
+  --color-secondary: #FF0000;
+  --color-tertiary: #3D1807;
+  --color-quaternary: #F95A00;
+  --color-texto-white: #FFFFFF;
+  --color-texto-black: #101010;
+  --color-texto-light: #525252;
+  --color-texto-erased: #888888;
+  --cor-div-primary: #FFFFFF;
+  --cor-div-secondary: #101010;
+  --color-background: #F6F6F6;
+  --box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.255);
+  --border-radius: 10px;
+}
 
   footer{
     background-color: var(--color-background);
@@ -22,11 +30,11 @@
       border-bottom: 1px solid #D9D9D9;
       padding: 30px 0px;
 
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(140px, 1fr));
       align-items: flex-start;
       justify-content: center;
-
-      gap: 100px;
+      gap: 40px;
 
       & .coluna{
         display: flex;
@@ -65,16 +73,54 @@
 
     & .segunda{
       display: flex;
+      flex-wrap: wrap;
+      row-gap: 12px;
+      column-gap: 12px;
       justify-content: center;
       align-items: center;
       color: var(--color-texto-light);
       font-size: 14px;
-      padding: 30px 0px;
+      padding: 30px 12px;
 
       & img{
         height: 50px;
-        margin-right: 20px;
+        margin-right: 12px;
       }
+      & p{
+        text-align: center;
+      }
+    }
+  }
+  
+  /* Responsivo do footer: priorizar quebras de linha */
+  @media (max-width: 1024px) {
+    footer .primeira{
+      grid-template-columns: repeat(2, minmax(140px, 1fr));
+      gap: 24px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    footer .primeira{
+      grid-template-columns: 1fr;
+      justify-items: center;
+    }
+    footer .segunda{
+      padding: 24px 12px;
+    }
+    footer .segunda img{
+      height: 44px;
+      margin-right: 10px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    footer .segunda{
+      flex-direction: column;
+      gap: 10px;
+    }
+    footer .segunda img{
+      margin-right: 0;
     }
   }
   

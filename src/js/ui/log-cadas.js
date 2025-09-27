@@ -1,11 +1,11 @@
 // Importar a função utilitária
-import { gerenciarEstadoInputs, inicializarGerenciamentoInputs } from '../utils.js';
+import { inicializarGerenciamentoInputs } from '../utils.js';
 import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
 import { loginWithEmailAndPassword } from '../api/auth.js';
 import { registerCustomer } from '../api/user.js';
 
 // Aguardar o DOM estar pronto
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // --- Inicializar gerenciamento de inputs ---
     inicializarGerenciamentoInputs();
 
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function verificarTodosInputsPreenchidos() {
             let todosPreenchidos = true;
-            
+
             // Verificar se todos os campos obrigatórios estão preenchidos
             inputsObrigatorios.forEach(input => {
                 if (input.value.trim() === '') {
@@ -60,13 +60,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 2. Alternar Visibilidade da Senha ---
     function configurarToggleSenha(input, mostrar, ocultar) {
-        mostrar.addEventListener('click', function() {
+        mostrar.addEventListener('click', function () {
             input.type = 'text';
             mostrar.style.display = 'none';
             ocultar.style.display = 'flex';
         });
 
-        ocultar.addEventListener('click', function() {
+        ocultar.addEventListener('click', function () {
             input.type = 'password';
             mostrar.style.display = 'flex';
             ocultar.style.display = 'none';
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const senhaInput = document.getElementById('senha');
     const mostrarSenha = document.getElementById('mostrarSenha');
     const ocultarSenha = document.getElementById('ocultarSenha');
-    
+
     if (senhaInput && mostrarSenha && ocultarSenha) {
         configurarToggleSenha(senhaInput, mostrarSenha, ocultarSenha);
     }
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmaSenhaInput = document.getElementById('confirma-senha');
     const mostrarConfirmaSenha = document.getElementById('mostrarConfirmaSenha');
     const ocultarConfirmaSenha = document.getElementById('ocultarConfirmaSenha');
-    
+
     if (confirmaSenhaInput && mostrarConfirmaSenha && ocultarConfirmaSenha) {
         configurarToggleSenha(confirmaSenhaInput, mostrarConfirmaSenha, ocultarConfirmaSenha);
     }
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (botaoAcao) {
                 const inputsObrigatorios = form.querySelectorAll('input[required], select[required], textarea[required]');
                 let todosPreenchidos = true;
-                
+
                 inputsObrigatorios.forEach(input => {
                     if (input.value.trim() === '') {
                         todosPreenchidos = false;
@@ -150,10 +150,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Aplicar validação quando a senha for digitada
     if (senhaInput) {
-        senhaInput.addEventListener('input', function() {
+        senhaInput.addEventListener('input', function () {
             const senha = this.value;
             validarSenhaForte(senha);
-            
+
             // Verificar se as senhas coincidem
             const confirmaSenha = document.getElementById('confirma-senha');
             if (confirmaSenha) {
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     confirmaSenha.style.borderColor = '#e0e1e4';
                 }
             }
-            
+
             // Revalidar botões
             revalidarBotoes();
         });
@@ -172,16 +172,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Verificar coincidência de senhas
     if (confirmaSenhaInput) {
-        confirmaSenhaInput.addEventListener('input', function() {
+        confirmaSenhaInput.addEventListener('input', function () {
             const senha = document.getElementById('senha')?.value || '';
             const confirmaSenha = this.value;
-            
+
             if (confirmaSenha && senha !== confirmaSenha) {
                 this.style.borderColor = '#dc3545';
             } else {
                 this.style.borderColor = '#e0e1e4';
             }
-            
+
             // Revalidar botões
             revalidarBotoes();
         });
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 4. Máscara para telefone ---
     const telefoneInput = document.getElementById('telefone');
     if (telefoneInput) {
-        telefoneInput.addEventListener('input', function() {
+        telefoneInput.addEventListener('input', function () {
             let value = this.value.replace(/\D/g, '');
             if (value.length >= 11) {
                 value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- 5. Animações dos labels são gerenciadas pela função utilitária ---
-    
+
     // --- 6. Integração com API: Login e Cadastro ---
     function normalizarTelefone(valor) {
         return (valor || '').replace(/\D/g, '');
@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     try {
                         const fallbackUser = userResp || { email };
                         window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
-                    } catch (_e) {}
+                    } catch (_e) { }
                     setTimeout(() => {
                         window.location.href = '../../index.html';
                     }, 1200);
