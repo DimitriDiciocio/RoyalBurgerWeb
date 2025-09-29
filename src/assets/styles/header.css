@@ -37,6 +37,7 @@ header {
   & .navegacao {
     display: flex;
     align-items: center;
+    flex-direction: row;
 
     & img {
       height: 45px;
@@ -58,6 +59,7 @@ header {
     }
 
     & a {
+      text-wrap: nowrap;
       color: var(--color-texto-black);
       font-size: 14px;
       margin: 0px 10px

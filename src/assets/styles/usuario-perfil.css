@@ -14,7 +14,11 @@
     --border-radius: 10px;
   }
 
-  .banner {
+main{
+    padding: 68px 0px 0px 0px;
+}
+
+.banner {
     background-repeat: no-repeat;
     background-size: cover;
     object-fit: cover;
@@ -407,4 +411,8 @@
             }
         }
     }
+}
+
+.espaco-branco{
+    height: 120px;
 }

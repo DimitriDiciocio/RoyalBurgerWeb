@@ -195,7 +195,7 @@ function isLoginPage() {
           conta.setAttribute('title', 'Dados da conta');
           conta.onclick = () => {
             const path = getDadosContaPath();
-            const isAlreadyOnDados = /dados-conta\.html(\?.*)?(#.*)?$/.test(window.location.pathname);
+            const isAlreadyOnDados = /usuario-perfil\.html(\?.*)?(#.*)?$/.test(window.location.pathname);
             if (!isAlreadyOnDados) {
               window.location.href = path;
             }
@@ -351,11 +351,11 @@ function isLoginPage() {
     const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
   
     if (isInPagesFolder) {
-      return 'dados-conta.html';
+      return 'usuario-perfil.html';
     } else if (isInSrcFolder) {
-      return 'pages/dados-conta.html';
+      return 'pages/usuario-perfil.html';
     } else {
-      return 'src/pages/dados-conta.html';
+      return 'src/pages/usuario-perfil.html';
     }
   }
   

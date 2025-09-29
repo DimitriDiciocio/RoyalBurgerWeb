@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="../assets/styles/global.css">
     <link rel="stylesheet" href="../assets/styles/footer.css">
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
-    <link rel="stylesheet" href="../assets/styles/modal.css">
+    <link rel="stylesheet" href="../assets/styles/modais.css">
     <link rel="stylesheet" href="../assets/styles/usuario-perfil.css">
     <!-- js sistema -->
     <script src="../js/utils.js" type="module" defer></script>
@@ -20,6 +20,7 @@
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/usuario-perfil.js" type="module" defer></script>
+    <script src="../js/ui/modais.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -31,8 +32,6 @@
 
     <main>
         <img class="banner" src="../assets/img/banner-conta.png" alt="">
-
-        <div class="espaco-branco"></div>
 
         <div class="absolute">
             <section class="navegacao">
@@ -93,7 +92,8 @@
                 <div class="quadro-info">
                     <div class="tema">
                         <p class="tirulo">Informações do usuário</p>
-                        <p class="edita">Editar Informações do perfil</p>
+
+                        <p class="edita" onclick="abrirModal('editar-info-user')">Editar Informações do perfil</p>
                     </div>
 
                     <div class="info">
@@ -118,7 +118,8 @@
                 <div class="quadro-info">
                     <div class="tema">
                         <p class="tirulo">Informações de contato</p>
-                        <p class="edita">Editar Informações de contato</p>
+
+                        <p class="edita" onclick="abrirModal('editar-info-contato')">Editar Informações de contato</p>
                     </div>
 
                     <div class="info">
@@ -146,11 +147,11 @@
                         </div>
                     </div>
 
-                    <p class="edita">Editar endereço</p>
+                    <p class="edita"  onclick="abrirModal('editar-endereco')">Editar endereço</p>
                 </div>
 
                 <div class="adiciona-ende">
-                    <button>Adicionar um novo endereço</button>
+                    <button onclick="abrirModal('adicionar-endereco')">Adicionar um novo endereço</button>
                 </div>
 
             </section>
@@ -209,7 +210,7 @@
                             <p class="descricao">Troque sua senha atual por uma nova e mais segura</p>
                         </div>
 
-                        <p class="edita">Alterar senha</p>
+                        <p class="edita" onclick="abrirModal('alterar-senha')">Alterar senha</p>
                     </div>
 
                     <div class="info-checa">
@@ -218,7 +219,7 @@
                             <p class="descricao">Verifique eu email para uma melhor experiência e segurança</p>
                         </div>
 
-                        <p class="edita">Verificar email</p>
+                        <p class="edita" onclick="abrirModal('verificar-email')">Verificar email</p>
                     </div>
                 </div>
 
@@ -235,7 +236,7 @@
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('editar-info-user')"></i>
                     <p class="titulo">Editar dados</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
@@ -270,7 +271,7 @@
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('editar-info-contato')"></i>
                     <p class="titulo">Editar dados</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
@@ -299,7 +300,7 @@
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('editar-endereco')"></i>
                     <p class="titulo">Editar endereço</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
@@ -348,7 +349,7 @@
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('adicionar-endereco')"></i>
                     <p class="titulo">Adicionar endereço</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
@@ -397,7 +398,7 @@
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('alterar-senha')"></i>
                     <p class="titulo">Adicionar endereço</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
@@ -445,12 +446,12 @@
             </div>
         </div>
 
-        <div id="alterar-senha" class="modal" style="display: none;">
+        <div id="verificar-email" class="modal" style="display: none;">
             <div class="div-overlay"></div>
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('verificar-email')"></i>
                     <p class="titulo">Adicionar endereço</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
@@ -480,6 +481,9 @@
             </div>
         </div>
 
+        Lorem ipsum dolor sit amet consectetur adipisicing elit. Optio iure necessitatibus, dolorum aspernatur harum, laborum, quam odio quis culpa nobis deserunt hic molestias! Dolorem, ullam? Commodi minus deleniti libero error?
+        
+        <div class="espaco-branco"></div>
 
     </main>
     <!-- importare footer -->
