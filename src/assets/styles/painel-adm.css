@@ -1,0 +1,170 @@
+:root {
+  --color-primary: #FFC700;
+  --color-secondary: #FF0000;
+  --color-tertiary: #3D1807;
+  --color-quaternary: #F95A00;
+  --color-texto-white: #FFFFFF;
+  --color-texto-black: #101010;
+  --color-texto-light: #525252;
+  --color-texto-erased: #888888;
+  --cor-div-primary: #FFFFFF;
+  --cor-div-secondary: #101010;
+  --color-background: #F6F6F6;
+  --box-shadow: 0px 1px rgba(0, 0, 0, 0.15);
+  --border-radius: 10px;
+}
+
+main{
+    display: flex;
+    justify-content: space-between;
+    gap: 60px;
+
+    & .navegacao{
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 150px;
+        padding: 170px 0px;
+
+        & div{
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            align-items: center;
+            color: var(--color-texto-erased);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+
+            &:hover{
+                color: #525252;
+            }
+
+            &:active{
+                color: #D9D9D9;
+            }
+        }
+
+        & div.select{
+            color: var(--color-texto-black);
+        }
+    }
+
+    
+
+    & #secao-deshboard, #secao-pedidos, #secao-venda, #secao-cardapio, 
+    #secao-estoque, #secao-relatorios, #secao-finaceiro, #secao-funcionarios, #secao-configuracoes{
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    & .header{
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding-top: 20px;
+        height: 100px;
+
+        & .titulo-secao{
+            font-size: 35px;
+            color: var(--color-texto-black);
+            font-weight: 500;
+        }
+
+        & .descricao-secao{
+            font-size: 25px;
+            color: var(--color-texto-light);
+            font-weight: 400;
+        }
+
+        & button.adicionar{
+            color: var(--color-texto-white);
+            background-color: var(--color-texto-black);
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            border: none;
+            font-size: 14px;
+            border-radius: 8px;
+            padding: 5px 25px;
+
+            &:hover {
+                background-color: rgb(55, 55, 55);
+            }
+
+            &:active {
+                background-color: rgb(147, 147, 147);
+            }
+        }
+    }
+
+    & #secao-funcionarios{
+
+        & .fichas{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            padding-top: 20px;
+            width: 100%;
+
+            & .ficha{
+                background-color: var(--cor-div-primary);
+                box-shadow: var(--box-shadow);
+                border-radius: var(--border-radius);
+                padding: 10px 20px;
+                min-width: 300px;
+                /* NO @MIDIA A % DO WIDTH VAI AUMENTAR PARA CABER NA TELA    */
+                width: 30%;
+
+
+                & .nome{
+                    display: flex;
+                    gap: 5px;
+                    color: var(--color-texto-black);
+                    font-weight: 500;
+                    font-size: 18px;
+
+                    & i{
+                        font-size: 16px;
+                        display: flex;
+                        flex-direction: row;
+                        justify-self: start;
+                        cursor: pointer;
+                    }
+                }
+
+                & .gmail{
+                    display: flex;
+                    gap: 5px;
+                    color: var(--color-texto-erased);
+                    font-weight: 400;
+                    font-size: 16px;
+                    align-items: center;
+
+                    & i{
+                        font-size: 12px;
+                    }
+                }
+
+                & .tipo{
+                    background-color: #FFE100;
+                    color: var(--color-texto-white);
+                    border-radius: 5px;
+                    font-weight: 500;
+                    font-size: 12px;
+                    width: 100px;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+            }
+        }
+        
+    }
+}

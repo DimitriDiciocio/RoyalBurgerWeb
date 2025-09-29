@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
+
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <link rel="stylesheet" href="../assets/styles/modais.css">
+    <link rel="stylesheet" href="../assets/styles/painel-adm.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/usuario-perfil.js" type="module" defer></script>
+    <script src="../js/ui/modais.js" type="module" defer></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- importara header -->
+    <div id="header-container"></div>
+
+    <main>
+        <section class="navegacao">
+            <div>
+                <i class="fa-solid fa-chart-simple"></i>
+                <p>Dashboard</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-basket-shopping"></i>
+                <p>Pedidos</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-credit-card"></i>
+                <p>Ponto de venda</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-burger"></i>
+                <p>Cardápio</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-dolly"></i>
+                <p>Estoque</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-chart-bar"></i>
+                <p>Relatórios</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-dollar-sign"></i>
+                <p>Finaceiro</p>
+            </div>
+
+            <div class="select">
+                <i class="fa-solid fa-user-tie"></i>
+                <p>Funcionários</p>
+            </div>
+
+            <div>
+                <i class="fa-solid fa-gear"></i>
+                <p>Configurações</p>
+            </div>
+        </section>
+
+        <section id="secao-deshboard" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Dashboard</p>
+                <p class="descricao-secao">Visão geral das operações em tempo real</p>
+            </div>
+        </section>
+
+        <section id="secao-pedidos" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Pedidos</p>
+                <p class="descricao-secao">Gerencie todos os pedidos em tempo real</p>
+            </div>
+        </section>
+
+        <section id="secao-venda" style="display: none;">
+        
+        </section>
+
+        <section id="secao-cardapio" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Gerenciamneto do Cardápio</p>
+                <p class="descricao-secao">Configure itens, preços e disponibilidade</p>
+            </div>
+        </section>
+
+        <section id="secao-estoque" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Gerenciamento de estoque</p>
+                <p class="descricao-secao">Gerencie ingredientes e insumos</p>
+            </div>
+        </section>
+
+        <section id="secao-relatorios" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Relatórios e Analytics</p>
+                <p class="descricao-secao">Análise detalhada de vendas, finanças, performance e funcionários</p>
+            </div>
+        </section>
+
+        <section id="secao-finaceiro" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Financeiro</p>
+                <p class="descricao-secao">Adicione receitas, despesas, defina impostos e gerencie suas finanças</p>
+            </div>
+        </section>
+
+        <section id="secao-funcionarios" style="display: flex;">
+            <div class="header">
+                <div>
+                    <p class="titulo-secao">Gerenciamento de Funcionários</p>
+                    <p class="descricao-secao">Gerencie seus funcionários em atividade e adicione contas</p>
+                </div>
+
+                <button class="adicionar">
+                    <i class="fa-solid fa-plus"></i>
+                    <p>Novo usuário</p>
+                </button>
+            </div>
+
+            <div class="fichas">
+                <div class="ficha">
+                    <div class="nome">
+                        <p>Ygor Brocha</p>
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between;">
+                        <div style="display: flex; flex-direction: column;">
+                            <div class="gmail">
+                                <i class="fa-solid fa-envelope"></i>
+                                <p>email@gmail.com</p>
+                            </div>
+
+                            <p class="tipo">Geretne</p>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column;">
+                            <input type="checkbox">
+
+                            <p>Ativo</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p>Exibir Métricas</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="secao-configuracoes" style="display: none;">
+            <div class="header">
+                <p class="titulo-secao">Configurações</p>
+                <p class="descricao-secao">Defina metas financeiras, categorias, prazos, taxas e informações da empresa</p>
+            </div>
+        </section>
+        
+    </main>
+    <!-- importare footer -->
+    <div id="footer-container"></div>
+</body>
+
+</html>
