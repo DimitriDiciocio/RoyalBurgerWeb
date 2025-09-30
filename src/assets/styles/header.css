@@ -302,7 +302,7 @@ header.header-logged-out {
 .nav-modal .nav-modal-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .nav-modal .nav-modal-dialog {
@@ -313,7 +313,7 @@ header.header-logged-out {
   width: 85%;
   max-width: 360px;
   background: var(--cor-div-primary);
-  box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -380,6 +380,22 @@ header.header-logged-out {
   header .nav-menu {
     display: none !important;
   }
+
+  /* Garantir que as classes de estado não reativem o menu no mobile */
+  header.header-logged-in .nav-menu,
+  header.header-logged-out .nav-menu {
+    display: none !important;
+  }
+
+  /* Mobile: esconder itens extras e manter apenas logo, hambúrguer e ícone da conta */
+  /* Deixar a decisão do que aparece para o JS conforme estado (logado/deslogado) */
+
+  header #user-header #user .cesta,
+  header #user-header #user .pontos-royal,
+  header #user-header #user .endereco,
+  header #user-header #user .sep {
+    display: none !important;
+  }
 }
 
 @media (max-width: 768px) {
@@ -403,6 +419,10 @@ header.header-logged-out {
 }
 
 @media (max-width: 480px) {
+  header {
+    padding: 8px 12px;
+  }
+
   .nav-modal .nav-modal-dialog {
     width: 100%;
     max-width: none;
