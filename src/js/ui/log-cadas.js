@@ -242,26 +242,53 @@ document.addEventListener('DOMContentLoaded', function () {
                         phone: telefone
                     };
                     const resp = await registerCustomer(payload);
-                    toastFromApiSuccess(resp, 'Conta criada com sucesso!');
-                    // Redireciona para login
+                    toastFromApiSuccess(resp, 'Conta criada com sucesso! Redirecionando para verificação de email...');
+                    // Redireciona para verificação de email
                     setTimeout(() => {
-                        window.location.href = 'login.html';
-                    }, 800);
+                        window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}`;
+                    }, 1500);
                 } else {
                     // Login
                     if (!email || !senha) return;
-                    const resp = await loginWithEmailAndPassword({ email, password: senha });
-                    const userResp = resp?.user || null;
-                    const nomeUsuario = userResp?.full_name || userResp?.name || '';
-                    showToast(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, { type: 'success', title: 'Login' });
-                    // Atualiza header imediatamente com dados do usuário (fallback para e-mail quando não vier user)
+                    
                     try {
-                        const fallbackUser = userResp || { email };
-                        window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
-                    } catch (_e) { }
-                    setTimeout(() => {
-                        window.location.href = '../../index.html';
-                    }, 1200);
+                        const resp = await loginWithEmailAndPassword({ email, password: senha });
+                        const userResp = resp?.user || null;
+                        const nomeUsuario = userResp?.full_name || userResp?.name || '';
+                        showToast(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, { type: 'success', title: 'Login' });
+                        // Atualiza header imediatamente com dados do usuário (fallback para e-mail quando não vier user)
+                        try {
+                            const fallbackUser = userResp || { email };
+                            window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
+                        } catch (_e) { }
+                        setTimeout(() => {
+                            window.location.href = '../../index.html';
+                        }, 1200);
+                    } catch (loginErr) {
+                        // Verificar se o erro é por email não verificado
+                        const errorMsg = loginErr?.payload?.error || loginErr?.message || '';
+                        
+                        if (errorMsg.toLowerCase().includes('email não verificado') || 
+                            errorMsg.toLowerCase().includes('email não está verificado') ||
+                            errorMsg.toLowerCase().includes('verifique seu email') ||
+                            errorMsg.toLowerCase().includes('não verificado') ||
+                            loginErr?.status === 403) {
+                            
+                            showToast('Seu email ainda não foi verificado. Redirecionando para verificação...', { 
+                                type: 'warning', 
+                                title: 'Verificação Pendente',
+                                autoClose: 2000,
+                                noButtons: true
+                            });
+                            
+                            setTimeout(() => {
+                                // Adiciona parâmetro noRequest para não solicitar novo código
+                                window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}&noRequest=true`;
+                            }, 2000);
+                        } else {
+                            throw loginErr;
+                        }
+                    }
                 }
             } catch (err) {
                 toastFromApiError(err);

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer - Verificar Email</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/login-cadastro.css">
+    <link rel="stylesheet" href="../assets/styles/verificar-email.css">
+    <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/verificar-email.js" type="module" defer></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- importara header -->
+    <div id="header-container"></div>
+
+    <main>
+        <section class="verification-container">
+            <div class="verification-card">
+                <button class="btn-close" onclick="window.location.href='login.html'">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+
+                <div class="verification-icon">
+                    <img src="../assets/svg/logo.svg" alt="Royal Burger Logo">
+                </div>
+
+                <h2 class="verification-title">Verifique seu E-mail</h2>
+                
+                <p class="verification-description">
+                    Enviamos um código de 6 dígitos para o seu email cadastrado. 
+                </p>
+
+                <p class="verification-email" id="email-display"></p>
+
+                <form id="form-verificar-email">
+                    <div class="code-inputs">
+                        <input type="text" class="code-input" maxlength="1" pattern="\d" inputmode="numeric" data-index="0" autocomplete="off">
+                        <input type="text" class="code-input" maxlength="1" pattern="\d" inputmode="numeric" data-index="1" autocomplete="off">
+                        <input type="text" class="code-input" maxlength="1" pattern="\d" inputmode="numeric" data-index="2" autocomplete="off">
+                        <input type="text" class="code-input" maxlength="1" pattern="\d" inputmode="numeric" data-index="3" autocomplete="off">
+                        <input type="text" class="code-input" maxlength="1" pattern="\d" inputmode="numeric" data-index="4" autocomplete="off">
+                        <input type="text" class="code-input" maxlength="1" pattern="\d" inputmode="numeric" data-index="5" autocomplete="off">
+                    </div>
+
+                    <button class="btn-resend" type="button" id="reenviar-codigo">Reenviar Código</button>
+
+                    <button type="submit" id="btn-verificar" class="btn-verify">Verificar E-mail</button>
+                </form>
+
+                <p class="change-email-text">
+                    Deseja alterar seu e-mail? 
+                    <a href="cadastro.html" class="change-email-link">Alterar aqui</a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- importare footer -->
+    <div id="footer-container"></div>
+
+</body>
+
+</html>

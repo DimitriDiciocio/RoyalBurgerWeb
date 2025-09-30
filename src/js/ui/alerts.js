@@ -177,10 +177,16 @@ function ensureToastContainer() {
     return container;
 }
 
-export function showToast(message, { type = 'info', title, autoClose = DEFAULT_AUTO_CLOSE_MS } = {}) {
+export function showToast(message, { type = 'info', title, autoClose = DEFAULT_AUTO_CLOSE_MS, noButtons = false } = {}) {
     if (type === 'error') {
         return showErrorBar(title || 'Erro', message, { autoClose });
     }
+    
+    // Se noButtons for true, usa apenas a barra de erro estilizada
+    if (noButtons) {
+        return showErrorBar(title || 'Aviso', message, { autoClose });
+    }
+    
     // Para compatibilidade, mensagens não-erro vão para o modal de ação,
     // com botão único Confirmar.
     showActionModal({ type, message, confirmText: 'Confirmar', cancelText: 'Fechar' });

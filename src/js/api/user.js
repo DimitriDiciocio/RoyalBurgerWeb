@@ -52,3 +52,28 @@ export async function updateAddress(addressId, payload) {
 export async function deleteAddress(addressId) {
     return apiRequest(`${CUSTOMER_BASE}/addresses/${addressId}`, { method: 'DELETE' });
 }
+
+// Verificação de Email
+export async function requestEmailVerification(email) {
+    return apiRequest('/api/users/request-email-verification', {
+        method: 'POST',
+        body: { email },
+        skipAuth: true
+    });
+}
+
+export async function verifyEmailCode(email, code) {
+    return apiRequest('/api/users/verify-email', {
+        method: 'POST',
+        body: { email, code },
+        skipAuth: true
+    });
+}
+
+export async function resendVerificationCode(email) {
+    return apiRequest('/api/users/resend-verification-code', {
+        method: 'POST',
+        body: { email },
+        skipAuth: true
+    });
+}
