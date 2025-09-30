@@ -29,9 +29,8 @@
       border-top: 1px solid #D9D9D9;
       border-bottom: 1px solid #D9D9D9;
       padding: 30px 0px;
-
-      display: grid;
-      grid-template-columns: repeat(3, minmax(140px, 1fr));
+      display: flex;
+      flex-direction: row;
       align-items: flex-start;
       justify-content: center;
       gap: 40px;
@@ -123,4 +122,3 @@
       margin-right: 0;
     }
   }
-  

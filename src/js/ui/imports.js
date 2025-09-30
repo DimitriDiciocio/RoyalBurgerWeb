@@ -157,6 +157,18 @@ function isLoginPage() {
     const isLoggedIn = typeof window.isUserLoggedIn === 'function' ? window.isUserLoggedIn() : false;
     const isLogin = isLoginPage();
     const isCadastro = isCadastroPage();
+
+    // Determinar estado "mobile" de forma robusta (MQ + visibilidade real do botão)
+    const mq = window.matchMedia && window.matchMedia('(max-width: 1024px)');
+    let isMobile = !!(mq && mq.matches);
+    try {
+      if (!isMobile && hamburgerBtn) {
+        const cs = window.getComputedStyle(hamburgerBtn);
+        if (cs && cs.display !== 'none') {
+          isMobile = true;
+        }
+      }
+    } catch (_e) {}
   
     // Reset classes
     header.classList.remove('header-login', 'header-logged-out', 'header-logged-in');
@@ -170,15 +182,27 @@ function isLoginPage() {
       if (hamburgerBtn) hamburgerBtn.style.display = 'none';
       if (navModalAuth) navModalAuth.style.display = '';
     } else if (isLoggedIn) {
-      // Usuário logado: mostrar todos os itens de navegação
+      // Usuário logado
       header.classList.add('header-logged-in');
-      if (navMenu) navMenu.style.display = 'flex';
-      if (loginHeader) loginHeader.style.display = 'none';
-      if (userHeader) userHeader.style.display = 'flex';
-      if (hamburgerBtn) hamburgerBtn.style.display = '';
-      if (navModalAuth) navModalAuth.style.display = 'none';
+
+      if (isMobile) {
+        // Mobile: esconder nav e manter hambúrguer + ícone de usuário
+        if (navMenu) navMenu.style.setProperty('display', 'none', 'important');
+        if (loginHeader) loginHeader.style.display = 'none';
+        if (userHeader) userHeader.style.display = 'flex';
+        if (hamburgerBtn) hamburgerBtn.style.display = '';
+        if (navModalAuth) navModalAuth.style.display = 'none';
+      } else {
+        // Desktop: mostrar navegação completa
+        if (navMenu) navMenu.style.removeProperty('display');
+        if (navMenu) navMenu.style.display = 'flex';
+        if (loginHeader) loginHeader.style.display = 'none';
+        if (userHeader) userHeader.style.display = 'flex';
+        if (hamburgerBtn) hamburgerBtn.style.display = 'none';
+        if (navModalAuth) navModalAuth.style.display = 'none';
+      }
   
-      // Mostrar links que só aparecem quando logado
+      // Mostrar links que só aparecem quando logado (apenas na nav quando visível)
       navLoggedOnlyLinks.forEach(link => {
         link.style.display = 'block';
       });
@@ -203,14 +227,25 @@ function isLoginPage() {
         } catch (_e) { }
       }
     } else {
-      // Usuário não logado: esconder links de Clube Royal e Pedidos
+      // Usuário não logado
       header.classList.add('header-logged-out');
-      if (navMenu) navMenu.style.display = 'flex';
-      if (loginHeader) loginHeader.style.display = 'flex';
-      if (userHeader) userHeader.style.display = 'none';
-      if (hamburgerBtn) hamburgerBtn.style.display = 'none';
-      if (navModalAuth) navModalAuth.style.display = '';
-  
+
+      if (isMobile) {
+        // Mobile: logo + botões de cadastro/entrar
+        if (navMenu) navMenu.style.setProperty('display', 'none', 'important');
+        if (loginHeader) loginHeader.style.display = 'flex';
+        if (userHeader) userHeader.style.display = 'none';
+        if (hamburgerBtn) hamburgerBtn.style.display = 'none';
+        if (navModalAuth) navModalAuth.style.display = '';
+      } else {
+        // Desktop: logo + botões de cadastro/entrar (sem menu)
+        if (navMenu) navMenu.style.setProperty('display', 'none', 'important');
+        if (loginHeader) loginHeader.style.display = 'flex';
+        if (userHeader) userHeader.style.display = 'none';
+        if (hamburgerBtn) hamburgerBtn.style.display = 'none';
+        if (navModalAuth) navModalAuth.style.display = '';
+      }
+
       // Esconder links que só aparecem quando logado
       navLoggedOnlyLinks.forEach(link => {
         link.style.display = 'none';
@@ -358,6 +393,21 @@ function isLoginPage() {
       return 'src/pages/usuario-perfil.html';
     }
   }
+
+  // Caminho correto para a página de login
+  function getLoginPath() {
+    const currentPath = window.location.pathname;
+    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
+    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
+
+    if (isInPagesFolder) {
+      return 'login.html';
+    } else if (isInSrcFolder) {
+      return 'pages/login.html';
+    } else {
+      return 'src/pages/login.html';
+    }
+  }
   
   // Função para obter o caminho correto do header baseado na página atual
   function getHeaderPath() {
@@ -453,12 +503,23 @@ function isLoginPage() {
             if (e.key === 'Escape') closeModal();
           });
         } catch (_e) { }
-        // Hidrata usuário se necessário (para gerar iniciais corretamente)
+      // Hidrata usuário se necessário (para gerar iniciais corretamente)
         if (typeof window.isUserLoggedIn === 'function' && window.isUserLoggedIn()) {
           if (typeof window.hydrateUserFromMe === 'function') {
             window.hydrateUserFromMe();
           }
         }
+      // Reconfigura o header ao mudar o breakpoint de largura
+      try {
+        const mm = window.matchMedia('(max-width: 1024px)');
+        if (mm) {
+          if (typeof mm.addEventListener === 'function') {
+            mm.addEventListener('change', () => { if (typeof window.configureHeader === 'function') window.configureHeader(); });
+          } else if (typeof mm.addListener === 'function') {
+            mm.addListener(() => { if (typeof window.configureHeader === 'function') window.configureHeader(); });
+          }
+        }
+      } catch (_e) { }
       }, 100);
     } catch (error) {
       console.error('Erro ao carregar o header:', error);
