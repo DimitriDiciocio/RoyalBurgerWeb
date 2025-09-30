@@ -19,8 +19,7 @@
     <script src="../js/ui/header.js" type="module" defer></script>
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
-    <script src="../js/ui/usuario-perfil.js" type="module" defer></script>
-    <script src="../js/ui/modais.js" type="module" defer></script>
+    <script src="../js/ui/painel-adm.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -32,63 +31,67 @@
 
     <main>
         <section class="navegacao">
-            <div>
+            <div id="nav-dashboard">
                 <i class="fa-solid fa-chart-simple"></i>
                 <p>Dashboard</p>
             </div>
 
-            <div>
+            <div id="nav-pedidos">
                 <i class="fa-solid fa-basket-shopping"></i>
                 <p>Pedidos</p>
             </div>
 
-            <div>
+            <div id="nav-venda">
                 <i class="fa-solid fa-credit-card"></i>
                 <p>Ponto de venda</p>
             </div>
 
-            <div>
+            <div id="nav-cardapio">
                 <i class="fa-solid fa-burger"></i>
                 <p>Cardápio</p>
             </div>
 
-            <div>
+            <div id="nav-estoque">
                 <i class="fa-solid fa-dolly"></i>
                 <p>Estoque</p>
             </div>
 
-            <div>
+            <div id="nav-relatorios">
                 <i class="fa-solid fa-chart-bar"></i>
                 <p>Relatórios</p>
             </div>
 
-            <div>
+            <div id="nav-finaceiro">
                 <i class="fa-solid fa-dollar-sign"></i>
                 <p>Finaceiro</p>
             </div>
 
-            <div class="select">
+            <div id="nav-funcionarios">
                 <i class="fa-solid fa-user-tie"></i>
                 <p>Funcionários</p>
             </div>
 
-            <div>
+            <div id="nav-configuracoes">
                 <i class="fa-solid fa-gear"></i>
                 <p>Configurações</p>
             </div>
         </section>
 
-        <section id="secao-deshboard" style="display: none;">
+        <section id="secao-dashboard" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Dashboard</p>
-                <p class="descricao-secao">Visão geral das operações em tempo real</p>
+                <div class="texto">
+                    <p class="titulo-secao">Dashboard</p>
+                    <p class="descricao-secao">Visão geral das operações em tempo real</p>
+                </div>
             </div>
         </section>
 
         <section id="secao-pedidos" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Pedidos</p>
-                <p class="descricao-secao">Gerencie todos os pedidos em tempo real</p>
+                <div class="texto">
+                    <p class="titulo-secao">Pedidos</p>
+                    <p class="descricao-secao">Gerencie todos os pedidos em tempo real</p>
+                </div>
             </div>
         </section>
 
@@ -98,35 +101,43 @@
 
         <section id="secao-cardapio" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Gerenciamneto do Cardápio</p>
-                <p class="descricao-secao">Configure itens, preços e disponibilidade</p>
+                <div class="texto">
+                    <p class="titulo-secao">Gerenciamneto do Cardápio</p>
+                    <p class="descricao-secao">Configure itens, preços e disponibilidade</p>
+                </div>
             </div>
         </section>
 
         <section id="secao-estoque" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Gerenciamento de estoque</p>
-                <p class="descricao-secao">Gerencie ingredientes e insumos</p>
+                <div class="texto">
+                    <p class="titulo-secao">Gerenciamento de estoque</p>
+                    <p class="descricao-secao">Gerencie ingredientes e insumos</p>
+                </div>
             </div>
         </section>
 
         <section id="secao-relatorios" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Relatórios e Analytics</p>
-                <p class="descricao-secao">Análise detalhada de vendas, finanças, performance e funcionários</p>
+                <div class="texto">
+                    <p class="titulo-secao">Relatórios e Analytics</p>
+                    <p class="descricao-secao">Análise detalhada de vendas, finanças, performance e funcionários</p>
+                </div>
             </div>
         </section>
 
         <section id="secao-finaceiro" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Financeiro</p>
-                <p class="descricao-secao">Adicione receitas, despesas, defina impostos e gerencie suas finanças</p>
+                <div class="texto">
+                    <p class="titulo-secao">Financeiro</p>
+                    <p class="descricao-secao">Adicione receitas, despesas, defina impostos e gerencie suas finanças</p>
+                </div>
             </div>
         </section>
 
         <section id="secao-funcionarios" style="display: flex;">
             <div class="header">
-                <div>
+                <div class="texto">
                     <p class="titulo-secao">Gerenciamento de Funcionários</p>
                     <p class="descricao-secao">Gerencie seus funcionários em atividade e adicione contas</p>
                 </div>
@@ -170,8 +181,202 @@
 
         <section id="secao-configuracoes" style="display: none;">
             <div class="header">
-                <p class="titulo-secao">Configurações</p>
-                <p class="descricao-secao">Defina metas financeiras, categorias, prazos, taxas e informações da empresa</p>
+                <div class="texto">
+                    <p class="titulo-secao">Configurações</p>
+                    <p class="descricao-secao">Defina metas financeiras, categorias, prazos, taxas e informações da empresa</p>
+                </div>
+            </div>
+
+            <div class="secao">
+                <div class="titulo">
+                    <p>Metas financeiras</p>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Meta de Receita Mensal</p>
+                        <p class="descricao">Defina uma meta mensal de receita esperada</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Meta de Pedidos Mensais</p>
+                        <p class="descricao">Defina uma meta mensal de pedidos esperados</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+            </div>
+
+            <div class="secao">
+                <div class="titulo">
+                    <p>Definir categorias e itens do cardápio</p>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Categorias do cardápio</p>
+                        <p class="descricao">Cadastre, edite, exclua e reorganize seu cardápio</p>
+                    </div>
+
+                    <button>Acessar</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Itens das categorias do cardápio</p>
+                        <p class="descricao">Cadastre, edite, exclua e reorganize seus itens das categorias do cardápio</p>
+                    </div>
+
+                    <button>Acessar</button>
+                </div>
+            </div>
+
+            <div class="secao">
+                <div class="titulo">
+                    <p>Definir prazos</p>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Prazo de iniciação de pedido</p>
+                        <p class="descricao">O tempo necessário para que um pedido novo comece a ser preparado</p>
+                    </div>
+
+                    <div class="tempo">
+                        <p>5 min</p>
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Prazo de preparo de pedido</p>
+                        <p class="descricao">O tempo necessário para que um pedido em preparo seja finalizado</p>
+                    </div>
+
+                    <div class="tempo">
+                        <p>15 min</p>
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Prazo de envio de pedido</p>
+                        <p class="descricao">O tempo necessário para que um pedido em finalizado seja entregue</p>
+                    </div>
+
+                    <div class="tempo">
+                        <p>15 min</p>
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Prazo de entrega de pedido</p>
+                        <p class="descricao">O tempo necessário para que um pedido novo chegue até a pessoa</p>
+                    </div>
+
+                    <div class="tempo">
+                        <p>35 min</p>
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="secao">
+                <div class="titulo">
+                    <p>Taxas</p>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Taxa de entrega</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Taxa de conversão do clube</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+                
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Taxa de expiração de pontos do clube</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+            </div>
+
+            <div class="secao">
+                <div class="titulo">
+                    <p>Inforações da empresa</p>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Nome Fantasia</p>
+                        <p class="descricao">Nome comercial pelo qual a hamburgueria será conhecida pelos clientes</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Razão Social</p>
+                        <p class="descricao">Nome jurídico registrado da empresa conforme consta no CNPJ</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">CNPJ</p>
+                        <p class="descricao">Número de cadastro nacional da pessoa jurídica para identificação fiscal</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Endereço</p>
+                        <p class="descricao">Endereço completo da matriz ou filial da hamburgueria</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">Telefone</p>
+                        <p class="descricao">Telefone principal de contato da empresa para clientes e fornecedores</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
+
+                <div class="info">
+                    <div style="display: flex; flex-direction: column;">
+                        <p class="config">E-mail</p>
+                        <p class="descricao">E-mail oficial da empresa para comunicações e suporte</p>
+                    </div>
+
+                    <button>Definir</button>
+                </div>
             </div>
         </section>
         

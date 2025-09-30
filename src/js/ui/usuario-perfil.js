@@ -4,7 +4,6 @@ import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage } from "./alerts.js";
 
 $(document).ready(function () {
-
     // ====== Guarda de rota: somente clientes podem acessar esta página ======
     try {
         const u = getStoredUser();
