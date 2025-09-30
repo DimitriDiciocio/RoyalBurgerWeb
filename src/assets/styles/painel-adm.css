@@ -120,6 +120,58 @@ main{
         }
     }
 
+    & #secao-cardapio{
+        & .relata{
+            display: flex;
+            justify-content: space-between;
+
+            & .quadro{
+                background-color: var(--cor-div-primary);
+                box-shadow: var(--box-shadow);
+                border-radius: 5px;
+                padding: 5px;
+
+                & .titulo{
+                    height: 100%;
+                    display: flex;
+                    justify-content: space-evenly;
+                    align-items: center;
+
+                    & p{
+                        color: var(--color-texto-black);
+                        font-size: 0.7rem;
+                    }
+
+                    & i{
+                        color: var(--color-texto-erased);
+                        font-size: 0.7rem;
+                    }
+                }
+
+                & .valor{
+                    display: flex;
+                    justify-content: start;
+                    flex-direction: column;
+
+                    & .grande{
+                        color: var(--color-texto-black);
+                        font-size: 0.9rem;
+                    }
+
+                    & .pequeno{
+                        color: var(--color-texto-black);
+                        font-size: 0.8rem;
+                    }
+
+                    & .descricao{
+                        color: var(--color-texto-erased);
+                        font-size: 0.6rem;
+                    }
+                }
+            }
+        }
+    }
+
     & #secao-funcionarios{
 
         & .fichas{
