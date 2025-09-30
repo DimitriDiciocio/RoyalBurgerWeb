@@ -114,6 +114,12 @@
   }
 
   @media (max-width: 480px) {
+    footer .primeira{
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
     footer .segunda{
       flex-direction: column;
       gap: 10px;
