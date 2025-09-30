@@ -11,10 +11,13 @@ export function gerenciarEstadoInputs() {
     inputs.forEach(input => {
         // Função para verificar se o input tem valor ou placeholder nativo
         function temValorOuPlaceholder() {
-            const valor = input.value.trim();
+            // Para SELECT, manter o label sempre ativo para não conflitar com o option visível
+            if (input.tagName === 'SELECT') {
+                return true;
+            }
+            const valor = (input.value || '').trim();
             const temPlaceholder = input.placeholder && input.placeholder !== '';
             const tipoComPlaceholder = ['date', 'time', 'datetime-local', 'month', 'week'].includes(input.type);
-            
             return valor !== '' || temPlaceholder || tipoComPlaceholder;
         }
         
@@ -72,6 +75,21 @@ export function gerenciarEstadoInputs() {
         
         // Verificar estado inicial
         atualizarEstadoLabel();
+
+        // Observa mudanças programáticas do value (inputs e selects)
+        try {
+            let ultimoValor = input.value;
+            const intervalo = setInterval(() => {
+                if (!document.body.contains(input)) {
+                    clearInterval(intervalo);
+                    return;
+                }
+                if (input.value !== ultimoValor) {
+                    ultimoValor = input.value;
+                    atualizarEstadoLabel();
+                }
+            }, 250);
+        } catch (_e) { }
     });
 }
 

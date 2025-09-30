@@ -14,7 +14,11 @@
   --border-radius: 10px;
 }
 
-
+.sep-select{
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
 
 .modal {
   position: fixed;

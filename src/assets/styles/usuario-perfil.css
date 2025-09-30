@@ -90,7 +90,7 @@ main{
             padding: 20px 5px;
             gap: 20px;
 
-            & div {
+            & div, a {
                 display: flex;
                 align-items: center;
                 color: var(--color-texto-erased);
@@ -202,7 +202,7 @@ main{
         & .info {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: center;    
             padding: 20px 40px;
             border-top: 1px solid #D9D9D9;
 

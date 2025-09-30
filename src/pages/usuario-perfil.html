@@ -43,10 +43,10 @@
                     </div>
 
                     <div class="navega">
-                        <div>
+                        <a href="../../index.html">
                             <i class="fa-solid fa-magnifying-glass"></i>
                             <p>Ver cardápio</p>
-                        </div>
+                        </a>
 
                         <div>
                             <i class="fa-solid fa-user"></i>
@@ -63,10 +63,10 @@
                             <p>Endereços</p>
                         </div>
 
-                        <div>
+                        <a href="../pages/clube-royal.html">
                             <i class="fa-solid fa-crown"></i>
                             <p>Ver pontos</p>
-                        </div>
+                        </a>
 
                         <div>
                             <i class="fa-solid fa-gear"></i>
@@ -97,21 +97,18 @@
                     </div>
 
                     <div class="info">
-                        <p class="label">Nome Completo*</p>
-                        <p class="cont">Ygor Birochi da Fonseca Ataniel</p>
-                        <i class="fa-solid fa-chevron-down"></i>
+                        <p class="label">Nome Completo</p>
+                        <p class="cont"></p>
                     </div>
 
                     <div class="info">
                         <p class="label">CPF</p>
-                        <p class="cont">000.000.000-11</p>
-                        <i class="fa-solid fa-chevron-down"></i>
+                        <p class="cont"></p>
                     </div>
 
                     <div class="info">
-                        <p class="label">Data de nascimento*</p>
-                        <p class="cont">19/07/2007</p>
-                        <i class="fa-solid fa-chevron-down"></i>
+                        <p class="label">Data de nascimento</p>
+                        <p class="cont"></p>
                     </div>
                 </div>
 
@@ -123,15 +120,13 @@
                     </div>
 
                     <div class="info">
-                        <p class="label">E-mail*</p>
-                        <p class="cont">ybirochi123456@gmail.com</p>
-                        <i class="fa-solid fa-chevron-down"></i>
+                        <p class="label">E-mail</p>
+                        <p class="cont">/p>
                     </div>
 
                     <div class="info">
-                        <p class="label">Telefone*</p>
-                        <p class="cont">(00)00000-0000</p>
-                        <i class="fa-solid fa-chevron-down"></i>
+                        <p class="label">Telefone</p>
+                        <p class="cont">/p>
                     </div>
                 </div>
             </section>
@@ -307,28 +302,47 @@
 
                 <div class="main">
                     <div class="div-input">
-                        <label for="rua">Rua*</label>
-                        <input type="text" id="rua" name="rua" required autocomplete="off">
+                        <label for="cep-edit">CEP*</label>
+                        <input type="text" id="cep-edit" name="cep" required autocomplete="off">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                    <div class="sep-select">
+                        <div class="div-input">
+                            <label for="estado-edit">Estado*</label>
+                            <select id="estado-edit" name="estado" required>
+                                <option value="" disabled selected>Selecione o estado</option>
+                            </select>
+                        </div>
+                        <div class="div-input">
+                        <label for="cidade-edit">Cidade*</label>
+                        <select id="cidade-edit" name="cidade" required>
+                            <option value="" disabled selected>Selecione a cidade</option>
+                        </select>
+                    </div>
+                    </div>
+                    <div class="div-input">
+                        <label for="rua-edit">Rua*</label>
+                        <input type="text" id="rua-edit" name="rua" required autocomplete="off">
                     </div>
 
                     <div class="div-input">
-                        <label for="bairro">Bairro*</label>
-                        <input type="text" id="bairro" name="bairro" required autocomplete="off">
+                        <label for="bairro-edit">Bairro*</label>
+                        <input type="text" id="bairro-edit" name="bairro" required autocomplete="off">
                     </div>
 
                     <div class="div-input">
-                        <label for="numero">Número*</label>
-                        <input type="number" id="numero" name="numero" required autocomplete="off">
+                        <label for="numero-edit">Número*</label>
+                        <input type="number" id="numero-edit" name="numero" required autocomplete="off">
                     </div>
 
                     <div class="div-checa">
                         <input type="checkbox">
-                        <label>Endereço sem número</label>
+                        <label>Endereço sem número*</label>
                     </div>
 
                     <div class="div-input">
-                        <label for="complemento">Complemento*</label>
-                        <input type="text" id="complemento" name="complemento" required autocomplete="off">
+                        <label for="complemento-edit">Complemento</label>
+                        <input type="text" id="complemento-edit" name="complemento" required autocomplete="off">
                     </div>
 
                     <div class="div-checa">
@@ -344,7 +358,7 @@
             </div>
         </div>
 
-        <div id="adicionar-endereco" class="modal" style="display: none">
+        <div id="adicionar-endereco" class="modal" style="display: none" data-reset-on-close="true">
             <div class="div-overlay"></div>
 
             <div class="modal-contet">
@@ -356,18 +370,37 @@
 
                 <div class="main">
                     <div class="div-input">
-                        <label for="rua">Rua*</label>
-                        <input type="text" id="rua" name="rua" required autocomplete="off">
+                        <label for="cep-add">CEP*</label>
+                        <input type="text" id="cep-add" name="cep" required autocomplete="off">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                    <div class="sep-select">
+                        <div class="div-input">
+                            <label for="estado-add">Estado*</label>
+                            <select id="estado-add" name="estado" required>
+                                <option value="" disabled selected>Selecione o estado</option>
+                            </select>
+                        </div>
+                        <div class="div-input">
+                            <label for="cidade-add">Cidade*</label>
+                            <select id="cidade-add" name="cidade" required>
+                                <option value="" disabled selected>Selecione a cidade</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="div-input">
+                        <label for="rua-add">Rua*</label>
+                        <input type="text" id="rua-add" name="rua" required autocomplete="off">
                     </div>
 
                     <div class="div-input">
-                        <label for="bairro">Bairro*</label>
-                        <input type="text" id="bairro" name="bairro" required autocomplete="off">
+                        <label for="bairro-add">Bairro*</label>
+                        <input type="text" id="bairro-add" name="bairro" required autocomplete="off">
                     </div>
 
                     <div class="div-input">
-                        <label for="numero">Número*</label>
-                        <input type="number" id="numero" name="numero" required autocomplete="off">
+                        <label for="numero-add">Número*</label>
+                        <input type="number" id="numero-add" name="numero" required autocomplete="off">
                     </div>
 
                     <div class="div-checa">
@@ -376,8 +409,8 @@
                     </div>
 
                     <div class="div-input">
-                        <label for="complemento">Complemento*</label>
-                        <input type="text" id="complemento" name="complemento" required autocomplete="off">
+                        <label for="complemento-add">Complemento*</label>
+                        <input type="text" id="complemento-add" name="complemento" required autocomplete="off">
                     </div>
 
                     <div class="div-checa">
@@ -405,16 +438,16 @@
 
                 <div class="main">
                     <div class="div-input">
-                        <label for="senha">Senha atual</label>
-                        <input type="password" id="senha" name="senha" required autocomplete="off">
+                        <label for="senha-atual">Senha atual</label>
+                        <input type="password" id="senha-atual" name="senha-atual" required autocomplete="off">
                         <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
                         <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
                             style="display: none;"></i>
                     </div>
 
                     <div class="div-input">
-                        <label for="senha">Senha nova</label>
-                        <input type="password" id="senha" name="senha" required autocomplete="off">
+                        <label for="nova-senha">Senha nova</label>
+                        <input type="password" id="nova-senha" name="nova-senha" required autocomplete="off">
                         <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
                         <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
                             style="display: none;"></i>
@@ -430,8 +463,8 @@
                     </div>
 
                     <div class="div-input">
-                        <label for="confirma-senha">Confirmar senha</label>
-                        <input type="password" id="confirma-senha" name="confirma-senha" required autocomplete="off">
+                        <label for="confirma-senha-alter">Confirmar senha</label>
+                        <input type="password" id="confirma-senha-alter" name="confirma-senha-alter" required autocomplete="off">
                         <i class="fa-solid fa-eye" id="mostrarConfirmaSenha" aria-hidden="true"></i>
                         <i class="fa-solid fa-eye-slash" id="ocultarConfirmaSenha" aria-hidden="true"
                             style="display: none;"></i>
@@ -442,7 +475,7 @@
                     <button>Confirmar</button>
                 </div>
 
-                <script src="../js/ui/log-cadas.js"></script>
+                
             </div>
         </div>
 
@@ -465,8 +498,8 @@
                     </p>
 
                     <div class="div-input">
-                        <label for="confirma-senha">Código</label>
-                        <input type="password" id="confirma-senha" name="confirma-senha" required autocomplete="off">
+                        <label for="codigo-verificacao">Código</label>
+                        <input type="password" id="codigo-verificacao" name="codigo-verificacao" required autocomplete="off">
                         <i class="fa-solid fa-eye" id="mostrarConfirmaSenha" aria-hidden="true"></i>
                         <i class="fa-solid fa-eye-slash" id="ocultarConfirmaSenha" aria-hidden="true"
                             style="display: none;"></i>
@@ -477,7 +510,7 @@
                     <button>Confirmar</button>
                 </div>
 
-                <script src="../js/ui/log-cadas.js"></script>
+                
             </div>
         </div>
 
