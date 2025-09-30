@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer - Recuperar Senha</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/verificar-email.css">
+    <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/esqueceu-senha.js" type="module" defer></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- importara header -->
+    <div id="header-container"></div>
+
+    <main>
+        <section class="verification-container">
+            <div class="verification-card">
+                <button class="btn-close" onclick="window.location.href='login.html'">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+
+                <div class="verification-icon">
+                    <i class="fa-solid fa-lock" style="font-size: 2rem; color: white;"></i>
+                </div>
+
+                <h2 class="verification-title">Recuperar Senha</h2>
+                
+                <p class="verification-description">
+                    Informe seu e-mail cadastrado e enviaremos um link para redefinir sua senha.
+                </p>
+
+                <form id="form-esqueceu-senha">
+                    <div class="div-input">
+                        <label for="email">E-mail</label>
+                        <input type="email" id="email" name="email" required autocomplete="off">
+                    </div>
+
+                    <button type="submit" id="btn-enviar" class="btn-verify">Enviar Link de Recuperação</button>
+                </form>
+
+                <p class="change-email-text">
+                    Lembrou sua senha? 
+                    <a href="login.html" class="change-email-link">Voltar ao login</a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- importare footer -->
+    <div id="footer-container"></div>
+
+</body>
+
+</html>

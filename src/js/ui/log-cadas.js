@@ -295,4 +295,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    // --- Handler para "Esqueceu a senha?" ---
+    const forgotPasswordLink = document.getElementById('forgot-password');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', function (e) {
+            e.preventDefault();
+            window.location.href = 'esqueceu-senha.html';
+        });
+    }
 });

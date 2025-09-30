@@ -77,3 +77,20 @@ export async function resendVerificationCode(email) {
         skipAuth: true
     });
 }
+
+// Recuperação de Senha
+export async function requestPasswordReset(email) {
+    return apiRequest('/api/users/request-password-reset', {
+        method: 'POST',
+        body: { email },
+        skipAuth: true
+    });
+}
+
+export async function resetPassword(token, new_password) {
+    return apiRequest('/api/users/reset-password', {
+        method: 'POST',
+        body: { token, new_password },
+        skipAuth: true
+    });
+}

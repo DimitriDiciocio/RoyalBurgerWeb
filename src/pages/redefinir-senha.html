@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer - Redefinir Senha</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/login-cadastro.css">
+    <link rel="stylesheet" href="../assets/styles/verificar-email.css">
+    <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/redefinir-senha.js" type="module" defer></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- importara header -->
+    <div id="header-container"></div>
+
+    <main>
+        <section class="verification-container">
+            <div class="verification-card" style="max-width: 500px;">
+                <button class="btn-close" onclick="window.location.href='login.html'">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+
+                <div class="verification-icon">
+                    <i class="fa-solid fa-key" style="font-size: 2rem; color: white;"></i>
+                </div>
+
+                <h2 class="verification-title">Nova Senha</h2>
+                
+                <p class="verification-description">
+                    Digite sua nova senha abaixo.
+                </p>
+
+                <form id="form-redefinir-senha">
+                    <div class="div-input">
+                        <label for="senha">Nova Senha</label>
+                        <input type="password" id="senha" name="senha" required autocomplete="off">
+                        <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true" style="display: none;"></i>
+                    </div>
+
+                    <div class="password-requirements">
+                        <h5>Requisitos da senha:</h5>
+                        <ul class="instrucao">
+                            <li id="req-maiuscula">1 Letra em maiúsculo</li>
+                            <li id="req-numero">1 Dígito numérico</li>
+                            <li id="req-especial">1 Caractere especial</li>
+                            <li id="req-tamanho">8 Dígitos</li>
+                        </ul>
+                    </div>
+
+                    <div class="div-input">
+                        <label for="confirma-senha">Confirmar Nova Senha</label>
+                        <input type="password" id="confirma-senha" name="confirma-senha" required autocomplete="off">
+                        <i class="fa-solid fa-eye" id="mostrarConfirmaSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarConfirmaSenha" aria-hidden="true" style="display: none;"></i>
+                    </div>
+
+                    <button type="submit" id="btn-redefinir" class="btn-verify" style="margin-top: 20px;">Redefinir Senha</button>
+                </form>
+
+                <p class="change-email-text">
+                    <a href="login.html" class="change-email-link">Voltar ao login</a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- importare footer -->
+    <div id="footer-container"></div>
+
+</body>
+
+</html>
