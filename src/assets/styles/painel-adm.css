@@ -22,13 +22,16 @@ main{
     & .navegacao{
         display: flex;
         flex-direction: column;
+        justify-content: center;
+        position: sticky;
+        top: 40px;
         gap: 20px;
-        width: 150px;
-        padding: 170px 0px;
+        height: 90vh;
 
         & div{
             display: flex;
             flex-direction: row;
+            text-wrap: nowrap;
             gap: 10px;
             align-items: center;
             color: var(--color-texto-erased);
@@ -53,11 +56,15 @@ main{
 
     
 
-    & #secao-deshboard, #secao-pedidos, #secao-venda, #secao-cardapio, 
+    & #secao-dashboard, #secao-pedidos, #secao-venda, #secao-cardapio, 
     #secao-estoque, #secao-relatorios, #secao-finaceiro, #secao-funcionarios, #secao-configuracoes{
         width: 100%;
         display: flex;
         flex-direction: column;
+
+        /* overflow-x: auto;
+        scrollbar-width: none;
+        height: 90vh; */
     }
 
     & .header{
@@ -68,17 +75,26 @@ main{
         width: 100%;
         padding-top: 20px;
         height: 100px;
+        margin-bottom: 50px;
 
-        & .titulo-secao{
-            font-size: 35px;
-            color: var(--color-texto-black);
-            font-weight: 500;
-        }
+        & .texto{
+            display: flex;
+            flex-direction: column;
+            justify-content: start;
 
-        & .descricao-secao{
-            font-size: 25px;
-            color: var(--color-texto-light);
-            font-weight: 400;
+            & .titulo-secao{
+                font-size: 1.4rem;
+                color: var(--color-texto-black);
+                font-weight: 500;
+                text-wrap: nowrap;
+            }
+
+            & .descricao-secao{
+                font-size: 1.2rem;
+                color: var(--color-texto-light);
+                font-weight: 400;
+                text-wrap: nowrap;
+            }
         }
 
         & button.adicionar{
@@ -166,5 +182,82 @@ main{
             }
         }
         
+    }
+
+    & #secao-configuracoes{
+        & .secao{
+            display: flex;
+            flex-direction: column;
+            margin: 10px 0px;
+
+            & .titulo{
+                color: var(--color-texto-black);
+                margin-bottom: 5px;
+                font-size: 1rem;
+            }
+
+            & .info{
+                padding: 10px 40px;
+                border-bottom: 0.5px solid #D9D9D9;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 1rem;
+
+                & .config{
+                    color: var(--color-texto-black);
+                }
+
+                & .descricao{
+                    color: var(--color-texto-erased);
+                }
+
+                & button{
+                    background-color: transparent;
+                    color: var(--color-texto-black);
+                    border: 0.5px solid var(--color-texto-black);
+                    border-radius: 7px;
+                    display: flex;
+                    text-align: center;
+                    justify-content: center;
+                    padding: 10px 0px;
+                    width: 100px;
+
+                    &:hover {
+                        color: rgb(55, 55, 55);
+                        border: 0.5px solid rgb(55, 55, 55);
+                    }
+
+                    &:active {
+                        color: rgb(147, 147, 147);
+                        border: 0.5px solid rgb(147, 147, 147);
+                    }
+                }
+
+                & .tempo{
+                    font-size: 1rem;
+                    color: var(--color-texto-black);
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 8px;
+                    user-select: none;
+
+                    & i{
+                        font-size: 0.7rem;
+                        cursor: pointer;
+
+                        &:hover{
+                            color: rgb(55, 55, 55);
+                        }
+
+                        &:active{
+                            color: rgb(147, 147, 147);
+                        }
+                    }
+                }
+            }
+
+        }
     }
 }
