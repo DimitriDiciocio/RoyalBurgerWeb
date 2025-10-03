@@ -11,9 +11,9 @@ $(document).ready(function () {
         const isCustomer = String(role || '').toLowerCase() === 'customer';
         if (!isCustomer) {
             setFlashMessage({
-                type: 'info',
-                title: 'Acesso restrito',
-                message: 'Você precisa estar logado como cliente para acessar seus dados.'
+                type: 'error',
+                title: 'Acesso Restrito',
+                message: 'Você precisa estar logado como cliente para acessar esta página.'
             });
             // Redireciona para a página inicial relativa a partir de src/pages/
             window.location.href = '../../index.html';
@@ -21,7 +21,11 @@ $(document).ready(function () {
         }
     } catch (_e) {
         // Em qualquer falha, proteger a rota
-        setFlashMessage({ type: 'info', title: 'Acesso restrito', message: 'Faça login como cliente para continuar.' });
+        setFlashMessage({ 
+            type: 'error', 
+            title: 'Acesso Restrito', 
+            message: 'Faça login como cliente para continuar.' 
+        });
         window.location.href = '../../index.html';
         return;
     }

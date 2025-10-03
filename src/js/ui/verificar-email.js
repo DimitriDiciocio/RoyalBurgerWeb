@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Solicitar código de verificação automaticamente ao carregar
         try {
             await requestEmailVerification(email);
-            showToast('Código de verificação enviado por SMS!', { type: 'success', autoClose: 3000 });
+            showToast('Código de verificação enviado por email!', { type: 'success', autoClose: 3000 });
         } catch (err) {
             // Se der erro mas for porque já tem código pendente, não mostrar erro
             const errorMsg = err?.payload?.error || err?.message || '';

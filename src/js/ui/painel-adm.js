@@ -1,9 +1,54 @@
 // painel-adm.js
 
+import { getStoredUser } from '../api/api.js';
+import { setFlashMessage } from './alerts.js';
+
 console.log('Arquivo JavaScript (painel.js) carregado com sucesso - Usando Event Listeners e Persistência de Seção.');
 
 // --- Chave para armazenar a seção ativa no localStorage ---
 const ACTIVE_SECTION_STORAGE_KEY = 'activePanelSection';
+
+// --- Verificação de permissões de administrador ---
+function verificarPermissoesAdmin() {
+    try {
+        const user = getStoredUser();
+        if (!user) {
+            setFlashMessage({
+                type: 'error',
+                title: 'Acesso Restrito',
+                message: 'Você precisa estar logado para acessar esta página.'
+            });
+            window.location.href = '../../index.html';
+            return false;
+        }
+
+        const role = user.role || user.user_role || user.type || user.user_type;
+        const isAdmin = String(role || '').toLowerCase() === 'admin' || 
+                       String(role || '').toLowerCase() === 'administrator' ||
+                       String(role || '').toLowerCase() === 'gerente';
+
+        if (!isAdmin) {
+            setFlashMessage({
+                type: 'error',
+                title: 'Acesso Restrito',
+                message: 'Apenas administradores podem acessar esta página.'
+            });
+            window.location.href = '../../index.html';
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Erro ao verificar permissões:', error);
+        setFlashMessage({
+            type: 'error',
+            title: 'Acesso Restrito',
+            message: 'Não foi possível verificar suas permissões. Tente fazer login novamente.'
+        });
+        window.location.href = '../../index.html';
+        return false;
+    }
+}
 
 // --- Função para mostrar/esconder seções ---
 function mostrarSecao(idSecao) {
@@ -39,6 +84,11 @@ function mostrarSecao(idSecao) {
 
 // --- Lógica de inicialização e adição de Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. Verificar permissões de administrador antes de inicializar o painel
+    if (!verificarPermissoesAdmin()) {
+        return; // Para a execução se o usuário não tem permissão
+    }
+
     // 1. Adicionar Event Listeners para cada item de navegação
     const itensNavegacao = document.querySelectorAll('.navegacao div');
     itensNavegacao.forEach(item => {
