@@ -64,10 +64,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // Limpar campo
             emailInput.value = '';
             
-            // Redirecionar para login após 3 segundos
+            // Redirecionar para verificação de código após 2 segundos
             setTimeout(() => {
-                window.location.href = 'login.html';
-            }, 3000);
+                window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}&type=password-reset`;
+            }, 2000);
         } catch (err) {
             toastFromApiError(err);
             // Reabilitar botão

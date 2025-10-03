@@ -1,28 +1,55 @@
 // Gerenciamento da página de redefinir senha
 import { inicializarGerenciamentoInputs } from '../utils.js';
 import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
-import { resetPassword } from '../api/user.js';
+import { resetPassword, changePasswordWithCode } from '../api/user.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     // Inicializar gerenciamento de inputs
     inicializarGerenciamentoInputs();
 
-    // Obter token da query string
+    // Obter parâmetros da query string
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
+    const type = urlParams.get('type'); // 'reset' ou 'password-change'
+    const email = urlParams.get('email');
+    const reset_code = urlParams.get('reset_code');
 
     const senhaInput = document.getElementById('senha');
     const confirmaSenhaInput = document.getElementById('confirma-senha');
     const btnRedefinir = document.getElementById('btn-redefinir');
     const form = document.getElementById('form-redefinir-senha');
 
-    // Se não houver token, redireciona para login
-    if (!token) {
-        showToast('Token inválido ou expirado. Solicite um novo link de recuperação.', { type: 'error' });
-        setTimeout(() => {
-            window.location.href = 'esqueceu-senha.html';
-        }, 2000);
-        return;
+    // Verificar se é alteração de senha por código
+    if (type === 'password-change') {
+        // Obter dados do sessionStorage
+        const passwordChangeEmail = sessionStorage.getItem('passwordChangeEmail');
+        const passwordChangeCode = sessionStorage.getItem('passwordChangeCode');
+        
+        if (!passwordChangeEmail || !passwordChangeCode) {
+            showToast('Sessão expirada. Solicite um novo código de alteração.', { type: 'error' });
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 2000);
+            return;
+        }
+        
+        // Atualizar título e descrição
+        const titleElement = document.getElementById('verification-title');
+        const descElement = document.getElementById('verification-description');
+        if (titleElement) titleElement.textContent = 'Nova Senha';
+        if (descElement) descElement.textContent = 'Digite sua nova senha abaixo.';
+        
+        // Atualizar texto do botão
+        if (btnRedefinir) btnRedefinir.textContent = 'Alterar Senha';
+    } else {
+        // Verificação de parâmetros para reset de senha
+        if (!email || !reset_code) {
+            showToast('Parâmetros inválidos ou expirados. Solicite um novo código de recuperação.', { type: 'error' });
+            setTimeout(() => {
+                window.location.href = 'esqueceu-senha.html';
+            }, 2000);
+            return;
+        }
     }
 
     // Toggle visibilidade da senha
@@ -142,8 +169,25 @@ document.addEventListener('DOMContentLoaded', function () {
         btnRedefinir.textContent = 'Redefinindo...';
 
         try {
-            const resp = await resetPassword(token, senha);
-            toastFromApiSuccess(resp, 'Senha redefinida com sucesso! Redirecionando para o login...');
+            let resp;
+            
+            if (type === 'password-change') {
+                // Alteração de senha por código
+                const passwordChangeEmail = sessionStorage.getItem('passwordChangeEmail');
+                const passwordChangeCode = sessionStorage.getItem('passwordChangeCode');
+                
+                resp = await changePasswordWithCode(passwordChangeEmail, passwordChangeCode, senha);
+                
+                // Limpar dados temporários
+                sessionStorage.removeItem('passwordChangeEmail');
+                sessionStorage.removeItem('passwordChangeCode');
+                
+                toastFromApiSuccess(resp, 'Senha alterada com sucesso! Redirecionando para o login...');
+            } else {
+                // Reset de senha por código
+                resp = await resetPassword(email, reset_code, senha);
+                toastFromApiSuccess(resp, 'Senha redefinida com sucesso! Redirecionando para o login...');
+            }
             
             // Redirecionar para login após sucesso
             setTimeout(() => {

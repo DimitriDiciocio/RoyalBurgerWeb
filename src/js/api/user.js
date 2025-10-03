@@ -87,10 +87,44 @@ export async function requestPasswordReset(email) {
     });
 }
 
-export async function resetPassword(token, new_password) {
+export async function resetPassword(email, reset_code, new_password) {
     return apiRequest('/api/users/reset-password', {
         method: 'POST',
-        body: { token, new_password },
+        body: { email, reset_code, new_password },
         skipAuth: true
+    });
+}
+
+// Alteração de senha por código (para login)
+// Nota: Estes endpoints precisam ser implementados no backend
+export async function requestPasswordChangeCode(email) {
+    return apiRequest('/api/users/request-password-change-code', {
+        method: 'POST',
+        body: { email },
+        skipAuth: true
+    });
+}
+
+export async function verifyPasswordChangeCode(email, code) {
+    return apiRequest('/api/users/verify-password-change-code', {
+        method: 'POST',
+        body: { email, code },
+        skipAuth: true
+    });
+}
+
+export async function changePasswordWithCode(email, code, new_password) {
+    return apiRequest('/api/users/change-password-with-code', {
+        method: 'POST',
+        body: { email, code, new_password },
+        skipAuth: true
+    });
+}
+
+// Alteração de senha no perfil (requer autenticação)
+export async function changePassword(current_password, new_password) {
+    return apiRequest('/api/users/change-password', {
+        method: 'PUT',
+        body: { current_password, new_password }
     });
 }

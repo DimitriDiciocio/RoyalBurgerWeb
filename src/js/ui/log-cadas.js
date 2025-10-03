@@ -304,4 +304,33 @@ document.addEventListener('DOMContentLoaded', function () {
             window.location.href = 'esqueceu-senha.html';
         });
     }
+
+    // --- Handler para "Alterar senha por código" ---
+    const changePasswordCodeLink = document.getElementById('change-password-code');
+    if (changePasswordCodeLink) {
+        changePasswordCodeLink.addEventListener('click', function (e) {
+            e.preventDefault();
+            
+            // Obter email do campo de login
+            const emailInput = document.getElementById('email');
+            const email = emailInput.value.trim();
+            
+            if (!email) {
+                showToast('Por favor, digite seu email primeiro.', { type: 'error' });
+                emailInput.focus();
+                return;
+            }
+            
+            // Validar formato do email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showToast('Por favor, digite um email válido.', { type: 'error' });
+                emailInput.focus();
+                return;
+            }
+            
+            // Redirecionar para página de verificação de código (alteração de senha)
+            window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}&type=password-change`;
+        });
+    }
 });

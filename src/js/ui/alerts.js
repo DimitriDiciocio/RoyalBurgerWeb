@@ -199,8 +199,22 @@ export function showConfirm({ title = 'Confirmação', message = 'Deseja continu
 }
 
 export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
-    const msg = (err && (err.payload?.error || err.payload?.message || err.message)) || fallback;
-    return showErrorBar('Erro', msg);
+    let title = 'Erro';
+    let msg = (err && (err.payload?.error || err.payload?.message || err.message)) || fallback;
+    
+    // Tratamento específico para erros de conexão
+    if (err?.isConnectionError || err?.status === 0) {
+        title = 'Problema de Conexão';
+        msg = 'Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet.';
+    } else if (err?.status >= 500) {
+        title = 'Servidor Indisponível';
+        msg = 'O servidor está temporariamente indisponível. Tente novamente em alguns minutos.';
+    } else if (err?.status === 404) {
+        title = 'Serviço Não Encontrado';
+        msg = 'O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.';
+    }
+    
+    return showErrorBar(title, msg);
 }
 
 export function toastFromApiSuccess(resp, fallback = 'Operação realizada com sucesso.') {

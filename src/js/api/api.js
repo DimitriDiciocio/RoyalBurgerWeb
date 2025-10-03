@@ -78,34 +78,94 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
         if (token) baseHeaders['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
-        method,
-        headers: baseHeaders,
-        body: body ? JSON.stringify(body) : undefined,
-        credentials: 'include'
-    });
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: baseHeaders,
+            body: body ? JSON.stringify(body) : undefined,
+            credentials: 'include'
+        });
 
-    let data;
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-        data = await response.json();
-    } else {
-        data = await response.text();
+        let data;
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            data = await response.text();
+        }
+
+        if (!response.ok) {
+            // Tratamento específico para diferentes tipos de erro
+            let errorMessage;
+            
+            if (response.status === 0 || response.status >= 500) {
+                // Servidor não está respondendo ou erro interno
+                errorMessage = 'Servidor temporariamente indisponível. Verifique sua conexão e tente novamente.';
+            } else if (response.status === 404) {
+                // Endpoint não encontrado
+                errorMessage = 'Serviço não encontrado. Verifique se o servidor está rodando.';
+            } else if (response.status === 401) {
+                // Não autorizado
+                errorMessage = data?.error || data?.message || 'Acesso não autorizado.';
+            } else if (response.status === 403) {
+                // Proibido
+                errorMessage = data?.error || data?.message || 'Acesso negado.';
+            } else {
+                // Outros erros
+                errorMessage = (data && (data.error || data.msg || data.message)) || `Erro ${response.status}`;
+            }
+            
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+
+        return data;
+    } catch (fetchError) {
+        // Erro de rede ou conexão
+        if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+            const connectionError = new Error('Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet.');
+            connectionError.status = 0;
+            connectionError.isConnectionError = true;
+            throw connectionError;
+        }
+        
+        // Re-throw outros erros
+        throw fetchError;
     }
-
-    if (!response.ok) {
-        const errorMessage = (data && (data.error || data.msg || data.message)) || `Erro ${response.status}`;
-        const error = new Error(errorMessage);
-        error.status = response.status;
-        error.payload = data;
-        throw error;
-    }
-
-    return data;
 }
 
 export function logoutLocal() {
     clearStoredToken();
     clearStoredUser();
+}
+
+// Função para verificar se a API está disponível
+export async function checkApiHealth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
+}
+
+// Função para verificar conectividade básica
+export async function checkConnectivity() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+        return true; // Se chegou até aqui, a conexão está funcionando
+    } catch (error) {
+        return false;
+    }
 }
 

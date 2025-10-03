@@ -597,7 +597,7 @@ $(document).ready(function () {
                 message: 'Deseja realmente sair da sua conta?',
                 confirmText: 'Sair',
                 cancelText: 'Cancelar',
-                type: 'info'
+                type: 'warning'
             });
             if (!confirmed) return;
             try {
@@ -625,7 +625,7 @@ $(document).ready(function () {
                 message: 'Tem certeza? Sua conta será inativada e você será desconectado.',
                 confirmText: 'Excluir',
                 cancelText: 'Cancelar',
-                type: 'warning'
+                type: 'delete'
             });
             if (!confirmed) return;
 

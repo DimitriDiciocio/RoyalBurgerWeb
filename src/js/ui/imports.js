@@ -544,3 +544,10 @@ function isLoginPage() {
   window.getDadosContaPath = getDadosContaPath;
   window.loadHeader = loadHeader;
   window.getLogoSvgPath = getLogoSvgPath;
+
+  // Inicializar verificador de conectividade
+  import('./connectivity-checker.js').then(module => {
+    module.initConnectivityChecker();
+  }).catch(err => {
+    console.warn('Não foi possível carregar o verificador de conectividade:', err);
+  });
