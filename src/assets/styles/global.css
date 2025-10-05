@@ -62,7 +62,7 @@ main {
         }
     }
 
-    & input, select {
+    & input, select, textarea {
         width: 100%;
         padding: 12px;
         font-size: 0.9rem;
