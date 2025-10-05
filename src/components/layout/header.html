@@ -5,13 +5,22 @@
         <button class="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="nav-modal">
             <i class="fa-solid fa-bars"></i>
         </button>
-
         <nav class="nav-menu" id="nav-menu">
-            <a href="../../index.html">Início</a>
-            <a href="../pages/clube-royal.html" class="nav-logged-only">Clube Royal</a>
-            <a href="../pages/pedidos.html" class="nav-logged-only">Pedidos</a>
-            <!-- <a href="">Painel Administrativo</a> -->
-            <a href="#contato">Contato</a>
+            <!-- Links base (sempre visíveis) -->
+            <a href="../../index.html" class="nav-link-base">Início</a>
+            
+            <!-- Links específicos por perfil -->
+            <a href="../pages/clube-royal.html" class="nav-link nav-link-customer nav-logged-only">Clube Royal</a>
+            <a href="../pages/pedidos.html" class="nav-link nav-link-customer nav-logged-only">Pedidos</a>
+            
+            <!-- Links para atendentes/entregadores -->
+            <a href="../pages/pedidos.html" class="nav-link nav-link-attendant nav-logged-only">Gerenciar Pedidos</a>
+            
+            <!-- Links para gerentes e administradores -->
+            <a href="../pages/painel-adm.html" class="nav-link nav-link-manager nav-link-admin nav-logged-only">Painel Administrativo</a>
+            
+            <!-- Link sempre visível -->
+            <a href="#contato" class="nav-link-base">Contato</a>
         </nav>
     </div>
 
@@ -29,8 +38,8 @@
 
     <div id="user-header" style="display: none">
         <div id="user">
-
-            <div class="cesta" id="cesta">
+            <!-- Elementos específicos para Customer -->
+            <div class="cesta user-element-customer" id="cesta">
                 <i class="fa-solid fa-basket-shopping"></i>
                 <div>
                     <p class="total">Total sem taxas</p>
@@ -41,19 +50,20 @@
                 </div>
             </div>
 
-            <div class="pontos-royal" title="Seus pontos royal">
+            <div class="pontos-royal user-element-customer" title="Seus pontos royal">
                 <i class="fa-solid fa-crown"></i>
                 <p>100 Pontos</p>
             </div>
 
-            <div class="endereco">
+            <div class="endereco user-element-customer">
                 <i class="fa-solid fa-location-dot"></i>
                 <p>R. Antonio Munhoz Artilha, 103</p>
                 <i class="fa-solid fa-chevron-down"></i>
             </div>
 
-            <div class="sep"></div>
+            <div class="sep user-element-customer"></div>
 
+            <!-- Ícone do perfil (sempre visível para usuários logados) -->
             <div class="conta">
                 <!-- As iniciais do usuário logado serão inseridas dinamicamente pelo JS -->
             </div>
@@ -73,15 +83,28 @@
             </button>
         </div>
         <nav class="nav-modal-links">
-            <a href="../../index.html">Início</a>
-            <a href="../pages/clube-royal.html" class="nav-logged-only">Clube Royal</a>
-            <a href="../pages/pedidos.html" class="nav-logged-only">Pedidos</a>
-            <a href="#contato">Contato</a>
+            <!-- Links base (sempre visíveis) -->
+            <a href="../../index.html" class="nav-link-base">Início</a>
+            
+            <!-- Links específicos por perfil -->
+            <a href="../pages/clube-royal.html" class="nav-link nav-link-customer nav-logged-only">Clube Royal</a>
+            <a href="../pages/pedidos.html" class="nav-link nav-link-customer nav-logged-only">Pedidos</a>
+            
+            <!-- Links para atendentes/entregadores -->
+            <a href="../pages/pedidos.html" class="nav-link nav-link-attendant nav-logged-only">Gerenciar Pedidos</a>
+            
+            <!-- Links para gerentes e administradores -->
+            <a href="../pages/painel-adm.html" class="nav-link nav-link-manager nav-link-admin nav-logged-only">Painel Administrativo</a>
+            
+            <!-- Link sempre visível -->
+            <a href="#contato" class="nav-link-base">Contato</a>
+            
+            <!-- Links de autenticação (apenas para usuários não logados) -->
             <div class="nav-modal-auth">
                 <a href="../pages/cadastro.html">Criar Conta</a>
                 <a href="../pages/login.html">Entrar</a>
             </div>
         </nav>
     </div>
-    
+
 </div>

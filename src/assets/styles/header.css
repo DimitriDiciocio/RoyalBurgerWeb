@@ -42,8 +42,6 @@ header {
     & img {
       height: 45px;
       margin-right: 20px;
-
-      user-drag: none;
       user-select: none;
       -webkit-user-drag: none;
     }
@@ -62,7 +60,12 @@ header {
       text-wrap: nowrap;
       color: var(--color-texto-black);
       font-size: 14px;
-      margin: 0px 10px
+      margin: 0px 10px;
+      transition: color 0.2s ease;
+    }
+
+    & a:hover {
+      color: var(--color-primary);
     }
   }
 
@@ -247,9 +250,6 @@ header.header-logged-in {
     display: flex !important;
   }
 
-  & .nav-logged-only {
-    display: block !important;
-  }
 
   & #login-header {
     display: none !important;
@@ -285,6 +285,130 @@ header.header-logged-out {
 #user-header,
 .nav-logged-only {
   transition: all 0.3s ease;
+}
+
+/* Estilos para links de navegação baseados em perfis */
+.nav-link-base {
+  display: none !important;
+}
+
+.nav-link {
+  display: none !important;
+}
+
+/* Perfil Visitor - Visitante (não logado) */
+.header-profile-visitor .nav-link-base {
+  display: flex !important;
+}
+
+/* Perfil Customer - Cliente */
+.header-profile-customer .nav-link-base {
+  display: flex !important;
+}
+.header-profile-customer .nav-link-customer {
+  display: flex !important;
+}
+
+/* Perfil Attendant - Atendente */
+.header-profile-attendant .nav-link-base {
+  display: flex !important;
+}
+.header-profile-attendant .nav-link-attendant {
+  display: flex !important;
+}
+
+/* Perfil Manager - Gerente */
+.header-profile-manager .nav-link-base {
+  display: flex !important;
+}
+.header-profile-manager .nav-link-manager {
+  display: flex !important;
+}
+
+/* Perfil Admin - Administrador */
+.header-profile-admin .nav-link-base {
+  display: flex !important;
+}
+.header-profile-admin .nav-link-admin {
+  display: flex !important;
+}
+
+/* Herança de permissões: Admin herda de Manager */
+.header-profile-admin .nav-link-manager {
+  display: flex !important;
+}
+
+/* Herança de permissões: Manager herda de Attendant */
+.header-profile-manager .nav-link-attendant {
+  display: flex !important;
+}
+
+/* Controle de visibilidade dos elementos do usuário por perfil */
+.user-element-customer {
+  display: none !important;
+}
+
+/* Customer: mostrar cesta, pontos, endereço e ícone do perfil */
+.header-profile-customer .user-element-customer {
+  display: flex !important;
+}
+
+/* Attendant/Manager/Admin: mostrar apenas ícone do perfil */
+.header-profile-attendant .user-element-customer,
+.header-profile-manager .user-element-customer,
+.header-profile-admin .user-element-customer {
+  display: none !important;
+}
+
+/* Estilos para modal de navegação com perfis */
+.nav-modal-links .nav-link-base {
+  display: none !important;
+}
+
+.nav-modal-links .nav-link {
+  display: none !important;
+}
+
+/* Aplicar mesmas regras de perfil no modal */
+.header-profile-visitor .nav-modal-links .nav-link-base {
+  display: block !important;
+}
+
+.header-profile-customer .nav-modal-links .nav-link-base {
+  display: block !important;
+}
+.header-profile-customer .nav-modal-links .nav-link-customer {
+  display: block !important;
+}
+
+.header-profile-attendant .nav-modal-links .nav-link-base {
+  display: block !important;
+}
+.header-profile-attendant .nav-modal-links .nav-link-attendant {
+  display: block !important;
+}
+
+.header-profile-manager .nav-modal-links .nav-link-base {
+  display: block !important;
+}
+.header-profile-manager .nav-modal-links .nav-link-manager {
+  display: block !important;
+}
+
+.header-profile-admin .nav-modal-links .nav-link-base {
+  display: block !important;
+}
+.header-profile-admin .nav-modal-links .nav-link-admin {
+  display: block !important;
+}
+
+/* Herança no modal */
+.header-profile-admin .nav-modal-links .nav-link-manager {
+  display: block !important;
+}
+
+.header-profile-manager .nav-modal-links .nav-link-attendant {
+  display: block !important;
 }
 
 /* Modal de navegação (hambúrguer) */

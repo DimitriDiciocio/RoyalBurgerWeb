@@ -4,16 +4,17 @@ import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage, showToast } from "./alerts.js";
 
 $(document).ready(function () {
-    // ====== Guarda de rota: somente clientes podem acessar esta página ======
+    // ====== Guarda de rota: qualquer usuário logado pode acessar esta página ======
     try {
         const u = getStoredUser();
-        const role = u && (u.role || u.user_role || u.type);
-        const isCustomer = String(role || '').toLowerCase() === 'customer';
-        if (!isCustomer) {
+        const token = localStorage.getItem('rb.token') || localStorage.getItem('authToken');
+        
+        // Verifica se há usuário e token (usuário logado)
+        if (!u || !token) {
             setFlashMessage({
                 type: 'error',
                 title: 'Acesso Restrito',
-                message: 'Você precisa estar logado como cliente para acessar esta página.'
+                message: 'Você precisa estar logado para acessar esta página.'
             });
             // Redireciona para a página inicial relativa a partir de src/pages/
             window.location.href = '../../index.html';
@@ -24,7 +25,7 @@ $(document).ready(function () {
         setFlashMessage({ 
             type: 'error', 
             title: 'Acesso Restrito', 
-            message: 'Faça login como cliente para continuar.' 
+            message: 'Faça login para continuar.' 
         });
         window.location.href = '../../index.html';
         return;

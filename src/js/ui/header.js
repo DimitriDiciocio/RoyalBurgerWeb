@@ -29,6 +29,72 @@ function getStoredUser() {
 // Expor para outros módulos
 window.getStoredUser = getStoredUser;
 
+// Função para obter o perfil do usuário
+function getUserProfile() {
+  const user = getStoredUser();
+  if (!user) return null;
+  
+  // Verifica diferentes campos possíveis para o perfil
+  return user.profile || user.role || user.type || user.user_type || 'customer';
+}
+
+// Função para verificar se o usuário tem um perfil específico
+function hasProfile(profile) {
+  const userProfile = getUserProfile();
+  if (!userProfile) return false;
+  
+  // Normalizar o perfil para lowercase
+  const normalizedProfile = userProfile.toLowerCase();
+  const normalizedTarget = profile.toLowerCase();
+  
+  return normalizedProfile === normalizedTarget;
+}
+
+// Função para verificar se o usuário tem permissão para um perfil (considerando herança)
+function hasPermissionFor(profile) {
+  const userProfile = getUserProfile();
+  if (!userProfile) return false;
+  
+  const normalizedProfile = userProfile.toLowerCase();
+  const normalizedTarget = profile.toLowerCase();
+  
+  // Admin tem acesso a tudo
+  if (normalizedProfile === 'admin') return true;
+  
+  // Manager tem acesso a attendant e customer
+  if (normalizedProfile === 'manager') {
+    return ['attendant', 'customer'].includes(normalizedTarget);
+  }
+  
+  // Attendant (entregador) tem acesso apenas a suas próprias funcionalidades
+  if (normalizedProfile === 'attendant') {
+    return normalizedTarget === 'attendant';
+  }
+  
+  // Customer só tem acesso a customer
+  if (normalizedProfile === 'customer') {
+    return normalizedTarget === 'customer';
+  }
+  
+  return false;
+}
+
+// Expor funções para outros módulos
+window.getUserProfile = getUserProfile;
+window.hasProfile = hasProfile;
+window.hasPermissionFor = hasPermissionFor;
+
+// Função de debug para testar perfis
+window.debugProfile = function(profile) {
+  const user = { profile: profile, name: 'Test User' };
+  localStorage.setItem(RB_STORAGE_KEYS.user, JSON.stringify(user));
+  if (typeof window.configureHeader === 'function') {
+    window.configureHeader();
+  }
+  console.log(`Perfil aplicado: ${profile}`);
+  console.log('Classes do header:', document.querySelector('header').className);
+};
+
 function getStoredToken() {
   return localStorage.getItem(RB_STORAGE_KEYS.token) || localStorage.getItem('authToken') || '';
 }

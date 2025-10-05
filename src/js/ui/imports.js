@@ -157,6 +157,9 @@ function isLoginPage() {
     const isLoggedIn = typeof window.isUserLoggedIn === 'function' ? window.isUserLoggedIn() : false;
     const isLogin = isLoginPage();
     const isCadastro = isCadastroPage();
+    
+    // Obter perfil do usuário
+    const userProfile = typeof window.getUserProfile === 'function' ? window.getUserProfile() : null;
 
     // Determinar estado "mobile" de forma robusta (MQ + visibilidade real do botão)
     const mq = window.matchMedia && window.matchMedia('(max-width: 1024px)');
@@ -172,6 +175,7 @@ function isLoginPage() {
   
     // Reset classes
     header.classList.remove('header-login', 'header-logged-out', 'header-logged-in');
+    header.classList.remove('header-profile-visitor', 'header-profile-customer', 'header-profile-attendant', 'header-profile-manager', 'header-profile-admin');
   
     if (isLogin || isCadastro) {
       // Página de login/cadastro: apenas logo centralizada
@@ -184,6 +188,31 @@ function isLoginPage() {
     } else if (isLoggedIn) {
       // Usuário logado
       header.classList.add('header-logged-in');
+      
+      // Aplicar classe de perfil baseada no perfil do usuário
+      if (userProfile) {
+        const normalizedProfile = userProfile.toLowerCase();
+        switch (normalizedProfile) {
+          case 'customer':
+            header.classList.add('header-profile-customer');
+            break;
+          case 'attendant':
+            header.classList.add('header-profile-attendant');
+            break;
+          case 'manager':
+            header.classList.add('header-profile-manager');
+            break;
+          case 'admin':
+            header.classList.add('header-profile-admin');
+            break;
+          default:
+            // Fallback para customer se perfil não reconhecido
+            header.classList.add('header-profile-customer');
+        }
+      } else {
+        // Fallback para customer se não conseguir obter perfil
+        header.classList.add('header-profile-customer');
+      }
 
       if (isMobile) {
         // Mobile: esconder nav e manter hambúrguer + ícone de usuário
@@ -202,10 +231,7 @@ function isLoginPage() {
         if (navModalAuth) navModalAuth.style.display = 'none';
       }
   
-      // Mostrar links que só aparecem quando logado (apenas na nav quando visível)
-      navLoggedOnlyLinks.forEach(link => {
-        link.style.display = 'block';
-      });
+      // Links específicos por perfil são controlados pelo CSS
   
       // Atualiza ícone com iniciais do usuário
       const user = typeof window.getStoredUser === 'function' ? window.getStoredUser() : null;
@@ -229,6 +255,7 @@ function isLoginPage() {
     } else {
       // Usuário não logado
       header.classList.add('header-logged-out');
+      header.classList.add('header-profile-visitor');
 
       if (isMobile) {
         // Mobile: logo + botões de cadastro/entrar
