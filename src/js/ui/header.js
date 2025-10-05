@@ -38,27 +38,40 @@ async function hydrateUserFromMe() {
   const token = getStoredToken();
   if (hasUser || !token) return;
 
-  const possiblePaths = ['/api/users/profile', '/api/users/me', '/src/auth/me'];
-  for (const path of possiblePaths) {
-    try {
-      const response = await fetch(path, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const user = data?.user || data || null;
-        if (user) {
-          try { localStorage.setItem(RB_STORAGE_KEYS.user, JSON.stringify(user)); } catch (_e) { }
-          if (typeof window.configureHeader === 'function') {
-            window.configureHeader();
+  // Importar API_BASE_URL dinamicamente para evitar dependência circular
+  try {
+    const { API_BASE_URL } = await import('../api/api.js');
+    const possiblePaths = ['/api/users/profile', '/api/users/me', '/src/auth/me'];
+    
+    for (const path of possiblePaths) {
+      try {
+        const fullUrl = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+        const response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const user = data?.user || data || null;
+          if (user) {
+            try { localStorage.setItem(RB_STORAGE_KEYS.user, JSON.stringify(user)); } catch (_e) { }
+            if (typeof window.configureHeader === 'function') {
+              window.configureHeader();
+            }
+            return;
           }
-          return;
         }
+      } catch (_e) {
+        // continua tentando próximo path
       }
-    } catch (_e) {
-      // continua tentando próximo path
     }
+  } catch (_e) {
+    // Se não conseguir importar API_BASE_URL, não faz nada
+    console.warn('Não foi possível importar API_BASE_URL para hidratação do usuário');
   }
 }
 

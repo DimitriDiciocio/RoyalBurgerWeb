@@ -105,8 +105,11 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
                 // Endpoint não encontrado
                 errorMessage = 'Serviço não encontrado. Verifique se o servidor está rodando.';
             } else if (response.status === 401) {
-                // Não autorizado
-                errorMessage = data?.error || data?.message || 'Acesso não autorizado.';
+                // Não autorizado - provavelmente token expirado
+                errorMessage = data?.error || data?.message || 'Sessão expirada. Faça login novamente.';
+                // Limpar token expirado automaticamente
+                clearStoredToken();
+                clearStoredUser();
             } else if (response.status === 403) {
                 // Proibido
                 errorMessage = data?.error || data?.message || 'Acesso negado.';
@@ -140,32 +143,3 @@ export function logoutLocal() {
     clearStoredToken();
     clearStoredUser();
 }
-
-// Função para verificar se a API está disponível
-export async function checkApiHealth() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/health`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
-        });
-        return response.ok;
-    } catch (error) {
-        return false;
-    }
-}
-
-// Função para verificar conectividade básica
-export async function checkConnectivity() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
-        });
-        return true; // Se chegou até aqui, a conexão está funcionando
-    } catch (error) {
-        return false;
-    }
-}
-
