@@ -348,6 +348,8 @@ function isLoginPage() {
             newHref = 'clube-royal.html';
           } else if (href.includes('pedidos.html')) {
             newHref = 'pedidos.html';
+          } else if (href.includes('painel-adm.html')) {
+            newHref = 'painel-adm.html';
           }
         } else if (isInSrcFolder) {
           if (href.includes('index.html')) {
@@ -356,6 +358,8 @@ function isLoginPage() {
             newHref = 'pages/clube-royal.html';
           } else if (href.includes('pedidos.html')) {
             newHref = 'pages/pedidos.html';
+          } else if (href.includes('painel-adm.html')) {
+            newHref = 'pages/painel-adm.html';
           }
         } else {
           if (href.includes('index.html')) {
@@ -364,6 +368,8 @@ function isLoginPage() {
             newHref = 'src/pages/clube-royal.html';
           } else if (href.includes('pedidos.html')) {
             newHref = 'src/pages/pedidos.html';
+          } else if (href.includes('painel-adm.html')) {
+            newHref = 'src/pages/painel-adm.html';
           }
         }
   
@@ -566,8 +572,24 @@ function isLoginPage() {
     }
   }
 
+  // Função para obter o caminho correto do painel administrativo
+  function getPainelAdmPath() {
+    const currentPath = window.location.pathname;
+    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
+    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
+  
+    if (isInPagesFolder) {
+      return 'painel-adm.html';
+    } else if (isInSrcFolder) {
+      return 'pages/painel-adm.html';
+    } else {
+      return 'src/pages/painel-adm.html';
+    }
+  }
+
   // Expor funções do header/footer para outros módulos
   window.configureHeader = configureHeader;
   window.getDadosContaPath = getDadosContaPath;
+  window.getPainelAdmPath = getPainelAdmPath;
   window.loadHeader = loadHeader;
   window.getLogoSvgPath = getLogoSvgPath;

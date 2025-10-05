@@ -8,7 +8,7 @@ console.log('Arquivo JavaScript (painel.js) carregado com sucesso - Usando Event
 // --- Chave para armazenar a seção ativa no localStorage ---
 const ACTIVE_SECTION_STORAGE_KEY = 'activePanelSection';
 
-// --- Verificação de permissões de administrador ---
+// --- Verificação de permissões de administrador e gerente ---
 function verificarPermissoesAdmin() {
     try {
         const user = getStoredUser();
@@ -22,16 +22,18 @@ function verificarPermissoesAdmin() {
             return false;
         }
 
-        const role = user.role || user.user_role || user.type || user.user_type;
-        const isAdmin = String(role || '').toLowerCase() === 'admin' || 
-                       String(role || '').toLowerCase() === 'administrator' ||
-                       String(role || '').toLowerCase() === 'gerente';
+        const role = user.role || user.user_role || user.type || user.user_type || user.profile;
+        const normalizedRole = String(role || '').toLowerCase();
+        const isAdminOrManager = normalizedRole === 'admin' || 
+                                normalizedRole === 'administrator' ||
+                                normalizedRole === 'manager' ||
+                                normalizedRole === 'gerente';
 
-        if (!isAdmin) {
+        if (!isAdminOrManager) {
             setFlashMessage({
                 type: 'error',
                 title: 'Acesso Restrito',
-                message: 'Apenas administradores podem acessar esta página.'
+                message: 'Apenas administradores e gerentes podem acessar esta página.'
             });
             window.location.href = '../../index.html';
             return false;
@@ -84,7 +86,7 @@ function mostrarSecao(idSecao) {
 
 // --- Lógica de inicialização e adição de Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 0. Verificar permissões de administrador antes de inicializar o painel
+    // 0. Verificar permissões de administrador/gerente antes de inicializar o painel
     if (!verificarPermissoesAdmin()) {
         return; // Para a execução se o usuário não tem permissão
     }
