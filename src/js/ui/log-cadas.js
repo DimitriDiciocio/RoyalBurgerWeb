@@ -1,8 +1,14 @@
 // Importar a função utilitária
 import { inicializarGerenciamentoInputs } from '../utils.js';
 import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
-import { loginWithEmailAndPassword } from '../api/auth.js';
+import { loginWithEmailAndPassword, verify2FACode } from '../api/auth.js';
 import { registerCustomer } from '../api/user.js';
+
+// Função para redirecionar para verificação 2FA
+function redirecionarPara2FA(userId, email) {
+    // Redireciona para a página de verificação com parâmetros específicos para 2FA
+    window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}&type=2fa&user_id=${userId}`;
+}
 
 // Aguardar o DOM estar pronto
 document.addEventListener('DOMContentLoaded', function () {
@@ -253,17 +259,37 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     try {
                         const resp = await loginWithEmailAndPassword({ email, password: senha });
+                        
+                        // Verificar se 2FA é necessário
+                        if (resp && resp.requires_2fa) {
+                            showToast('Código de verificação enviado para seu email.', { 
+                                type: 'info', 
+                                title: 'Verificação em duas etapas',
+                                autoClose: 2000
+                            });
+                            
+                            // Redirecionar para página de verificação 2FA
+                            setTimeout(() => {
+                                redirecionarPara2FA(resp.user_id, email);
+                            }, 2000);
+                            return;
+                        }
+                        
+                        // Login normal (sem 2FA)
                         const userResp = resp?.user || null;
                         const nomeUsuario = userResp?.full_name || userResp?.name || '';
                         showToast(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, { type: 'success', title: 'Login' });
+                        
                         // Atualiza header imediatamente com dados do usuário (fallback para e-mail quando não vier user)
                         try {
                             const fallbackUser = userResp || { email };
                             window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
                         } catch (_e) { }
+                        
                         setTimeout(() => {
                             window.location.href = '../../index.html';
                         }, 1200);
+                        
                     } catch (loginErr) {
                         // Verificar se o erro é por email não verificado
                         const errorMsg = loginErr?.payload?.error || loginErr?.message || '';
@@ -333,4 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
             window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}&type=password-change`;
         });
     }
+
+    // Tornar função global para uso
+    window.redirecionarPara2FA = redirecionarPara2FA;
 });

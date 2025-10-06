@@ -38,8 +38,8 @@
 
                 <div class="quadro-navegacao">
                     <div>
-                        <p class="perfil">YB</p>
-                        <p class="nome">Ygor Brocha</p>
+                        <p class="perfil"></p>
+                        <p class="nome"></p>
                     </div>
 
                     <div class="navega">
@@ -206,15 +206,6 @@
                         </div>
 
                         <p class="edita" onclick="abrirModal('alterar-senha')">Alterar senha</p>
-                    </div>
-
-                    <div class="info-checa">
-                        <div>
-                            <p class="titulo">Verificar email</p>
-                            <p class="descricao">Verifique eu email para uma melhor experiência e segurança</p>
-                        </div>
-
-                        <p class="edita" onclick="abrirModal('verificar-email')">Verificar email</p>
                     </div>
                 </div>
 
@@ -491,7 +482,7 @@
 
                 <div class="main">
                     <p>
-                        Irá chegar um código de verificação de 6 dígitos no email 
+                        Irá chegar um código de verificação de 6 dígitos no email 
                         <span>email.exemplo@gmail.com</span>. <br>
                         Insira esse código no campo abaixo para verificar seu email
                         e ter uma melhor experiência e segurança.
@@ -511,6 +502,35 @@
                 </div>
 
                 
+            </div>
+        </div>
+
+        <!-- Modal para confirmação de 2FA -->
+        <div id="confirmar-2fa" class="modal" style="display: none;">
+            <div class="div-overlay"></div>
+
+            <div class="modal-contet">
+                <div class="header">
+                    <i class="fa-solid fa-xmark" onclick="fecharModal('confirmar-2fa')"></i>
+                    <p class="titulo">Confirmar ativação do 2FA</p>
+                    <p class="descricao">Digite o código enviado para seu email</p>
+                </div>
+
+                <div class="main">
+                    <p>
+                        Um código de verificação foi enviado para seu email. 
+                        Digite o código de 6 dígitos abaixo para ativar a verificação em duas etapas.
+                    </p>
+
+                    <div class="div-input">
+                        <label for="codigo-confirmacao-2fa">Código de verificação</label>
+                        <input type="text" id="codigo-confirmacao-2fa" name="codigo-confirmacao-2fa" required autocomplete="off" maxlength="6" placeholder="000000">
+                    </div>
+                </div>
+
+                <div class="footer">
+                    <button id="btn-confirmar-2fa">Confirmar e Ativar</button>
+                </div>
             </div>
         </div>
 

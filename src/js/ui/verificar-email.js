@@ -1,13 +1,15 @@
 // Gerenciamento da verificação de email usando sistema genérico
 import { createEmailVerification } from './code-verification.js';
 import { verifyEmailCode, resendVerificationCode, requestEmailVerification, verifyPasswordChangeCode, requestPasswordChangeCode, requestPasswordReset } from '../api/user.js';
+import { verify2FACode } from '../api/auth.js';
 import { showToast } from './alerts.js';
 
 document.addEventListener('DOMContentLoaded', async function () {
     // Verificar se há email na query string
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get('email');
-    const type = urlParams.get('type'); // 'email', 'password-change' ou 'password-reset'
+    const type = urlParams.get('type'); // 'email', 'password-change', 'password-reset' ou '2fa'
+    const userId = urlParams.get('user_id'); // Para 2FA
 
     // Se não houver email, redireciona para cadastro
     if (!email) {
@@ -78,6 +80,65 @@ document.addEventListener('DOMContentLoaded', async function () {
             },
             onError: async (err) => {
                 showToast('Código inválido. Tente novamente.', { type: 'error' });
+            }
+        };
+    } else if (type === '2fa') {
+        // Configuração para verificação 2FA
+        config = {
+            title: 'Verificação em Duas Etapas',
+            description: 'Enviamos um código de 6 dígitos para confirmar seu login.',
+            showChangeEmailLink: false,
+            autoRequest: false, // Não solicitar automaticamente pois já foi solicitado no login
+            onVerify: async (email, code) => {
+                if (!userId) {
+                    showToast('Erro: ID do usuário não encontrado.', { type: 'error' });
+                    return false;
+                }
+                
+                const result = await verify2FACode(userId, code);
+                
+                if (result && result.access_token) {
+                    const userResp = result?.user || null;
+                    const nomeUsuario = userResp?.full_name || userResp?.name || '';
+                    
+                    showToast(`Bem-vindo${nomeUsuario ? ', ' + nomeUsuario : ''}!`, { 
+                        type: 'success', 
+                        title: 'Login realizado com sucesso' 
+                    });
+                    
+                    // Atualiza header imediatamente
+                    try {
+                        const fallbackUser = userResp || { email };
+                        window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
+                    } catch (_e) { }
+                    
+                    // Redirecionar para página inicial
+                    setTimeout(() => {
+                        window.location.href = '../../index.html';
+                    }, 1200);
+                    
+                    return true;
+                }
+                
+                return false;
+            },
+            onResend: async (email) => {
+                // Para 2FA, não há reenvio direto - o usuário precisa fazer login novamente
+                showToast('Para reenviar o código, faça login novamente.', { type: 'info' });
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+                return false;
+            },
+            onRequest: async (email) => {
+                // Não aplicável para 2FA
+                return false;
+            },
+            onSuccess: async (result) => {
+                // O redirecionamento já é feito no onVerify
+            },
+            onError: async (err) => {
+                showToast('Código inválido ou expirado. Tente novamente.', { type: 'error' });
             }
         };
     } else {

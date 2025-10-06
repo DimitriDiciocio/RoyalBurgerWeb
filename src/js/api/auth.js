@@ -44,3 +44,41 @@ export async function logout() {
     }
     logoutLocal();
 }
+
+// Funções para 2FA (Two-Factor Authentication)
+export async function verify2FACode(userId, code) {
+    const data = await apiRequest('/api/users/verify-2fa', {
+        method: 'POST',
+        body: { user_id: userId, code },
+        skipAuth: true
+    });
+
+    // Se a verificação foi bem-sucedida, armazenar token e dados do usuário
+    if (data && (data.access_token || data.token)) {
+        const token = data.access_token || data.token;
+        setStoredToken(token);
+    }
+    if (data && data.user) {
+        setStoredUser(data.user);
+    }
+    
+    return data;
+}
+
+export async function toggle2FA(enable) {
+    return apiRequest('/api/users/toggle-2fa', {
+        method: 'POST',
+        body: { enable }
+    });
+}
+
+export async function confirm2FAEnable(code) {
+    return apiRequest('/api/users/enable-2fa-confirm', {
+        method: 'POST',
+        body: { code }
+    });
+}
+
+export async function get2FAStatus() {
+    return apiRequest('/api/users/2fa-status', { method: 'GET' });
+}

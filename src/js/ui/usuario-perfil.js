@@ -1,4 +1,4 @@
-import { logout, fetchMe } from "../api/auth.js";
+import { logout, fetchMe, toggle2FA, confirm2FAEnable, get2FAStatus } from "../api/auth.js";
 import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress } from "../api/user.js";
 import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage, showToast } from "./alerts.js";
@@ -290,6 +290,260 @@ $(document).ready(function () {
         }
     }
 
+    // ====== Gerenciamento de 2FA ======
+    let isProcessing2FA = false; // Flag para evitar múltiplas solicitações
+    
+    async function carregarStatus2FA() {
+        try {
+            const status = await get2FAStatus();
+            
+            // Encontrar o toggle específico da "Verificação em duas etapas"
+            const infoChecaElements = document.querySelectorAll('#config .info-checa');
+            let toggleElement = null;
+            
+            infoChecaElements.forEach(element => {
+                const titulo = element.querySelector('.titulo');
+                if (titulo && titulo.textContent.includes('Verificação em duas etapas')) {
+                    toggleElement = element.querySelector('input[type="checkbox"]');
+                }
+            });
+            
+            if (toggleElement) {
+                // Verificar se o status tem a propriedade esperada
+                const isEnabled = status.two_factor_enabled || status.enabled || false;
+                toggleElement.checked = isEnabled;
+                
+                // Atualizar visual do toggle
+                const bolinha = toggleElement.nextElementSibling;
+                if (bolinha) {
+                    if (isEnabled) {
+                        bolinha.style.backgroundColor = 'var(--color-primary)';
+                        bolinha.querySelector('::before') && (bolinha.querySelector('::before').style.transform = 'translateX(22px)');
+                    } else {
+                        bolinha.style.backgroundColor = '#ccc';
+                        bolinha.querySelector('::before') && (bolinha.querySelector('::before').style.transform = 'translateX(0)');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao carregar status do 2FA:', error);
+            // Em caso de erro, definir como desabilitado
+            const infoChecaElements = document.querySelectorAll('#config .info-checa');
+            infoChecaElements.forEach(element => {
+                const titulo = element.querySelector('.titulo');
+                if (titulo && titulo.textContent.includes('Verificação em duas etapas')) {
+                    const toggleElement = element.querySelector('input[type="checkbox"]');
+                    if (toggleElement) {
+                        toggleElement.checked = false;
+                    }
+                }
+            });
+        }
+    }
+
+    // Configurar toggle 2FA
+    function configurarToggle2FA() {
+        // Encontrar o toggle específico da "Verificação em duas etapas"
+        const infoChecaElements = document.querySelectorAll('#config .info-checa');
+        let toggleElement = null;
+        
+        // Procurar pelo elemento que contém "Verificação em duas etapas"
+        infoChecaElements.forEach(element => {
+            const titulo = element.querySelector('.titulo');
+            if (titulo && titulo.textContent.includes('Verificação em duas etapas')) {
+                toggleElement = element.querySelector('input[type="checkbox"]');
+            }
+        });
+        
+        if (toggleElement) {
+            // Remover listeners existentes para evitar duplicação
+            const newToggle = toggleElement.cloneNode(true);
+            toggleElement.parentNode.replaceChild(newToggle, toggleElement);
+            toggleElement = newToggle;
+            
+            // Adicionar listener no input
+            toggleElement.addEventListener('change', async function() {
+                // Evitar múltiplas solicitações simultâneas
+                if (isProcessing2FA) {
+                    console.log('Já está processando uma solicitação 2FA, ignorando...');
+                    return;
+                }
+                
+                const isEnabled = this.checked;
+                
+                try {
+                    if (isEnabled) {
+                        isProcessing2FA = true;
+                        
+                        // Habilitar 2FA - Passo 1: Solicitar código
+                        const result = await toggle2FA(true);
+                        
+                        if (result.requires_confirmation) {
+                            showToast('Código de verificação enviado para seu email.', { 
+                                type: 'info', 
+                                title: 'Confirmação necessária' 
+                            });
+                            
+                            // Abrir modal de confirmação
+                            abrirModal('confirmar-2fa');
+                            
+                            // Limpar campo de código e focar
+                            setTimeout(() => {
+                                const codigoInput = document.getElementById('codigo-confirmacao-2fa');
+                                if (codigoInput) {
+                                    codigoInput.value = '';
+                                    codigoInput.focus();
+                                }
+                            }, 100);
+                        } else {
+                            // Se não precisar de confirmação, atualizar status
+                            await carregarStatus2FA();
+                            isProcessing2FA = false;
+                        }
+                    } else {
+                        // Desabilitar 2FA
+                        const confirmed = await showConfirm({
+                            title: 'Desabilitar 2FA',
+                            message: 'Tem certeza que deseja desabilitar a verificação em duas etapas? Isso reduzirá a segurança da sua conta.',
+                            confirmText: 'Desabilitar',
+                            cancelText: 'Cancelar'
+                        });
+                        
+                        if (confirmed) {
+                            const result = await toggle2FA(false);
+                            showToast('Verificação em duas etapas desabilitada.', { type: 'success' });
+                            
+                            // Atualizar status após desabilitar
+                            await carregarStatus2FA();
+                        } else {
+                            // Reverter o toggle se cancelado
+                            this.checked = true;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Erro ao alterar 2FA:', error);
+                    toastFromApiError(error);
+                    // Reverter o toggle em caso de erro
+                    this.checked = !isEnabled;
+                    isProcessing2FA = false;
+                }
+            });
+            
+            // Adicionar listener também no label para garantir que o clique seja capturado
+            const label = toggleElement.closest('label');
+            if (label) {
+                label.addEventListener('click', function(e) {
+                    // Pequeno delay para permitir que o checkbox seja atualizado
+                    setTimeout(() => {
+                        const checkbox = this.querySelector('input[type="checkbox"]');
+                        if (checkbox) {
+                            // Disparar evento change se necessário
+                            checkbox.dispatchEvent(new Event('change'));
+                        }
+                    }, 10);
+                });
+            }
+        }
+    }
+
+    // Configurar confirmação de 2FA
+    function configurarConfirmacao2FA() {
+        const btnConfirmar2FA = document.getElementById('btn-confirmar-2fa');
+        const codigoInput = document.getElementById('codigo-confirmacao-2fa');
+        const modal2FA = document.getElementById('confirmar-2fa');
+        
+        if (btnConfirmar2FA && codigoInput) {
+            // Máscara para aceitar apenas números e limitar a 6 dígitos
+            codigoInput.addEventListener('input', function() {
+                let value = this.value.replace(/\D/g, '');
+                if (value.length > 6) {
+                    value = value.substring(0, 6);
+                }
+                this.value = value;
+                
+                // Ativar/desativar botão baseado no tamanho do código
+                if (value.length === 6) {
+                    btnConfirmar2FA.disabled = false;
+                } else {
+                    btnConfirmar2FA.disabled = true;
+                }
+            });
+
+            btnConfirmar2FA.addEventListener('click', async function() {
+                const codigo = codigoInput.value.trim();
+                
+                if (!codigo || codigo.length !== 6) {
+                    showToast('Por favor, digite o código de 6 dígitos.', { type: 'error' });
+                    return;
+                }
+                
+                try {
+                    this.disabled = true;
+                    this.textContent = 'Confirmando...';
+                    
+                    const result = await confirm2FAEnable(codigo);
+                    
+                    if (result && result.message) {
+                        showToast(result.message, { type: 'success' });
+                    } else {
+                        showToast('Verificação em duas etapas ativada com sucesso!', { type: 'success' });
+                    }
+                    
+                    fecharModal('confirmar-2fa');
+                    
+                    // Atualizar status do toggle
+                    await carregarStatus2FA();
+                    
+                    // Resetar flag de processamento
+                    isProcessing2FA = false;
+                    
+                } catch (error) {
+                    console.error('Erro ao confirmar 2FA:', error);
+                    toastFromApiError(error);
+                    this.disabled = false;
+                    this.textContent = 'Confirmar e Ativar';
+                    // Resetar flag de processamento em caso de erro
+                    isProcessing2FA = false;
+                }
+            });
+        }
+
+        // Configurar fechamento do modal e reversão do toggle
+        if (modal2FA) {
+            const overlay = modal2FA.querySelector('.div-overlay');
+            const closeBtn = modal2FA.querySelector('.fa-xmark');
+            
+            const fecharModal2FA = () => {
+                modal2FA.style.display = 'none';
+                // Reverter o toggle para desabilitado (usuário cancelou a ativação)
+                const infoChecaElements = document.querySelectorAll('#config .info-checa');
+                infoChecaElements.forEach(element => {
+                    const titulo = element.querySelector('.titulo');
+                    if (titulo && titulo.textContent.includes('Verificação em duas etapas')) {
+                        const toggleElement = element.querySelector('input[type="checkbox"]');
+                        if (toggleElement) {
+                            toggleElement.checked = false;
+                        }
+                    }
+                });
+                // Limpar o campo de código
+                if (codigoInput) {
+                    codigoInput.value = '';
+                }
+                // Resetar flag de processamento
+                isProcessing2FA = false;
+            };
+            
+            if (overlay) {
+                overlay.addEventListener('click', fecharModal2FA);
+            }
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', fecharModal2FA);
+            }
+        }
+    }
+
     function criarCardEndereco(end) {
         const div = document.createElement('div');
         div.className = 'quadro-endereco';
@@ -557,6 +811,68 @@ $(document).ready(function () {
 
     // Carrega perfil e endereços na entrada
     carregarPerfil();
+
+    // Configurar funcionalidades de 2FA
+    configurarToggle2FA();
+    configurarConfirmacao2FA();
+    
+    // Carregar status 2FA após um pequeno delay para garantir que o DOM esteja pronto
+    setTimeout(async () => {
+        await carregarStatus2FA();
+    }, 500);
+
+    // Recarregar status 2FA quando a seção de configurações for exibida
+    $(document).on('click', '.navega div:contains("Configurações")', async function() {
+        setTimeout(async () => {
+            await carregarStatus2FA();
+        }, 100);
+    });
+
+    // Função de teste para debug (remover em produção)
+    window.testarToggle2FA = function() {
+        console.log('=== TESTE TOGGLE 2FA ===');
+        console.log('Flag isProcessing2FA:', isProcessing2FA);
+        
+        // Encontrar o toggle específico da "Verificação em duas etapas"
+        const infoChecaElements = document.querySelectorAll('#config .info-checa');
+        let toggle = null;
+        
+        infoChecaElements.forEach(element => {
+            const titulo = element.querySelector('.titulo');
+            if (titulo && titulo.textContent.includes('Verificação em duas etapas')) {
+                toggle = element.querySelector('input[type="checkbox"]');
+            }
+        });
+        
+        console.log('Toggle 2FA encontrado:', toggle);
+        
+        if (toggle) {
+            console.log('Toggle checked:', toggle.checked);
+            console.log('Toggle disabled:', toggle.disabled);
+            
+            // Testar clique manual
+            console.log('Testando clique manual...');
+            toggle.checked = !toggle.checked;
+            toggle.dispatchEvent(new Event('change'));
+        } else {
+            console.log('Toggle 2FA não encontrado! Verificando todos os toggles...');
+            
+            // Listar todos os toggles disponíveis
+            const allToggles = document.querySelectorAll('#config input[type="checkbox"]');
+            allToggles.forEach((toggle, index) => {
+                const parent = toggle.closest('.info-checa');
+                const titulo = parent ? parent.querySelector('.titulo') : null;
+                console.log(`Toggle ${index + 1}:`, toggle, 'Título:', titulo ? titulo.textContent : 'N/A');
+            });
+        }
+    };
+
+    // Função para resetar flag de processamento (para debug)
+    window.resetarFlag2FA = function() {
+        isProcessing2FA = false;
+        console.log('Flag isProcessing2FA resetada para false');
+    };
+
 
     // mostra "dados da conta" ao entrar
     $("#dados-user").show();

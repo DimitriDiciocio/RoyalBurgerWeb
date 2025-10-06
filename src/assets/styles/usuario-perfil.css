@@ -263,6 +263,7 @@ main{
                     transition: .4s;
 
                     &::before {
+                        content: '';
                         position: absolute;
                         height: 22px;
                         width: 22px;
@@ -271,14 +272,15 @@ main{
                         background-color: white;
                         border-radius: 50%;
                         transition: .4s;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
                     }
                 }
 
-                input:checked+.bolinha {
+                input:checked + .bolinha {
                     background-color: var(--color-primary);
                 }
 
-                input:checked+.bolinha::before {
+                input:checked + .bolinha::before {
                     transform: translateX(22px);
                 }
             }
