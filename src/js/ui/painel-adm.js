@@ -199,7 +199,7 @@ class SectionManager {
             { id: 'secao-estoque', handler: () => new EstoqueManager() },
             { id: 'secao-relatorios', handler: null },
             { id: 'secao-finaceiro', handler: null },
-            { id: 'secao-funcionarios', handler: null },
+            { id: 'secao-funcionarios', handler: () => new FuncionarioManager() },
             { id: 'secao-configuracoes', handler: null }
         ];
 
@@ -310,7 +310,10 @@ class SectionManager {
                 // Emitir evento antes da inicialização
                 eventSystem.emit('section:beforeInit', { sectionId });
                 
-                handler();
+                const manager = handler();
+                if (manager && typeof manager.init === 'function') {
+                    manager.init();
+                }
                 
                 // Emitir evento após a inicialização
                 eventSystem.emit('section:afterInit', { sectionId });
@@ -395,8 +398,8 @@ class AuthManager {
             
             if (!user) {
                 this.handleAuthError('Você precisa estar logado para acessar esta página.');
-                return false;
-            }
+            return false;
+        }
 
             const userRole = this.normalizeUserRole(user);
             const hasPermission = CONFIG.ADMIN_ROLES.includes(userRole);
@@ -429,12 +432,12 @@ class AuthManager {
      * @param {string} message - Mensagem de erro
      */
     static handleAuthError(message) {
-        setFlashMessage({
-            type: 'error',
-            title: 'Acesso Restrito',
+            setFlashMessage({
+                type: 'error',
+                title: 'Acesso Restrito',
             message: message
-        });
-        window.location.href = '../../index.html';
+            });
+            window.location.href = '../../index.html';
     }
 }
 
@@ -1186,7 +1189,7 @@ class CardapioManager {
         if (!this.validateIngredientes(formData.ingredientes)) {
             return false;
         }
-        
+
         return true;
     }
 
@@ -1922,11 +1925,27 @@ class EstoqueManager {
      * Remove os event listeners da modal de ingrediente
      */
     removeIngredientModalListeners() {
-        // Remover todos os listeners clonando os elementos
+        // Remover listeners específicos para evitar vazamentos de memória
         const modal = document.getElementById('modal-ingrediente');
-        if (modal) {
-            const newModal = modal.cloneNode(true);
-            modal.parentNode.replaceChild(newModal, modal);
+        if (!modal) return;
+
+        const btnFechar = modal.querySelector('.fechar-modal');
+        const btnCancelar = document.getElementById('cancelar-ingrediente');
+        const btnSalvar = document.getElementById('salvar-ingrediente');
+        const overlay = modal.querySelector('.div-overlay');
+
+        // Remover listeners específicos
+        if (btnFechar) {
+            btnFechar.replaceWith(btnFechar.cloneNode(true));
+        }
+        if (btnCancelar) {
+            btnCancelar.replaceWith(btnCancelar.cloneNode(true));
+        }
+        if (btnSalvar) {
+            btnSalvar.replaceWith(btnSalvar.cloneNode(true));
+        }
+        if (overlay) {
+            overlay.replaceWith(overlay.cloneNode(true));
         }
     }
 
@@ -2412,7 +2431,7 @@ class EventSystem {
             this.events.get(eventName).forEach(callback => {
                 try {
                     callback(data);
-                } catch (error) {
+    } catch (error) {
                     console.error(`Erro no listener do evento ${eventName}:`, error);
                 }
             });
@@ -2552,8 +2571,8 @@ class ValidationSystem {
         const element = document.querySelector(selector);
         if (!element) {
             console.warn(`Elemento não encontrado: ${selector} ${context}`);
-            return false;
-        }
+        return false;
+    }
         return true;
     }
 
@@ -2593,6 +2612,1056 @@ class ValidationSystem {
 
 // ============================================================================
 // INICIALIZAÇÃO DO SISTEMA
+// ============================================================================
+
+/**
+ * Gerenciador de dados de funcionários (mock)
+ */
+class FuncionarioDataManager {
+    constructor() {
+        this.funcionarios = [
+            {
+                id: 1,
+                nome: 'Ygor Brocha',
+                email: 'ygor@royalburger.com',
+                nascimento: '1990-05-15',
+                telefone: '(11) 99999-9999',
+                cargo: 'gerente',
+                ativo: true,
+                dataCriacao: '2024-01-15T10:30:00Z'
+            },
+            {
+                id: 2,
+                nome: 'Maria Silva',
+                email: 'maria@royalburger.com',
+                nascimento: '1995-08-22',
+                telefone: '(11) 88888-8888',
+                cargo: 'atendente',
+                ativo: true,
+                dataCriacao: '2024-02-10T14:20:00Z'
+            },
+            {
+                id: 3,
+                nome: 'João Santos',
+                email: 'joao@royalburger.com',
+                nascimento: '1992-12-03',
+                telefone: '(11) 77777-7777',
+                cargo: 'entregador',
+                ativo: true,
+                dataCriacao: '2024-02-15T09:15:00Z'
+            },
+            {
+                id: 4,
+                nome: 'Ana Costa',
+                email: 'ana@royalburger.com',
+                nascimento: '1988-03-18',
+                telefone: '(11) 66666-6666',
+                cargo: 'atendente',
+                ativo: false,
+                dataCriacao: '2024-01-20T16:45:00Z'
+            },
+            {
+                id: 5,
+                nome: 'Carlos Oliveira',
+                email: 'carlos@royalburger.com',
+                nascimento: '1993-07-25',
+                telefone: '(11) 55555-5555',
+                cargo: 'entregador',
+                ativo: true,
+                dataCriacao: '2024-03-01T11:30:00Z'
+            },
+            {
+                id: 6,
+                nome: 'Lucas Admin',
+                email: 'lucas@royalburger.com',
+                nascimento: '1985-11-10',
+                telefone: '(11) 44444-4444',
+                cargo: 'admin',
+                ativo: true,
+                dataCriacao: '2024-01-01T08:00:00Z'
+            },
+            // Usuários Clientes
+            {
+                id: 7,
+                nome: 'Pedro Almeida',
+                email: 'pedro.almeida@gmail.com',
+                nascimento: '1998-04-12',
+                telefone: '(11) 33333-3333',
+                cargo: 'cliente',
+                ativo: true,
+                dataCriacao: '2024-03-15T14:20:00Z'
+            },
+            {
+                id: 8,
+                nome: 'Fernanda Lima',
+                email: 'fernanda.lima@hotmail.com',
+                nascimento: '1996-09-08',
+                telefone: '(11) 22222-2222',
+                cargo: 'cliente',
+                ativo: true,
+                dataCriacao: '2024-03-20T10:15:00Z'
+            },
+            {
+                id: 9,
+                nome: 'Roberto Souza',
+                email: 'roberto.souza@yahoo.com',
+                nascimento: '1987-12-25',
+                telefone: '(11) 11111-1111',
+                cargo: 'cliente',
+                ativo: true,
+                dataCriacao: '2024-02-28T16:30:00Z'
+            },
+            {
+                id: 10,
+                nome: 'Juliana Ferreira',
+                email: 'juliana.ferreira@outlook.com',
+                nascimento: '1994-06-14',
+                telefone: '(11) 99999-0000',
+                cargo: 'cliente',
+                ativo: false,
+                dataCriacao: '2024-01-10T12:45:00Z'
+            },
+            {
+                id: 11,
+                nome: 'Marcos Rodrigues',
+                email: 'marcos.rodrigues@gmail.com',
+                nascimento: '1991-11-03',
+                telefone: '(11) 88888-0000',
+                cargo: 'cliente',
+                ativo: true,
+                dataCriacao: '2024-03-05T09:20:00Z'
+            },
+            {
+                id: 12,
+                nome: 'Camila Santos',
+                email: 'camila.santos@hotmail.com',
+                nascimento: '1999-02-18',
+                telefone: '(11) 77777-0000',
+                cargo: 'cliente',
+                ativo: true,
+                dataCriacao: '2024-03-12T15:10:00Z'
+            }
+        ];
+    }
+
+    getAllFuncionarios() {
+        return this.funcionarios;
+    }
+
+    getFuncionarioById(id) {
+        return this.funcionarios.find(f => f.id === id);
+    }
+
+    addFuncionario(funcionarioData) {
+        const newId = Math.max(...this.funcionarios.map(f => f.id)) + 1;
+        const funcionario = {
+            id: newId,
+            ...funcionarioData,
+            ativo: true,
+            dataCriacao: new Date().toISOString()
+        };
+        this.funcionarios.push(funcionario);
+        return funcionario;
+    }
+
+    updateFuncionario(id, funcionarioData) {
+        const index = this.funcionarios.findIndex(f => f.id === id);
+        if (index !== -1) {
+            this.funcionarios[index] = { ...this.funcionarios[index], ...funcionarioData };
+            return this.funcionarios[index];
+        }
+        return null;
+    }
+
+    toggleFuncionarioStatus(id) {
+        const funcionario = this.getFuncionarioById(id);
+        if (funcionario) {
+            funcionario.ativo = !funcionario.ativo;
+            return funcionario;
+        }
+        return null;
+    }
+
+    getMetrics() {
+        const total = this.funcionarios.length;
+        const ativos = this.funcionarios.filter(f => f.ativo).length;
+        const inativos = total - ativos;
+        
+        const cargos = {
+            atendente: this.funcionarios.filter(f => f.cargo === 'atendente').length,
+            gerente: this.funcionarios.filter(f => f.cargo === 'gerente').length,
+            entregador: this.funcionarios.filter(f => f.cargo === 'entregador').length,
+            admin: this.funcionarios.filter(f => f.cargo === 'admin').length,
+            cliente: this.funcionarios.filter(f => f.cargo === 'cliente').length
+        };
+
+        // Separar funcionários e clientes
+        const funcionarios = this.funcionarios.filter(f => f.cargo !== 'cliente').length;
+        const clientes = this.funcionarios.filter(f => f.cargo === 'cliente').length;
+
+        return {
+            total,
+            ativos,
+            inativos,
+            cargos,
+            funcionarios,
+            clientes
+        };
+    }
+}
+
+/**
+ * Gerenciador da seção de funcionários
+ */
+class FuncionarioManager {
+    constructor() {
+        this.currentEditingId = null;
+        this.funcionarioDataManager = new FuncionarioDataManager();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.setupFilterHandlers();
+        this.loadFuncionarios();
+    }
+
+    setupEventListeners() {
+        const newFuncionarioButton = document.querySelector('#secao-funcionarios .adicionar');
+        if (newFuncionarioButton) {
+            newFuncionarioButton.addEventListener('click', () => this.handleNewFuncionario());
+        }
+
+        this.setupFuncionarioHandlers();
+    }
+
+    setupFuncionarioHandlers() {
+        const section = document.getElementById('secao-funcionarios');
+        if (!section) {
+            console.error('Seção de funcionários não encontrada');
+            return;
+        }
+
+        // Event delegation para botões de editar
+        section.addEventListener('click', (e) => {
+            const editButton = e.target.closest('.btn-editar');
+            if (editButton) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleEditClick(editButton);
+            }
+        });
+
+        // Event delegation para toggles
+        section.addEventListener('change', (e) => {
+            if (e.target.matches('.toggle input[type="checkbox"]')) {
+                this.handleToggleChange(e.target);
+            }
+        });
+
+        // Event delegation para clique no toggle (fallback)
+        section.addEventListener('click', (e) => {
+            const toggleContainer = e.target.closest('.toggle');
+            if (toggleContainer) {
+                const checkbox = toggleContainer.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    this.handleToggleChange(checkbox);
+                }
+            }
+        });
+
+        // Event delegation para link de métricas
+        section.addEventListener('click', (e) => {
+            const metricsLink = e.target.closest('.link-metricas');
+            if (metricsLink) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleMetricsClick(metricsLink);
+            }
+        });
+    }
+
+    setupFilterHandlers() {
+        const section = document.getElementById('secao-funcionarios');
+        if (!section) return;
+
+        // Filtro de busca por nome
+        const searchInput = section.querySelector('#busca-funcionario');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.handleSearch(e.target.value);
+            });
+        }
+
+        // Filtro por cargo
+        const cargoFilter = section.querySelector('#cargo-filtro');
+        if (cargoFilter) {
+            cargoFilter.addEventListener('change', (e) => {
+                this.handleCargoFilter(e.target.value);
+            });
+        }
+
+        // Filtro por status
+        const statusFilter = section.querySelector('#status-funcionario');
+        if (statusFilter) {
+            statusFilter.addEventListener('change', (e) => {
+                this.handleStatusFilter(e.target.value);
+            });
+        }
+    }
+
+    handleSearch(searchTerm) {
+        const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
+        const term = searchTerm.toLowerCase().trim();
+
+        cards.forEach(card => {
+            const nomeElement = card.querySelector('.nome-funcionario');
+            const emailElement = card.querySelector('.email p');
+            
+            if (nomeElement && emailElement) {
+                const nome = nomeElement.textContent.toLowerCase();
+                const email = emailElement.textContent.toLowerCase();
+                
+                const matches = nome.includes(term) || email.includes(term);
+                card.style.display = matches ? 'block' : 'none';
+            }
+        });
+
+        // Emitir evento de busca
+        eventSystem.emit('funcionario:search', {
+            term: searchTerm,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    handleCargoFilter(cargo) {
+        const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
+        
+        cards.forEach(card => {
+            const cargoElement = card.querySelector('.cargo');
+            if (cargoElement) {
+                const cardCargo = cargoElement.className.split(' ').find(cls => 
+                    ['atendente', 'gerente', 'entregador', 'admin', 'cliente'].includes(cls)
+                );
+                
+                const shouldShow = !cargo || cardCargo === cargo;
+                card.style.display = shouldShow ? 'block' : 'none';
+            }
+        });
+
+        // Emitir evento de filtro
+        eventSystem.emit('funcionario:filter', {
+            type: 'cargo',
+            value: cargo
+        });
+    }
+
+    handleStatusFilter(status) {
+        const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
+        
+        cards.forEach(card => {
+            const toggleElement = card.querySelector('.toggle');
+            const statusText = card.querySelector('.status-text');
+            
+            if (toggleElement && statusText) {
+                const isActive = toggleElement.classList.contains('active');
+                const cardStatus = isActive ? 'ativo' : 'inativo';
+                
+                const shouldShow = !status || cardStatus === status;
+                card.style.display = shouldShow ? 'block' : 'none';
+            }
+        });
+
+        // Emitir evento de filtro
+        eventSystem.emit('funcionario:filter', {
+            type: 'status',
+            value: status
+        });
+    }
+
+    handleNewFuncionario() {
+        this.openFuncionarioModal();
+    }
+
+    openFuncionarioModal(funcionarioData = null) {
+        const modal = document.getElementById('modal-funcionario');
+        const titulo = document.getElementById('titulo-modal-funcionario');
+        const salvarBtn = document.getElementById('salvar-funcionario');
+        const camposSenha = document.getElementById('campos-senha');
+
+        if (!modal || !titulo || !salvarBtn) {
+            console.error('Elementos da modal não encontrados');
+            return;
+        }
+
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        if (funcionarioData) {
+            titulo.textContent = 'Editar usuário';
+            salvarBtn.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
+            this.currentEditingId = funcionarioData.id;
+            this.populateFuncionarioModal(funcionarioData);
+            // Ocultar campos de senha na edição
+            if (camposSenha) {
+                camposSenha.style.display = 'none';
+            }
+        } else {
+            titulo.textContent = 'Adicione um novo usuário';
+            salvarBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Adicionar';
+            this.currentEditingId = null;
+            this.clearFuncionarioModal();
+            // Mostrar campos de senha para novo usuário
+            if (camposSenha) {
+                camposSenha.style.display = 'flex';
+            }
+        }
+
+        this.setupFuncionarioModalListeners(funcionarioData);
+    }
+
+    closeFuncionarioModal() {
+        const modal = document.getElementById('modal-funcionario');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+            this.currentEditingId = null;
+        }
+    }
+
+    clearFuncionarioModal() {
+        const fields = ['nome-funcionario', 'email-funcionario', 'nascimento-funcionario', 'telefone-funcionario', 'cargo-funcionario', 'senha-funcionario', 'confirmar-senha-funcionario'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+                field.classList.remove('error', 'success');
+            }
+        });
+        
+        // Limpar validações de senha
+        this.clearPasswordValidation();
+    }
+
+    populateFuncionarioModal(funcionarioData) {
+        const fields = {
+            'nome-funcionario': funcionarioData.nome,
+            'email-funcionario': funcionarioData.email,
+            'nascimento-funcionario': funcionarioData.nascimento || '',
+            'telefone-funcionario': funcionarioData.telefone || '',
+            'cargo-funcionario': funcionarioData.cargo
+        };
+
+        Object.entries(fields).forEach(([fieldId, value]) => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = value;
+                field.classList.remove('error', 'success');
+            }
+        });
+
+        // Campos de senha ficam vazios na edição
+        const senhaFields = ['senha-funcionario', 'confirmar-senha-funcionario'];
+        senhaFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+                field.classList.remove('error', 'success');
+            }
+        });
+        
+        // Limpar validações de senha
+        this.clearPasswordValidation();
+    }
+
+    setupFuncionarioModalListeners(funcionarioData = null) {
+        this.removeFuncionarioModalListeners();
+
+        const closeBtn = document.querySelector('#modal-funcionario .fechar-modal');
+        const cancelBtn = document.getElementById('cancelar-funcionario');
+        const salvarBtn = document.getElementById('salvar-funcionario');
+        const overlay = document.querySelector('#modal-funcionario .div-overlay');
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeFuncionarioModal());
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeFuncionarioModal());
+        }
+
+        if (salvarBtn) {
+            salvarBtn.addEventListener('click', () => {
+                if (funcionarioData) {
+                    this.handleEditFuncionario();
+    } else {
+                    this.handleAddFuncionario();
+                }
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeFuncionarioModal());
+        }
+
+        this.setupFuncionarioValidation();
+    }
+
+    removeFuncionarioModalListeners() {
+        const modal = document.getElementById('modal-funcionario');
+        if (modal) {
+            const newModal = modal.cloneNode(true);
+            modal.parentNode.replaceChild(newModal, modal);
+        }
+    }
+
+    setupFuncionarioValidation() {
+        const fields = [
+            { id: 'nome-funcionario', config: { required: true, minLength: 2 } },
+            { id: 'email-funcionario', config: { required: true, type: 'email' } },
+            { id: 'nascimento-funcionario', config: { required: true, type: 'date' } },
+            { id: 'telefone-funcionario', config: { required: true, type: 'tel' } },
+            { id: 'cargo-funcionario', config: { required: true } },
+            { id: 'senha-funcionario', config: { required: false, minLength: 8, type: 'password' } },
+            { id: 'confirmar-senha-funcionario', config: { required: false, matchField: 'senha-funcionario' } }
+        ];
+
+        fields.forEach(({ id, config }) => {
+            const field = document.getElementById(id);
+            if (field) {
+                field.addEventListener('input', () => {
+                    this.validateFuncionarioField(field, config);
+                    if (id === 'senha-funcionario') {
+                        this.validatePasswordRequirements();
+                    }
+                });
+                field.addEventListener('blur', () => this.validateFuncionarioField(field, config));
+            }
+        });
+
+        // Configurar toggle de senha
+        this.setupPasswordToggle();
+    }
+
+    validateFuncionarioField(field, config) {
+        const value = field.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+
+        // Validação obrigatória
+        if (config.required && !value) {
+            isValid = false;
+            errorMessage = 'Este campo é obrigatório';
+        }
+
+        // Validação de tamanho mínimo
+        if (isValid && config.minLength && value.length < config.minLength) {
+            isValid = false;
+            errorMessage = `Mínimo de ${config.minLength} caracteres`;
+        }
+
+        // Validação de email
+        if (isValid && config.type === 'email' && value) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(value)) {
+                isValid = false;
+                errorMessage = 'Email inválido';
+            }
+        }
+
+        // Validação de telefone
+        if (isValid && config.type === 'tel' && value) {
+            const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+            if (!phoneRegex.test(value)) {
+                isValid = false;
+                errorMessage = 'Telefone inválido (formato: (11) 99999-9999)';
+            }
+        }
+
+        // Validação de data
+        if (isValid && config.type === 'date' && value) {
+            const date = new Date(value);
+            const today = new Date();
+            if (date >= today) {
+                isValid = false;
+                errorMessage = 'Data deve ser anterior a hoje';
+            }
+        }
+
+        // Validação de senha
+        if (isValid && config.type === 'password' && value) {
+            if (!this.isValidPassword(value)) {
+                isValid = false;
+                errorMessage = 'Senha não atende aos requisitos';
+            }
+        }
+
+        // Validação de confirmação de senha
+        if (isValid && config.matchField && value) {
+            const matchField = document.getElementById(config.matchField);
+            if (matchField && matchField.value !== value) {
+                isValid = false;
+                errorMessage = 'As senhas não coincidem';
+            }
+        }
+
+        // Aplicar classes de validação
+        field.classList.remove('error', 'success');
+        if (value) {
+            field.classList.add(isValid ? 'success' : 'error');
+        }
+
+        return isValid;
+    }
+
+    validateAllFuncionarioFields() {
+        const isEditing = this.currentEditingId !== null;
+        
+        const fields = [
+            { id: 'nome-funcionario', config: { required: true, minLength: 2 } },
+            { id: 'email-funcionario', config: { required: true, type: 'email' } },
+            { id: 'nascimento-funcionario', config: { required: true, type: 'date' } },
+            { id: 'telefone-funcionario', config: { required: true, type: 'tel' } },
+            { id: 'cargo-funcionario', config: { required: true } },
+            { id: 'senha-funcionario', config: { required: !isEditing, minLength: 8, type: 'password' } },
+            { id: 'confirmar-senha-funcionario', config: { required: !isEditing, matchField: 'senha-funcionario' } }
+        ];
+
+        let allValid = true;
+        fields.forEach(({ id, config }) => {
+            const field = document.getElementById(id);
+            if (field) {
+                const isValid = this.validateFuncionarioField(field, config);
+                if (!isValid) allValid = false;
+            }
+        });
+
+        return allValid;
+    }
+
+    handleAddFuncionario() {
+        if (!this.validateAllFuncionarioFields()) {
+            this.showErrorMessage('Por favor, corrija os erros nos campos');
+            return;
+        }
+
+        const formData = this.getFuncionarioFormData();
+        const funcionario = this.funcionarioDataManager.addFuncionario(formData);
+
+        this.loadFuncionarios();
+        this.closeFuncionarioModal();
+        this.showSuccessMessage('Funcionário adicionado com sucesso!');
+    }
+
+    handleEditFuncionario() {
+        if (!this.validateAllFuncionarioFields()) {
+            this.showErrorMessage('Por favor, corrija os erros nos campos');
+            return;
+        }
+
+        const formData = this.getFuncionarioFormData();
+        const funcionario = this.funcionarioDataManager.updateFuncionario(this.currentEditingId, formData);
+
+        if (funcionario) {
+            this.loadFuncionarios();
+            this.closeFuncionarioModal();
+            this.showSuccessMessage('Funcionário atualizado com sucesso!');
+        } else {
+            this.showErrorMessage('Erro ao atualizar funcionário');
+        }
+    }
+
+    getFuncionarioFormData() {
+        return {
+            nome: document.getElementById('nome-funcionario')?.value || '',
+            email: document.getElementById('email-funcionario')?.value || '',
+            nascimento: document.getElementById('nascimento-funcionario')?.value || '',
+            telefone: document.getElementById('telefone-funcionario')?.value || '',
+            cargo: document.getElementById('cargo-funcionario')?.value || '',
+            senha: document.getElementById('senha-funcionario')?.value || ''
+        };
+    }
+
+    setupPasswordToggle() {
+        // Toggle para senha principal
+        const mostrarSenha = document.getElementById('mostrar-senha-funcionario');
+        const ocultarSenha = document.getElementById('ocultar-senha-funcionario');
+        const senhaInput = document.getElementById('senha-funcionario');
+
+        if (mostrarSenha && ocultarSenha && senhaInput) {
+            mostrarSenha.addEventListener('click', () => {
+                senhaInput.type = 'text';
+                mostrarSenha.style.display = 'none';
+                ocultarSenha.style.display = 'block';
+            });
+
+            ocultarSenha.addEventListener('click', () => {
+                senhaInput.type = 'password';
+                ocultarSenha.style.display = 'none';
+                mostrarSenha.style.display = 'block';
+            });
+        }
+
+        // Toggle para confirmação de senha
+        const mostrarConfirmaSenha = document.getElementById('mostrar-confirma-senha-funcionario');
+        const ocultarConfirmaSenha = document.getElementById('ocultar-confirma-senha-funcionario');
+        const confirmaSenhaInput = document.getElementById('confirmar-senha-funcionario');
+
+        if (mostrarConfirmaSenha && ocultarConfirmaSenha && confirmaSenhaInput) {
+            mostrarConfirmaSenha.addEventListener('click', () => {
+                confirmaSenhaInput.type = 'text';
+                mostrarConfirmaSenha.style.display = 'none';
+                ocultarConfirmaSenha.style.display = 'block';
+            });
+
+            ocultarConfirmaSenha.addEventListener('click', () => {
+                confirmaSenhaInput.type = 'password';
+                ocultarConfirmaSenha.style.display = 'none';
+                mostrarConfirmaSenha.style.display = 'block';
+            });
+        }
+    }
+
+    isValidPassword(password) {
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        const hasMinLength = password.length >= 8;
+
+        return hasUpperCase && hasNumber && hasSpecialChar && hasMinLength;
+    }
+
+    validatePasswordRequirements() {
+        const password = document.getElementById('senha-funcionario')?.value || '';
+        
+        const requirements = {
+            'req-maiuscula-funcionario': /[A-Z]/.test(password),
+            'req-numero-funcionario': /\d/.test(password),
+            'req-especial-funcionario': /[!@#$%^&*(),.?":{}|<>]/.test(password),
+            'req-tamanho-funcionario': password.length >= 8
+        };
+
+        Object.entries(requirements).forEach(([id, isValid]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.classList.remove('valid', 'invalid');
+                element.classList.add(isValid ? 'valid' : 'invalid');
+            }
+        });
+    }
+
+    clearPasswordValidation() {
+        const requirements = ['req-maiuscula-funcionario', 'req-numero-funcionario', 'req-especial-funcionario', 'req-tamanho-funcionario'];
+        requirements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.classList.remove('valid', 'invalid');
+            }
+        });
+    }
+
+    loadFuncionarios() {
+        const funcionarios = this.funcionarioDataManager.getAllFuncionarios();
+        const container = document.querySelector('#secao-funcionarios .funcionarios');
+        
+        if (!container) {
+            console.error('Container de funcionários não encontrado');
+            return;
+        }
+
+        container.innerHTML = '';
+
+        funcionarios.forEach(funcionario => {
+            const card = this.createFuncionarioCard(funcionario);
+            container.appendChild(card);
+        });
+    }
+
+    createFuncionarioCard(funcionario) {
+        const card = document.createElement('div');
+        card.className = 'card-funcionario';
+        card.dataset.funcionarioId = funcionario.id;
+
+        const cargoClass = funcionario.cargo;
+        const cargoText = this.getCargoText(funcionario.cargo);
+        const statusClass = funcionario.ativo ? 'active' : '';
+        const statusText = funcionario.ativo ? 'Ativo' : 'Inativo';
+        const statusIcon = funcionario.ativo ? 'fa-eye' : 'fa-eye-slash';
+
+        card.innerHTML = `
+            <div class="header-card">
+                <div class="info-principal">
+                    <p class="nome-funcionario">${funcionario.nome}</p>
+                    <div class="email">
+                        <i class="fa-solid fa-envelope"></i>
+                        <p>${funcionario.email}</p>
+                    </div>
+                    <span class="cargo ${cargoClass}">${cargoText}</span>
+                </div>
+                <div class="controles-header">
+                    <button class="btn-editar ${funcionario.cargo === 'admin' ? 'disabled' : ''}" ${funcionario.cargo === 'admin' ? 'title="Não é possível editar administradores"' : ''}>
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <div class="toggle-container">
+                        <div class="toggle ${statusClass} ${funcionario.cargo === 'admin' ? 'admin-protected' : ''}">
+                            <div class="toggle-slider"></div>
+                            <input type="checkbox" ${funcionario.ativo ? 'checked' : ''} style="display: none;" ${funcionario.cargo === 'admin' ? 'disabled' : ''}>
+                        </div>
+                        <div class="status-text ${funcionario.ativo ? '' : 'inactive'}">
+                            <i class="fa-solid ${statusIcon}"></i>
+                            <span>${statusText}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-card">
+                <p class="link-metricas ${funcionario.cargo === 'admin' ? 'disabled' : ''}" ${funcionario.cargo === 'admin' ? 'title="Métricas de administradores não estão disponíveis"' : ''}>Exibir métricas</p>
+            </div>
+        `;
+
+        return card;
+    }
+
+    getCargoText(cargo) {
+        const cargos = {
+            'atendente': 'Atendente',
+            'gerente': 'Gerente',
+            'entregador': 'Entregador',
+            'admin': 'Administrador',
+            'cliente': 'Cliente'
+        };
+        return cargos[cargo] || cargo;
+    }
+
+    handleEditClick(button) {
+        const card = button.closest('.card-funcionario');
+        const funcionarioId = parseInt(card.dataset.funcionarioId);
+        const funcionario = this.funcionarioDataManager.getFuncionarioById(funcionarioId);
+
+        if (funcionario) {
+            // Verificar se é administrador
+            if (funcionario.cargo === 'admin') {
+                this.showErrorMessage('Não é possível editar administradores');
+                return;
+            }
+
+            this.currentEditingId = funcionarioId;
+            this.openFuncionarioModal(funcionario);
+        }
+    }
+
+    handleToggleChange(toggle) {
+        const card = toggle.closest('.card-funcionario');
+        const funcionarioId = parseInt(card.dataset.funcionarioId);
+        const funcionario = this.funcionarioDataManager.getFuncionarioById(funcionarioId);
+
+        if (funcionario) {
+            // Verificar se é administrador e se está tentando desativar
+            if (funcionario.cargo === 'admin' && !funcionario.ativo) {
+                this.showErrorMessage('Não é possível desativar administradores');
+                // Reverter o toggle para ativo
+                toggle.checked = true;
+                return;
+            }
+
+            const updatedFuncionario = this.funcionarioDataManager.toggleFuncionarioStatus(funcionarioId);
+
+            if (updatedFuncionario) {
+                // Atualizar visual do toggle
+                const toggleElement = card.querySelector('.toggle');
+                const statusText = card.querySelector('.status-text');
+                const statusIcon = card.querySelector('.status-text i');
+
+                if (updatedFuncionario.ativo) {
+                    toggleElement.classList.add('active');
+                    statusText.classList.remove('inactive');
+                    statusText.querySelector('span').textContent = 'Ativo';
+                    statusIcon.className = 'fa-solid fa-eye';
+                } else {
+                    toggleElement.classList.remove('active');
+                    statusText.classList.add('inactive');
+                    statusText.querySelector('span').textContent = 'Inativo';
+                    statusIcon.className = 'fa-solid fa-eye-slash';
+                }
+            }
+        }
+    }
+
+    handleMetricsClick(link) {
+        const card = link.closest('.card-funcionario');
+        const funcionarioId = parseInt(card.dataset.funcionarioId);
+        const funcionario = this.funcionarioDataManager.getFuncionarioById(funcionarioId);
+
+        if (funcionario) {
+            // Verificar se é administrador
+            if (funcionario.cargo === 'admin') {
+                this.showErrorMessage('Métricas de administradores não estão disponíveis');
+                return;
+            }
+
+            this.openMetricasModal(funcionario);
+        }
+    }
+
+    openMetricasModal(funcionario) {
+        const modal = document.getElementById('modal-metricas');
+        if (!modal) return;
+
+        // Preencher dados do funcionário
+        this.populateMetricasModal(funcionario);
+
+        // Mostrar modal
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        // Configurar event listeners
+        this.setupMetricasModalListeners();
+    }
+
+    populateMetricasModal(funcionario) {
+        // Gerar iniciais do nome
+        const iniciais = this.generateIniciais(funcionario.nome);
+        document.getElementById('iniciais-funcionario').textContent = iniciais;
+
+        // Dados básicos
+        document.getElementById('nome-funcionario-metricas').textContent = funcionario.nome;
+        document.getElementById('email-funcionario-metricas').textContent = funcionario.email;
+
+        // Cargo
+        const cargoElement = document.getElementById('cargo-funcionario-metricas');
+        cargoElement.textContent = this.getCargoText(funcionario.cargo);
+        cargoElement.className = `cargo-tag ${funcionario.cargo}`;
+
+        // Tempo em atividade
+        const tempoAtividade = this.calculateTempoAtividade(funcionario.dataCriacao);
+        document.getElementById('tempo-atividade').textContent = tempoAtividade;
+
+        // Dados pessoais
+        document.getElementById('cpf-funcionario').textContent = this.generateCPF();
+        document.getElementById('nascimento-funcionario').textContent = this.formatDate(funcionario.nascimento);
+        document.getElementById('telefone-funcionario').textContent = funcionario.telefone;
+
+        // Métricas baseadas no cargo
+        this.populateMetricasByCargo(funcionario.cargo);
+    }
+
+    populateMetricasByCargo(cargo) {
+        const metricas = this.getMetricasByCargo(cargo);
+
+        // Métrica 1
+        document.getElementById('metrica-1-titulo').textContent = metricas.metrica1.titulo;
+        document.getElementById('metrica-1-subtitulo').textContent = metricas.metrica1.subtitulo;
+        document.getElementById('metrica-1-valor').textContent = metricas.metrica1.valor;
+
+        // Métrica 2
+        document.getElementById('metrica-2-titulo').textContent = metricas.metrica2.titulo;
+        document.getElementById('metrica-2-subtitulo').textContent = metricas.metrica2.subtitulo;
+        document.getElementById('metrica-2-valor').textContent = metricas.metrica2.valor;
+
+        // Métrica 3
+        document.getElementById('metrica-3-titulo').textContent = metricas.metrica3.titulo;
+        const metrica3Subtitulo = document.getElementById('metrica-3-subtitulo');
+        if (metrica3Subtitulo) {
+            if (metricas.metrica3.subtitulo) {
+                metrica3Subtitulo.textContent = metricas.metrica3.subtitulo;
+            } else {
+                metrica3Subtitulo.textContent = '';
+            }
+        }
+        document.getElementById('metrica-3-valor').textContent = metricas.metrica3.valor;
+    }
+
+    getMetricasByCargo(cargo) {
+        const metricas = {
+            atendente: {
+                metrica1: { titulo: 'Pedidos atendidos', subtitulo: 'Por dia', valor: '45' },
+                metrica2: { titulo: 'Tempo médio de atendimento', subtitulo: 'Por pedido', valor: '3.2 min' },
+                metrica3: { titulo: 'Avaliação do cliente', subtitulo: null, valor: '4.8' }
+            },
+            gerente: {
+                metrica1: { titulo: 'Produtividade da equipe', subtitulo: 'Pedidos concluídos', valor: '200' },
+                metrica2: { titulo: 'Faturamento total', subtitulo: 'Período sob gestão', valor: 'R$ 15.420,00' },
+                metrica3: { titulo: 'Avaliação da gestão', subtitulo: null, valor: '4.6' }
+            },
+            entregador: {
+                metrica1: { titulo: 'Média de entregas realizadas', subtitulo: 'Por dia', valor: '12' },
+                metrica2: { titulo: 'Tempo médio de entrega', subtitulo: 'Por entrega', valor: '25 min' },
+                metrica3: { titulo: 'Avaliação do cliente', subtitulo: null, valor: '4.7' }
+            },
+            cliente: {
+                metrica1: { titulo: 'Pedidos realizados', subtitulo: 'Total', valor: '28' },
+                metrica2: { titulo: 'Valor total gasto', subtitulo: 'Histórico', valor: 'R$ 1.240,00' },
+                metrica3: { titulo: 'Último pedido', subtitulo: null, valor: 'Há 3 dias' }
+            }
+        };
+
+        return metricas[cargo] || metricas.atendente;
+    }
+
+    generateIniciais(nome) {
+        return nome.split(' ')
+            .map(n => n.charAt(0))
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+    }
+
+    calculateTempoAtividade(dataCriacao) {
+        const hoje = new Date();
+        const criacao = new Date(dataCriacao);
+        const diffTime = Math.abs(hoje - criacao);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return `${diffDays} Dias`;
+    }
+
+    generateCPF() {
+        // Gerar CPF fictício para demonstração
+        const cpf = Math.floor(Math.random() * 900000000) + 100000000;
+        return cpf.toString().replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pt-BR');
+    }
+
+    setupMetricasModalListeners() {
+        const modal = document.getElementById('modal-metricas');
+        const fecharBtn = document.getElementById('fechar-metricas');
+        const overlay = modal ? modal.querySelector('.div-overlay') : null;
+
+        // Fechar modal
+        const closeModal = () => {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        // Remover listeners anteriores para evitar duplicação
+        if (fecharBtn) {
+            fecharBtn.removeEventListener('click', closeModal);
+            fecharBtn.addEventListener('click', closeModal);
+        }
+
+        if (overlay) {
+            overlay.removeEventListener('click', closeModal);
+            overlay.addEventListener('click', closeModal);
+        }
+    }
+
+    showSuccessMessage(message) {
+        // Sistema de notificações temporário com alert
+        // TODO: Implementar sistema de notificações mais robusto
+        alert(`✅ ${message}`);
+    }
+
+    showErrorMessage(message) {
+        // Sistema de notificações temporário com alert
+        // TODO: Implementar sistema de notificações mais robusto
+        alert(`❌ ${message}`);
+    }
+}
+
 // ============================================================================
 
 /**
@@ -2653,6 +3722,7 @@ function setupGlobalEventListeners() {
         // ou atualizar outras partes da interface
     });
 }
+
 
 // Inicializar quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', initializeAdminPanel);
