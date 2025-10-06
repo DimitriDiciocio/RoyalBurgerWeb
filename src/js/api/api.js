@@ -83,7 +83,8 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
             method,
             headers: baseHeaders,
             body: body ? JSON.stringify(body) : undefined,
-            credentials: 'include'
+            credentials: 'include',
+            mode: 'cors' // Força modo CORS
         });
 
         let data;
@@ -113,6 +114,9 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
             } else if (response.status === 403) {
                 // Proibido
                 errorMessage = data?.error || data?.message || 'Acesso negado.';
+            } else if (response.status === 308) {
+                // Redirecionamento permanente - problema de CORS
+                errorMessage = 'Erro de configuração do servidor. Verifique se o CORS está configurado corretamente.';
             } else {
                 // Outros erros
                 errorMessage = (data && (data.error || data.msg || data.message)) || `Erro ${response.status}`;
@@ -128,6 +132,14 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
     } catch (fetchError) {
         // Erro de rede ou conexão
         if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+            // Verificar se é erro de CORS
+            if (fetchError.message.includes('CORS') || fetchError.message.includes('blocked')) {
+                const corsError = new Error('Erro de CORS: O servidor não permite requisições do frontend. Configure o CORS no backend Flask.');
+                corsError.status = 0;
+                corsError.isCorsError = true;
+                throw corsError;
+            }
+            
             const connectionError = new Error('Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet.');
             connectionError.status = 0;
             connectionError.isConnectionError = true;

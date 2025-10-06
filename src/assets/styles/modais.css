@@ -814,20 +814,6 @@
 
       & .div-input {
 
-        & input,
-        & select {
-
-          &.error {
-            border-color: #ef4444;
-            background-color: #fef2f2;
-          }
-
-          &.success {
-            border-color: #10b981;
-            background-color: #f0fdf4;
-          }
-        }
-
         & .password-toggle {
           position: absolute;
           right: 12px;
@@ -856,6 +842,13 @@
         background-color: #f9fafb;
         border-radius: 8px;
         border: 1px solid #e5e7eb;
+
+
+        & .div-input {
+          & label {
+            background-color: #f9fafb;
+          }
+        }
 
         & .password-requirements {
           display: flex;

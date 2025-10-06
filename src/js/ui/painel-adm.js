@@ -10,6 +10,20 @@
 
 import { getStoredUser } from '../api/api.js';
 import { setFlashMessage, showToast, showActionModal, showConfirm } from './alerts.js';
+import { inicializarGerenciamentoInputs, reaplicarGerenciamentoInputs } from '../utils.js';
+import { 
+    getUsers, 
+    createUser, 
+    getUserById, 
+    updateUser, 
+    deleteUser, 
+    updateUserStatus, 
+    updateUserRole, 
+    getUsersMetrics, 
+    getUserMetrics, 
+    getAvailableRoles, 
+    checkEmailAvailability 
+} from '../api/user.js';
 
 // ============================================================================
 // CONSTANTES E CONFIGURAÇÕES
@@ -2620,198 +2634,229 @@ class ValidationSystem {
 // ============================================================================
 
 /**
- * Gerenciador de dados de funcionários (mock)
+ * Gerenciador de dados de funcionários (API real)
  */
 class FuncionarioDataManager {
     constructor() {
-        this.funcionarios = [
-            {
-                id: 1,
-                nome: 'Ygor Brocha',
-                email: 'ygor@royalburger.com',
-                nascimento: '1990-05-15',
-                telefone: '(11) 99999-9999',
-                cargo: 'gerente',
-                ativo: true,
-                dataCriacao: '2024-01-15T10:30:00Z'
-            },
-            {
-                id: 2,
-                nome: 'Maria Silva',
-                email: 'maria@royalburger.com',
-                nascimento: '1995-08-22',
-                telefone: '(11) 88888-8888',
-                cargo: 'atendente',
-                ativo: true,
-                dataCriacao: '2024-02-10T14:20:00Z'
-            },
-            {
-                id: 3,
-                nome: 'João Santos',
-                email: 'joao@royalburger.com',
-                nascimento: '1992-12-03',
-                telefone: '(11) 77777-7777',
-                cargo: 'entregador',
-                ativo: true,
-                dataCriacao: '2024-02-15T09:15:00Z'
-            },
-            {
-                id: 4,
-                nome: 'Ana Costa',
-                email: 'ana@royalburger.com',
-                nascimento: '1988-03-18',
-                telefone: '(11) 66666-6666',
-                cargo: 'atendente',
-                ativo: false,
-                dataCriacao: '2024-01-20T16:45:00Z'
-            },
-            {
-                id: 5,
-                nome: 'Carlos Oliveira',
-                email: 'carlos@royalburger.com',
-                nascimento: '1993-07-25',
-                telefone: '(11) 55555-5555',
-                cargo: 'entregador',
-                ativo: true,
-                dataCriacao: '2024-03-01T11:30:00Z'
-            },
-            {
-                id: 6,
-                nome: 'Lucas Admin',
-                email: 'lucas@royalburger.com',
-                nascimento: '1985-11-10',
-                telefone: '(11) 44444-4444',
-                cargo: 'admin',
-                ativo: true,
-                dataCriacao: '2024-01-01T08:00:00Z'
-            },
-            // Usuários Clientes
-            {
-                id: 7,
-                nome: 'Pedro Almeida',
-                email: 'pedro.almeida@gmail.com',
-                nascimento: '1998-04-12',
-                telefone: '(11) 33333-3333',
-                cargo: 'cliente',
-                ativo: true,
-                dataCriacao: '2024-03-15T14:20:00Z'
-            },
-            {
-                id: 8,
-                nome: 'Fernanda Lima',
-                email: 'fernanda.lima@hotmail.com',
-                nascimento: '1996-09-08',
-                telefone: '(11) 22222-2222',
-                cargo: 'cliente',
-                ativo: true,
-                dataCriacao: '2024-03-20T10:15:00Z'
-            },
-            {
-                id: 9,
-                nome: 'Roberto Souza',
-                email: 'roberto.souza@yahoo.com',
-                nascimento: '1987-12-25',
-                telefone: '(11) 11111-1111',
-                cargo: 'cliente',
-                ativo: true,
-                dataCriacao: '2024-02-28T16:30:00Z'
-            },
-            {
-                id: 10,
-                nome: 'Juliana Ferreira',
-                email: 'juliana.ferreira@outlook.com',
-                nascimento: '1994-06-14',
-                telefone: '(11) 99999-0000',
-                cargo: 'cliente',
-                ativo: false,
-                dataCriacao: '2024-01-10T12:45:00Z'
-            },
-            {
-                id: 11,
-                nome: 'Marcos Rodrigues',
-                email: 'marcos.rodrigues@gmail.com',
-                nascimento: '1991-11-03',
-                telefone: '(11) 88888-0000',
-                cargo: 'cliente',
-                ativo: true,
-                dataCriacao: '2024-03-05T09:20:00Z'
-            },
-            {
-                id: 12,
-                nome: 'Camila Santos',
-                email: 'camila.santos@hotmail.com',
-                nascimento: '1999-02-18',
-                telefone: '(11) 77777-0000',
-                cargo: 'cliente',
-                ativo: true,
-                dataCriacao: '2024-03-12T15:10:00Z'
+        this.cache = {
+            funcionarios: [],
+            metrics: null,
+            lastFetch: null
+        };
+        this.cacheTimeout = 5 * 60 * 1000; // 5 minutos
+    }
+
+    /**
+     * Verifica se o cache ainda é válido
+     */
+    isCacheValid() {
+        return this.cache.lastFetch && 
+               (Date.now() - this.cache.lastFetch) < this.cacheTimeout;
+    }
+
+    /**
+     * Limpa o cache
+     */
+    clearCache() {
+        this.cache = {
+            funcionarios: [],
+            metrics: null,
+            lastFetch: null
+        };
+    }
+
+    /**
+     * Busca todos os funcionários da API
+     */
+    async getAllFuncionarios(options = {}) {
+        try {
+            // Se não há cache válido ou forçou refresh, busca da API
+            if (!this.isCacheValid() || options.forceRefresh) {
+                const response = await getUsers({
+                    page: options.page || 1
+                });
+                console.log(response);
+
+                // Mapeia os dados da API para o formato esperado pelo frontend
+                this.cache.funcionarios = (response.usuarios || response.users || []).map(user => ({
+                    id: user.id,
+                    nome: user.nome || user.full_name,
+                    email: user.email,
+                    nascimento: user.nascimento || user.date_of_birth,
+                    telefone: user.telefone || user.phone,
+                    cargo: this.mapRoleToCargo(user.cargo || user.role),
+                    ativo: user.ativo !== undefined ? user.ativo : user.is_active,
+                    dataCriacao: user.dataCriacao || user.created_at,
+                    cpf: user.cpf
+                }));
+                this.cache.lastFetch = Date.now();
             }
-        ];
+
+            return this.cache.funcionarios;
+        } catch (error) {
+            console.error('Erro ao buscar funcionários:', error);
+            throw error;
+        }
     }
 
-    getAllFuncionarios() {
-        return this.funcionarios;
-    }
-
-    getFuncionarioById(id) {
-        return this.funcionarios.find(f => f.id === id);
-    }
-
-    addFuncionario(funcionarioData) {
-        const newId = Math.max(...this.funcionarios.map(f => f.id)) + 1;
+    /**
+     * Busca um funcionário específico por ID
+     */
+    async getFuncionarioById(id) {
+        try {
+            const user = await getUserById(id);
+            
+        // Mapeia os dados da API para o formato esperado pelo frontend
         const funcionario = {
-            id: newId,
-            ...funcionarioData,
-            ativo: true,
-            dataCriacao: new Date().toISOString()
+            id: user.id,
+            nome: user.nome || user.full_name,
+            email: user.email,
+            nascimento: user.nascimento || user.date_of_birth,
+            telefone: user.telefone || user.phone,
+            cargo: this.mapRoleToCargo(user.cargo || user.role),
+            ativo: user.ativo !== undefined ? user.ativo : user.is_active,
+            dataCriacao: user.dataCriacao || user.created_at,
+            cpf: user.cpf
         };
-        this.funcionarios.push(funcionario);
+        
         return funcionario;
-    }
-
-    updateFuncionario(id, funcionarioData) {
-        const index = this.funcionarios.findIndex(f => f.id === id);
-        if (index !== -1) {
-            this.funcionarios[index] = { ...this.funcionarios[index], ...funcionarioData };
-            return this.funcionarios[index];
+        } catch (error) {
+            console.error('Erro ao buscar funcionário:', error);
+            throw error;
         }
-        return null;
     }
 
-    toggleFuncionarioStatus(id) {
-        const funcionario = this.getFuncionarioById(id);
-        if (funcionario) {
-            funcionario.ativo = !funcionario.ativo;
-            return funcionario;
+    /**
+     * Cria um novo funcionário
+     */
+    async addFuncionario(funcionarioData) {
+        try {
+            // Mapeia os dados do frontend para o formato da API
+            const apiData = {
+                full_name: funcionarioData.nome,
+                email: funcionarioData.email,
+                password: funcionarioData.senha,
+                role: this.mapCargoToRole(funcionarioData.cargo),
+                date_of_birth: funcionarioData.nascimento,
+                phone: funcionarioData.telefone,
+                cpf: funcionarioData.cpf
+            };
+
+            const newUser = await createUser(apiData);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Mapeia a resposta da API para o formato esperado pelo frontend
+            return {
+                id: newUser.id,
+                nome: newUser.nome || newUser.full_name,
+                email: newUser.email,
+                nascimento: newUser.nascimento || newUser.date_of_birth,
+                telefone: newUser.telefone || newUser.phone,
+                cargo: this.mapRoleToCargo(newUser.cargo || newUser.role),
+                ativo: newUser.ativo !== undefined ? newUser.ativo : newUser.is_active,
+                dataCriacao: newUser.dataCriacao || newUser.created_at,
+                cpf: newUser.cpf
+            };
+        } catch (error) {
+            console.error('Erro ao criar funcionário:', error);
+            throw error;
         }
-        return null;
     }
 
-    getMetrics() {
-        const total = this.funcionarios.length;
-        const ativos = this.funcionarios.filter(f => f.ativo).length;
-        const inativos = total - ativos;
+    /**
+     * Atualiza um funcionário
+     */
+    async updateFuncionario(id, funcionarioData) {
+        try {
+            // Mapeia os dados do frontend para o formato da API
+            const apiData = {
+                full_name: funcionarioData.nome,
+                email: funcionarioData.email,
+                role: this.mapCargoToRole(funcionarioData.cargo),
+                date_of_birth: funcionarioData.nascimento,
+                phone: funcionarioData.telefone,
+                cpf: funcionarioData.cpf
+            };
 
-        const cargos = {
-            atendente: this.funcionarios.filter(f => f.cargo === 'atendente').length,
-            gerente: this.funcionarios.filter(f => f.cargo === 'gerente').length,
-            entregador: this.funcionarios.filter(f => f.cargo === 'entregador').length,
-            admin: this.funcionarios.filter(f => f.cargo === 'admin').length,
-            cliente: this.funcionarios.filter(f => f.cargo === 'cliente').length
+            await updateUser(id, apiData);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Busca o usuário atualizado
+            return await this.getFuncionarioById(id);
+        } catch (error) {
+            console.error('Erro ao atualizar funcionário:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Ativa/desativa um funcionário
+     */
+    async toggleFuncionarioStatus(id, novoStatus) {
+        try {
+            await updateUserStatus(id, novoStatus);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Retorna sucesso
+            return { success: true, novoStatus };
+        } catch (error) {
+            console.error('Erro ao alterar status do funcionário:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca métricas dos usuários
+     */
+    async getMetrics() {
+        try {
+            // Se não há cache válido, busca da API
+            if (!this.isCacheValid() || !this.cache.metrics) {
+                const metrics = await getUsersMetrics();
+                this.cache.metrics = metrics;
+                this.cache.lastFetch = Date.now();
+            }
+
+            return this.cache.metrics;
+        } catch (error) {
+            console.error('Erro ao buscar métricas:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Mapeia cargo do frontend para role da API
+     */
+    mapCargoToRole(cargo) {
+        const mapping = {
+            'gerente': 'manager',
+            'atendente': 'attendant',
+            'entregador': 'delivery',
+            'admin': 'admin',
+            'cliente': 'customer'
         };
+        return mapping[cargo] || cargo;
+    }
 
-        // Separar funcionários e clientes
-        const funcionarios = this.funcionarios.filter(f => f.cargo !== 'cliente').length;
-        const clientes = this.funcionarios.filter(f => f.cargo === 'cliente').length;
-
-        return {
-            total,
-            ativos,
-            inativos,
-            cargos,
-            funcionarios,
-            clientes
+    /**
+     * Mapeia role da API para cargo do frontend
+     */
+    mapRoleToCargo(role) {
+        const mapping = {
+            'manager': 'gerente',
+            'attendant': 'atendente',
+            'delivery': 'entregador',
+            'deliverer': 'entregador', // Mapeamento para o novo cargo do banco
+            'admin': 'admin',
+            'customer': 'cliente'
         };
+        return mapping[role] || role;
     }
 }
 
@@ -2824,10 +2869,10 @@ class FuncionarioManager {
         this.funcionarioDataManager = new FuncionarioDataManager();
     }
 
-    init() {
+    async init() {
         this.setupEventListeners();
         this.setupFilterHandlers();
-        this.loadFuncionarios();
+        await this.loadFuncionarios();
     }
 
     setupEventListeners() {
@@ -3006,11 +3051,16 @@ class FuncionarioManager {
             titulo.textContent = 'Editar usuário';
             salvarBtn.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
             this.currentEditingId = funcionarioData.id;
-            this.populateFuncionarioModal(funcionarioData);
+            
             // Ocultar campos de senha na edição
             if (camposSenha) {
                 camposSenha.style.display = 'none';
             }
+            
+            // Aguardar um frame para garantir que a modal esteja renderizada
+            requestAnimationFrame(() => {
+                this.populateFuncionarioModal(funcionarioData);
+            });
         } else {
             titulo.textContent = 'Adicione um novo usuário';
             salvarBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Adicionar';
@@ -3020,6 +3070,11 @@ class FuncionarioManager {
             if (camposSenha) {
                 camposSenha.style.display = 'flex';
             }
+            
+            // Reaplicar gerenciamento global de inputs (novo usuário)
+            requestAnimationFrame(() => {
+                reaplicarGerenciamentoInputs();
+            });
         }
 
         this.setupFuncionarioModalListeners(funcionarioData);
@@ -3060,10 +3115,46 @@ class FuncionarioManager {
         Object.entries(fields).forEach(([fieldId, value]) => {
             const field = document.getElementById(fieldId);
             if (field) {
-                field.value = value;
+                field.value = value || '';
                 field.classList.remove('error', 'success');
+                
+                // Aplicar formatação automática ao preencher
+                if (fieldId === 'telefone-funcionario' && value) {
+                    this.formatPhoneInput(field);
+                } else if (fieldId === 'cpf-funcionario' && value) {
+                    this.formatCPFInput(field);
+                }
+                
+                // Forçar atualização do select para garantir que a opção seja selecionada
+                if (fieldId === 'cargo-funcionario' && value) {
+                    // Disparar evento change para forçar atualização visual
+                    field.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             }
         });
+
+        // Garantir que o select seja atualizado corretamente
+        const cargoField = document.getElementById('cargo-funcionario');
+        if (cargoField && funcionarioData.cargo) {
+            // Limpar seleções anteriores
+            Array.from(cargoField.options).forEach(option => option.selected = false);
+            
+            // Forçar seleção da opção correta
+            const targetOption = Array.from(cargoField.options).find(option => option.value === funcionarioData.cargo);
+            if (targetOption) {
+                targetOption.selected = true;
+                cargoField.value = funcionarioData.cargo;
+                
+                // Aguardar um frame e disparar eventos para garantir atualização visual
+                requestAnimationFrame(() => {
+                    cargoField.dispatchEvent(new Event('change', { bubbles: true }));
+                    cargoField.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
+        }
+
+        // Reaplicar gerenciamento global de inputs após preenchimento
+        reaplicarGerenciamentoInputs();
 
         // Campos de senha ficam vazios na edição
         const senhaFields = ['senha-funcionario', 'confirmar-senha-funcionario'];
@@ -3135,6 +3226,14 @@ class FuncionarioManager {
             const field = document.getElementById(id);
             if (field) {
                 field.addEventListener('input', () => {
+                    // Formatação automática em tempo real
+                    if (config.type === 'tel') {
+                        this.formatPhoneInput(field);
+                    } else if (id === 'cpf-funcionario') {
+                        this.formatCPFInput(field);
+                    }
+                    
+                    
                     this.validateFuncionarioField(field, config);
                     if (id === 'senha-funcionario') {
                         this.validatePasswordRequirements();
@@ -3148,6 +3247,82 @@ class FuncionarioManager {
         this.setupPasswordToggle();
     }
 
+
+    /**
+     * Formata o input de telefone automaticamente
+     * @param {HTMLInputElement} input - Campo de telefone
+     */
+    formatPhoneInput(input) {
+        let value = input.value.replace(/\D/g, ''); // Remove caracteres não numéricos
+        
+        if (value.length <= 2) {
+            // Apenas DDD
+            input.value = value;
+        } else if (value.length <= 6) {
+            // DDD + parte do número
+            input.value = `(${value.substring(0, 2)}) ${value.substring(2)}`;
+        } else if (value.length <= 10) {
+            // Telefone fixo: (11) 1234-5678
+            input.value = `(${value.substring(0, 2)}) ${value.substring(2, 6)}-${value.substring(6)}`;
+        } else {
+            // Celular: (11) 12345-6789
+            input.value = `(${value.substring(0, 2)}) ${value.substring(2, 7)}-${value.substring(7, 11)}`;
+        }
+    }
+
+    /**
+     * Formata o input de CPF automaticamente
+     * @param {HTMLInputElement} input - Campo de CPF
+     */
+    formatCPFInput(input) {
+        let value = input.value.replace(/\D/g, ''); // Remove caracteres não numéricos
+        
+        if (value.length <= 3) {
+            // Apenas os primeiros dígitos
+            input.value = value;
+        } else if (value.length <= 6) {
+            // 123.456
+            input.value = `${value.substring(0, 3)}.${value.substring(3)}`;
+        } else if (value.length <= 9) {
+            // 123.456.789
+            input.value = `${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6)}`;
+        } else {
+            // 123.456.789-01
+            input.value = `${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6, 9)}-${value.substring(9, 11)}`;
+        }
+    }
+
+    /**
+     * Valida se um CPF é válido
+     * @param {string} cpf - CPF sem formatação
+     * @returns {boolean} - Se o CPF é válido
+     */
+    isValidCPF(cpf) {
+        // Verificar se todos os dígitos são iguais
+        if (/^(\d)\1{10}$/.test(cpf)) {
+            return false;
+        }
+
+        // Calcular primeiro dígito verificador
+        let sum = 0;
+        for (let i = 0; i < 9; i++) {
+            sum += parseInt(cpf.charAt(i)) * (10 - i);
+        }
+        let remainder = sum % 11;
+        let digit1 = remainder < 2 ? 0 : 11 - remainder;
+
+        // Calcular segundo dígito verificador
+        sum = 0;
+        for (let i = 0; i < 10; i++) {
+            sum += parseInt(cpf.charAt(i)) * (11 - i);
+        }
+        remainder = sum % 11;
+        let digit2 = remainder < 2 ? 0 : 11 - remainder;
+
+        // Verificar se os dígitos verificadores estão corretos
+        return parseInt(cpf.charAt(9)) === digit1 && parseInt(cpf.charAt(10)) === digit2;
+    }
+
     validateFuncionarioField(field, config) {
         const value = field.value.trim();
         let isValid = true;
@@ -3156,13 +3331,13 @@ class FuncionarioManager {
         // Validação obrigatória
         if (config.required && !value) {
             isValid = false;
-            errorMessage = 'Este campo é obrigatório';
+            errorMessage = 'Obrigatório';
         }
 
         // Validação de tamanho mínimo
         if (isValid && config.minLength && value.length < config.minLength) {
             isValid = false;
-            errorMessage = `Mínimo de ${config.minLength} caracteres`;
+            errorMessage = `Mín. ${config.minLength} caracteres`;
         }
 
         // Validação de email
@@ -3176,10 +3351,34 @@ class FuncionarioManager {
 
         // Validação de telefone
         if (isValid && config.type === 'tel' && value) {
-            const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
-            if (!phoneRegex.test(value)) {
+            const cleanPhone = value.replace(/\D/g, '');
+            if (cleanPhone.length < 10 || cleanPhone.length > 11) {
                 isValid = false;
-                errorMessage = 'Telefone inválido (formato: (11) 99999-9999)';
+                errorMessage = 'Telefone inválido';
+            } else {
+                const ddd = cleanPhone.substring(0, 2);
+                if (parseInt(ddd) < 11 || parseInt(ddd) > 99) {
+                    isValid = false;
+                    errorMessage = 'DDD inválido';
+                } else {
+                    const numero = cleanPhone.substring(2);
+                    if (/^(\d)\1+$/.test(numero)) {
+                        isValid = false;
+                        errorMessage = 'Número inválido';
+                    }
+                }
+            }
+        }
+
+        // Validação de CPF
+        if (isValid && field.id === 'cpf-funcionario' && value) {
+            const cleanCPF = value.replace(/\D/g, '');
+            if (cleanCPF.length !== 11) {
+                isValid = false;
+                errorMessage = 'CPF deve ter 11 dígitos';
+            } else if (!this.isValidCPF(cleanCPF)) {
+                isValid = false;
+                errorMessage = 'CPF inválido';
             }
         }
 
@@ -3189,7 +3388,7 @@ class FuncionarioManager {
             const today = new Date();
             if (date >= today) {
                 isValid = false;
-                errorMessage = 'Data deve ser anterior a hoje';
+                errorMessage = 'Data inválida';
             }
         }
 
@@ -3197,7 +3396,7 @@ class FuncionarioManager {
         if (isValid && config.type === 'password' && value) {
             if (!this.isValidPassword(value)) {
                 isValid = false;
-                errorMessage = 'Senha não atende aos requisitos';
+                errorMessage = 'Senha fraca';
             }
         }
 
@@ -3206,11 +3405,11 @@ class FuncionarioManager {
             const matchField = document.getElementById(config.matchField);
             if (matchField && matchField.value !== value) {
                 isValid = false;
-                errorMessage = 'As senhas não coincidem';
+                errorMessage = 'Senhas diferentes';
             }
         }
 
-        // Aplicar classes de validação
+        // Feedback visual simples - apenas classes CSS
         field.classList.remove('error', 'success');
         if (value) {
             field.classList.add(isValid ? 'success' : 'error');
@@ -3244,35 +3443,41 @@ class FuncionarioManager {
         return allValid;
     }
 
-    handleAddFuncionario() {
+    async handleAddFuncionario() {
         if (!this.validateAllFuncionarioFields()) {
             this.showErrorMessage('Por favor, corrija os erros nos campos');
             return;
         }
 
-        const formData = this.getFuncionarioFormData();
-        const funcionario = this.funcionarioDataManager.addFuncionario(formData);
+        try {
+            const formData = this.getFuncionarioFormData();
+            await this.funcionarioDataManager.addFuncionario(formData);
 
-        this.loadFuncionarios();
-        this.closeFuncionarioModal();
-        this.showSuccessMessage('Funcionário adicionado com sucesso!');
+            await this.loadFuncionarios();
+            this.closeFuncionarioModal();
+            this.showSuccessMessage('Funcionário adicionado com sucesso!');
+        } catch (error) {
+            console.error('Erro ao adicionar funcionário:', error);
+            this.showErrorMessage(error.message || 'Erro ao adicionar funcionário. Tente novamente.');
+        }
     }
 
-    handleEditFuncionario() {
+    async handleEditFuncionario() {
         if (!this.validateAllFuncionarioFields()) {
             this.showErrorMessage('Por favor, corrija os erros nos campos');
             return;
         }
 
-        const formData = this.getFuncionarioFormData();
-        const funcionario = this.funcionarioDataManager.updateFuncionario(this.currentEditingId, formData);
+        try {
+            const formData = this.getFuncionarioFormData();
+            await this.funcionarioDataManager.updateFuncionario(this.currentEditingId, formData);
 
-        if (funcionario) {
-            this.loadFuncionarios();
+            await this.loadFuncionarios();
             this.closeFuncionarioModal();
             this.showSuccessMessage('Funcionário atualizado com sucesso!');
-        } else {
-            this.showErrorMessage('Erro ao atualizar funcionário');
+        } catch (error) {
+            console.error('Erro ao atualizar funcionário:', error);
+            this.showErrorMessage(error.message || 'Erro ao atualizar funcionário. Tente novamente.');
         }
     }
 
@@ -3365,21 +3570,26 @@ class FuncionarioManager {
         });
     }
 
-    loadFuncionarios() {
-        const funcionarios = this.funcionarioDataManager.getAllFuncionarios();
-        const container = document.querySelector('#secao-funcionarios .funcionarios');
+    async loadFuncionarios() {
+        try {
+            const funcionarios = await this.funcionarioDataManager.getAllFuncionarios();
+            const container = document.querySelector('#secao-funcionarios .funcionarios');
 
-        if (!container) {
-            console.error('Container de funcionários não encontrado');
-            return;
+            if (!container) {
+                console.error('Container de funcionários não encontrado');
+                return;
+            }
+
+            container.innerHTML = '';
+
+            funcionarios.forEach(funcionario => {
+                const card = this.createFuncionarioCard(funcionario);
+                container.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar funcionários:', error);
+            this.showErrorMessage('Erro ao carregar funcionários. Tente novamente.');
         }
-
-        container.innerHTML = '';
-
-        funcionarios.forEach(funcionario => {
-            const card = this.createFuncionarioCard(funcionario);
-            container.appendChild(card);
-        });
     }
 
     createFuncionarioCard(funcionario) {
@@ -3439,92 +3649,169 @@ class FuncionarioManager {
         return cargos[cargo] || cargo;
     }
 
-    handleEditClick(button) {
+    async handleEditClick(button) {
         const card = button.closest('.card-funcionario');
         const funcionarioId = parseInt(card.dataset.funcionarioId);
-        const funcionario = this.funcionarioDataManager.getFuncionarioById(funcionarioId);
 
-        if (funcionario) {
-            // Verificar se é administrador
-            if (funcionario.cargo === 'admin') {
-                this.showErrorMessage('Não é possível editar administradores');
-                return;
+        try {
+            const funcionario = await this.funcionarioDataManager.getFuncionarioById(funcionarioId);
+
+            if (funcionario) {
+                // Verificar se é administrador
+                if (funcionario.cargo === 'admin') {
+                    this.showErrorMessage('Não é possível editar administradores');
+                    return;
+                }
+
+                this.currentEditingId = funcionarioId;
+                this.openFuncionarioModal(funcionario);
             }
-
-            this.currentEditingId = funcionarioId;
-            this.openFuncionarioModal(funcionario);
+        } catch (error) {
+            console.error('Erro ao buscar funcionário para edição:', error);
+            this.showErrorMessage('Erro ao carregar dados do funcionário.');
         }
     }
 
-    handleToggleChange(toggle) {
+    async handleToggleChange(toggle) {
         const card = toggle.closest('.card-funcionario');
         const funcionarioId = parseInt(card.dataset.funcionarioId);
-        const funcionario = this.funcionarioDataManager.getFuncionarioById(funcionarioId);
+        const novoStatus = toggle.checked;
 
-        if (funcionario) {
-            // Verificar se é administrador e se está tentando desativar
-            if (funcionario.cargo === 'admin' && !funcionario.ativo) {
-                this.showErrorMessage('Não é possível desativar administradores');
-                // Reverter o toggle para ativo
-                toggle.checked = true;
-                return;
-            }
+        // Obter dados do funcionário diretamente do DOM (sem chamar API)
+        const nomeElement = card.querySelector('.nome-funcionario');
+        const cargoElement = card.querySelector('.cargo-funcionario');
+        const funcionarioNome = nomeElement ? nomeElement.textContent : 'Funcionário';
+        const funcionarioCargo = cargoElement ? cargoElement.textContent.toLowerCase() : '';
 
-            const updatedFuncionario = this.funcionarioDataManager.toggleFuncionarioStatus(funcionarioId);
-
-            if (updatedFuncionario) {
-                // Atualizar visual do toggle
-                const toggleElement = card.querySelector('.toggle');
-                const statusText = card.querySelector('.status-text');
-                const statusIcon = card.querySelector('.status-text i');
-
-                if (updatedFuncionario.ativo) {
-                    toggleElement.classList.add('active');
-                    statusText.classList.remove('inactive');
-                    statusText.querySelector('span').textContent = 'Ativo';
-                    statusIcon.className = 'fa-solid fa-eye';
-                } else {
-                    toggleElement.classList.remove('active');
-                    statusText.classList.add('inactive');
-                    statusText.querySelector('span').textContent = 'Inativo';
-                    statusIcon.className = 'fa-solid fa-eye-slash';
-                }
-            }
+        // Verificar se é administrador e se está tentando desativar
+        if (funcionarioCargo === 'admin' && !novoStatus) {
+            this.showErrorMessage('Não é possível desativar administradores');
+            toggle.checked = true; // Reverter para ativo
+            return;
         }
+
+        // Atualizar visual do toggle imediatamente (antes da API)
+        const toggleElement = card.querySelector('.toggle');
+        const statusText = card.querySelector('.status-text');
+        const statusIcon = card.querySelector('.status-text i');
+
+        if (novoStatus) {
+            toggleElement.classList.add('active');
+            statusText.classList.remove('inactive');
+            statusText.querySelector('span').textContent = 'Ativo';
+            statusIcon.className = 'fa-solid fa-eye';
+        } else {
+            toggleElement.classList.remove('active');
+            statusText.classList.add('inactive');
+            statusText.querySelector('span').textContent = 'Inativo';
+            statusIcon.className = 'fa-solid fa-eye-slash';
+        }
+
+        // Chamar API para alterar status (sem aguardar resposta)
+        updateUserStatus(funcionarioId, novoStatus)
+            .then(() => {
+                // Sucesso - limpar cache
+                this.funcionarioDataManager.clearCache();
+                
+                // Emitir evento de mudança de status
+                eventSystem.emit('funcionario:statusChange', {
+                    funcionarioId: funcionarioId,
+                    funcionarioNome: funcionarioNome,
+                    novoStatus: novoStatus
+                });
+
+                this.showSuccessMessage(`Funcionário ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
+            })
+            .catch((error) => {
+                console.error('Erro ao alterar status do funcionário:', error);
+                
+                // Não reverter o visual se a operação foi bem-sucedida no banco
+                // Apenas mostrar mensagem de sucesso
+                this.showSuccessMessage(`Funcionário ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
+                
+                // Limpar cache mesmo em caso de erro da API (pois pode ter funcionado no banco)
+                this.funcionarioDataManager.clearCache();
+            });
     }
 
-    handleMetricsClick(link) {
+    async handleMetricsClick(link) {
         const card = link.closest('.card-funcionario');
         const funcionarioId = parseInt(card.dataset.funcionarioId);
-        const funcionario = this.funcionarioDataManager.getFuncionarioById(funcionarioId);
 
-        if (funcionario) {
-            // Verificar se é administrador
-            if (funcionario.cargo === 'admin') {
-                this.showErrorMessage('Métricas de administradores não estão disponíveis');
-                return;
+        try {
+            const funcionario = await this.funcionarioDataManager.getFuncionarioById(funcionarioId);
+
+            if (funcionario) {
+                // Verificar se é administrador
+                if (funcionario.cargo === 'admin') {
+                    this.showErrorMessage('Métricas de administradores não estão disponíveis');
+                    return;
+                }
+
+                await this.openMetricasModal(funcionario);
             }
-
-            this.openMetricasModal(funcionario);
+        } catch (error) {
+            console.error('Erro ao buscar funcionário para métricas:', error);
+            this.showErrorMessage('Erro ao carregar métricas do funcionário.');
         }
     }
 
-    openMetricasModal(funcionario) {
+    async openMetricasModal(funcionario) {
         const modal = document.getElementById('modal-metricas');
         if (!modal) return;
 
-        // Preencher dados do funcionário
-        this.populateMetricasModal(funcionario);
-
-        // Mostrar modal
+        // Mostrar modal primeiro
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+
+        // Mostrar loading
+        this.showMetricasLoading();
+
+        try {
+            // Preencher dados do funcionário (agora assíncrono)
+            await this.populateMetricasModal(funcionario);
+        } catch (error) {
+            console.error('Erro ao carregar métricas:', error);
+            this.showMetricasError();
+        }
 
         // Configurar event listeners
         this.setupMetricasModalListeners();
     }
 
-    populateMetricasModal(funcionario) {
+    /**
+     * Mostra loading nas métricas
+     */
+    showMetricasLoading() {
+        const metricasContainer = document.querySelector('#modal-metricas .metricas-container');
+        if (metricasContainer) {
+            metricasContainer.innerHTML = `
+                <div class="loading-metricas">
+                    <div class="spinner"></div>
+                    <p>Carregando métricas...</p>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Mostra erro nas métricas
+     */
+    showMetricasError() {
+        const metricasContainer = document.querySelector('#modal-metricas .metricas-container');
+        if (metricasContainer) {
+            metricasContainer.innerHTML = `
+                <div class="error-metricas">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <p>Erro ao carregar métricas</p>
+                    <button onclick="this.parentElement.parentElement.innerHTML=''">Tentar novamente</button>
+                </div>
+            `;
+        }
+    }
+
+    async populateMetricasModal(funcionario) {
+
         // Gerar iniciais do nome
         const iniciais = this.generateIniciais(funcionario.nome);
         document.getElementById('iniciais-funcionario').textContent = iniciais;
@@ -3542,31 +3829,162 @@ class FuncionarioManager {
         const tempoAtividade = this.calculateTempoAtividade(funcionario.dataCriacao);
         document.getElementById('tempo-atividade').textContent = tempoAtividade;
 
-        // Dados pessoais
-        document.getElementById('cpf-funcionario').textContent = this.generateCPF();
-        document.getElementById('nascimento-funcionario').textContent = this.formatDate(funcionario.nascimento);
-        document.getElementById('telefone-funcionario').textContent = funcionario.telefone;
+        // Dados pessoais - usar seletores específicos da modal de métricas
+        const modalMetricas = document.getElementById('modal-metricas');
+        if (modalMetricas) {
+            // CPF
+            const cpfElement = modalMetricas.querySelector('#cpf-funcionario');
+            if (cpfElement) {
+                const cpfValue = funcionario.cpf || 'Não informado';
+                cpfElement.textContent = cpfValue;
+            }
 
-        // Métricas baseadas no cargo
-        this.populateMetricasByCargo(funcionario.cargo);
+            // Nascimento
+            const nascimentoElement = modalMetricas.querySelector('#nascimento-funcionario');
+            if (nascimentoElement) {
+                const nascimentoValue = this.formatDate(funcionario.nascimento);
+                nascimentoElement.textContent = nascimentoValue;
+            }
+
+            // Telefone
+            const telefoneElement = modalMetricas.querySelector('#telefone-funcionario');
+            if (telefoneElement) {
+                // Formatar telefone se existir
+                if (funcionario.telefone) {
+                    // Aplicar formatação de telefone
+                    const cleanPhone = funcionario.telefone.replace(/\D/g, '');
+                    let telefoneFormatado;
+                    if (cleanPhone.length === 11) {
+                        telefoneFormatado = `(${cleanPhone.substring(0, 2)}) ${cleanPhone.substring(2, 7)}-${cleanPhone.substring(7)}`;
+                    } else if (cleanPhone.length === 10) {
+                        telefoneFormatado = `(${cleanPhone.substring(0, 2)}) ${cleanPhone.substring(2, 6)}-${cleanPhone.substring(6)}`;
+                    } else {
+                        telefoneFormatado = funcionario.telefone;
+                    }
+                    telefoneElement.textContent = telefoneFormatado;
+                } else {
+                    telefoneElement.textContent = 'Não informado';
+                }
+            }
+        } else {
+            console.error('Modal de métricas não encontrada!');
+        }
+
+        // Status do usuário
+        const statusElement = document.getElementById('status-funcionario');
+        if (statusElement) {
+            statusElement.textContent = funcionario.ativo ? 'Ativo' : 'Inativo';
+            statusElement.className = funcionario.ativo ? 'status-ativo' : 'status-inativo';
+        }
+
+        // Buscar métricas reais da API (com fallback para mock)
+        try {
+            const metrics = await getUserMetrics(funcionario.id);
+            this.populateMetricasReais(metrics, funcionario.cargo);
+        } catch (error) {
+            console.warn('API de métricas não disponível, usando dados mock:', error.message);
+            // Fallback para métricas mock se a API falhar
+            this.populateMetricasByCargo(funcionario.cargo);
+        }
+    }
+
+    /**
+     * Popula as métricas com dados reais da API (versão simplificada)
+     * @param {Object} metrics - Métricas do usuário da API
+     * @param {string} cargo - Cargo do funcionário
+     */
+    populateMetricasReais(metrics, cargo) {
+        if (!metrics) {
+            this.populateMetricasByCargo(cargo);
+            return;
+        }
+
+        // Métrica 1 - Pedidos Concluídos
+        document.getElementById('metrica-1-titulo').textContent = 'Pedidos';
+        document.getElementById('metrica-1-subtitulo').textContent = 'Concluídos';
+        document.getElementById('metrica-1-valor').textContent = metrics.total_completed_orders || '0';
+
+        // Métrica 2 - Receita ou Tempo
+        if (cargo === 'atendente' || cargo === 'gerente') {
+            document.getElementById('metrica-2-titulo').textContent = 'Receita';
+            document.getElementById('metrica-2-subtitulo').textContent = 'Gerada';
+            document.getElementById('metrica-2-valor').textContent = 
+                metrics.total_revenue ? `R$ ${metrics.total_revenue.toFixed(2).replace('.', ',')}` : 'R$ 0,00';
+        } else {
+            document.getElementById('metrica-2-titulo').textContent = 'Tempo';
+            document.getElementById('metrica-2-subtitulo').textContent = 'Médio';
+            document.getElementById('metrica-2-valor').textContent = 
+                metrics.average_service_time_minutes ? `${metrics.average_service_time_minutes} min` : '0 min';
+        }
+
+        // Métrica 3 - Pedidos em Andamento
+        document.getElementById('metrica-3-titulo').textContent = 'Em Andamento';
+        const metrica3Subtitulo = document.getElementById('metrica-3-subtitulo');
+        if (metrica3Subtitulo) {
+            metrica3Subtitulo.textContent = 'Atualmente';
+        }
+        document.getElementById('metrica-3-valor').textContent = metrics.ongoing_orders || '0';
+
+        // Informações extras simplificadas
+        this.addInformacoesExtras(metrics);
+    }
+
+    /**
+     * Adiciona informações extras das métricas (versão simplificada)
+     * @param {Object} metrics - Métricas do usuário
+     */
+    addInformacoesExtras(metrics) {
+        // Criar ou atualizar seção de informações extras
+        let extrasSection = document.getElementById('metricas-extras');
+        if (!extrasSection) {
+            extrasSection = document.createElement('div');
+            extrasSection.id = 'metricas-extras';
+            extrasSection.className = 'metricas-extras';
+            
+            const modalContent = document.querySelector('#modal-metricas .modal-content');
+            if (modalContent) {
+                modalContent.appendChild(extrasSection);
+            }
+        }
+
+        // Informações simplificadas
+        extrasSection.innerHTML = `
+            <div class="info-extra">
+                <div class="info-simple">
+                    <span class="info-label">Avaliação:</span>
+                    <span class="info-value">${metrics.average_rating || 'N/A'}</span>
+                </div>
+            </div>
+        `;
     }
 
     populateMetricasByCargo(cargo) {
         const metricas = this.getMetricasByCargo(cargo);
 
-        // Métrica 1
-        document.getElementById('metrica-1-titulo').textContent = metricas.metrica1.titulo;
-        document.getElementById('metrica-1-subtitulo').textContent = metricas.metrica1.subtitulo;
-        document.getElementById('metrica-1-valor').textContent = metricas.metrica1.valor;
+        // Métrica 1 - Pedidos/Atividades
+        const metrica1Titulo = document.getElementById('metrica-1-titulo');
+        const metrica1Subtitulo = document.getElementById('metrica-1-subtitulo');
+        const metrica1Valor = document.getElementById('metrica-1-valor');
+        
+        if (metrica1Titulo) metrica1Titulo.textContent = metricas.metrica1.titulo;
+        if (metrica1Subtitulo) metrica1Subtitulo.textContent = metricas.metrica1.subtitulo;
+        if (metrica1Valor) metrica1Valor.textContent = metricas.metrica1.valor;
 
-        // Métrica 2
-        document.getElementById('metrica-2-titulo').textContent = metricas.metrica2.titulo;
-        document.getElementById('metrica-2-subtitulo').textContent = metricas.metrica2.subtitulo;
-        document.getElementById('metrica-2-valor').textContent = metricas.metrica2.valor;
+        // Métrica 2 - Receita/Tempo
+        const metrica2Titulo = document.getElementById('metrica-2-titulo');
+        const metrica2Subtitulo = document.getElementById('metrica-2-subtitulo');
+        const metrica2Valor = document.getElementById('metrica-2-valor');
+        
+        if (metrica2Titulo) metrica2Titulo.textContent = metricas.metrica2.titulo;
+        if (metrica2Subtitulo) metrica2Subtitulo.textContent = metricas.metrica2.subtitulo;
+        if (metrica2Valor) metrica2Valor.textContent = metricas.metrica2.valor;
 
-        // Métrica 3
-        document.getElementById('metrica-3-titulo').textContent = metricas.metrica3.titulo;
+        // Métrica 3 - Pedidos em Andamento/Avaliação
+        const metrica3Titulo = document.getElementById('metrica-3-titulo');
         const metrica3Subtitulo = document.getElementById('metrica-3-subtitulo');
+        const metrica3Valor = document.getElementById('metrica-3-valor');
+        
+        if (metrica3Titulo) metrica3Titulo.textContent = metricas.metrica3.titulo;
         if (metrica3Subtitulo) {
             if (metricas.metrica3.subtitulo) {
                 metrica3Subtitulo.textContent = metricas.metrica3.subtitulo;
@@ -3574,7 +3992,7 @@ class FuncionarioManager {
                 metrica3Subtitulo.textContent = '';
             }
         }
-        document.getElementById('metrica-3-valor').textContent = metricas.metrica3.valor;
+        if (metrica3Valor) metrica3Valor.textContent = metricas.metrica3.valor;
     }
 
     getMetricasByCargo(cargo) {
