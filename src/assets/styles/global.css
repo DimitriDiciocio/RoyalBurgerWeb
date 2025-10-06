@@ -21,7 +21,7 @@
 
 
 main {
-    padding: 68px 60px 0px 60px;
+    padding: 68px 10vh 0px 10vh;
     background-color: var(--color-background);
 }
 
@@ -102,5 +102,41 @@ main {
         &:hover {
             color: var(--color-texto-black);
         }
+    }
+}
+
+@media (max-width: 1440px) {
+
+}
+
+@media (max-width: 1280px) {
+
+}
+
+@media (max-width: 1024px) {
+    main {
+        padding: 68px 7vh 0px 7vh;
+        background-color: var(--color-background);
+    }
+}
+
+@media (max-width: 768px) {
+    main {
+        padding: 68px 7vh 0px 7vh;
+        background-color: var(--color-background);
+    }
+}
+
+@media (max-width: 480px) {
+    main {
+        padding: 68px 5vh 0px 5vh;
+        background-color: var(--color-background);
+    }
+}
+
+@media (max-width: 320px){
+    main {
+        padding: 68px 3vh 0px 3vh;
+        background-color: var(--color-background);
     }
 }
