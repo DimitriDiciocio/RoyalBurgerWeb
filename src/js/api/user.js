@@ -285,3 +285,19 @@ export async function changePassword(current_password, new_password) {
         body: { current_password, new_password }
     });
 }
+
+// Alteração de email (requer verificação)
+// export async function requestEmailChange(current_email, new_email) {
+//     return apiRequest('/api/users/request-email-change', {
+//         method: 'POST',
+//         body: { current_email, new_email },
+//         skipAuth: true // Não requer autenticação - é uma operação de verificação
+//     });
+// }
+
+// export async function verifyEmailChange(new_email, code) {
+//     return apiRequest('/api/users/verify-email-change', {
+//         method: 'POST',
+//         body: { new_email, code },
+//         skipAuth: true
+//     });

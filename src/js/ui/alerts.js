@@ -210,10 +210,24 @@ export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
         title = 'Servidor Indisponível';
         msg = 'O servidor está temporariamente indisponível. Tente novamente em alguns minutos.';
     } else if (err?.status === 404) {
-        title = 'Serviço Não Encontrado';
-        msg = 'O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.';
+        // Verificar se é erro de login (credenciais inválidas) ou endpoint não encontrado
+        const isLoginError = err.message && (
+            err.message.includes('E-mail ou senha incorretos') ||
+            err.message.includes('credenciais') ||
+            err.message.includes('incorretos')
+        );
+
+        
+        if (isLoginError) {
+            // É um erro de login - usar a mensagem original
+            title = 'Erro de Login';
+            msg = err.message;
+        } else {
+            // Endpoint não encontrado
+            title = 'Serviço Não Encontrado';
+            msg = 'O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.';
+        }
     }
-    
     return showErrorBar(title, msg);
 }
 

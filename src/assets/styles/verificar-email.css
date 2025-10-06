@@ -1,24 +1,26 @@
 /* Estilos para a página de verificação de email */
 
+main {
+    padding: 80px;
+}
+
 .verification-container {
-    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
     background-color: var(--color-background);
-    width: 450px;
 }
 
 .verification-card {
     background-color: var(--cor-div-primary);
     border-radius: 20px;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.1);
-    padding: 40px;
-    max-width: 540px;
+    padding: 30px;
     width: 100%;
     position: relative;
     text-align: center;
+    max-width: 500px;
 }
 
 .btn-close {
@@ -45,7 +47,7 @@
 .verification-icon {
     width: 70px;
     height: 70px;
-    margin: 0 auto 30px;
+    margin: 0 auto 10px;
     background: linear-gradient(135deg, var(--color-primary) 0%, #ffd54f 100%);
     border-radius: 20px;
     display: flex;
@@ -71,15 +73,14 @@
     font-size: 0.95rem;
     color: var(--color-texto-light);
     line-height: 1.6;
-    margin-bottom: 20px;
-    padding: 0 10px;
+    padding-bottom: 10px;
 }
 
 .verification-email {
     font-size: 1rem;
     color: var(--color-texto-black);
     font-weight: 600;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
 }
 
 .code-inputs {
@@ -156,8 +157,6 @@
     cursor: pointer;
     transition: all 0.3s;
     box-shadow: 0px 4px 12px rgba(255, 199, 0, 0.3);
-    margin-bottom: 0;
-    margin-top: 18px;
 }
 
 .btn-verify:hover {
@@ -187,7 +186,6 @@
     text-decoration: underline;
     transition: color 0.3s;
     padding: 12px;
-    margin-bottom: 15px;
 }
 
 .btn-resend:hover {
@@ -279,3 +277,166 @@
         padding: 13px;
     }
 }
+
+/* Modal de Alterar Email - Estilos Customizados */
+/* #modal-alterar-email {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#modal-alterar-email[style*="flex"] {
+    opacity: 1;
+    visibility: visible;
+}
+
+#modal-alterar-email .modal-contet {
+    background: var(--cor-div-primary);
+    border-radius: 12px;
+    padding: 0;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+#modal-alterar-email[style*="flex"] .modal-contet {
+    transform: scale(1);
+}
+
+#modal-alterar-email .header {
+    padding: 25px 25px 15px 25px;
+    border-bottom: 1px solid #e0e1e4;
+    position: relative;
+}
+
+#modal-alterar-email .header .fa-times {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 1.3rem;
+    color: #ccc;
+    cursor: pointer;
+    transition: color 0.3s;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+#modal-alterar-email .header .fa-times:hover {
+    color: var(--color-secondary);
+    background-color: #f3f4f6;
+}
+
+#modal-alterar-email .titulo {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--color-texto-black);
+    margin-bottom: 8px;
+}
+
+#modal-alterar-email .descricao {
+    color: var(--color-texto-erased);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+#modal-alterar-email .main {
+    padding: 20px 25px;
+}
+#modal-alterar-email .footer {
+    padding: 20px 25px 25px 25px;
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+#modal-alterar-email .btn-cancelar {
+    background: transparent;
+    border: 2px solid #e0e1e4;
+    color: var(--color-texto-erased);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+}
+
+#modal-alterar-email .btn-cancelar:hover {
+    border-color: var(--color-texto-erased);
+    color: var(--color-texto-black);
+    background-color: #f9fafb;
+}
+
+#modal-alterar-email .btn-salvar {
+    background-color: var(--color-texto-black);
+    color: var(--color-texto-white);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+}
+
+#modal-alterar-email .btn-salvar:hover {
+    background-color: #374151;
+}
+
+#modal-alterar-email .btn-salvar:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+
+/* Responsividade da Modal */
+/* @media (max-width: 768px) {
+    #modal-alterar-email .modal-contet {
+        width: 95%;
+        margin: 20px;
+    }
+
+    #modal-alterar-email .header {
+        padding: 20px 20px 15px 20px;
+    }
+
+    #modal-alterar-email .titulo {
+        font-size: 1.2rem;
+    }
+
+    #modal-alterar-email .main {
+        padding: 15px 20px;
+    }
+
+    #modal-alterar-email .footer {
+        padding: 15px 20px 20px 20px;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #modal-alterar-email .btn-cancelar,
+    #modal-alterar-email .btn-salvar {
+        width: 100%;
+        padding: 14px;
+    }
+} */

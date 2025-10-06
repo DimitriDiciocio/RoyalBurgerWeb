@@ -236,3 +236,38 @@
 .modelo-alert-modal.success .bnt .confirmar{ background: #27ae60; }
 .modelo-alert-modal.warning .bnt .confirmar{ background: #f2994a; }
 .modelo-alert-modal.info .bnt .confirmar{ background: #2d9cdb; }
+
+/* ====== Mensagens de erro em inputs ====== */
+.mensagem-erro {
+    color: #EB5757;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    animation: slideInError 0.2s ease-out;
+}
+
+.mensagem-erro::before {
+    content: "⚠";
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+@keyframes slideInError {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Estados dos inputs */
+.div-input input.error {
+    border: 2px solid #EB5757;
+    background-color: #FDF2F2;
+    box-shadow: 0 0 0 3px rgba(235, 87, 87, 0.1);
+}

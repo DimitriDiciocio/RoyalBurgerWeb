@@ -96,6 +96,7 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
         }
 
         if (!response.ok) {
+            
             // Tratamento específico para diferentes tipos de erro
             let errorMessage;
             
@@ -103,14 +104,24 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
                 // Servidor não está respondendo ou erro interno
                 errorMessage = 'Servidor temporariamente indisponível. Verifique sua conexão e tente novamente.';
             } else if (response.status === 404) {
-                // Endpoint não encontrado
-                errorMessage = 'Serviço não encontrado. Verifique se o servidor está rodando.';
+                // Verificar se é erro de login (credenciais inválidas) ou endpoint não encontrado
+                const isLoginEndpoint = path.includes('/login') || path.includes('/users/login');
+                if (isLoginEndpoint && data?.error) {
+                    // É um erro de login - usar a mensagem do backend
+                    errorMessage = data.error;
+                } else {
+                    // Endpoint não encontrado
+                    errorMessage = 'Serviço não encontrado. Verifique se o servidor está rodando.';
+                }
             } else if (response.status === 401) {
-                // Não autorizado - provavelmente token expirado
+                // Não autorizado - provavelmente token expirado ou credenciais inválidas
                 errorMessage = data?.error || data?.message || 'Sessão expirada. Faça login novamente.';
-                // Limpar token expirado automaticamente
-                clearStoredToken();
-                clearStoredUser();
+                // Limpar token expirado automaticamente apenas se não for erro de login
+                const isLoginEndpoint = path.includes('/login') || path.includes('/users/login');
+                if (!isLoginEndpoint) {
+                    clearStoredToken();
+                    clearStoredUser();
+                }
             } else if (response.status === 403) {
                 // Proibido
                 errorMessage = data?.error || data?.message || 'Acesso negado.';

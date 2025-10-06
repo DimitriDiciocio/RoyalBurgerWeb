@@ -141,12 +141,47 @@ document.addEventListener('DOMContentLoaded', async function () {
                 showToast('Código inválido ou expirado. Tente novamente.', { type: 'error' });
             }
         };
+    } else if (type === 'email-change') {
+        // Configuração para alteração de email
+        config = {
+            title: 'Verificar Novo Email',
+            description: 'Enviamos um código de 6 dígitos para o seu novo email.',
+            showChangeEmailLink: false,
+            autoRequest: false, // Não solicitar automaticamente pois já foi solicitado
+            onVerify: async (email, code) => {
+                // Importar a função de verificação de alteração de email
+                const { verifyEmailChange } = await import('../api/user.js');
+                return await verifyEmailChange(email, code);
+            },
+            onResend: async (email) => {
+                // Para alteração de email, não há reenvio direto
+                showToast('Para reenviar o código, solicite a alteração novamente.', { type: 'info' });
+                return false;
+            },
+            onRequest: async (email) => {
+                // Não aplicável para alteração de email
+                return false;
+            },
+            onSuccess: async (result) => {
+                showToast('Email alterado com sucesso!', { type: 'success' });
+                // Redirecionar para login após sucesso
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 1500);
+            },
+            onError: async (err) => {
+                showToast('Código inválido ou expirado. Tente novamente.', { type: 'error' });
+            }
+        };
     } else {
         // Configuração padrão para verificação de email
         config = {
             title: 'Verifique seu E-mail',
             description: 'Enviamos um código de 6 dígitos para o seu email cadastrado.',
             showChangeEmailLink: true,
+            changeEmailText: 'Deseja alterar seu e-mail?',
+            changeEmailLink: 'Alterar aqui',
+            changeEmailUrl: 'javascript:void(0)', // Previne redirecionamento
             onVerify: async (email, code) => {
                 return await verifyEmailCode(email, code);
             },
@@ -174,4 +209,152 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Inicializar verificação
     verification.init();
+
+    // ====== Funcionalidade da Modal de Alterar Email ======
+    // Forçar exibição do link de alterar email para verificação normal
+    if (type !== 'email-change' && type !== 'password-change' && type !== 'password-reset' && type !== '2fa') {
+        const changeEmailElement = document.querySelector('.change-email-text');
+        if (changeEmailElement) {
+            changeEmailElement.style.display = 'block';
+            // Garantir que o link tenha o ID correto
+            const link = changeEmailElement.querySelector('.change-email-link');
+            if (link) {
+                link.id = 'btn-alterar-email';
+                link.href = 'javascript:void(0)';
+            }
+        }
+    }
+    const btnAlterarEmail = document.getElementById('btn-alterar-email');
+    const inputNovoEmail = document.getElementById('novo-email');
+    const btnConfirmarAlterar = document.getElementById('confirmar-alterar-email');
+
+    // Função para validar email
+    function validarEmail(email) {
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        return emailRegex.test(email);
+    }
+
+    // Aguardar um pouco para garantir que o link seja configurado
+    setTimeout(() => {
+        const btnAlterarEmail = document.getElementById('btn-alterar-email');
+        
+        // Só adicionar event listener se o elemento existir
+        if (btnAlterarEmail) {
+            console.log('Botão alterar email encontrado, adicionando event listener');
+            // Abrir modal usando função global
+            btnAlterarEmail.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Clicou no botão alterar email');
+                console.log('Função abrirModal existe?', typeof window.abrirModal);
+                
+                // Verificar se a função existe antes de usar
+                if (typeof window.abrirModal === 'function') {
+                    window.abrirModal('modal-alterar-email');
+                    console.log('Modal deve estar aberta agora');
+                    setTimeout(() => inputNovoEmail.focus(), 100);
+                } else {
+                    console.error('Função abrirModal não encontrada!');
+                    // Fallback: mostrar modal manualmente
+                    const modal = document.getElementById('modal-alterar-email');
+                    if (modal) {
+                        modal.style.display = 'flex';
+                        setTimeout(() => inputNovoEmail.focus(), 100);
+                    }
+                }
+                return false;
+            });
+        } else {
+            console.log('Botão alterar email NÃO encontrado');
+        }
+    }, 100);
+
+    // Validação do email em tempo real
+    if (inputNovoEmail) {
+        inputNovoEmail.addEventListener('input', function() {
+            const email = this.value.trim();
+            
+            if (email && !validarEmail(email)) {
+                this.classList.add('invalid');
+                this.classList.remove('valid');
+            } else if (email && validarEmail(email)) {
+                this.classList.remove('invalid');
+                this.classList.add('valid');
+            } else {
+                this.classList.remove('invalid', 'valid');
+            }
+        });
+    }
+
+    // Submissão do formulário
+    if (btnConfirmarAlterar) {
+        btnConfirmarAlterar.addEventListener('click', async function() {
+        const novoEmail = inputNovoEmail.value.trim();
+        
+        if (!novoEmail) {
+            showToast('Por favor, digite o novo email.', { type: 'error' });
+            inputNovoEmail.focus();
+            return;
+        }
+        
+        if (!validarEmail(novoEmail)) {
+            showToast('Por favor, digite um email válido.', { type: 'error' });
+            inputNovoEmail.focus();
+            return;
+        }
+        
+        // Obter email atual do localStorage
+        const { getStoredUser } = await import('../api/api.js');
+        const userData = getStoredUser();
+        const currentEmail = userData ? userData.email : email;
+        
+        // Verificar se o novo email é diferente do atual
+        if (novoEmail === currentEmail) {
+            showToast('O novo email deve ser diferente do atual.', { type: 'error' });
+            inputNovoEmail.focus();
+            return;
+        }
+        
+        // Desabilitar botão e mostrar loading
+        btnConfirmarAlterar.disabled = true;
+        btnConfirmarAlterar.textContent = 'Alterando...';
+        
+        try {
+            
+            console.log('Email atual do localStorage:', currentEmail);
+            console.log('Email da URL:', email);
+            console.log('Novo email:', novoEmail);
+            
+            // Para verificação de email, vamos simplesmente redirecionar com o novo email
+            // em vez de tentar alterar no banco (que ainda não existe)
+            
+            // Atualizar localStorage com o novo email se houver dados do usuário
+            if (userData) {
+                const updatedUserData = { ...userData, email: novoEmail };
+                localStorage.setItem('rb.user', JSON.stringify(updatedUserData));
+                console.log('Email atualizado no localStorage:', novoEmail);
+            }
+            
+            showToast('Redirecionando para verificação do novo email...', { 
+                type: 'success',
+                title: 'Email atualizado'
+            });
+            
+            // Fechar modal usando função global
+            window.fecharModal('modal-alterar-email');
+            
+            // Redirecionar para verificação com o novo email
+            setTimeout(() => {
+                window.location.href = `verificar-email.html?email=${encodeURIComponent(novoEmail)}&type=email`;
+            }, 1500);
+        } catch (error) {
+            console.error('Erro ao alterar email:', error);
+            showToast('Erro ao alterar email. Tente novamente.', { type: 'error' });
+        } finally {
+            // Reabilitar botão
+            btnConfirmarAlterar.disabled = false;
+            btnConfirmarAlterar.textContent = 'Alterar Email';
+        }
+        });
+    }
 });

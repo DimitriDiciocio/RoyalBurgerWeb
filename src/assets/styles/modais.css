@@ -232,7 +232,7 @@
           width: 22px;
           position: absolute;
           right: 20px;
-          top: 54%;
+          top: 50%;
           transform: translateY(-50%);
           cursor: pointer;
           z-index: 99;
@@ -1952,6 +1952,310 @@
         &:hover {
           background-color: #374151;
         }
+      }
+    }
+  }
+}
+
+/* Modal de Alterar Senha - Estilos Específicos */
+#alterar-senha {
+  .modal-contet {
+    max-width: 450px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    gap: 5px;
+  }
+
+  .header {
+    padding: 0px 20px 12px 20px;
+    border-bottom: 1px solid #e0e1e4;
+    position: relative;
+
+    .fa-xmark {
+      position: absolute;
+      top: 0px;
+      right: 15px;
+      font-size: 1.2rem;
+      color: #ccc;
+      cursor: pointer;
+      transition: color 0.3s;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+
+      &:hover {
+        color: var(--color-secondary);
+        background-color: #f3f4f6;
+      }
+    }
+
+    .titulo {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--color-texto-black);
+      margin-bottom: 6px;
+    }
+
+    .descricao {
+      color: var(--color-texto-erased);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+  }
+
+  .main {
+    padding: 15px 20px;
+    gap: 20px;
+
+    .div-input {
+      position: relative;
+      width: 100%;
+
+      label {
+        font-size: 0.8rem;
+        color: var(--color-texto-erased);
+        font-weight: 600;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        left: 14px;
+        background: var(--cor-div-primary);
+        width: fit-content;
+        transition: 0.3s;
+        z-index: 1;
+        padding: 0 4px;
+
+        &.active {
+          color: var(--color-texto-erased);
+          top: 0;
+          font-size: 0.7rem;
+          z-index: 3;
+        }
+
+        &.focused {
+          color: var(--color-tertiary);
+        }
+      }
+
+      input {
+        width: 100%;
+        padding: 10px 40px 10px 12px;
+        font-size: 0.85rem;
+        border: 2px #e0e1e4 solid;
+        border-radius: 6px;
+        outline: none;
+        transition: 0.3s;
+        background: transparent;
+        z-index: 2;
+
+        &:focus {
+          border: 2px var(--color-tertiary) solid;
+        }
+      }
+
+      &:focus-within label {
+        color: var(--color-tertiary);
+        top: 0;
+        font-size: 0.7rem;
+        z-index: 3;
+      }
+
+      i {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        z-index: 99;
+        font-size: 1rem;
+        color: var(--color-texto-erased);
+        pointer-events: auto;
+
+        &:hover {
+          color: var(--color-texto-black);
+        }
+      }
+    }
+
+    .password-requirements {
+      padding: 12px;
+      background-color: #f9fafb;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+
+      h5 {
+        margin: 0 0 8px 0;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--color-texto-black);
+      }
+
+      .instrucao {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        li {
+          font-size: 0.75rem;
+          color: var(--color-texto-erased);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: 0px;
+          transition: color 0.3s;
+
+          &::before {
+            content: '✗';
+            color: var(--color-texto-erased);
+            font-weight: bold;
+            width: 14px;
+            text-align: center;
+          }
+
+          &.valid {
+            color: #10b981;
+
+            &::before {
+              content: '✓';
+              color: #10b981;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .footer {
+    padding: 0px 20px 20px 20px;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: flex-end;
+
+    .btn-cancelar {
+      background: transparent;
+      border: 2px solid #e0e1e4;
+      color: var(--color-texto-erased);
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 90px;
+
+      &:hover {
+        border-color: var(--color-texto-erased);
+        color: var(--color-texto-black);
+        background-color: #f9fafb;
+      }
+    }
+
+    .btn-salvar {
+      background-color: var(--color-texto-black);
+      color: var(--color-texto-white);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 90px;
+
+      &:hover {
+        background-color: #374151;
+      }
+
+      &:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+      }
+
+      &.inativo {
+        background-color: #e0e1e4;
+        color: #999;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+/* Responsividade da Modal de Alterar Senha */
+@media (max-width: 768px) {
+  #alterar-senha {
+    .modal-contet {
+      width: 95%;
+      margin: 15px;
+      max-height: 95vh;
+    }
+
+    .header {
+      padding: 15px 15px 10px 15px;
+
+      .titulo {
+        font-size: 1.1rem;
+      }
+
+      .descricao {
+        font-size: 0.8rem;
+      }
+    }
+
+    .main {
+      padding: 12px 15px;
+
+      .div-input {
+        margin-bottom: 10px;
+
+        input {
+          padding: 8px 10px;
+          font-size: 0.8rem;
+        }
+      }
+
+      .password-requirements {
+        padding: 10px;
+        margin: 8px 0;
+
+        h5 {
+          font-size: 0.75rem;
+          margin-bottom: 6px;
+        }
+
+        .instrucao {
+          gap: 3px;
+
+          li {
+            font-size: 0.7rem;
+            gap: 5px;
+          }
+        }
+      }
+    }
+
+    .footer {
+      padding: 12px 15px 15px 15px;
+      flex-direction: column;
+      gap: 8px;
+
+      .btn-cancelar,
+      .btn-salvar {
+        width: 100%;
+        padding: 12px;
+        font-size: 0.8rem;
       }
     }
   }

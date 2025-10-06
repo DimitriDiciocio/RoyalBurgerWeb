@@ -13,11 +13,13 @@
     <link rel="stylesheet" href="../assets/styles/login-cadastro.css">
     <link rel="stylesheet" href="../assets/styles/verificar-email.css">
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <link rel="stylesheet" href="../assets/styles/modais.css">
     <!-- js sistema -->
     <script src="../js/utils.js" type="module" defer></script>
     <script src="../js/ui/header.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/modais.js" defer></script>
     <script src="../js/ui/verificar-email.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
@@ -31,9 +33,9 @@
     <main>
         <section class="verification-container">
             <div class="verification-card">
-                <button class="btn-close" onclick="window.location.href='login.html'">
+                <!-- <button class="btn-close" onclick="window.location.href='login.html'">
                     <i class="fa-solid fa-times"></i>
-                </button>
+                </button> -->
 
                 <div class="verification-icon">
                     <img src="../assets/svg/logo.svg" alt="Royal Burger Logo">
@@ -62,16 +64,42 @@
                     <button type="submit" id="btn-verificar" class="btn-verify">Verificar E-mail</button>
                 </form>
 
-                <p class="change-email-text">
+                <!-- <p class="change-email-text">
                     Deseja alterar seu e-mail? 
-                    <a href="cadastro.html" class="change-email-link">Alterar aqui</a>
-                </p>
+                    <a class="change-email-link" id="btn-alterar-email">Alterar aqui</a>
+                </p> -->
             </div>
         </section>
     </main>
 
     <!-- importare footer -->
     <div id="footer-container"></div>
+
+    <!-- Modal para alterar email -->
+    <div id="modal-alterar-email" class="modal" style="display: none;" data-reset-on-close="true">
+        <div class="div-overlay"></div>
+        <div class="modal-contet">
+            <div class="header">
+                <i class="fa-solid fa-times" data-close-modal="modal-alterar-email"></i>
+                <div class="titulo">Alterar Email</div>
+                <div class="descricao">Digite o novo email que deseja usar. Um código de verificação será enviado para o novo endereço.</div>
+            </div>
+            
+            <div class="main">
+                <form id="form-alterar-email">
+                    <div class="div-input">
+                        <label for="novo-email">Novo Email</label>
+                        <input type="email" id="novo-email" name="novo-email" required autocomplete="off">
+                    </div>
+                </form>
+            </div>
+            
+            <div class="footer">
+                <button type="button" class="btn-cancelar" data-close-modal="modal-alterar-email">Cancelar</button>
+                <button type="button" class="btn-salvar" id="confirmar-alterar-email">Alterar Email</button>
+            </div>
+        </div>
+    </div>
 
 </body>
 

@@ -81,7 +81,7 @@
 
                     <div class="pontos">
                         <i class="fa-solid fa-crown"></i>
-                        <p>200</p>
+                        <p>100</p>
                     </div>
 
                     <p class="txt2">Faltam <span>XX</span> dias para seus pontos expirarem</p>
@@ -417,56 +417,56 @@
             </div>
         </div>
 
-        <div id="alterar-senha" class="modal" style="display: none;">
+        <div id="alterar-senha" class="modal" style="display: none;" data-reset-on-close="true">
             <div class="div-overlay"></div>
 
             <div class="modal-contet">
                 <div class="header">
-                    <i class="fa-solid fa-xmark" onclick="fecharModal('alterar-senha')"></i>
-                    <p class="titulo">Adicionar endereço</p>
+                    <i class="fa-solid fa-xmark" data-close-modal="alterar-senha"></i>
+                    <p class="titulo">Alterar Senha</p>
                     <p class="descricao">Campos com (*) são obrigatórios</p>
                 </div>
 
                 <div class="main">
                     <div class="div-input">
-                        <label for="senha-atual">Senha atual</label>
+                        <label for="senha-atual">Senha atual*</label>
                         <input type="password" id="senha-atual" name="senha-atual" required autocomplete="off">
-                        <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
-                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
+                        <i class="fa-solid fa-eye" id="mostrarSenhaAtual" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarSenhaAtual" aria-hidden="true"
                             style="display: none;"></i>
                     </div>
 
                     <div class="div-input">
-                        <label for="nova-senha">Senha nova</label>
+                        <label for="nova-senha">Nova senha*</label>
                         <input type="password" id="nova-senha" name="nova-senha" required autocomplete="off">
-                        <i class="fa-solid fa-eye" id="mostrarSenha" aria-hidden="true"></i>
-                        <i class="fa-solid fa-eye-slash" id="ocultarSenha" aria-hidden="true"
+                        <i class="fa-solid fa-eye" id="mostrarNovaSenha" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarNovaSenha" aria-hidden="true"
                             style="display: none;"></i>
                     </div>
 
                     <div class="password-requirements">
+                        <h5>Requisitos da senha:</h5>
                         <ul class="instrucao">
-                            <li id="req-maiuscula">1 Letra em maiúsculo</li>
-                            <li id="req-numero">1 Dígito numérico</li>
-                            <li id="req-especial">1 Caractere especial</li>
-                            <li id="req-tamanho">8 Dígitos</li>
+                            <li id="req-maiuscula-alt">1 Letra em maiúsculo</li>
+                            <li id="req-numero-alt">1 Dígito numérico</li>
+                            <li id="req-especial-alt">1 Caractere especial</li>
+                            <li id="req-tamanho-alt">8 Dígitos</li>
                         </ul>
                     </div>
 
                     <div class="div-input">
-                        <label for="confirma-senha-alter">Confirmar senha</label>
+                        <label for="confirma-senha-alter">Confirmar nova senha*</label>
                         <input type="password" id="confirma-senha-alter" name="confirma-senha-alter" required autocomplete="off">
-                        <i class="fa-solid fa-eye" id="mostrarConfirmaSenha" aria-hidden="true"></i>
-                        <i class="fa-solid fa-eye-slash" id="ocultarConfirmaSenha" aria-hidden="true"
+                        <i class="fa-solid fa-eye" id="mostrarConfirmaSenhaAlt" aria-hidden="true"></i>
+                        <i class="fa-solid fa-eye-slash" id="ocultarConfirmaSenhaAlt" aria-hidden="true"
                             style="display: none;"></i>
                     </div>
                 </div>
 
                 <div class="footer">
-                    <button>Confirmar</button>
+                    <button class="btn-cancelar" data-close-modal="alterar-senha">Cancelar</button>
+                    <button class="btn-salvar" id="btn-confirmar-alterar-senha">Alterar Senha</button>
                 </div>
-
-                
             </div>
         </div>
 
