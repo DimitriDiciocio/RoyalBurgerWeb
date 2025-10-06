@@ -762,19 +762,26 @@
 
                 <div class="div-input">
                     <label for="unidade-ingrediente">Unidade</label>
-                    <input type="text" id="unidade-ingrediente" name="unidade-ingrediente"
+                    <select id="unidade-ingrediente" name="unidade-ingrediente"
                         placeholder="kg, g, L, ml, etc." autocomplete="off">
+                        <option value="">Selecione uma unidade</option>
+                        <option value="un">un</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="L">L</option>
+                        <option value="ml">ml</option>
+                    </select>
                 </div>
 
                 <div class="campos-linha">
                     <div class="div-input">
-                        <label for="min-ingrediente">Min</label>
+                        <label for="min-ingrediente">Valor mínimo</label>
                         <input type="number" id="min-ingrediente" name="min-ingrediente" min="0" step="0.1"
                             autocomplete="off">
                     </div>
 
                     <div class="div-input">
-                        <label for="max-ingrediente">Max</label>
+                        <label for="max-ingrediente">Valor máximo</label>
                         <input type="number" id="max-ingrediente" name="max-ingrediente" min="0" step="0.1"
                             autocomplete="off">
                     </div>
@@ -872,8 +879,14 @@
 
                                 <div class="div-input">
                                     <label for="observacao-1">Unidade</label>
-                                    <input type="text" id="observacao-1" name="observacao-1" autocomplete="off">
-                                    <!-- fatia, un... -->
+                                    <select type="text" id="observacao-1" name="observacao-1" autocomplete="off">
+                                        <option value="">Selecione uma unidade</option>
+                                        <option value="un">un</option>
+                                        <option value="kg">kg</option>
+                                        <option value="g">g</option>
+                                        <option value="L">L</option>
+                                        <option value="ml">ml</option>
+                                    </select>
                                 </div>
                                 <button type="button" class="btn-remover-ingrediente">
                                     <i class="fa-solid fa-trash"></i>
