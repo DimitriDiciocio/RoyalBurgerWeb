@@ -1065,8 +1065,14 @@ class CardapioManager {
 
                 <div class="div-input">
                     <label for="unidade-${newIndex}">Unidade</label>
-                    <input type="text" id="unidade-${newIndex}" name="unidade-${newIndex}" autocomplete="off">
-                    <!-- fatia, un... -->
+                    <select type="text" id="unidade-${newIndex}" name="unidade-${newIndex}" autocomplete="off">
+                        <option value="">Selecione uma unidade</option>
+                        <option value="un">un</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="L">L</option>
+                        <option value="ml">ml</option>
+                    </select>
                 </div>
                 <button type="button" class="btn-remover-ingrediente">
                     <i class="fa-solid fa-trash"></i>
