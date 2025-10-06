@@ -813,33 +813,9 @@
       gap: 20px;
 
       & .div-input {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        & label {
-          color: var(--color-texto-black);
-          font-size: 14px;
-          font-weight: 600;
-          margin: 0;
-        }
 
         & input,
         & select {
-          padding: 12px 16px;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          font-size: 14px;
-          color: var(--color-texto-black);
-          background-color: var(--color-texto-white);
-          transition: 0.3s;
-          outline: none;
-
-          &:focus {
-            border-color: var(--color-texto-black);
-            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
-          }
 
           &.error {
             border-color: #ef4444;
