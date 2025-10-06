@@ -9,7 +9,7 @@
  */
 
 import { getStoredUser } from '../api/api.js';
-import { setFlashMessage } from './alerts.js';
+import { setFlashMessage, showToast, showActionModal, showConfirm } from './alerts.js';
 
 // ============================================================================
 // CONSTANTES E CONFIGURAÇÕES
@@ -213,7 +213,7 @@ class SectionManager {
      */
     setupNavigation() {
         const navigationItems = document.querySelectorAll(CONFIG.SELECTORS.NAVIGATION);
-        
+
         navigationItems.forEach(item => {
             item.addEventListener('click', (event) => {
                 event.preventDefault();
@@ -243,7 +243,7 @@ class SectionManager {
             this.updateNavigation(sectionId);
             this.saveActiveSection(sectionId);
             this.initializeSectionHandler(sectionId);
-            
+
             this.activeSection = sectionId;
             console.log(`Seção ativada: ${sectionId}`);
         } catch (error) {
@@ -309,12 +309,12 @@ class SectionManager {
             try {
                 // Emitir evento antes da inicialização
                 eventSystem.emit('section:beforeInit', { sectionId });
-                
+
                 const manager = handler();
                 if (manager && typeof manager.init === 'function') {
                     manager.init();
                 }
-                
+
                 // Emitir evento após a inicialização
                 eventSystem.emit('section:afterInit', { sectionId });
             } catch (error) {
@@ -332,7 +332,7 @@ class SectionManager {
 
         try {
             const savedSection = localStorage.getItem(CONFIG.STORAGE_KEYS.ACTIVE_SECTION);
-            
+
             if (savedSection && document.getElementById(savedSection)) {
                 sectionToShow = savedSection;
             } else if (savedSection) {
@@ -358,12 +358,12 @@ class SectionManager {
      * @param {Error} error - Erro ocorrido
      */
     handleSectionError(sectionId, error) {
-            setFlashMessage({
-                type: 'error',
+        setFlashMessage({
+            type: 'error',
             title: 'Erro de Navegação',
             message: `Não foi possível carregar a seção ${sectionId}. Tentando carregar o dashboard.`
         });
-        
+
         // Fallback para dashboard
         if (sectionId !== CONFIG.DEFAULT_SECTION) {
             this.showSection(CONFIG.DEFAULT_SECTION);
@@ -395,23 +395,23 @@ class AuthManager {
     static verifyAdminPermissions() {
         try {
             const user = getStoredUser();
-            
+
             if (!user) {
                 this.handleAuthError('Você precisa estar logado para acessar esta página.');
-            return false;
-        }
+                return false;
+            }
 
             const userRole = this.normalizeUserRole(user);
             const hasPermission = CONFIG.ADMIN_ROLES.includes(userRole);
 
             if (!hasPermission) {
                 this.handleAuthError('Apenas administradores e gerentes podem acessar esta página.');
-            return false;
-        }
+                return false;
+            }
 
-        return true;
-    } catch (error) {
-        console.error('Erro ao verificar permissões:', error);
+            return true;
+        } catch (error) {
+            console.error('Erro ao verificar permissões:', error);
             this.handleAuthError('Não foi possível verificar suas permissões. Tente fazer login novamente.');
             return false;
         }
@@ -432,12 +432,12 @@ class AuthManager {
      * @param {string} message - Mensagem de erro
      */
     static handleAuthError(message) {
-            setFlashMessage({
-                type: 'error',
-                title: 'Acesso Restrito',
+        setFlashMessage({
+            type: 'error',
+            title: 'Acesso Restrito',
             message: message
-            });
-            window.location.href = '../../index.html';
+        });
+        window.location.href = '../../index.html';
     }
 }
 
@@ -460,7 +460,7 @@ class CardapioManager {
             productCards: '.card-produto',
             statusElements: '.card-produto .status'
         };
-        
+
         this.init();
     }
 
@@ -481,7 +481,7 @@ class CardapioManager {
      */
     setupToggleHandlers() {
         const toggles = document.querySelectorAll(this.selectors.toggles);
-        
+
         toggles.forEach(toggle => {
             toggle.addEventListener('change', (event) => {
                 this.handleToggleChange(event.target);
@@ -497,7 +497,7 @@ class CardapioManager {
         const card = toggle.closest('.card-produto');
         const statusElement = card.querySelector('.status');
         const productName = card.querySelector('h3').textContent;
-        
+
         if (toggle.checked) {
             statusElement.innerHTML = '<i class="fa-solid fa-eye"></i> Disponível';
             statusElement.className = 'status disponivel';
@@ -505,16 +505,16 @@ class CardapioManager {
             statusElement.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Indisponível';
             statusElement.className = 'status indisponivel';
         }
-        
+
         // Emitir evento de mudança de dados
         eventSystem.emit('data:changed', {
             type: 'product_availability',
             productName: productName,
             available: toggle.checked
         });
-        
+
         // TODO: Integrar com API para salvar status
-        console.log(`Status do produto "${productName}" alterado para: ${toggle.checked ? 'Disponível' : 'Indisponível'}`);
+        // Status do produto alterado
     }
 
     /**
@@ -522,7 +522,7 @@ class CardapioManager {
      */
     setupEditHandlers() {
         const editButtons = document.querySelectorAll(this.selectors.editButtons);
-        
+
         editButtons.forEach(button => {
             button.addEventListener('click', (event) => {
                 this.handleEditClick(event.target);
@@ -537,13 +537,13 @@ class CardapioManager {
     handleEditClick(button) {
         const card = button.closest('.card-produto');
         const productName = card.querySelector('h3').textContent;
-        
+
         // Emitir evento de edição
         eventSystem.emit('product:edit', {
             productName: productName,
             card: card
         });
-        
+
         // Abrir modal de edição com dados do produto
         const productData = this.extractProductData(card);
         this.openModal('edit', productData);
@@ -560,7 +560,7 @@ class CardapioManager {
         const categoria = card.querySelector('.categoria').textContent;
         const preco = card.querySelector('.valor.preco').textContent;
         const tempo = card.querySelector('.detalhe:nth-child(3) .valor').textContent;
-        
+
         return {
             nome,
             descricao,
@@ -575,7 +575,7 @@ class CardapioManager {
      */
     setupSearchHandlers() {
         const searchInput = document.querySelector(this.selectors.searchInput);
-        
+
         if (searchInput) {
             searchInput.addEventListener('input', (event) => {
                 this.handleSearch(event.target.value);
@@ -590,15 +590,15 @@ class CardapioManager {
     handleSearch(searchTerm) {
         const cards = document.querySelectorAll(this.selectors.productCards);
         const normalizedTerm = searchTerm.toLowerCase();
-        
+
         cards.forEach(card => {
             const productName = card.querySelector('h3').textContent.toLowerCase();
             const description = card.querySelector('.descricao-produto').textContent.toLowerCase();
-            
+
             const matches = productName.includes(normalizedTerm) || description.includes(normalizedTerm);
             card.style.display = matches ? 'block' : 'none';
         });
-        
+
         // Emitir evento de busca
         eventSystem.emit('search:performed', {
             term: searchTerm,
@@ -612,13 +612,13 @@ class CardapioManager {
     setupFilterHandlers() {
         const categoryFilter = document.querySelector(this.selectors.categoryFilter);
         const statusFilter = document.querySelector(this.selectors.statusFilter);
-        
+
         if (categoryFilter) {
             categoryFilter.addEventListener('change', (event) => {
                 this.handleCategoryFilter(event.target.value);
             });
         }
-        
+
         if (statusFilter) {
             statusFilter.addEventListener('change', (event) => {
                 this.handleStatusFilter(event.target.value);
@@ -632,13 +632,13 @@ class CardapioManager {
      */
     handleCategoryFilter(category) {
         const cards = document.querySelectorAll(this.selectors.productCards);
-        
+
         cards.forEach(card => {
             const cardCategory = card.querySelector('.categoria').textContent.toLowerCase();
             const matches = !category || cardCategory === category;
             card.style.display = matches ? 'block' : 'none';
         });
-        
+
         // Emitir evento de filtro
         eventSystem.emit('filter:applied', {
             type: 'category',
@@ -652,20 +652,20 @@ class CardapioManager {
      */
     handleStatusFilter(status) {
         const cards = document.querySelectorAll(this.selectors.productCards);
-        
+
         cards.forEach(card => {
             const statusElement = card.querySelector('.status');
             const isAvailable = statusElement.classList.contains('disponivel');
-            
+
             let matches = true;
             if (status) {
-                matches = (status === 'disponivel' && isAvailable) || 
-                         (status === 'indisponivel' && !isAvailable);
+                matches = (status === 'disponivel' && isAvailable) ||
+                    (status === 'indisponivel' && !isAvailable);
             }
-            
+
             card.style.display = matches ? 'block' : 'none';
         });
-        
+
         // Emitir evento de filtro
         eventSystem.emit('filter:applied', {
             type: 'status',
@@ -678,7 +678,7 @@ class CardapioManager {
      */
     setupNewItemHandler() {
         const newItemButton = document.querySelector(this.selectors.newItemButton);
-        
+
         if (newItemButton) {
             newItemButton.addEventListener('click', () => {
                 this.handleNewItem();
@@ -691,7 +691,7 @@ class CardapioManager {
      */
     setupStatusHandlers() {
         const toggles = document.querySelectorAll(this.selectors.toggles);
-        
+
         toggles.forEach(toggle => {
             // Sincronizar estado inicial
             this.syncToggleWithStatus(toggle);
@@ -705,7 +705,7 @@ class CardapioManager {
     syncToggleWithStatus(toggle) {
         const card = toggle.closest('.card-produto');
         const statusElement = card.querySelector('.status');
-        
+
         if (statusElement) {
             const isAvailable = statusElement.classList.contains('disponivel');
             toggle.checked = isAvailable;
@@ -728,7 +728,7 @@ class CardapioManager {
         const modal = document.getElementById('modal-produto');
         const titulo = document.getElementById('titulo-modal');
         const textoBotao = document.getElementById('texto-botao');
-        
+
         if (mode === 'add') {
             titulo.textContent = 'Adicionar Produto';
             textoBotao.textContent = 'Adicionar item';
@@ -738,7 +738,7 @@ class CardapioManager {
             textoBotao.textContent = 'Salvar alterações';
             this.populateModal(productData);
         }
-        
+
         modal.style.display = 'flex';
         this.setupModalHandlers();
     }
@@ -761,13 +761,13 @@ class CardapioManager {
         const precoInput = document.getElementById('preco-produto');
         const categoriaSelect = document.getElementById('categoria-produto');
         const tempoInput = document.getElementById('tempo-produto');
-        
+
         if (nomeInput) nomeInput.value = '';
         if (descricaoInput) descricaoInput.value = '';
         if (precoInput) precoInput.value = '';
         if (categoriaSelect) categoriaSelect.value = '';
         if (tempoInput) tempoInput.value = '';
-        
+
         // Limpar ingredientes (manter apenas o primeiro)
         const container = document.querySelector('.ingredientes-container');
         if (container) {
@@ -775,12 +775,12 @@ class CardapioManager {
             items.forEach((item, index) => {
                 if (index > 0) {
                     item.remove();
-        } else {
+                } else {
                     // Limpar campos do primeiro ingrediente
                     const select = item.querySelector('select');
                     const quantidadeInput = item.querySelector('input[name*="quantidade"]');
                     const unidadeInput = item.querySelector('input[name*="unidade"]');
-                    
+
                     if (select) select.value = '';
                     if (quantidadeInput) quantidadeInput.value = '';
                     if (unidadeInput) unidadeInput.value = '';
@@ -799,13 +799,13 @@ class CardapioManager {
         const precoInput = document.getElementById('preco-produto');
         const categoriaSelect = document.getElementById('categoria-produto');
         const tempoInput = document.getElementById('tempo-produto');
-        
+
         if (nomeInput) nomeInput.value = productData.nome || '';
         if (descricaoInput) descricaoInput.value = productData.descricao || '';
         if (precoInput) precoInput.value = productData.preco || '';
         if (categoriaSelect) categoriaSelect.value = productData.categoria || '';
         if (tempoInput) tempoInput.value = productData.tempo || '';
-        
+
         // TODO: Implementar preenchimento de ingredientes
     }
 
@@ -816,21 +816,21 @@ class CardapioManager {
         // Fechar modal
         document.getElementById('fechar-modal').onclick = () => this.closeModal();
         document.getElementById('cancelar-produto').onclick = () => this.closeModal();
-        
+
         // Salvar produto
         document.getElementById('salvar-produto').onclick = () => this.saveProduct();
-        
+
         // Adicionar ingrediente
         const addIngredientBtn = document.querySelector('.btn-adicionar-ingrediente');
         if (addIngredientBtn) {
             addIngredientBtn.onclick = () => this.addIngredient();
         }
-        
+
         // Remover ingredientes
         document.querySelectorAll('.btn-remover-ingrediente').forEach(btn => {
             btn.onclick = (e) => this.removeIngredient(e.target.closest('.ingrediente-item'));
         });
-        
+
         // Validações em tempo real
         this.setupRealTimeValidation();
     }
@@ -989,7 +989,7 @@ class CardapioManager {
     showFieldValidation(input, isValid, message) {
         // Remover validação anterior
         input.classList.remove('valid', 'invalid');
-        
+
         // Remover mensagem anterior
         const existingMessage = input.parentNode.querySelector('.validation-message');
         if (existingMessage) {
@@ -1001,7 +1001,7 @@ class CardapioManager {
                 input.classList.add('valid');
             } else {
                 input.classList.add('invalid');
-                
+
                 // Adicionar mensagem de erro
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'validation-message';
@@ -1023,7 +1023,7 @@ class CardapioManager {
      */
     formatPrecoInput(input) {
         let value = input.value.replace(/\D/g, ''); // Remove tudo que não é dígito
-        
+
         if (value.length > 0) {
             // Adiciona R$ e formata como moeda
             const formatted = (parseInt(value) / 100).toLocaleString('pt-BR', {
@@ -1041,7 +1041,7 @@ class CardapioManager {
         const container = document.querySelector('.ingredientes-container');
         const items = container.querySelectorAll('.ingrediente-item');
         const newIndex = items.length + 1;
-        
+
         const newItem = document.createElement('div');
         newItem.className = 'ingrediente-item';
         newItem.innerHTML = `
@@ -1073,9 +1073,9 @@ class CardapioManager {
                 </button>
             </div>
         `;
-        
+
         container.appendChild(newItem);
-        
+
         // Adicionar handler para o botão de remover
         newItem.querySelector('.btn-remover-ingrediente').onclick = () => this.removeIngredient(newItem);
     }
@@ -1087,7 +1087,7 @@ class CardapioManager {
     removeIngredient(item) {
         const container = document.querySelector('.ingredientes-container');
         const items = container.querySelectorAll('.ingrediente-item');
-        
+
         // Não permitir remover se for o único ingrediente
         if (items.length > 1) {
             item.remove();
@@ -1099,16 +1099,16 @@ class CardapioManager {
      */
     saveProduct() {
         const formData = this.getFormData();
-        
+
         if (this.validateForm(formData)) {
             // Emitir evento de salvamento
             eventSystem.emit('product:save', {
                 data: formData,
                 timestamp: new Date().toISOString()
             });
-            
+
             this.closeModal();
-            console.log('Produto salvo:', formData);
+            // Produto salvo com sucesso
         }
     }
 
@@ -1122,28 +1122,28 @@ class CardapioManager {
             const select = item.querySelector('select');
             const quantidadeInput = item.querySelector('input[name*="quantidade"]');
             const unidadeInput = item.querySelector('input[name*="unidade"]');
-            
+
             if (select && quantidadeInput && unidadeInput) {
                 const ingrediente = select.value;
                 const quantidade = quantidadeInput.value;
                 const unidade = unidadeInput.value;
-                
+
                 if (ingrediente && quantidade && unidade) {
-                    ingredientes.push({ 
-                        ingrediente, 
-                        quantidade, 
-                        unidade 
+                    ingredientes.push({
+                        ingrediente,
+                        quantidade,
+                        unidade
                     });
                 }
             }
         });
-        
+
         const nomeInput = document.getElementById('nome-produto');
         const descricaoInput = document.getElementById('descricao-produto');
         const precoInput = document.getElementById('preco-produto');
         const categoriaSelect = document.getElementById('categoria-produto');
         const tempoInput = document.getElementById('tempo-produto');
-        
+
         return {
             nome: nomeInput ? nomeInput.value : '',
             descricao: descricaoInput ? descricaoInput.value : '',
@@ -1162,29 +1162,29 @@ class CardapioManager {
     validateForm(formData) {
         // Validar nome
         if (!this.validateNome(formData.nome)) {
-        return false;
-    }
-        
+            return false;
+        }
+
         // Validar descrição
         if (!this.validateDescricao(formData.descricao)) {
             return false;
         }
-        
+
         // Validar preço
         if (!this.validatePreco(formData.preco)) {
             return false;
         }
-        
+
         // Validar categoria
         if (!this.validateCategoria(formData.categoria)) {
             return false;
         }
-        
+
         // Validar tempo
         if (!this.validateTempo(formData.tempo)) {
             return false;
         }
-        
+
         // Validar ingredientes
         if (!this.validateIngredientes(formData.ingredientes)) {
             return false;
@@ -1203,24 +1203,24 @@ class CardapioManager {
             this.showValidationError('Nome do produto é obrigatório');
             return false;
         }
-        
+
         if (nome.trim().length < 2) {
             this.showValidationError('Nome deve ter pelo menos 2 caracteres');
             return false;
         }
-        
+
         if (nome.trim().length > 50) {
             this.showValidationError('Nome deve ter no máximo 50 caracteres');
             return false;
         }
-        
+
         // Verificar se contém apenas letras, números, espaços e caracteres especiais comuns
         const nomeRegex = /^[a-zA-ZÀ-ÿ0-9\s\-'&.()]+$/;
         if (!nomeRegex.test(nome.trim())) {
             this.showValidationError('Nome contém caracteres inválidos');
             return false;
         }
-        
+
         return true;
     }
 
@@ -1234,17 +1234,17 @@ class CardapioManager {
             this.showValidationError('Descrição é obrigatória');
             return false;
         }
-        
+
         if (descricao.trim().length < 10) {
             this.showValidationError('Descrição deve ter pelo menos 10 caracteres');
             return false;
         }
-        
+
         if (descricao.trim().length > 200) {
             this.showValidationError('Descrição deve ter no máximo 200 caracteres');
             return false;
         }
-        
+
         return true;
     }
 
@@ -1258,34 +1258,34 @@ class CardapioManager {
             this.showValidationError('Preço é obrigatório');
             return false;
         }
-        
+
         // Remover R$ e espaços para validação
         const precoLimpo = preco.replace(/R\$\s?/g, '').replace(/,/g, '.').trim();
-        
+
         // Verificar se é um número válido
         const precoNumero = parseFloat(precoLimpo);
         if (isNaN(precoNumero)) {
             this.showValidationError('Preço deve ser um valor numérico válido');
             return false;
         }
-        
+
         if (precoNumero <= 0) {
             this.showValidationError('Preço deve ser maior que zero');
             return false;
         }
-        
+
         if (precoNumero > 999.99) {
             this.showValidationError('Preço deve ser menor que R$ 1.000,00');
             return false;
         }
-        
+
         // Verificar formato (aceita R$ 0,00 ou 0.00)
         const precoRegex = /^(R\$\s?)?\d{1,3}([.,]\d{2})?$/;
         if (!precoRegex.test(preco.trim())) {
             this.showValidationError('Formato de preço inválido. Use: R$ 0,00 ou 0.00');
             return false;
         }
-        
+
         return true;
     }
 
@@ -1299,13 +1299,13 @@ class CardapioManager {
             this.showValidationError('Categoria é obrigatória');
             return false;
         }
-        
+
         const categoriasValidas = ['burguer', 'sanduiche', 'bebida', 'sobremesa'];
         if (!categoriasValidas.includes(categoria)) {
             this.showValidationError('Categoria selecionada é inválida');
             return false;
         }
-        
+
         return true;
     }
 
@@ -1319,23 +1319,23 @@ class CardapioManager {
             this.showValidationError('Tempo de preparo é obrigatório');
             return false;
         }
-        
+
         const tempoNumero = parseInt(tempo);
         if (isNaN(tempoNumero)) {
             this.showValidationError('Tempo deve ser um número válido');
             return false;
         }
-        
+
         if (tempoNumero <= 0) {
             this.showValidationError('Tempo deve ser maior que zero');
             return false;
         }
-        
+
         if (tempoNumero > 120) {
             this.showValidationError('Tempo deve ser menor que 120 minutos');
             return false;
         }
-        
+
         return true;
     }
 
@@ -1349,58 +1349,58 @@ class CardapioManager {
             this.showValidationError('Pelo menos um ingrediente é obrigatório');
             return false;
         }
-        
+
         if (ingredientes.length > 10) {
             this.showValidationError('Máximo de 10 ingredientes permitidos');
             return false;
         }
-        
+
         const ingredientesUnicos = new Set();
-        
+
         for (let i = 0; i < ingredientes.length; i++) {
             const ingrediente = ingredientes[i];
-            
+
             // Validar ingrediente
             if (!ingrediente.ingrediente || !ingrediente.ingrediente.trim()) {
                 this.showValidationError(`Ingrediente ${i + 1}: selecione um ingrediente válido`);
                 return false;
             }
-            
+
             // Verificar duplicatas
             if (ingredientesUnicos.has(ingrediente.ingrediente)) {
                 this.showValidationError(`Ingrediente "${ingrediente.ingrediente}" está duplicado`);
                 return false;
             }
             ingredientesUnicos.add(ingrediente.ingrediente);
-            
+
             // Validar quantidade
             if (!ingrediente.quantidade || !ingrediente.quantidade.trim()) {
                 this.showValidationError(`Ingrediente ${i + 1}: quantidade é obrigatória`);
                 return false;
             }
-            
+
             const quantidadeNumero = parseFloat(ingrediente.quantidade);
             if (isNaN(quantidadeNumero) || quantidadeNumero <= 0) {
                 this.showValidationError(`Ingrediente ${i + 1}: quantidade deve ser um número maior que zero`);
                 return false;
             }
-            
+
             if (quantidadeNumero > 1000) {
                 this.showValidationError(`Ingrediente ${i + 1}: quantidade deve ser menor que 1000`);
                 return false;
             }
-            
+
             // Validar unidade
             if (!ingrediente.unidade || !ingrediente.unidade.trim()) {
                 this.showValidationError(`Ingrediente ${i + 1}: unidade é obrigatória`);
                 return false;
             }
-            
+
             if (ingrediente.unidade.trim().length < 1 || ingrediente.unidade.trim().length > 10) {
                 this.showValidationError(`Ingrediente ${i + 1}: unidade deve ter entre 1 e 10 caracteres`);
                 return false;
             }
-            
+
             // Verificar se unidade contém apenas letras
             const unidadeRegex = /^[a-zA-ZÀ-ÿ]+$/;
             if (!unidadeRegex.test(ingrediente.unidade.trim())) {
@@ -1408,7 +1408,7 @@ class CardapioManager {
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -1417,8 +1417,7 @@ class CardapioManager {
      * @param {string} message - Mensagem de erro
      */
     showValidationError(message) {
-        // Usar alert por enquanto, pode ser substituído por um sistema de notificações mais elegante
-        alert(`❌ Erro de validação:\n\n${message}`);
+        showToast(message, { type: 'error', title: 'Erro de validação' });
     }
 }
 
@@ -1535,7 +1534,7 @@ class EstoqueManager {
         cards.forEach(card => {
             const ingredientName = card.querySelector('h3').textContent.toLowerCase();
             const shouldShow = ingredientName.includes(term);
-            
+
             card.style.display = shouldShow ? 'block' : 'none';
         });
 
@@ -1552,11 +1551,11 @@ class EstoqueManager {
      */
     handleCategoryFilter(category) {
         const cards = document.querySelectorAll(this.selectors.ingredientCards);
-        
+
         cards.forEach(card => {
             const cardCategory = card.querySelector('.categoria-fornecedor span').textContent.toLowerCase();
             const shouldShow = !category || cardCategory === category.toLowerCase();
-            
+
             card.style.display = shouldShow ? 'block' : 'none';
         });
 
@@ -1573,13 +1572,13 @@ class EstoqueManager {
      */
     handleStatusFilter(status) {
         const cards = document.querySelectorAll(this.selectors.ingredientCards);
-        
+
         cards.forEach(card => {
             const statusTag = card.querySelector('.tag-status');
             const cardStatus = statusTag.className.includes('em-estoque') ? 'em-estoque' :
-                             statusTag.className.includes('estoque-baixo') ? 'estoque-baixo' :
-                             statusTag.className.includes('sem-estoque') ? 'sem-estoque' : '';
-            
+                statusTag.className.includes('estoque-baixo') ? 'estoque-baixo' :
+                    statusTag.className.includes('sem-estoque') ? 'sem-estoque' : '';
+
             const shouldShow = !status || cardStatus === status;
             card.style.display = shouldShow ? 'block' : 'none';
         });
@@ -1599,21 +1598,21 @@ class EstoqueManager {
         const card = button.closest('.card-ingrediente');
         const ingredientId = parseInt(card.dataset.ingredientId);
         const ingredient = ingredientDataManager.getIngredientById(ingredientId);
-        
+
         if (!ingredient) {
             console.error('Ingrediente não encontrado');
             return;
         }
-        
+
         // Emitir evento de edição
         eventSystem.emit('ingredient:edit', {
             ingredientName: ingredient.nome,
             card: card
         });
-        
+
         // Armazenar ID para edição
         this.currentEditingId = ingredientId;
-        
+
         // Preparar dados para a modal
         const ingredientData = {
             nome: ingredient.nome,
@@ -1624,7 +1623,7 @@ class EstoqueManager {
             min: ingredient.min,
             max: ingredient.max
         };
-        
+
         this.openIngredientModal(ingredientData);
     }
 
@@ -1636,38 +1635,38 @@ class EstoqueManager {
         const card = toggle.closest('.card-ingrediente');
         const ingredientId = parseInt(card.dataset.ingredientId);
         const ingredient = ingredientDataManager.getIngredientById(ingredientId);
-        
+
         if (!ingredient) {
             console.error('Ingrediente não encontrado');
             return;
         }
-        
+
         // Atualizar status no sistema de dados
         const updatedIngredient = ingredientDataManager.toggleIngredientStatus(ingredientId);
-        
+
         if (updatedIngredient) {
             // Atualizar interface
             const statusElement = card.querySelector('.status-ativo span');
             const iconElement = card.querySelector('.status-ativo i');
-            
+
             if (toggle.checked) {
                 statusElement.textContent = 'Ativo';
                 statusElement.parentElement.style.color = '#4CAF50';
                 iconElement.className = 'fa-solid fa-eye';
-        } else {
+            } else {
                 statusElement.textContent = 'Inativo';
                 statusElement.parentElement.style.color = '#f44336';
                 iconElement.className = 'fa-solid fa-eye-slash';
             }
-            
+
             // Emitir evento de mudança de status
             eventSystem.emit('ingredient:statusChange', {
                 ingredientName: ingredient.nome,
                 isActive: toggle.checked,
                 timestamp: new Date().toISOString()
             });
-            
-            console.log(`Status do ingrediente ${ingredient.nome}: ${toggle.checked ? 'Ativo' : 'Inativo'}`);
+
+            // Status do ingrediente alterado
         }
     }
 
@@ -1678,22 +1677,22 @@ class EstoqueManager {
     handleQuantityChange(button) {
         // Prevenir múltiplos cliques
         if (button.disabled) return;
-        
+
         const card = button.closest('.card-ingrediente');
         const ingredientId = parseInt(card.dataset.ingredientId);
         const ingredient = ingredientDataManager.getIngredientById(ingredientId);
-        
+
         if (!ingredient) {
             console.error('Ingrediente não encontrado');
             return;
         }
-        
+
         // Desabilitar botão temporariamente
         button.disabled = true;
-        
+
         const isIncrease = button.dataset.action === 'increase';
         let newQuantity = Number(ingredient.atual);
-        
+
         if (isIncrease) {
             newQuantity = newQuantity + 1;
             // Verificar se não excede o máximo
@@ -1707,25 +1706,25 @@ class EstoqueManager {
                 newQuantity = 0;
             }
         }
-        
+
         // Atualizar quantidade no sistema de dados
         const updatedIngredient = ingredientDataManager.updateIngredientQuantity(ingredientId, newQuantity);
-        
+
         if (updatedIngredient) {
             // Atualizar interface
             const quantityElement = card.querySelector('.quantidade');
             const progressElement = card.querySelector('.progresso');
             const progressPercentage = ingredient.max > 0 ? (newQuantity / ingredient.max) * 100 : 0;
-            
+
             quantityElement.textContent = `${newQuantity}${ingredient.unidade}`;
             progressElement.style.width = `${progressPercentage}%`;
-            
+
             // Atualizar status do card
             this.updateCardStatus(card, newQuantity, ingredient.min, ingredient.max);
-            
+
             // Atualizar métricas
             this.updateMetrics();
-            
+
             // Emitir evento de mudança de quantidade
             eventSystem.emit('ingredient:quantityChange', {
                 ingredientName: ingredient.nome,
@@ -1733,7 +1732,7 @@ class EstoqueManager {
                 timestamp: new Date().toISOString()
             });
         }
-        
+
         // Reabilitar botão após um pequeno delay
         setTimeout(() => {
             button.disabled = false;
@@ -1750,11 +1749,11 @@ class EstoqueManager {
     updateCardStatus(card, currentQuantity, minQuantity, maxQuantity) {
         const statusTag = card.querySelector('.tag-status');
         const statusSpan = statusTag.querySelector('span');
-        
+
         // Remover classes de status anteriores
         statusTag.classList.remove('em-estoque', 'estoque-baixo', 'sem-estoque');
         card.classList.remove('sem-estoque', 'estoque-baixo', 'em-estoque');
-        
+
         if (currentQuantity === 0) {
             statusTag.classList.add('sem-estoque');
             statusSpan.textContent = 'Sem estoque';
@@ -1778,7 +1777,7 @@ class EstoqueManager {
         eventSystem.emit('ingredient:create', {
             timestamp: new Date().toISOString()
         });
-        
+
         this.openIngredientModal();
     }
 
@@ -1790,7 +1789,7 @@ class EstoqueManager {
         const modal = document.getElementById('modal-ingrediente');
         const titulo = document.getElementById('titulo-modal-ingrediente');
         const btnSalvar = document.getElementById('salvar-ingrediente');
-        
+
         if (!modal) {
             console.error('Modal de ingrediente não encontrada');
             return;
@@ -1824,7 +1823,7 @@ class EstoqueManager {
             modal.style.display = 'none';
             document.body.style.overflow = 'auto';
         }
-        
+
         // Limpar ID de edição
         this.currentEditingId = null;
     }
@@ -1916,7 +1915,7 @@ class EstoqueManager {
 
         // Validação em tempo real
         this.setupIngredientValidation();
-        
+
         // Formatação automática para campo de custo
         this.setupCurrencyFormatting();
     }
@@ -2064,10 +2063,10 @@ class EstoqueManager {
         }
 
         const ingredientData = this.getIngredientFormData();
-        
+
         // Converter custo de string para número
         const custoNumerico = parseFloat(ingredientData.custo.replace('R$', '').replace(',', '.').trim());
-        
+
         const newIngredient = ingredientDataManager.addIngredient({
             nome: ingredientData.nome,
             fornecedor: ingredientData.fornecedor,
@@ -2078,12 +2077,12 @@ class EstoqueManager {
             max: ingredientData.max
         });
 
-        console.log('Ingrediente adicionado:', newIngredient);
-        
+        // Ingrediente adicionado com sucesso
+
         // Recarregar a lista e métricas
         this.loadIngredients();
         this.updateMetrics();
-        
+
         this.closeIngredientModal();
         this.showSuccessMessage('Ingrediente adicionado com sucesso!');
     }
@@ -2099,15 +2098,15 @@ class EstoqueManager {
 
         const ingredientData = this.getIngredientFormData();
         const ingredientId = this.currentEditingId;
-        
+
         if (!ingredientId) {
             console.error('ID do ingrediente não encontrado');
             return;
         }
-        
+
         // Converter custo de string para número
         const custoNumerico = parseFloat(ingredientData.custo.replace('R$', '').replace(',', '.').trim());
-        
+
         const updatedIngredient = ingredientDataManager.updateIngredient(ingredientId, {
             nome: ingredientData.nome,
             fornecedor: ingredientData.fornecedor,
@@ -2119,12 +2118,12 @@ class EstoqueManager {
         });
 
         if (updatedIngredient) {
-            console.log('Ingrediente atualizado:', updatedIngredient);
-            
+            // Ingrediente atualizado com sucesso
+
             // Recarregar a lista e métricas
             this.loadIngredients();
             this.updateMetrics();
-            
+
             this.closeIngredientModal();
             this.showSuccessMessage('Ingrediente atualizado com sucesso!');
         } else {
@@ -2178,11 +2177,11 @@ class EstoqueManager {
     loadIngredients() {
         const ingredients = ingredientDataManager.getAllIngredients();
         const container = document.querySelector('#secao-estoque .ingredientes');
-        
+
         if (!container) return;
 
         container.innerHTML = '';
-        
+
         ingredients.forEach(ingredient => {
             const card = this.createIngredientCard(ingredient);
             container.appendChild(card);
@@ -2279,7 +2278,7 @@ class EstoqueManager {
      */
     updateMetrics() {
         const metrics = ingredientDataManager.getMetrics();
-        
+
         // Atualizar valor total
         const valorTotalElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .grande');
         if (valorTotalElement) {
@@ -2369,7 +2368,7 @@ class EstoqueManager {
      */
     showSuccessMessage(message) {
         // Implementar sistema de notificações
-        console.log('✅', message);
+        // Mensagem de sucesso
     }
 
     /**
@@ -2378,7 +2377,7 @@ class EstoqueManager {
      */
     showErrorMessage(message) {
         // Implementar sistema de notificações
-        console.error('❌', message);
+        // Mensagem de erro
     }
 }
 
@@ -2431,7 +2430,7 @@ class EventSystem {
             this.events.get(eventName).forEach(callback => {
                 try {
                     callback(data);
-    } catch (error) {
+                } catch (error) {
                     console.error(`Erro no listener do evento ${eventName}:`, error);
                 }
             });
@@ -2571,8 +2570,8 @@ class ValidationSystem {
         const element = document.querySelector(selector);
         if (!element) {
             console.warn(`Elemento não encontrado: ${selector} ${context}`);
-        return false;
-    }
+            return false;
+        }
         return true;
     }
 
@@ -2786,7 +2785,7 @@ class FuncionarioDataManager {
         const total = this.funcionarios.length;
         const ativos = this.funcionarios.filter(f => f.ativo).length;
         const inativos = total - ativos;
-        
+
         const cargos = {
             atendente: this.funcionarios.filter(f => f.cargo === 'atendente').length,
             gerente: this.funcionarios.filter(f => f.cargo === 'gerente').length,
@@ -2917,11 +2916,11 @@ class FuncionarioManager {
         cards.forEach(card => {
             const nomeElement = card.querySelector('.nome-funcionario');
             const emailElement = card.querySelector('.email p');
-            
+
             if (nomeElement && emailElement) {
                 const nome = nomeElement.textContent.toLowerCase();
                 const email = emailElement.textContent.toLowerCase();
-                
+
                 const matches = nome.includes(term) || email.includes(term);
                 card.style.display = matches ? 'block' : 'none';
             }
@@ -2936,14 +2935,14 @@ class FuncionarioManager {
 
     handleCargoFilter(cargo) {
         const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
-        
+
         cards.forEach(card => {
             const cargoElement = card.querySelector('.cargo');
             if (cargoElement) {
-                const cardCargo = cargoElement.className.split(' ').find(cls => 
+                const cardCargo = cargoElement.className.split(' ').find(cls =>
                     ['atendente', 'gerente', 'entregador', 'admin', 'cliente'].includes(cls)
                 );
-                
+
                 const shouldShow = !cargo || cardCargo === cargo;
                 card.style.display = shouldShow ? 'block' : 'none';
             }
@@ -2958,15 +2957,15 @@ class FuncionarioManager {
 
     handleStatusFilter(status) {
         const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
-        
+
         cards.forEach(card => {
             const toggleElement = card.querySelector('.toggle');
             const statusText = card.querySelector('.status-text');
-            
+
             if (toggleElement && statusText) {
                 const isActive = toggleElement.classList.contains('active');
                 const cardStatus = isActive ? 'ativo' : 'inativo';
-                
+
                 const shouldShow = !status || cardStatus === status;
                 card.style.display = shouldShow ? 'block' : 'none';
             }
@@ -3038,7 +3037,7 @@ class FuncionarioManager {
                 field.classList.remove('error', 'success');
             }
         });
-        
+
         // Limpar validações de senha
         this.clearPasswordValidation();
     }
@@ -3069,7 +3068,7 @@ class FuncionarioManager {
                 field.classList.remove('error', 'success');
             }
         });
-        
+
         // Limpar validações de senha
         this.clearPasswordValidation();
     }
@@ -3094,7 +3093,7 @@ class FuncionarioManager {
             salvarBtn.addEventListener('click', () => {
                 if (funcionarioData) {
                     this.handleEditFuncionario();
-    } else {
+                } else {
                     this.handleAddFuncionario();
                 }
             });
@@ -3216,7 +3215,7 @@ class FuncionarioManager {
 
     validateAllFuncionarioFields() {
         const isEditing = this.currentEditingId !== null;
-        
+
         const fields = [
             { id: 'nome-funcionario', config: { required: true, minLength: 2 } },
             { id: 'email-funcionario', config: { required: true, type: 'email' } },
@@ -3333,7 +3332,7 @@ class FuncionarioManager {
 
     validatePasswordRequirements() {
         const password = document.getElementById('senha-funcionario')?.value || '';
-        
+
         const requirements = {
             'req-maiuscula-funcionario': /[A-Z]/.test(password),
             'req-numero-funcionario': /\d/.test(password),
@@ -3363,7 +3362,7 @@ class FuncionarioManager {
     loadFuncionarios() {
         const funcionarios = this.funcionarioDataManager.getAllFuncionarios();
         const container = document.querySelector('#secao-funcionarios .funcionarios');
-        
+
         if (!container) {
             console.error('Container de funcionários não encontrado');
             return;
@@ -3650,15 +3649,11 @@ class FuncionarioManager {
     }
 
     showSuccessMessage(message) {
-        // Sistema de notificações temporário com alert
-        // TODO: Implementar sistema de notificações mais robusto
-        alert(`✅ ${message}`);
+        showToast(message, { type: 'success', title: 'Sucesso' });
     }
 
     showErrorMessage(message) {
-        // Sistema de notificações temporário com alert
-        // TODO: Implementar sistema de notificações mais robusto
-        alert(`❌ ${message}`);
+        showToast(message, { type: 'error', title: 'Erro' });
     }
 }
 
@@ -3668,31 +3663,31 @@ class FuncionarioManager {
  * Inicializa o painel administrativo
  */
 function initializeAdminPanel() {
-    console.log('Inicializando Painel Administrativo...');
-    
+    // Inicializando Painel Administrativo
+
     try {
         // Verificar permissões antes de inicializar
         if (!AuthManager.verifyAdminPermissions()) {
             return;
         }
-        
+
         // Emitir evento de inicialização
         eventSystem.emit('adminPanel:initializing');
-        
+
         // Inicializar gerenciador de seções
         window.adminPanel = new SectionManager();
-        
+
         // Configurar listeners globais
         setupGlobalEventListeners();
-        
+
         // Emitir evento de inicialização completa
         eventSystem.emit('adminPanel:initialized');
-        
-        console.log('Painel Administrativo inicializado com sucesso!');
+
+        // Painel Administrativo inicializado com sucesso
     } catch (error) {
         console.error('Erro ao inicializar painel administrativo:', error);
         eventSystem.emit('adminPanel:initError', { error });
-        
+
         setFlashMessage({
             type: 'error',
             title: 'Erro de Inicialização',
@@ -3707,22 +3702,802 @@ function initializeAdminPanel() {
 function setupGlobalEventListeners() {
     // Listener para mudanças de seção
     eventSystem.on('section:afterInit', (data) => {
-        console.log(`Seção ${data.sectionId} inicializada com sucesso`);
+        // Seção inicializada com sucesso
     });
-    
+
     // Listener para erros de seção
     eventSystem.on('section:initError', (data) => {
         console.error(`Erro ao inicializar seção ${data.sectionId}:`, data.error);
     });
-    
+
     // Listener para mudanças de dados (exemplo para futuras integrações)
     eventSystem.on('data:changed', (data) => {
-        console.log('Dados alterados:', data);
+        // Dados alterados
         // Aqui você pode implementar lógica para salvar automaticamente
         // ou atualizar outras partes da interface
     });
 }
 
 
+// ============================================================================
+// GERENCIADOR DE CATEGORIAS DO CARDÁPIO
+// ============================================================================
+
+/**
+ * Gerenciador de dados de categorias (mock)
+ */
+class CategoriaDataManager {
+    constructor() {
+        this.categorias = [
+            {
+                id: 1, nome: 'Hambúrgueres', ordem: 1, itens: [
+                    { id: 1, nome: 'Hambúrguer Clássico', valor: 'R$ 15,90' },
+                    { id: 2, nome: 'Hambúrguer Especial', valor: 'R$ 18,90' },
+                    { id: 3, nome: 'Hambúrguer Vegetariano', valor: 'R$ 16,90' }
+                ]
+            },
+            {
+                id: 2, nome: 'Bebidas', ordem: 2, itens: [
+                    { id: 4, nome: 'Coca-Cola', valor: 'R$ 4,50' },
+                    { id: 5, nome: 'Suco de Laranja', valor: 'R$ 6,00' },
+                    { id: 6, nome: 'Água', valor: 'R$ 2,50' }
+                ]
+            },
+            {
+                id: 3, nome: 'Acompanhamentos', ordem: 3, itens: [
+                    { id: 7, nome: 'Batata Frita', valor: 'R$ 8,90' },
+                    { id: 8, nome: 'Onion Rings', valor: 'R$ 9,90' }
+                ]
+            }
+        ];
+
+        // Todos os produtos disponíveis para adicionar às categorias
+        this.todosProdutos = [
+            { id: 101, nome: 'Hambúrguer Clássico', valor: 'R$ 15,90', categoria: 'Hambúrgueres' },
+            { id: 102, nome: 'Hambúrguer Especial', valor: 'R$ 18,90', categoria: 'Hambúrgueres' },
+            { id: 103, nome: 'Hambúrguer Vegetariano', valor: 'R$ 16,90', categoria: 'Hambúrgueres' },
+            { id: 104, nome: 'Hambúrguer Duplo', valor: 'R$ 22,90', categoria: 'Hambúrgueres' },
+            { id: 105, nome: 'Hambúrguer Bacon', valor: 'R$ 19,90', categoria: 'Hambúrgueres' },
+            { id: 106, nome: 'Coca-Cola', valor: 'R$ 4,50', categoria: 'Bebidas' },
+            { id: 107, nome: 'Suco de Laranja', valor: 'R$ 6,00', categoria: 'Bebidas' },
+            { id: 108, nome: 'Água', valor: 'R$ 2,50', categoria: 'Bebidas' },
+            { id: 109, nome: 'Refrigerante Guaraná', valor: 'R$ 4,50', categoria: 'Bebidas' },
+            { id: 110, nome: 'Cerveja', valor: 'R$ 8,90', categoria: 'Bebidas' },
+            { id: 111, nome: 'Batata Frita', valor: 'R$ 8,90', categoria: 'Acompanhamentos' },
+            { id: 112, nome: 'Onion Rings', valor: 'R$ 9,90', categoria: 'Acompanhamentos' },
+            { id: 113, nome: 'Nuggets', valor: 'R$ 12,90', categoria: 'Acompanhamentos' },
+            { id: 114, nome: 'Salada', valor: 'R$ 7,90', categoria: 'Acompanhamentos' }
+        ];
+    }
+
+    getAllCategorias() {
+        return this.categorias.sort((a, b) => a.ordem - b.ordem);
+    }
+
+    getCategoriaById(id) {
+        return this.categorias.find(c => c.id === id);
+    }
+
+    addCategoria(nome) {
+        const novaCategoria = {
+            id: Date.now(),
+            nome: nome,
+            ordem: this.categorias.length + 1,
+            itens: []
+        };
+        this.categorias.push(novaCategoria);
+        return novaCategoria;
+    }
+
+    updateCategoria(id, nome) {
+        const categoria = this.getCategoriaById(id);
+        if (categoria) {
+            categoria.nome = nome;
+            return categoria;
+        }
+        return null;
+    }
+
+    deleteCategoria(id) {
+        const index = this.categorias.findIndex(c => c.id === id);
+        if (index > -1) {
+            this.categorias.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+
+    reorderCategorias(categoriasOrdenadas) {
+        categoriasOrdenadas.forEach((categoria, index) => {
+            const cat = this.getCategoriaById(categoria.id);
+            if (cat) {
+                cat.ordem = index + 1;
+            }
+        });
+    }
+
+    getItensByCategoria(categoriaId) {
+        const categoria = this.getCategoriaById(categoriaId);
+        return categoria ? categoria.itens : [];
+    }
+
+    addItemToCategoria(categoriaId, nomeItem, valor = 'R$ 0,00') {
+        const categoria = this.getCategoriaById(categoriaId);
+        if (categoria) {
+            const novoItem = {
+                id: Date.now(),
+                nome: nomeItem,
+                valor: valor
+            };
+            categoria.itens.push(novoItem);
+            return novoItem;
+        }
+        return null;
+    }
+
+    updateItem(categoriaId, itemId, nomeItem) {
+        const categoria = this.getCategoriaById(categoriaId);
+        if (categoria) {
+            const item = categoria.itens.find(i => i.id === itemId);
+            if (item) {
+                item.nome = nomeItem;
+                return item;
+            }
+        }
+        return null;
+    }
+
+    deleteItem(categoriaId, itemId) {
+        const categoria = this.getCategoriaById(categoriaId);
+        if (categoria) {
+            const index = categoria.itens.findIndex(i => i.id === itemId);
+            if (index > -1) {
+                categoria.itens.splice(index, 1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getAllProdutos() {
+        return this.todosProdutos;
+    }
+
+    getProdutosDisponiveis(categoriaId) {
+        const categoria = this.getCategoriaById(categoriaId);
+        if (!categoria) return [];
+
+        const itensIds = categoria.itens.map(item => item.id);
+        return this.todosProdutos.filter(produto => !itensIds.includes(produto.id));
+    }
+}
+
+/**
+ * Gerenciador das modais de categorias e itens
+ */
+class CategoriaManager {
+    constructor() {
+        this.categoriaDataManager = new CategoriaDataManager();
+        this.currentCategoriaId = null;
+        this.draggedElement = null;
+        this.editandoCategoria = null;
+    }
+
+    init() {
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        // Botão para abrir modal de categorias usando ID específico
+        const btnCategorias = document.getElementById('btn-categorias');
+
+        if (btnCategorias) {
+            btnCategorias.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.openCategoriasModal();
+            });
+        }
+
+        // Event listeners da modal de categorias
+        this.setupCategoriasModalListeners();
+
+        // Event listeners da modal de itens
+        this.setupItensModalListeners();
+
+        // Event listeners da modal de formulário de categoria
+        this.setupCategoriaFormModalListeners();
+
+        // Event listeners da modal de produtos
+        this.setupProdutosModalListeners();
+    }
+
+    setupCategoriasModalListeners() {
+        // Botões da modal de categorias
+        document.getElementById('cancelar-categorias')?.addEventListener('click', () => this.closeCategoriasModal());
+        document.getElementById('salvar-categorias')?.addEventListener('click', () => this.saveCategorias());
+        document.getElementById('btn-adicionar-categoria')?.addEventListener('click', () => this.addCategoria());
+
+        // Overlay para fechar modal
+        const overlay = document.querySelector('#modal-categorias .div-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeCategoriasModal());
+        }
+    }
+
+    setupItensModalListeners() {
+        // Botões da modal de itens
+        document.getElementById('cancelar-itens')?.addEventListener('click', () => this.closeItensModal());
+        document.getElementById('salvar-itens')?.addEventListener('click', () => this.saveItens());
+        document.getElementById('btn-adicionar-item')?.addEventListener('click', () => this.addItem());
+        document.getElementById('voltar-categorias')?.addEventListener('click', () => this.voltarParaCategorias());
+
+        // Overlay para fechar modal
+        const overlay = document.querySelector('#modal-itens .div-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeItensModal());
+        }
+    }
+
+    setupCategoriaFormModalListeners() {
+        // Botões da modal de formulário de categoria
+        document.getElementById('cancelar-categoria-form')?.addEventListener('click', () => this.closeCategoriaFormModal());
+        document.getElementById('salvar-categoria-form')?.addEventListener('click', () => this.saveCategoriaForm());
+
+        // Overlay para fechar modal
+        const overlay = document.querySelector('#modal-categoria-form .div-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeCategoriaFormModal());
+        }
+    }
+
+    setupProdutosModalListeners() {
+        // Botões da modal de produtos
+        document.getElementById('cancelar-produtos')?.addEventListener('click', () => this.closeProdutosModal());
+        document.getElementById('adicionar-produtos')?.addEventListener('click', () => this.adicionarProdutosSelecionados());
+
+        // Busca de produtos
+        document.getElementById('busca-produto-modal')?.addEventListener('input', (e) => this.filtrarProdutos(e.target.value));
+
+        // Overlay para fechar modal
+        const overlay = document.querySelector('#modal-produtos .div-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeProdutosModal());
+        }
+    }
+
+    openCategoriasModal() {
+        const modal = document.getElementById('modal-categorias');
+
+        if (!modal) {
+            return;
+        }
+
+        this.loadCategorias();
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeCategoriasModal() {
+        const modal = document.getElementById('modal-categorias');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
+    openItensModal(categoriaId) {
+        const modal = document.getElementById('modal-itens');
+        if (!modal) return;
+
+        this.currentCategoriaId = categoriaId;
+        const categoria = this.categoriaDataManager.getCategoriaById(categoriaId);
+
+        if (categoria) {
+            document.getElementById('titulo-itens-categoria').textContent = `Itens da Categoria: ${categoria.nome}`;
+            this.loadItens(categoriaId);
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    closeItensModal() {
+        const modal = document.getElementById('modal-itens');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
+    voltarParaCategorias() {
+        this.closeItensModal();
+        this.openCategoriasModal();
+    }
+
+    loadCategorias() {
+        const categorias = this.categoriaDataManager.getAllCategorias();
+        const container = document.getElementById('lista-categorias');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        categorias.forEach(categoria => {
+            const categoriaElement = this.createCategoriaElement(categoria);
+            container.appendChild(categoriaElement);
+        });
+
+        this.setupDragAndDrop();
+    }
+
+    createCategoriaElement(categoria) {
+        const div = document.createElement('div');
+        div.className = 'categoria-item';
+        div.draggable = true;
+        div.dataset.categoriaId = categoria.id;
+
+        div.innerHTML = `
+            <div class="drag-handle">
+                <i class="fa-solid fa-grip-vertical"></i>
+            </div>
+            <p class="nome-categoria">${categoria.nome}</p>
+            <div class="acoes-categoria">
+                <a href="#" class="btn-acessar" data-categoria-id="${categoria.id}">
+                    Acessar categoria
+                    <i class="fa-solid fa-external-link-alt"></i>
+                </a>
+                <button class="btn-editar" data-categoria-id="${categoria.id}">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button class="btn-excluir" data-categoria-id="${categoria.id}">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        `;
+
+        // Event listeners
+        div.querySelector('.btn-acessar').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.openItensModal(categoria.id);
+        });
+
+        div.querySelector('.btn-editar').addEventListener('click', () => {
+            this.editCategoria(categoria.id);
+        });
+
+        div.querySelector('.btn-excluir').addEventListener('click', () => {
+            this.deleteCategoria(categoria.id);
+        });
+
+        return div;
+    }
+
+    setupDragAndDrop() {
+        const container = document.getElementById('lista-categorias');
+        if (!container) return;
+
+        // Drag events
+        container.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('categoria-item')) {
+                this.draggedElement = e.target;
+                e.target.classList.add('dragging');
+            }
+        });
+
+        container.addEventListener('dragend', (e) => {
+            if (e.target.classList.contains('categoria-item')) {
+                e.target.classList.remove('dragging');
+                this.draggedElement = null;
+            }
+        });
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = this.getDragAfterElement(container, e.clientY);
+            const dragging = container.querySelector('.dragging');
+
+            if (afterElement == null) {
+                container.appendChild(dragging);
+            } else {
+                container.insertBefore(dragging, afterElement);
+            }
+        });
+    }
+
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.categoria-item:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    addCategoria() {
+        this.editandoCategoria = null;
+        this.openCategoriaFormModal();
+    }
+
+    editCategoria(categoriaId) {
+        this.editandoCategoria = categoriaId;
+        this.openCategoriaFormModal();
+    }
+
+    async deleteCategoria(categoriaId) {
+        const categoria = this.categoriaDataManager.getCategoriaById(categoriaId);
+        if (!categoria) return;
+
+        const confirmado = await showConfirm({
+            title: 'Confirmar Exclusão',
+            message: `Tem certeza que deseja excluir a categoria "${categoria.nome}"?`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            type: 'delete'
+        });
+
+        if (confirmado) {
+            const sucesso = this.categoriaDataManager.deleteCategoria(categoriaId);
+            if (sucesso) {
+                this.loadCategorias();
+                this.showSuccessMessage(`Categoria "${categoria.nome}" excluída com sucesso!`);
+            }
+        }
+    }
+
+    saveCategorias() {
+        // Salvar nova ordem das categorias
+        const container = document.getElementById('lista-categorias');
+        const categoriasOrdenadas = Array.from(container.querySelectorAll('.categoria-item')).map(el => ({
+            id: parseInt(el.dataset.categoriaId)
+        }));
+
+        this.categoriaDataManager.reorderCategorias(categoriasOrdenadas);
+        this.showSuccessMessage('Ordem das categorias salva com sucesso!');
+        this.closeCategoriasModal();
+    }
+
+    loadItens(categoriaId) {
+        const itens = this.categoriaDataManager.getItensByCategoria(categoriaId);
+        const container = document.getElementById('lista-itens');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        itens.forEach(item => {
+            const itemElement = this.createItemElement(item);
+            container.appendChild(itemElement);
+        });
+    }
+
+    createItemElement(item) {
+        const div = document.createElement('div');
+        div.className = 'item-categoria';
+        div.dataset.itemId = item.id;
+
+        div.innerHTML = `
+            <div class="info-item">
+                <p class="nome-item">${item.nome}</p>
+                <p class="valor-item">${item.valor || 'R$ 0,00'}</p>
+            </div>
+            <div class="acoes-item">
+                <button class="btn-editar" data-item-id="${item.id}" title="Editar produto">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button class="btn-excluir" data-item-id="${item.id}" title="Remover da categoria">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        `;
+
+        // Event listeners
+        div.querySelector('.btn-editar').addEventListener('click', () => {
+            this.redirectToProdutos(item.id);
+        });
+
+        div.querySelector('.btn-excluir').addEventListener('click', () => {
+            this.deleteItem(item.id);
+        });
+
+        return div;
+    }
+
+    addItem() {
+        if (!this.currentCategoriaId) return;
+        this.openProdutosModal();
+    }
+
+    redirectToProdutos(itemId) {
+        // Fechar todas as modais abertas
+        this.closeItensModal();
+        this.closeCategoriasModal();
+        this.closeProdutosModal();
+        this.closeCategoriaFormModal();
+
+        // Ir para seção de produtos
+        const sectionManager = window.adminPanel;
+        if (sectionManager) {
+            sectionManager.showSection('secao-cardapio');
+        }
+
+        this.showSuccessMessage('Redirecionando para a seção de produtos...');
+    }
+
+    editItem(itemId) {
+        if (!this.currentCategoriaId) return;
+
+        const item = this.categoriaDataManager.getItensByCategoria(this.currentCategoriaId)
+            .find(i => i.id === itemId);
+
+        if (!item) return;
+
+        const novoNome = prompt('Digite o novo nome do item:', item.nome);
+        if (novoNome && novoNome.trim() && novoNome.trim() !== item.nome) {
+            const itemAtualizado = this.categoriaDataManager.updateItem(this.currentCategoriaId, itemId, novoNome.trim());
+            if (itemAtualizado) {
+                this.loadItens(this.currentCategoriaId);
+                this.showSuccessMessage(`Item atualizado para "${itemAtualizado.nome}"!`);
+            }
+        }
+    }
+
+    async deleteItem(itemId) {
+        if (!this.currentCategoriaId) return;
+
+        const item = this.categoriaDataManager.getItensByCategoria(this.currentCategoriaId)
+            .find(i => i.id === itemId);
+
+        if (!item) return;
+
+        const confirmado = await showConfirm({
+            title: 'Confirmar Exclusão',
+            message: `Tem certeza que deseja excluir o item "${item.nome}"?`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            type: 'delete'
+        });
+
+        if (confirmado) {
+            const sucesso = this.categoriaDataManager.deleteItem(this.currentCategoriaId, itemId);
+            if (sucesso) {
+                this.loadItens(this.currentCategoriaId);
+                this.showSuccessMessage(`Item "${item.nome}" excluído com sucesso!`);
+            }
+        }
+    }
+
+    saveItens() {
+        this.showSuccessMessage('Itens salvos com sucesso!');
+        this.closeItensModal();
+    }
+
+    // Modal de seleção de produtos
+    openProdutosModal() {
+        const modal = document.getElementById('modal-produtos');
+
+        if (!modal) {
+            return;
+        }
+
+        this.produtosSelecionados = new Set();
+        this.loadProdutosDisponiveis();
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeProdutosModal() {
+        const modal = document.getElementById('modal-produtos');
+        const inputBusca = document.getElementById('busca-produto-modal');
+
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        if (inputBusca) {
+            inputBusca.value = '';
+        }
+
+        this.produtosSelecionados = new Set();
+    }
+
+    loadProdutosDisponiveis() {
+        const produtosDisponiveis = this.categoriaDataManager.getProdutosDisponiveis(this.currentCategoriaId);
+        const container = document.getElementById('lista-produtos');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (produtosDisponiveis.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Não há produtos disponíveis para adicionar a esta categoria.</p>';
+            return;
+        }
+
+        produtosDisponiveis.forEach(produto => {
+            const produtoElement = this.createProdutoElement(produto);
+            container.appendChild(produtoElement);
+        });
+    }
+
+    createProdutoElement(produto) {
+        const div = document.createElement('div');
+        div.className = 'produto-item';
+        div.dataset.produtoId = produto.id;
+
+        div.innerHTML = `
+            <input type="checkbox" class="checkbox-produto" data-produto-id="${produto.id}">
+            <div class="info-produto">
+                <p class="nome-produto">${produto.nome}</p>
+                <p class="valor-produto">${produto.valor}</p>
+            </div>
+        `;
+
+        // Event listeners
+        const checkbox = div.querySelector('.checkbox-produto');
+        checkbox.addEventListener('change', (e) => {
+            this.toggleProdutoSelecao(produto.id, e.target.checked);
+        });
+
+        // Clique no item também seleciona/deseleciona
+        div.addEventListener('click', (e) => {
+            if (e.target !== checkbox) {
+                checkbox.checked = !checkbox.checked;
+                this.toggleProdutoSelecao(produto.id, checkbox.checked);
+            }
+        });
+
+        return div;
+    }
+
+    toggleProdutoSelecao(produtoId, selecionado) {
+        const produtoElement = document.querySelector(`[data-produto-id="${produtoId}"]`);
+
+        if (selecionado) {
+            this.produtosSelecionados.add(produtoId);
+            produtoElement.classList.add('selecionado');
+        } else {
+            this.produtosSelecionados.delete(produtoId);
+            produtoElement.classList.remove('selecionado');
+        }
+
+        this.updateBotaoAdicionar();
+    }
+
+    updateBotaoAdicionar() {
+        const btnAdicionar = document.getElementById('adicionar-produtos');
+        if (btnAdicionar) {
+            btnAdicionar.disabled = this.produtosSelecionados.size === 0;
+        }
+    }
+
+    filtrarProdutos(termo) {
+        const produtos = document.querySelectorAll('.produto-item');
+        const termoLower = termo.toLowerCase();
+
+        produtos.forEach(produto => {
+            const nome = produto.querySelector('.nome-produto').textContent.toLowerCase();
+            const valor = produto.querySelector('.valor-produto').textContent.toLowerCase();
+
+            if (nome.includes(termoLower) || valor.includes(termoLower)) {
+                produto.style.display = 'flex';
+            } else {
+                produto.style.display = 'none';
+            }
+        });
+    }
+
+    adicionarProdutosSelecionados() {
+        if (this.produtosSelecionados.size === 0) {
+            this.showSuccessMessage('Selecione pelo menos um produto para adicionar.');
+            return;
+        }
+
+        const todosProdutos = this.categoriaDataManager.getAllProdutos();
+        let adicionados = 0;
+
+        this.produtosSelecionados.forEach(produtoId => {
+            const produto = todosProdutos.find(p => p.id === produtoId);
+            if (produto) {
+                const novoItem = this.categoriaDataManager.addItemToCategoria(
+                    this.currentCategoriaId,
+                    produto.nome,
+                    produto.valor
+                );
+                if (novoItem) {
+                    adicionados++;
+                }
+            }
+        });
+
+        if (adicionados > 0) {
+            this.loadItens(this.currentCategoriaId);
+            this.showSuccessMessage(`${adicionados} produto(s) adicionado(s) com sucesso!`);
+            this.closeProdutosModal();
+        }
+    }
+
+    // Métodos da modal de formulário de categoria
+    openCategoriaFormModal() {
+        const modal = document.getElementById('modal-categoria-form');
+        const titulo = document.getElementById('titulo-categoria-form');
+        const input = document.getElementById('nome-categoria-input');
+
+        if (this.editandoCategoria) {
+            // Modo edição
+            const categoria = this.categoriaDataManager.getCategoriaById(this.editandoCategoria);
+            if (categoria) {
+                titulo.textContent = 'Editar Categoria';
+                input.value = categoria.nome;
+            }
+        } else {
+            // Modo adição
+            titulo.textContent = 'Adicionar Categoria';
+            input.value = '';
+        }
+
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        input.focus();
+    }
+
+    closeCategoriaFormModal() {
+        const modal = document.getElementById('modal-categoria-form');
+        const input = document.getElementById('nome-categoria-input');
+
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        input.value = '';
+        input.classList.remove('error', 'success');
+        this.editandoCategoria = null;
+    }
+
+    saveCategoriaForm() {
+        const input = document.getElementById('nome-categoria-input');
+        const nome = input.value.trim();
+
+        // Validação
+        if (!nome) {
+            input.classList.add('error');
+            input.classList.remove('success');
+            return;
+        }
+
+        input.classList.add('success');
+        input.classList.remove('error');
+
+        if (this.editandoCategoria) {
+            // Editar categoria existente
+            const categoriaAtualizada = this.categoriaDataManager.updateCategoria(this.editandoCategoria, nome);
+            if (categoriaAtualizada) {
+                this.loadCategorias();
+                this.showSuccessMessage(`Categoria atualizada para "${categoriaAtualizada.nome}"!`);
+            }
+        } else {
+            // Adicionar nova categoria
+            const novaCategoria = this.categoriaDataManager.addCategoria(nome);
+            this.loadCategorias();
+            this.showSuccessMessage(`Categoria "${novaCategoria.nome}" adicionada com sucesso!`);
+        }
+
+        this.closeCategoriaFormModal();
+    }
+
+    showSuccessMessage(message) {
+        showToast(message, { type: 'success', title: 'Sucesso' });
+    }
+}
+
 // Inicializar quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', initializeAdminPanel);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAdminPanel();
+
+    // Inicializar gerenciador de categorias
+    const categoriaManager = new CategoriaManager();
+    categoriaManager.init();
+});

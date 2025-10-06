@@ -552,7 +552,7 @@
                         <p class="descricao">Cadastre, edite, exclua e reorganize seu cardápio</p>
                     </div>
 
-                    <button>Acessar</button>
+                    <button id="btn-categorias">Acessar</button>
                 </div>
 
                 <div class="info">
@@ -561,8 +561,6 @@
                         <p class="descricao">Cadastre, edite, exclua e reorganize seus itens das categorias do cardápio
                         </p>
                     </div>
-
-                    <button>Acessar</button>
                 </div>
             </div>
 
@@ -1067,6 +1065,113 @@
 
             <div class="footer-modal">
                 <button class="btn-fechar" id="fechar-metricas">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Categorias do Cardápio -->
+    <div id="modal-categorias" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-categorias">
+            <div class="header-modal">
+                <h2>Categorias do Cardápio</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="lista-categorias" id="lista-categorias">
+                    <!-- Categorias serão geradas dinamicamente -->
+                </div>
+
+                <button class="btn-adicionar-categoria" id="btn-adicionar-categoria">
+                    <i class="fa-solid fa-plus"></i>
+                    Adicionar Categoria
+                </button>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-categorias">Cancelar</button>
+                <button class="btn-salvar" id="salvar-categorias">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Itens da Categoria -->
+    <div id="modal-itens" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-itens">
+            <div class="header-modal">
+                <h2 id="titulo-itens-categoria">Itens da Categoria</h2>
+                <button class="btn-voltar" id="voltar-categorias">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Voltar
+                </button>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="lista-itens" id="lista-itens">
+                    <!-- Itens serão gerados dinamicamente -->
+                </div>
+
+                <button class="btn-adicionar-item" id="btn-adicionar-item">
+                    <i class="fa-solid fa-plus"></i>
+                    Adicionar Item
+                </button>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-itens">Cancelar</button>
+                <button class="btn-salvar" id="salvar-itens">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar/Editar Categoria -->
+    <div id="modal-categoria-form" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-categoria-form">
+            <div class="header-modal">
+                <h2 id="titulo-categoria-form">Adicionar Categoria</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input">
+                    <label for="nome-categoria-input">Nome da categoria</label>
+                    <input type="text" id="nome-categoria-input" name="nome-categoria-input" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-categoria-form">Cancelar</button>
+                <button class="btn-salvar" id="salvar-categoria-form">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seleção de Produtos -->
+    <div id="modal-produtos" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-produtos">
+            <div class="header-modal">
+                <h2>Selecionar Produtos</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="filtros-produtos">
+                    <div class="div-input">
+                        <label for="busca-produto-modal">Buscar produto</label>
+                        <input type="text" id="busca-produto-modal" name="busca-produto-modal" autocomplete="off"
+                            placeholder="Digite o nome do produto">
+                    </div>
+                </div>
+
+                <div class="lista-produtos" id="lista-produtos">
+                    <!-- Produtos serão gerados dinamicamente -->
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-produtos">Cancelar</button>
+                <button class="btn-salvar" id="adicionar-produtos">Adicionar Selecionados</button>
             </div>
         </div>
     </div>
