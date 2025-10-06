@@ -29,6 +29,141 @@ const CONFIG = {
     ADMIN_ROLES: ['admin', 'administrator', 'manager', 'gerente']
 };
 
+// Configuração específica para seção de estoque
+const ESTOQUE_CONFIG = {
+    sectionId: 'secao-estoque',
+    navId: 'nav-estoque',
+    selectors: {
+        searchInput: '#busca-ingrediente',
+        categoryFilter: '#categoria-estoque',
+        statusFilter: '#status-estoque',
+        newItemButton: '#secao-estoque .adicionar',
+        ingredientCards: '.card-ingrediente',
+        editButtons: '.card-ingrediente .editar',
+        toggleSwitches: '.card-ingrediente .toggle input',
+        quantityButtons: '.card-ingrediente .btn-quantidade',
+        metricCards: '.relata .quadro'
+    }
+};
+
+// Sistema de dados mock para ingredientes
+class IngredientDataManager {
+    constructor() {
+        this.ingredients = [
+            {
+                id: 1,
+                nome: 'Carne Bovina',
+                fornecedor: 'Fornecedor A',
+                categoria: 'carnes',
+                custo: 10.50,
+                unidade: 'kg',
+                min: 20,
+                max: 100,
+                atual: 75,
+                ativo: true,
+                ultimaAtualizacao: '2025-01-01'
+            },
+            {
+                id: 2,
+                nome: 'Alface',
+                fornecedor: 'Fornecedor B',
+                categoria: 'vegetais',
+                custo: 2.30,
+                unidade: 'kg',
+                min: 5,
+                max: 30,
+                atual: 15,
+                ativo: true,
+                ultimaAtualizacao: '2025-01-01'
+            },
+            {
+                id: 3,
+                nome: 'Tomate',
+                fornecedor: 'Fornecedor C',
+                categoria: 'vegetais',
+                custo: 3.20,
+                unidade: 'kg',
+                min: 10,
+                max: 50,
+                atual: 0,
+                ativo: true,
+                ultimaAtualizacao: '2025-01-01'
+            }
+        ];
+    }
+
+    getAllIngredients() {
+        return this.ingredients;
+    }
+
+    getIngredientById(id) {
+        return this.ingredients.find(ing => ing.id === id);
+    }
+
+    addIngredient(ingredientData) {
+        const newId = Math.max(...this.ingredients.map(ing => ing.id)) + 1;
+        const newIngredient = {
+            id: newId,
+            ...ingredientData,
+            atual: 0,
+            ativo: true,
+            ultimaAtualizacao: new Date().toISOString().split('T')[0]
+        };
+        this.ingredients.push(newIngredient);
+        return newIngredient;
+    }
+
+    updateIngredient(id, ingredientData) {
+        const index = this.ingredients.findIndex(ing => ing.id === id);
+        if (index !== -1) {
+            this.ingredients[index] = {
+                ...this.ingredients[index],
+                ...ingredientData,
+                ultimaAtualizacao: new Date().toISOString().split('T')[0]
+            };
+            return this.ingredients[index];
+        }
+        return null;
+    }
+
+    updateIngredientQuantity(id, newQuantity) {
+        const ingredient = this.getIngredientById(id);
+        if (ingredient) {
+            ingredient.atual = Math.max(0, newQuantity);
+            ingredient.ultimaAtualizacao = new Date().toISOString().split('T')[0];
+            return ingredient;
+        }
+        return null;
+    }
+
+    toggleIngredientStatus(id) {
+        const ingredient = this.getIngredientById(id);
+        if (ingredient) {
+            ingredient.ativo = !ingredient.ativo;
+            return ingredient;
+        }
+        return null;
+    }
+
+    getMetrics() {
+        const total = this.ingredients.reduce((sum, ing) => sum + (ing.atual * ing.custo), 0);
+        const semEstoque = this.ingredients.filter(ing => ing.atual === 0).length;
+        const estoqueBaixo = this.ingredients.filter(ing => ing.atual > 0 && ing.atual <= ing.min).length;
+        const emEstoque = this.ingredients.filter(ing => ing.atual > ing.min).length;
+
+        return {
+            valorTotal: total,
+            semEstoque,
+            estoqueBaixo,
+            emEstoque,
+            totalItens: this.ingredients.length
+        };
+    }
+}
+
+// Instância global do gerenciador de dados
+const ingredientDataManager = new IngredientDataManager();
+
 // ============================================================================
 // SISTEMA DE GERENCIAMENTO DE SEÇÕES
 // ============================================================================
@@ -61,7 +196,7 @@ class SectionManager {
             { id: 'secao-pedidos', handler: null },
             { id: 'secao-venda', handler: null },
             { id: 'secao-cardapio', handler: () => new CardapioManager() },
-            { id: 'secao-estoque', handler: null },
+            { id: 'secao-estoque', handler: () => new EstoqueManager() },
             { id: 'secao-relatorios', handler: null },
             { id: 'secao-finaceiro', handler: null },
             { id: 'secao-funcionarios', handler: null },
@@ -1024,8 +1159,8 @@ class CardapioManager {
     validateForm(formData) {
         // Validar nome
         if (!this.validateNome(formData.nome)) {
-            return false;
-        }
+        return false;
+    }
         
         // Validar descrição
         if (!this.validateDescricao(formData.descricao)) {
@@ -1281,6 +1416,950 @@ class CardapioManager {
     showValidationError(message) {
         // Usar alert por enquanto, pode ser substituído por um sistema de notificações mais elegante
         alert(`❌ Erro de validação:\n\n${message}`);
+    }
+}
+
+// ============================================================================
+// GERENCIADOR DE ESTOQUE
+// ============================================================================
+
+class EstoqueManager {
+    constructor() {
+        this.selectors = ESTOQUE_CONFIG.selectors;
+        this.init();
+    }
+
+    /**
+     * Inicializa o gerenciador de estoque
+     */
+    init() {
+        this.setupEventListeners();
+        this.setupSearchHandlers();
+        this.setupFilterHandlers();
+        this.setupIngredientHandlers();
+        this.loadIngredients();
+        this.updateMetrics();
+    }
+
+    /**
+     * Configura os event listeners principais
+     */
+    setupEventListeners() {
+        // Botão novo ingrediente
+        const newItemButton = document.querySelector(this.selectors.newItemButton);
+        if (newItemButton) {
+            newItemButton.addEventListener('click', () => this.handleNewIngredient());
+        }
+    }
+
+    /**
+     * Configura os handlers de busca
+     */
+    setupSearchHandlers() {
+        const searchInput = document.querySelector(this.selectors.searchInput);
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.handleSearch(e.target.value);
+            });
+        }
+    }
+
+    /**
+     * Configura os handlers de filtros
+     */
+    setupFilterHandlers() {
+        const categoryFilter = document.querySelector(this.selectors.categoryFilter);
+        const statusFilter = document.querySelector(this.selectors.statusFilter);
+
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', (e) => {
+                this.handleCategoryFilter(e.target.value);
+            });
+        }
+
+        if (statusFilter) {
+            statusFilter.addEventListener('change', (e) => {
+                this.handleStatusFilter(e.target.value);
+            });
+        }
+    }
+
+    /**
+     * Configura os handlers dos ingredientes usando event delegation
+     */
+    setupIngredientHandlers() {
+        // Usar event delegation para elementos dinâmicos
+        const section = document.getElementById('secao-estoque');
+        if (!section) {
+            console.error('Seção de estoque não encontrada');
+            return;
+        }
+
+        // Event delegation para botões de editar
+        section.addEventListener('click', (e) => {
+            if (e.target.classList.contains('editar')) {
+                this.handleEditClick(e.target);
+            }
+        });
+
+        // Event delegation para toggle switches
+        section.addEventListener('change', (e) => {
+            if (e.target.matches('.toggle input[type="checkbox"]')) {
+                this.handleToggleChange(e.target);
+            }
+        });
+
+        // Event delegation para botões de quantidade
+        section.addEventListener('click', (e) => {
+            const button = e.target.closest('.btn-quantidade');
+            if (button) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleQuantityChange(button);
+            }
+        });
+
+    }
+
+    /**
+     * Trata busca de ingredientes
+     * @param {string} searchTerm - Termo de busca
+     */
+    handleSearch(searchTerm) {
+        const cards = document.querySelectorAll(this.selectors.ingredientCards);
+        const term = searchTerm.toLowerCase().trim();
+
+        cards.forEach(card => {
+            const ingredientName = card.querySelector('h3').textContent.toLowerCase();
+            const shouldShow = ingredientName.includes(term);
+            
+            card.style.display = shouldShow ? 'block' : 'none';
+        });
+
+        // Emitir evento de busca
+        eventSystem.emit('ingredient:search', {
+            searchTerm: term,
+            resultsCount: Array.from(cards).filter(card => card.style.display !== 'none').length
+        });
+    }
+
+    /**
+     * Trata filtro por categoria
+     * @param {string} category - Categoria selecionada
+     */
+    handleCategoryFilter(category) {
+        const cards = document.querySelectorAll(this.selectors.ingredientCards);
+        
+        cards.forEach(card => {
+            const cardCategory = card.querySelector('.categoria-fornecedor span').textContent.toLowerCase();
+            const shouldShow = !category || cardCategory === category.toLowerCase();
+            
+            card.style.display = shouldShow ? 'block' : 'none';
+        });
+
+        // Emitir evento de filtro
+        eventSystem.emit('ingredient:filter', {
+            type: 'category',
+            value: category
+        });
+    }
+
+    /**
+     * Trata filtro por status
+     * @param {string} status - Status selecionado
+     */
+    handleStatusFilter(status) {
+        const cards = document.querySelectorAll(this.selectors.ingredientCards);
+        
+        cards.forEach(card => {
+            const statusTag = card.querySelector('.tag-status');
+            const cardStatus = statusTag.className.includes('em-estoque') ? 'em-estoque' :
+                             statusTag.className.includes('estoque-baixo') ? 'estoque-baixo' :
+                             statusTag.className.includes('sem-estoque') ? 'sem-estoque' : '';
+            
+            const shouldShow = !status || cardStatus === status;
+            card.style.display = shouldShow ? 'block' : 'none';
+        });
+
+        // Emitir evento de filtro
+        eventSystem.emit('ingredient:filter', {
+            type: 'status',
+            value: status
+        });
+    }
+
+    /**
+     * Trata clique no botão de editar
+     * @param {HTMLElement} button - Botão clicado
+     */
+    handleEditClick(button) {
+        const card = button.closest('.card-ingrediente');
+        const ingredientId = parseInt(card.dataset.ingredientId);
+        const ingredient = ingredientDataManager.getIngredientById(ingredientId);
+        
+        if (!ingredient) {
+            console.error('Ingrediente não encontrado');
+            return;
+        }
+        
+        // Emitir evento de edição
+        eventSystem.emit('ingredient:edit', {
+            ingredientName: ingredient.nome,
+            card: card
+        });
+        
+        // Armazenar ID para edição
+        this.currentEditingId = ingredientId;
+        
+        // Preparar dados para a modal
+        const ingredientData = {
+            nome: ingredient.nome,
+            fornecedor: ingredient.fornecedor,
+            categoria: ingredient.categoria,
+            custo: `R$ ${ingredient.custo.toFixed(2).replace('.', ',')}`,
+            unidade: ingredient.unidade,
+            min: ingredient.min,
+            max: ingredient.max
+        };
+        
+        this.openIngredientModal(ingredientData);
+    }
+
+    /**
+     * Trata mudança no toggle de ativo/inativo
+     * @param {HTMLElement} toggle - Toggle clicado
+     */
+    handleToggleChange(toggle) {
+        const card = toggle.closest('.card-ingrediente');
+        const ingredientId = parseInt(card.dataset.ingredientId);
+        const ingredient = ingredientDataManager.getIngredientById(ingredientId);
+        
+        if (!ingredient) {
+            console.error('Ingrediente não encontrado');
+            return;
+        }
+        
+        // Atualizar status no sistema de dados
+        const updatedIngredient = ingredientDataManager.toggleIngredientStatus(ingredientId);
+        
+        if (updatedIngredient) {
+            // Atualizar interface
+            const statusElement = card.querySelector('.status-ativo span');
+            const iconElement = card.querySelector('.status-ativo i');
+            
+            if (toggle.checked) {
+                statusElement.textContent = 'Ativo';
+                statusElement.parentElement.style.color = '#4CAF50';
+                iconElement.className = 'fa-solid fa-eye';
+        } else {
+                statusElement.textContent = 'Inativo';
+                statusElement.parentElement.style.color = '#f44336';
+                iconElement.className = 'fa-solid fa-eye-slash';
+            }
+            
+            // Emitir evento de mudança de status
+            eventSystem.emit('ingredient:statusChange', {
+                ingredientName: ingredient.nome,
+                isActive: toggle.checked,
+                timestamp: new Date().toISOString()
+            });
+            
+            console.log(`Status do ingrediente ${ingredient.nome}: ${toggle.checked ? 'Ativo' : 'Inativo'}`);
+        }
+    }
+
+    /**
+     * Trata mudança na quantidade
+     * @param {HTMLElement} button - Botão clicado
+     */
+    handleQuantityChange(button) {
+        // Prevenir múltiplos cliques
+        if (button.disabled) return;
+        
+        const card = button.closest('.card-ingrediente');
+        const ingredientId = parseInt(card.dataset.ingredientId);
+        const ingredient = ingredientDataManager.getIngredientById(ingredientId);
+        
+        if (!ingredient) {
+            console.error('Ingrediente não encontrado');
+            return;
+        }
+        
+        // Desabilitar botão temporariamente
+        button.disabled = true;
+        
+        const isIncrease = button.dataset.action === 'increase';
+        let newQuantity = Number(ingredient.atual);
+        
+        if (isIncrease) {
+            newQuantity = newQuantity + 1;
+            // Verificar se não excede o máximo
+            if (newQuantity > Number(ingredient.max)) {
+                newQuantity = Number(ingredient.max);
+            }
+        } else {
+            newQuantity = newQuantity - 1;
+            // Verificar se não fica negativo
+            if (newQuantity < 0) {
+                newQuantity = 0;
+            }
+        }
+        
+        // Atualizar quantidade no sistema de dados
+        const updatedIngredient = ingredientDataManager.updateIngredientQuantity(ingredientId, newQuantity);
+        
+        if (updatedIngredient) {
+            // Atualizar interface
+            const quantityElement = card.querySelector('.quantidade');
+            const progressElement = card.querySelector('.progresso');
+            const progressPercentage = ingredient.max > 0 ? (newQuantity / ingredient.max) * 100 : 0;
+            
+            quantityElement.textContent = `${newQuantity}${ingredient.unidade}`;
+            progressElement.style.width = `${progressPercentage}%`;
+            
+            // Atualizar status do card
+            this.updateCardStatus(card, newQuantity, ingredient.min, ingredient.max);
+            
+            // Atualizar métricas
+            this.updateMetrics();
+            
+            // Emitir evento de mudança de quantidade
+            eventSystem.emit('ingredient:quantityChange', {
+                ingredientName: ingredient.nome,
+                newQuantity: newQuantity,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Reabilitar botão após um pequeno delay
+        setTimeout(() => {
+            button.disabled = false;
+        }, 100);
+    }
+
+    /**
+     * Atualiza o status visual do card baseado na quantidade
+     * @param {HTMLElement} card - Card do ingrediente
+     * @param {number} currentQuantity - Quantidade atual
+     * @param {number} minQuantity - Quantidade mínima
+     * @param {number} maxQuantity - Quantidade máxima
+     */
+    updateCardStatus(card, currentQuantity, minQuantity, maxQuantity) {
+        const statusTag = card.querySelector('.tag-status');
+        const statusSpan = statusTag.querySelector('span');
+        
+        // Remover classes de status anteriores
+        statusTag.classList.remove('em-estoque', 'estoque-baixo', 'sem-estoque');
+        card.classList.remove('sem-estoque', 'estoque-baixo', 'em-estoque');
+        
+        if (currentQuantity === 0) {
+            statusTag.classList.add('sem-estoque');
+            statusSpan.textContent = 'Sem estoque';
+            card.classList.add('sem-estoque');
+        } else if (currentQuantity <= minQuantity * 1.5) {
+            statusTag.classList.add('estoque-baixo');
+            statusSpan.textContent = 'Estoque baixo';
+            card.classList.add('estoque-baixo');
+        } else {
+            statusTag.classList.add('em-estoque');
+            statusSpan.textContent = 'Em estoque';
+            card.classList.add('em-estoque');
+        }
+    }
+
+    /**
+     * Trata criação de novo ingrediente
+     */
+    handleNewIngredient() {
+        // Emitir evento de criação
+        eventSystem.emit('ingredient:create', {
+            timestamp: new Date().toISOString()
+        });
+        
+        this.openIngredientModal();
+    }
+
+    /**
+     * Abre a modal de ingrediente
+     * @param {Object} ingredientData - Dados do ingrediente para edição (opcional)
+     */
+    openIngredientModal(ingredientData = null) {
+        const modal = document.getElementById('modal-ingrediente');
+        const titulo = document.getElementById('titulo-modal-ingrediente');
+        const btnSalvar = document.getElementById('salvar-ingrediente');
+        
+        if (!modal) {
+            console.error('Modal de ingrediente não encontrada');
+            return;
+        }
+
+        // Configurar título e botão baseado no modo
+        if (ingredientData) {
+            titulo.textContent = 'Editar ingrediente';
+            btnSalvar.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
+            this.populateIngredientModal(ingredientData);
+        } else {
+            titulo.textContent = 'Adicione um novo ingrediente';
+            btnSalvar.innerHTML = '<i class="fa-solid fa-plus"></i> Adicionar';
+            this.clearIngredientModal();
+        }
+
+        // Mostrar modal
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        // Configurar event listeners
+        this.setupIngredientModalListeners(ingredientData);
+    }
+
+    /**
+     * Fecha a modal de ingrediente
+     */
+    closeIngredientModal() {
+        const modal = document.getElementById('modal-ingrediente');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Limpar ID de edição
+        this.currentEditingId = null;
+    }
+
+    /**
+     * Limpa os campos da modal de ingrediente
+     */
+    clearIngredientModal() {
+        const fields = [
+            'nome-ingrediente',
+            'fornecedor-ingrediente',
+            'categoria-ingrediente',
+            'custo-ingrediente',
+            'unidade-ingrediente',
+            'min-ingrediente',
+            'max-ingrediente'
+        ];
+
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+                field.classList.remove('error', 'success');
+            }
+        });
+    }
+
+    /**
+     * Preenche a modal com dados do ingrediente
+     * @param {Object} ingredientData - Dados do ingrediente
+     */
+    populateIngredientModal(ingredientData) {
+        const fields = {
+            'nome-ingrediente': ingredientData.nome || '',
+            'fornecedor-ingrediente': ingredientData.fornecedor || '',
+            'categoria-ingrediente': ingredientData.categoria || '',
+            'custo-ingrediente': ingredientData.custo || '',
+            'unidade-ingrediente': ingredientData.unidade || '',
+            'min-ingrediente': ingredientData.min || '',
+            'max-ingrediente': ingredientData.max || ''
+        };
+
+        Object.entries(fields).forEach(([fieldId, value]) => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = value;
+                field.classList.remove('error', 'success');
+            }
+        });
+    }
+
+    /**
+     * Configura os event listeners da modal de ingrediente
+     * @param {Object} ingredientData - Dados do ingrediente para edição (opcional)
+     */
+    setupIngredientModalListeners(ingredientData = null) {
+        // Remover listeners anteriores
+        this.removeIngredientModalListeners();
+
+        // Botão fechar
+        const btnFechar = document.querySelector('#modal-ingrediente .fechar-modal');
+        if (btnFechar) {
+            btnFechar.addEventListener('click', () => this.closeIngredientModal());
+        }
+
+        // Botão cancelar
+        const btnCancelar = document.getElementById('cancelar-ingrediente');
+        if (btnCancelar) {
+            btnCancelar.addEventListener('click', () => this.closeIngredientModal());
+        }
+
+        // Botão salvar/adicionar
+        const btnSalvar = document.getElementById('salvar-ingrediente');
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', () => {
+                if (ingredientData) {
+                    this.handleEditIngredient();
+                } else {
+                    this.handleAddIngredient();
+                }
+            });
+        }
+
+        // Overlay para fechar modal
+        const overlay = document.querySelector('#modal-ingrediente .div-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeIngredientModal());
+        }
+
+        // Validação em tempo real
+        this.setupIngredientValidation();
+        
+        // Formatação automática para campo de custo
+        this.setupCurrencyFormatting();
+    }
+
+    /**
+     * Remove os event listeners da modal de ingrediente
+     */
+    removeIngredientModalListeners() {
+        // Remover todos os listeners clonando os elementos
+        const modal = document.getElementById('modal-ingrediente');
+        if (modal) {
+            const newModal = modal.cloneNode(true);
+            modal.parentNode.replaceChild(newModal, modal);
+        }
+    }
+
+    /**
+     * Configura validação em tempo real para os campos
+     */
+    setupIngredientValidation() {
+        const fields = [
+            { id: 'nome-ingrediente', type: 'text', required: true, minLength: 2 },
+            { id: 'fornecedor-ingrediente', type: 'text', required: true, minLength: 2 },
+            { id: 'categoria-ingrediente', type: 'select', required: true },
+            { id: 'custo-ingrediente', type: 'currency', required: true },
+            { id: 'unidade-ingrediente', type: 'text', required: true, minLength: 1 },
+            { id: 'min-ingrediente', type: 'number', required: true, min: 0 },
+            { id: 'max-ingrediente', type: 'number', required: true, min: 0 }
+        ];
+
+        fields.forEach(fieldConfig => {
+            const field = document.getElementById(fieldConfig.id);
+            if (field) {
+                field.addEventListener('input', () => this.validateIngredientField(field, fieldConfig));
+                field.addEventListener('blur', () => this.validateIngredientField(field, fieldConfig));
+            }
+        });
+    }
+
+    /**
+     * Valida um campo específico da modal de ingrediente
+     * @param {HTMLElement} field - Campo a ser validado
+     * @param {Object} config - Configuração de validação
+     */
+    validateIngredientField(field, config) {
+        const value = field.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+
+        // Validação de campo obrigatório
+        if (config.required && !value) {
+            isValid = false;
+            errorMessage = 'Este campo é obrigatório';
+        }
+
+        // Validação de tamanho mínimo
+        if (isValid && config.minLength && value.length < config.minLength) {
+            isValid = false;
+            errorMessage = `Mínimo de ${config.minLength} caracteres`;
+        }
+
+        // Validação de valor mínimo
+        if (isValid && config.min !== undefined && parseFloat(value) < config.min) {
+            isValid = false;
+            errorMessage = `Valor mínimo: ${config.min}`;
+        }
+
+        // Validação específica para moeda
+        if (isValid && config.type === 'currency' && value) {
+            const currencyRegex = /^R\$\s?\d{1,3}(\.\d{3})*(,\d{2})?$/;
+            if (!currencyRegex.test(value)) {
+                isValid = false;
+                errorMessage = 'Formato inválido (ex: R$ 10,50)';
+            }
+        }
+
+        // Validação específica para números
+        if (isValid && config.type === 'number' && value) {
+            const numValue = parseFloat(value);
+            if (isNaN(numValue)) {
+                isValid = false;
+                errorMessage = 'Digite um número válido';
+            }
+        }
+
+        // Aplicar classes de validação
+        field.classList.remove('error', 'success');
+        if (value) {
+            field.classList.add(isValid ? 'success' : 'error');
+        }
+
+        return isValid;
+    }
+
+    /**
+     * Valida todos os campos da modal de ingrediente
+     * @returns {boolean} - True se todos os campos são válidos
+     */
+    validateAllIngredientFields() {
+        const fields = [
+            { id: 'nome-ingrediente', type: 'text', required: true, minLength: 2 },
+            { id: 'fornecedor-ingrediente', type: 'text', required: true, minLength: 2 },
+            { id: 'categoria-ingrediente', type: 'select', required: true },
+            { id: 'custo-ingrediente', type: 'currency', required: true },
+            { id: 'unidade-ingrediente', type: 'text', required: true, minLength: 1 },
+            { id: 'min-ingrediente', type: 'number', required: true, min: 0 },
+            { id: 'max-ingrediente', type: 'number', required: true, min: 0 }
+        ];
+
+        let allValid = true;
+        fields.forEach(fieldConfig => {
+            const field = document.getElementById(fieldConfig.id);
+            if (field) {
+                const isValid = this.validateIngredientField(field, fieldConfig);
+                if (!isValid) allValid = false;
+            }
+        });
+
+        return allValid;
+    }
+
+    /**
+     * Trata adição de novo ingrediente
+     */
+    handleAddIngredient() {
+        if (!this.validateAllIngredientFields()) {
+            console.log('Formulário inválido');
+            return;
+        }
+
+        const ingredientData = this.getIngredientFormData();
+        
+        // Converter custo de string para número
+        const custoNumerico = parseFloat(ingredientData.custo.replace('R$', '').replace(',', '.').trim());
+        
+        const newIngredient = ingredientDataManager.addIngredient({
+            nome: ingredientData.nome,
+            fornecedor: ingredientData.fornecedor,
+            categoria: ingredientData.categoria,
+            custo: custoNumerico,
+            unidade: ingredientData.unidade,
+            min: ingredientData.min,
+            max: ingredientData.max
+        });
+
+        console.log('Ingrediente adicionado:', newIngredient);
+        
+        // Recarregar a lista e métricas
+        this.loadIngredients();
+        this.updateMetrics();
+        
+        this.closeIngredientModal();
+        this.showSuccessMessage('Ingrediente adicionado com sucesso!');
+    }
+
+    /**
+     * Trata edição de ingrediente
+     */
+    handleEditIngredient() {
+        if (!this.validateAllIngredientFields()) {
+            console.log('Formulário inválido');
+            return;
+        }
+
+        const ingredientData = this.getIngredientFormData();
+        const ingredientId = this.currentEditingId;
+        
+        if (!ingredientId) {
+            console.error('ID do ingrediente não encontrado');
+            return;
+        }
+        
+        // Converter custo de string para número
+        const custoNumerico = parseFloat(ingredientData.custo.replace('R$', '').replace(',', '.').trim());
+        
+        const updatedIngredient = ingredientDataManager.updateIngredient(ingredientId, {
+            nome: ingredientData.nome,
+            fornecedor: ingredientData.fornecedor,
+            categoria: ingredientData.categoria,
+            custo: custoNumerico,
+            unidade: ingredientData.unidade,
+            min: ingredientData.min,
+            max: ingredientData.max
+        });
+
+        if (updatedIngredient) {
+            console.log('Ingrediente atualizado:', updatedIngredient);
+            
+            // Recarregar a lista e métricas
+            this.loadIngredients();
+            this.updateMetrics();
+            
+            this.closeIngredientModal();
+            this.showSuccessMessage('Ingrediente atualizado com sucesso!');
+        } else {
+            console.error('Erro ao atualizar ingrediente');
+            this.showErrorMessage('Erro ao atualizar ingrediente');
+        }
+    }
+
+    /**
+     * Obtém os dados do formulário de ingrediente
+     * @returns {Object} - Dados do ingrediente
+     */
+    getIngredientFormData() {
+        return {
+            nome: document.getElementById('nome-ingrediente')?.value.trim() || '',
+            fornecedor: document.getElementById('fornecedor-ingrediente')?.value.trim() || '',
+            categoria: document.getElementById('categoria-ingrediente')?.value || '',
+            custo: document.getElementById('custo-ingrediente')?.value.trim() || '',
+            unidade: document.getElementById('unidade-ingrediente')?.value.trim() || '',
+            min: parseFloat(document.getElementById('min-ingrediente')?.value) || 0,
+            max: parseFloat(document.getElementById('max-ingrediente')?.value) || 0
+        };
+    }
+
+    /**
+     * Configura formatação automática para campo de moeda
+     */
+    setupCurrencyFormatting() {
+        const custoField = document.getElementById('custo-ingrediente');
+        if (custoField) {
+            custoField.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value) {
+                    // Converter centavos para reais
+                    const valorEmReais = parseInt(value) / 100;
+                    value = valorEmReais.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                }
+                e.target.value = value;
+            });
+        }
+    }
+
+    /**
+     * Carrega e renderiza os ingredientes
+     */
+    loadIngredients() {
+        const ingredients = ingredientDataManager.getAllIngredients();
+        const container = document.querySelector('#secao-estoque .ingredientes');
+        
+        if (!container) return;
+
+        container.innerHTML = '';
+        
+        ingredients.forEach(ingredient => {
+            const card = this.createIngredientCard(ingredient);
+            container.appendChild(card);
+        });
+    }
+
+    /**
+     * Cria um card de ingrediente
+     * @param {Object} ingredient - Dados do ingrediente
+     * @returns {HTMLElement} - Elemento do card
+     */
+    createIngredientCard(ingredient) {
+        const card = document.createElement('div');
+        card.className = `card-ingrediente ${this.getStatusClass(ingredient)}`;
+        card.dataset.ingredientId = ingredient.id;
+
+        const progressPercentage = ingredient.max > 0 ? (ingredient.atual / ingredient.max) * 100 : 0;
+        const statusText = this.getStatusText(ingredient);
+
+        card.innerHTML = `
+            <div class="cabecalho-ingrediente">
+                <div class="nome-ingrediente">
+                    <h3>${ingredient.nome}</h3>
+                    <div class="info-ingrediente">
+                        <div class="categoria-fornecedor">
+                            <i class="fa-solid fa-cubes-stacked"></i>
+                            <span>${this.getCategoryName(ingredient.categoria)}</span>
+                            <i class="fa-solid fa-store"></i>
+                            <span>${ingredient.fornecedor}</span>
+                        </div>
+                        
+                        <div class="tag-status ${this.getStatusClass(ingredient)}">
+                            <span>${statusText}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="controles-ingrediente">
+                    <i class="fa-solid fa-pen-to-square editar"></i>
+                    <div class="toggle-container">
+                        <label class="toggle">
+                            <input type="checkbox" ${ingredient.ativo ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                        <div class="status-ativo">
+                            <i class="fa-solid ${ingredient.ativo ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                            <span>${ingredient.ativo ? 'Ativo' : 'Inativo'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controle-estoque">
+                <div class="estoque-atual">
+                    <span class="label">Estoque atual</span>
+                    <span class="quantidade">${ingredient.atual}${ingredient.unidade}</span>
+                </div>
+                
+                <div class="barra-progresso">
+                    <div class="progresso" style="width: ${progressPercentage}%"></div>
+                </div>
+                
+                <div class="limites">
+                    <span>Min: ${ingredient.min}</span>
+                    <span>Max: ${ingredient.max}</span>
+                </div>
+                
+                <div class="botoes-quantidade">
+                    <button class="btn-quantidade" type="button" data-action="decrease">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <button class="btn-quantidade" type="button" data-action="increase">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="info-adicional">
+                <div class="custo">
+                    <p>Custo:</p>
+                    <p>R$ ${ingredient.custo.toFixed(2).replace('.', ',')} ${ingredient.unidade}</p>
+                </div>
+                <div class="ultima-atualizacao">
+                    <p>Última atualização:</p>
+                    <p>${this.formatDate(ingredient.ultimaAtualizacao)}</p>
+                </div>
+            </div>
+        `;
+
+        return card;
+    }
+
+    /**
+     * Atualiza as métricas do dashboard
+     */
+    updateMetrics() {
+        const metrics = ingredientDataManager.getMetrics();
+        
+        // Atualizar valor total
+        const valorTotalElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .grande');
+        if (valorTotalElement) {
+            valorTotalElement.textContent = `R$ ${metrics.valorTotal.toFixed(2).replace('.', ',')}`;
+        }
+
+        const totalItensElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .descricao');
+        if (totalItensElement) {
+            totalItensElement.textContent = `${metrics.totalItens} Itens`;
+        }
+
+        // Atualizar sem estoque
+        const semEstoqueElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(2) .valor .grande');
+        if (semEstoqueElement) {
+            semEstoqueElement.textContent = metrics.semEstoque.toString();
+        }
+
+        // Atualizar estoque baixo
+        const estoqueBaixoElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(3) .valor .grande');
+        if (estoqueBaixoElement) {
+            estoqueBaixoElement.textContent = metrics.estoqueBaixo.toString();
+        }
+
+        // Atualizar em estoque
+        const emEstoqueElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(4) .valor .grande');
+        if (emEstoqueElement) {
+            emEstoqueElement.textContent = metrics.emEstoque.toString();
+        }
+    }
+
+    /**
+     * Obtém a classe de status do ingrediente
+     * @param {Object} ingredient - Dados do ingrediente
+     * @returns {string} - Classe CSS
+     */
+    getStatusClass(ingredient) {
+        if (ingredient.atual === 0) return 'sem-estoque';
+        if (ingredient.atual <= ingredient.min) return 'estoque-baixo';
+        return 'em-estoque';
+    }
+
+    /**
+     * Obtém o texto de status do ingrediente
+     * @param {Object} ingredient - Dados do ingrediente
+     * @returns {string} - Texto do status
+     */
+    getStatusText(ingredient) {
+        if (ingredient.atual === 0) return 'Sem estoque';
+        if (ingredient.atual <= ingredient.min) return 'Estoque baixo';
+        return 'Em estoque';
+    }
+
+    /**
+     * Obtém o nome da categoria
+     * @param {string} category - Código da categoria
+     * @returns {string} - Nome da categoria
+     */
+    getCategoryName(category) {
+        const categories = {
+            'carnes': 'Carnes',
+            'vegetais': 'Vegetais',
+            'laticinios': 'Laticínios',
+            'temperos': 'Temperos',
+            'frutas': 'Frutas',
+            'legumes': 'Legumes',
+            'frutos-do-mar': 'Frutos do mar',
+            'bebidas': 'Bebidas',
+            'doces': 'Doces',
+            'outros': 'Outros'
+        };
+        return categories[category] || category;
+    }
+
+    /**
+     * Formata data para exibição
+     * @param {string} dateString - Data em formato ISO
+     * @returns {string} - Data formatada
+     */
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pt-BR');
+    }
+
+    /**
+     * Exibe mensagem de sucesso
+     * @param {string} message - Mensagem a ser exibida
+     */
+    showSuccessMessage(message) {
+        // Implementar sistema de notificações
+        console.log('✅', message);
+    }
+
+    /**
+     * Exibe mensagem de erro
+     * @param {string} message - Mensagem a ser exibida
+     */
+    showErrorMessage(message) {
+        // Implementar sistema de notificações
+        console.error('❌', message);
     }
 }
 

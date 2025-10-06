@@ -337,6 +337,313 @@
                     <p class="titulo-secao">Gerenciamento de estoque</p>
                     <p class="descricao-secao">Gerencie ingredientes e insumos</p>
                 </div>
+
+                <button class="adicionar">
+                    <i class="fa-solid fa-plus"></i>
+                    <p>Novo Ingrediente</p>
+                </button>
+            </div>
+
+            <!-- Cards de Métricas -->
+            <div class="relata">
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Valor Total em Estoque</p>
+                        <i class="fa-solid fa-dollar-sign"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">R$ 240,57</p>
+                        <p class="descricao">4 Itens</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Sem Estoque</p>
+                        <i class="fa-solid fa-ban"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">1</p>
+                        <p class="descricao">Compra urgente</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Estoque Baixo</p>
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">0</p>
+                        <p class="descricao">Requer atenção</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Em Estoque</p>
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">3</p>
+                        <p class="descricao">Estoque adequado</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filtros">
+                <div class="div-input">
+                    <label for="busca-ingrediente">Buscar por nome</label>
+                    <input type="text" id="busca-ingrediente" name="busca-ingrediente" autocomplete="off">
+                </div>
+                <div class="div-input">
+                    <label for="categoria-estoque">Categorias</label>
+                    <select id="categoria-estoque" name="categoria-estoque">
+                        <option value="">Selecione uma categoria</option>
+                        <option value="carnes">Carnes</option>
+                        <option value="vegetais">Vegetais</option>
+                        <option value="laticinios">Laticínios</option>
+                        <option value="temperos">Temperos</option>
+                        <option value="frutas">Frutas</option>
+                        <option value="legumes">Legumes</option>
+                        <option value="frutos-do-mar">Frutos do mar</option>
+                        <option value="bebidas">Bebidas</option>
+                        <option value="doces">Doces</option>
+                        <option value="outros">Outros</option>
+                    </select>
+                </div>
+                <div class="div-input">
+                    <label for="status-estoque">Status</label>
+                    <select id="status-estoque" name="status-estoque">
+                        <option value="">Selecione um status</option>
+                        <option value="em-estoque">Em Estoque</option>
+                        <option value="estoque-baixo">Estoque Baixo</option>
+                        <option value="sem-estoque">Sem Estoque</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Cards de Ingredientes -->
+            <div class="ingredientes">
+                <!-- Os cards serão gerados dinamicamente pelo JavaScript -->
+            </div>
+        </section>
+
+        <section id="secao-relatorios" style="display: none;">
+            <div class="header">
+                <div class="texto">
+                    <p class="titulo-secao">Relatórios e Analytics</p>
+                    <p class="descricao-secao">Análise detalhada de vendas, finanças, performance e funcionários</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="secao-finaceiro" style="display: none;">
+                                <div class="categoria-fornecedor">
+                                    <i class="fa-solid fa-cubes-stacked"></i>
+                                    <span>Carnes</span>
+                                    <i class="fa-solid fa-store"></i>
+                                    <span>Fornecedor A</span>
+                                </div>
+                                
+                                <div class="tag-status em-estoque">
+                                    <span>Em estoque</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="controles-ingrediente">
+                            <i class="fa-solid fa-pen-to-square editar"></i>
+                            <div class="toggle-container">
+                                <label class="toggle">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="status-ativo">
+                                    <i class="fa-solid fa-eye"></i>
+                                    <span>Ativo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+
+                    <div class="controle-estoque">
+                        <div class="estoque-atual">
+                            <span class="label">Estoque atual</span>
+                            <span class="quantidade">75kg</span>
+                        </div>
+                        
+                        <div class="barra-progresso">
+                            <div class="progresso" style="width: 75%"></div>
+                        </div>
+                        
+                        <div class="limites">
+                            <span>Min: 20</span>
+                            <span>Max: 100</span>
+                        </div>
+                        
+                        <div class="botoes-quantidade">
+                            <button class="btn-quantidade" type="button">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <button class="btn-quantidade" type="button">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="info-adicional">
+                        <div class="custo">
+                            <p>Custo:</p>
+                            <p>R$ 10,50 Kg</p>
+                        </div>
+                        <div class="ultima-atualizacao">
+                            <p>Última atualização:</p>
+                            <p>01/10/2025</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-ingrediente estoque-baixo">
+                    <div class="cabecalho-ingrediente">
+                        <div class="nome-ingrediente">
+                            <h3>Alface</h3>
+                            <div class="info-ingrediente">
+                                <div class="categoria-fornecedor">
+                                    <i class="fa-solid fa-cubes-stacked"></i>
+                                    <span>Vegetais</span>
+                                    <i class="fa-solid fa-store"></i>
+                                    <span>Fornecedor B</span>
+                                </div>
+                                
+                                <div class="tag-status estoque-baixo">
+                                    <span>Estoque baixo</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="controles-ingrediente">
+                            <i class="fa-solid fa-pen-to-square editar"></i>
+                            <div class="toggle-container">
+                                <label class="toggle">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="status-ativo">
+                                    <i class="fa-solid fa-eye"></i>
+                                    <span>Ativo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+
+                    <div class="controle-estoque">
+                        <div class="estoque-atual">
+                            <span class="label">Estoque atual</span>
+                            <span class="quantidade">15kg</span>
+                        </div>
+                        
+                        <div class="barra-progresso">
+                            <div class="progresso" style="width: 15%"></div>
+                        </div>
+                        
+                        <div class="limites">
+                            <span>Min: 20</span>
+                            <span>Max: 100</span>
+                        </div>
+                        
+                        <div class="botoes-quantidade">
+                            <button class="btn-quantidade" type="button">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <button class="btn-quantidade" type="button">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="info-adicional">
+                        <div class="custo">
+                            <p>Custo:</p>
+                            <p>R$ 3,50 Kg</p>
+                        </div>
+                        <div class="ultima-atualizacao">
+                            <p>Última atualização:</p>
+                            <p>01/10/2025</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-ingrediente sem-estoque">
+                    <div class="cabecalho-ingrediente">
+                        <div class="nome-ingrediente">
+                            <h3>Tomate</h3>
+                            <div class="info-ingrediente">
+                                <div class="categoria-fornecedor">
+                                    <i class="fa-solid fa-cubes-stacked"></i>
+                                    <span>Vegetais</span>
+                                    <i class="fa-solid fa-store"></i>
+                                    <span>Fornecedor C</span>
+                                </div>
+                                
+                                <div class="tag-status sem-estoque">
+                                    <span>Sem estoque</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="controles-ingrediente">
+                            <i class="fa-solid fa-pen-to-square editar"></i>
+                            <div class="toggle-container">
+                                <label class="toggle">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="status-ativo">
+                                    <i class="fa-solid fa-eye"></i>
+                                    <span>Ativo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+
+                    <div class="controle-estoque">
+                        <div class="estoque-atual">
+                            <span class="label">Estoque atual</span>
+                            <span class="quantidade">0kg</span>
+                        </div>
+                        
+                        <div class="barra-progresso">
+                            <div class="progresso" style="width: 0%"></div>
+                        </div>
+                        
+                        <div class="limites">
+                            <span>Min: 20</span>
+                            <span>Max: 100</span>
+                        </div>
+                        
+                        <div class="botoes-quantidade">
+                            <button class="btn-quantidade" type="button">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <button class="btn-quantidade" type="button">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="info-adicional">
+                        <div class="custo">
+                            <p>Custo:</p>
+                            <p>R$ 5,20 Kg</p>
+                        </div>
+                        <div class="ultima-atualizacao">
+                            <p>Última atualização:</p>
+                            <p>01/10/2025</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -602,10 +909,83 @@
                 </div>
             </div>
         </section>
+
         
     </main>
     <!-- importare footer -->
     <div id="footer-container"></div>
+
+    <!-- Modal Adicionar/Editar Ingrediente -->
+    <div id="modal-ingrediente" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-ingrediente">
+            <div class="header-modal">
+                <h2 id="titulo-modal-ingrediente">Adicione um novo ingrediente</h2>
+                <i class="fa-solid fa-xmark fechar-modal"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input">
+                    <label for="nome-ingrediente">Nome do ingrediente</label>
+                    <input type="text" id="nome-ingrediente" name="nome-ingrediente" autocomplete="off">
+                </div>
+
+                <div class="div-input">
+                    <label for="fornecedor-ingrediente">Fornecedor</label>
+                    <input type="text" id="fornecedor-ingrediente" name="fornecedor-ingrediente" autocomplete="off">
+                </div>
+
+                <div class="campos-linha">
+                    <div class="div-input">
+                        <label for="categoria-ingrediente">Categorias</label>
+                        <select id="categoria-ingrediente" name="categoria-ingrediente">
+                            <option value="">Selecione uma categoria</option>
+                            <option value="carnes">Carnes</option>
+                            <option value="vegetais">Vegetais</option>
+                            <option value="laticinios">Laticínios</option>
+                            <option value="temperos">Temperos</option>
+                            <option value="frutas">Frutas</option>
+                            <option value="legumes">Legumes</option>
+                            <option value="frutos-do-mar">Frutos do mar</option>
+                            <option value="bebidas">Bebidas</option>
+                            <option value="doces">Doces</option>
+                            <option value="outros">Outros</option>
+                        </select>
+                    </div>
+
+                    <div class="div-input">
+                        <label for="custo-ingrediente">Custo</label>
+                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" placeholder="R$ 0,00" autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="div-input">
+                    <label for="unidade-ingrediente">Unidade</label>
+                    <input type="text" id="unidade-ingrediente" name="unidade-ingrediente" placeholder="kg, g, L, ml, etc." autocomplete="off">
+                </div>
+
+                <div class="campos-linha">
+                    <div class="div-input">
+                        <label for="min-ingrediente">Min</label>
+                        <input type="number" id="min-ingrediente" name="min-ingrediente" min="0" step="0.1" autocomplete="off">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="max-ingrediente">Max</label>
+                        <input type="number" id="max-ingrediente" name="max-ingrediente" min="0" step="0.1" autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-ingrediente">Cancelar</button>
+                <button class="btn-adicionar" id="salvar-ingrediente">
+                    <i class="fa-solid fa-plus"></i>
+                    Adicionar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal Adicionar/Editar Produto -->
     <div id="modal-produto" class="modal" style="display: none;">
