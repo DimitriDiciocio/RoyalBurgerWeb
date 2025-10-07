@@ -1,5 +1,5 @@
 import { logout, fetchMe, toggle2FA, confirm2FAEnable, get2FAStatus } from "../api/auth.js";
-import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress, changePassword } from "../api/user.js";
+import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress, changePassword, changePasswordWithLogout } from "../api/user.js";
 import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage, showToast } from "./alerts.js";
 
@@ -1117,13 +1117,19 @@ $(document).ready(function () {
             btnAlterarSenha.disabled = true;
             btnAlterarSenha.textContent = 'Alterando...';
 
-            // Chamar API
-            const result = await changePassword(senhaAtual, novaSenha);
+            // Chamar API - sempre revoga todos os tokens por segurança
+            const result = await changePasswordWithLogout(senhaAtual, novaSenha);
             
-            showToast('Senha alterada com sucesso!', { type: 'success' });
+            showToast('Senha alterada com sucesso! Você foi desconectado por segurança.', { type: 'success' });
             
             // Fechar modal
             fecharModal('alterar-senha');
+            
+            // Fazer logout local e redirecionar para login
+            setTimeout(() => {
+                logoutLocal();
+                window.location.href = '../../index.html';
+            }, 2000);
             
         } catch (error) {
             console.error('Erro ao alterar senha:', error);
@@ -1290,6 +1296,7 @@ $(document).ready(function () {
             }
         });
     }
+
 
     // Excluir conta (inativação)
     const deleteLink = document.querySelector('.logout p');
