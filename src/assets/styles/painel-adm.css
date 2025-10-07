@@ -31,10 +31,6 @@ main {
 
         & div {
             display: flex;
-            flex-direction: row;
-            word-wrap: break-word;
-            word-break: break-word;
-            white-space: normal;
             gap: 10px;
             align-items: center;
             color: var(--color-texto-erased);
