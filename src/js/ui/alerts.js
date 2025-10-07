@@ -285,6 +285,19 @@ export function tryShowFlashFromStorage() {
     } catch (_e) { }
 }
 
+// ====== Funções de compatibilidade ======
+export function showSuccess(message, options = {}) {
+    return showToast(message, { type: 'success', ...options });
+}
+
+export function showError(message, options = {}) {
+    return showToast(message, { type: 'error', ...options });
+}
+
+export function showAlert(message, options = {}) {
+    return showToast(message, { type: 'info', ...options });
+}
+
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', tryShowFlashFromStorage);
 }

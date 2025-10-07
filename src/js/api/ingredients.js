@@ -9,7 +9,7 @@ import { apiRequest } from './api.js';
  * Lista todos os ingredientes com filtros opcionais
  * @param {Object} options - Opções de filtro e paginação
  * @param {string} options.name - Filtro por nome
- * @param {string} options.status - Filtro por status (low_stock, out_of_stock, in_stock)
+ * @param {string} options.status - Filtro por status (low_stock, out_of_stock, in_stock, unavailable, available, overstock)
  * @param {number} options.page - Página
  * @param {number} options.page_size - Itens por página
  * @returns {Promise<Object>} Lista de ingredientes com paginação
@@ -23,7 +23,7 @@ export const getIngredients = async (options = {}) => {
     if (options.page_size) params.append('page_size', options.page_size);
     
     const queryString = params.toString();
-    const url = `/api/ingredients/${queryString ? `?${queryString}` : ''}`;
+    const url = `/api/ingredients${queryString ? `?${queryString}` : ''}`;
     
     return await apiRequest(url, {
         method: 'GET'
@@ -57,11 +57,12 @@ export const getIngredientById = async (ingredientId) => {
  * @param {number} ingredientData.current_stock - Estoque atual
  * @param {string} ingredientData.stock_unit - Unidade de estoque
  * @param {number} ingredientData.min_stock_threshold - Estoque mínimo
+ * @param {number} ingredientData.max_stock - Estoque máximo
  * @param {string} ingredientData.supplier - Fornecedor do ingrediente
  * @returns {Promise<Object>} Ingrediente criado
  */
 export const createIngredient = async (ingredientData) => {
-    return await apiRequest('/api/ingredients/', {
+    return await apiRequest('/api/ingredients', {
         method: 'POST',
         body: JSON.stringify(ingredientData)
     });
@@ -74,7 +75,7 @@ export const createIngredient = async (ingredientData) => {
  * @returns {Promise<Object>} Resultado da atualização
  */
 export const updateIngredient = async (ingredientId, updateData) => {
-    return await apiRequest(`/api/ingredients/${ingredientId}/`, {
+    return await apiRequest(`/api/ingredients/${ingredientId}`, {
         method: 'PUT',
         body: JSON.stringify(updateData)
     });
@@ -86,7 +87,7 @@ export const updateIngredient = async (ingredientId, updateData) => {
  * @returns {Promise<Object>} Resultado da exclusão
  */
 export const deleteIngredient = async (ingredientId) => {
-    return await apiRequest(`/api/ingredients/${ingredientId}/`, {
+    return await apiRequest(`/api/ingredients/${ingredientId}`, {
         method: 'DELETE'
     });
 };
@@ -98,7 +99,7 @@ export const deleteIngredient = async (ingredientId) => {
  * @returns {Promise<Object>} Resultado da atualização
  */
 export const updateIngredientAvailability = async (ingredientId, isAvailable) => {
-    return await apiRequest(`/api/ingredients/${ingredientId}/availability/`, {
+    return await apiRequest(`/api/ingredients/${ingredientId}/availability`, {
         method: 'PATCH',
         body: JSON.stringify({ is_available: isAvailable })
     });
@@ -111,9 +112,22 @@ export const updateIngredientAvailability = async (ingredientId, isAvailable) =>
  * @returns {Promise<Object>} Resultado do ajuste
  */
 export const adjustIngredientStock = async (ingredientId, changeAmount) => {
-    return await apiRequest(`/api/ingredients/${ingredientId}/stock/`, {
+    return await apiRequest(`/api/ingredients/${ingredientId}/stock`, {
         method: 'POST',
         body: JSON.stringify({ change: changeAmount })
+    });
+};
+
+/**
+ * Adiciona uma quantidade ao estoque atual do ingrediente
+ * @param {number} ingredientId - ID do ingrediente
+ * @param {number} quantity - Quantidade a ser adicionada ao estoque atual
+ * @returns {Promise<Object>} Resultado da adição
+ */
+export const addIngredientQuantity = async (ingredientId, quantity) => {
+    return await apiRequest(`/api/ingredients/${ingredientId}/add-quantity`, {
+        method: 'POST',
+        body: JSON.stringify({ quantity: quantity })
     });
 };
 
