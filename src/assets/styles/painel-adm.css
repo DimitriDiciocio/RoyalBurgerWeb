@@ -32,7 +32,9 @@ main {
         & div {
             display: flex;
             flex-direction: row;
-            text-wrap: nowrap;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
             gap: 10px;
             align-items: center;
             color: var(--color-texto-erased);
@@ -86,19 +88,31 @@ main {
             display: flex;
             flex-direction: column;
             justify-content: start;
+            flex: 1;
+            min-width: 0;
 
             & .titulo-secao {
                 font-size: 1.4rem;
                 color: var(--color-texto-black);
                 font-weight: 500;
-                text-wrap: nowrap;
+                word-wrap: break-word;
+                word-break: break-word;
+                white-space: normal;
+                overflow-wrap: break-word;
+                hyphens: auto;
+                max-width: 100%;
             }
 
             & .descricao-secao {
                 font-size: 1.2rem;
                 color: var(--color-texto-light);
                 font-weight: 400;
-                text-wrap: nowrap;
+                word-wrap: break-word;
+                word-break: break-word;
+                white-space: normal;
+                overflow-wrap: break-word;
+                hyphens: auto;
+                max-width: 100%;
             }
         }
 
@@ -1773,7 +1787,9 @@ main {
 
                     & .tempo {
                         font-size: 0.9rem;
-                        text-wrap: nowrap;
+                        word-wrap: break-word;
+                        word-break: break-word;
+                        white-space: normal;
 
                         & i {
                             font-size: 0.7rem;
@@ -2286,7 +2302,9 @@ main {
 
                     & .tempo {
                         font-size: 0.8rem;
-                        text-wrap: nowrap;
+                        word-wrap: break-word;
+                        word-break: break-word;
+                        white-space: normal;
 
                         & i {
                             font-size: 0.7rem;
@@ -2314,11 +2332,11 @@ main {
             & .texto {
 
                 & .titulo-secao {
-                    font-size: 0.8rem;
+                    font-size: 1.5rem;
                 }
 
                 & .descricao-secao {
-                    font-size: 0.5rem;
+                    font-size: 1rem;
                 }
             }
 
@@ -2814,7 +2832,9 @@ main {
 
                     & .tempo {
                         font-size: 0.8rem;
-                        text-wrap: nowrap;
+                        word-wrap: break-word;
+                        word-break: break-word;
+                        white-space: normal;
 
                         & i {
                             font-size: 0.7rem;
@@ -3334,7 +3354,9 @@ main {
 
                     & .tempo {
                         font-size: 0.8rem;
-                        text-wrap: nowrap;
+                        word-wrap: break-word;
+                        word-break: break-word;
+                        white-space: normal;
 
                         & i {
                             font-size: 0.6rem;

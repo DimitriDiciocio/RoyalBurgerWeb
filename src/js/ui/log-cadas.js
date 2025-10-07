@@ -580,14 +580,30 @@ document.addEventListener('DOMContentLoaded', function () {
                         }, 1200);
                         
                     } catch (loginErr) {
-                        // Verificar se o erro é por email não verificado
+                        // Verificar o tipo específico de erro
                         const errorMsg = loginErr?.payload?.error || loginErr?.message || '';
+                        const errorMsgLower = errorMsg.toLowerCase();
                         
-                        if (errorMsg.toLowerCase().includes('email não verificado') || 
-                            errorMsg.toLowerCase().includes('email não está verificado') ||
-                            errorMsg.toLowerCase().includes('verifique seu email') ||
-                            errorMsg.toLowerCase().includes('não verificado') ||
-                            loginErr?.status === 403) {
+                        // Verificar se é erro de conta inativa/desativada
+                        if (errorMsgLower.includes('conta inativa') || 
+                            errorMsgLower.includes('conta desativada') ||
+                            errorMsgLower.includes('usuário inativo') ||
+                            errorMsgLower.includes('account inactive') ||
+                            errorMsgLower.includes('user inactive') ||
+                            errorMsgLower.includes('conta suspensa') ||
+                            errorMsgLower.includes('conta bloqueada')) {
+                            
+                            showToast('Sua conta está inativa. Entre em contato com o suporte para reativá-la.', { 
+                                type: 'error', 
+                                title: 'Conta Inativa',
+                                autoClose: 5000
+                            });
+                            
+                        } else if (errorMsgLower.includes('email não verificado') || 
+                            errorMsgLower.includes('email não está verificado') ||
+                            errorMsgLower.includes('verifique seu email') ||
+                            errorMsgLower.includes('não verificado') ||
+                            (loginErr?.status === 403 && !errorMsgLower.includes('inativa') && !errorMsgLower.includes('desativada'))) {
                             
                             showToast('Seu email ainda não foi verificado. Redirecionando para verificação...', { 
                                 type: 'warning', 

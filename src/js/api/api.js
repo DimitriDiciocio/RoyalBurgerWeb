@@ -123,8 +123,15 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
                     clearStoredUser();
                 }
             } else if (response.status === 403) {
-                // Proibido
-                errorMessage = data?.error || data?.message || 'Acesso negado.';
+                // Proibido - pode ser conta inativa, email não verificado, ou outros problemas
+                const isLoginEndpoint = path.includes('/login') || path.includes('/users/login');
+                if (isLoginEndpoint && data?.error) {
+                    // Para login, usar a mensagem específica do backend
+                    errorMessage = data.error;
+                } else {
+                    // Para outros endpoints, mensagem genérica
+                    errorMessage = data?.error || data?.message || 'Acesso negado.';
+                }
             } else if (response.status === 308) {
                 // Redirecionamento permanente - problema de CORS
                 errorMessage = 'Erro de configuração do servidor. Verifique se o CORS está configurado corretamente.';

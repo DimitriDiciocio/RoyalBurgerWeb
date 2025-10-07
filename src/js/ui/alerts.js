@@ -227,6 +227,28 @@ export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
             title = 'Serviço Não Encontrado';
             msg = 'O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.';
         }
+    } else if (err?.status === 403) {
+        // Verificar se é erro de conta inativa
+        const msgLower = msg.toLowerCase();
+        if (msgLower.includes('conta inativa') || 
+            msgLower.includes('conta desativada') ||
+            msgLower.includes('usuário inativo') ||
+            msgLower.includes('account inactive') ||
+            msgLower.includes('user inactive') ||
+            msgLower.includes('conta suspensa') ||
+            msgLower.includes('conta bloqueada')) {
+            title = 'Conta Inativa';
+            msg = 'Sua conta está inativa. Entre em contato com o suporte para reativá-la.';
+        } else if (msgLower.includes('email não verificado') || 
+                   msgLower.includes('email não está verificado') ||
+                   msgLower.includes('verifique seu email') ||
+                   msgLower.includes('não verificado')) {
+            title = 'Email Não Verificado';
+            // Manter a mensagem original do backend
+        } else {
+            title = 'Acesso Negado';
+            // Manter a mensagem original do backend
+        }
     }
     return showErrorBar(title, msg);
 }
