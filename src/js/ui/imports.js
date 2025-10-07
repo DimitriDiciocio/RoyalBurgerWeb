@@ -593,3 +593,31 @@ function isLoginPage() {
   window.getPainelAdmPath = getPainelAdmPath;
   window.loadHeader = loadHeader;
   window.getLogoSvgPath = getLogoSvgPath;
+
+  // Carregar módulos de API para categorias, produtos e ingredientes
+  async function loadAPIModules() {
+    try {
+      // Carregar módulo de categorias
+      const categoriesModule = await import('../api/categories.js');
+      Object.assign(window, categoriesModule);
+      
+      // Carregar módulo de produtos
+      const productsModule = await import('../api/products.js');
+      Object.assign(window, productsModule);
+      
+      // Carregar módulo de ingredientes
+      const ingredientsModule = await import('../api/ingredients.js');
+      Object.assign(window, ingredientsModule);
+      
+      console.log('✅ Módulos de API carregados com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao carregar módulos de API:', error);
+    }
+  }
+
+  // Carregar módulos de API quando a página estiver pronta
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadAPIModules);
+  } else {
+    loadAPIModules();
+  }

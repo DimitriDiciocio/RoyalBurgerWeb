@@ -82,7 +82,7 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
         const response = await fetch(url, {
             method,
             headers: baseHeaders,
-            body: body ? JSON.stringify(body) : undefined,
+            body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
             credentials: 'include',
             mode: 'cors' // Força modo CORS
         });
