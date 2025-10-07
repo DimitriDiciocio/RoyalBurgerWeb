@@ -416,14 +416,62 @@
                     <select id="categoria-estoque" name="categoria-estoque">
                         <option value="">Selecione uma categoria</option>
                         <option value="carnes">Carnes</option>
+                        <option value="aves">Aves</option>
+                        <option value="peixes">Peixes</option>
+                        <option value="frutos-do-mar">Frutos do Mar</option>
+                        <option value="embutidos">Embutidos</option>
                         <option value="vegetais">Vegetais</option>
-                        <option value="laticinios">Laticínios</option>
-                        <option value="temperos">Temperos</option>
-                        <option value="frutas">Frutas</option>
                         <option value="legumes">Legumes</option>
-                        <option value="frutos-do-mar">Frutos do mar</option>
+                        <option value="frutas">Frutas</option>
+                        <option value="verduras">Verduras</option>
+                        <option value="laticinios">Laticínios</option>
+                        <option value="queijos">Queijos</option>
+                        <option value="ovos">Ovos</option>
+                        <option value="graos">Grãos</option>
+                        <option value="cereais">Cereais</option>
+                        <option value="leguminosas">Leguminosas</option>
+                        <option value="temperos">Temperos</option>
+                        <option value="especiarias">Especiarias</option>
+                        <option value="ervas">Ervas</option>
+                        <option value="condimentos">Condimentos</option>
+                        <option value="molhos">Molhos</option>
+                        <option value="oleos">Óleos</option>
+                        <option value="vinagres">Vinagres</option>
                         <option value="bebidas">Bebidas</option>
+                        <option value="sucos">Sucos</option>
+                        <option value="refrigerantes">Refrigerantes</option>
+                        <option value="cervejas">Cervejas</option>
+                        <option value="vinhos">Vinhos</option>
+                        <option value="licores">Licores</option>
                         <option value="doces">Doces</option>
+                        <option value="sobremesas">Sobremesas</option>
+                        <option value="chocolates">Chocolates</option>
+                        <option value="acucares">Açúcares</option>
+                        <option value="mel">Mel</option>
+                        <option value="geleias">Geleias</option>
+                        <option value="farinhas">Farinhas</option>
+                        <option value="massa">Massas</option>
+                        <option value="paes">Pães</option>
+                        <option value="bolos">Bolos</option>
+                        <option value="biscoitos">Biscoitos</option>
+                        <option value="conservas">Conservas</option>
+                        <option value="enlatados">Enlatados</option>
+                        <option value="congelados">Congelados</option>
+                        <option value="desidratados">Desidratados</option>
+                        <option value="suplementos">Suplementos</option>
+                        <option value="vitaminas">Vitaminas</option>
+                        <option value="minerais">Minerais</option>
+                        <option value="aditivos">Aditivos</option>
+                        <option value="conservantes">Conservantes</option>
+                        <option value="corantes">Corantes</option>
+                        <option value="aromatizantes">Aromatizantes</option>
+                        <option value="estabilizantes">Estabilizantes</option>
+                        <option value="embalagens">Embalagens</option>
+                        <option value="utensilios">Utensílios</option>
+                        <option value="equipamentos">Equipamentos</option>
+                        <option value="limpeza">Limpeza</option>
+                        <option value="higiene">Higiene</option>
+                        <option value="seguranca">Segurança</option>
                         <option value="outros">Outros</option>
                     </select>
                 </div>
@@ -737,60 +785,107 @@
                     <label for="nome-ingrediente">Nome do ingrediente</label>
                     <input type="text" id="nome-ingrediente" name="nome-ingrediente" autocomplete="off">
                 </div>
-
                 <div class="div-input">
                     <label for="fornecedor-ingrediente">Fornecedor</label>
                     <input type="text" id="fornecedor-ingrediente" name="fornecedor-ingrediente" autocomplete="off">
                 </div>
 
-                <div class="campos-linha">
-                    <div class="div-input">
-                        <label for="categoria-ingrediente">Categorias</label>
-                        <select id="categoria-ingrediente" name="categoria-ingrediente">
-                            <option value="">Selecione uma categoria</option>
-                            <option value="carnes">Carnes</option>
-                            <option value="vegetais">Vegetais</option>
-                            <option value="laticinios">Laticínios</option>
-                            <option value="temperos">Temperos</option>
-                            <option value="frutas">Frutas</option>
-                            <option value="legumes">Legumes</option>
-                            <option value="frutos-do-mar">Frutos do mar</option>
-                            <option value="bebidas">Bebidas</option>
-                            <option value="doces">Doces</option>
-                            <option value="outros">Outros</option>
-                        </select>
-                    </div>
-
-                    <div class="div-input">
-                        <label for="custo-ingrediente">Custo</label>
-                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" placeholder="R$ 0,00"
-                            autocomplete="off">
-                    </div>
-                </div>
-
                 <div class="div-input">
-                    <label for="unidade-ingrediente">Unidade</label>
-                    <select id="unidade-ingrediente" name="unidade-ingrediente"
-                        placeholder="kg, g, L, ml, etc." autocomplete="off">
-                        <option value="">Selecione uma unidade</option>
-                        <option value="un">un</option>
-                        <option value="kg">kg</option>
-                        <option value="g">g</option>
-                        <option value="L">L</option>
-                        <option value="ml">ml</option>
+                    <label for="categoria-ingrediente">Categoria</label>
+                    <select id="categoria-ingrediente" name="categoria-ingrediente" autocomplete="off">
+                        <option value="">Selecione uma categoria</option>
+                        <option value="carnes">Carnes</option>
+                        <option value="aves">Aves</option>
+                        <option value="peixes">Peixes</option>
+                        <option value="frutos-do-mar">Frutos do Mar</option>
+                        <option value="embutidos">Embutidos</option>
+                        <option value="vegetais">Vegetais</option>
+                        <option value="legumes">Legumes</option>
+                        <option value="frutas">Frutas</option>
+                        <option value="verduras">Verduras</option>
+                        <option value="laticinios">Laticínios</option>
+                        <option value="queijos">Queijos</option>
+                        <option value="ovos">Ovos</option>
+                        <option value="graos">Grãos</option>
+                        <option value="cereais">Cereais</option>
+                        <option value="leguminosas">Leguminosas</option>
+                        <option value="temperos">Temperos</option>
+                        <option value="especiarias">Especiarias</option>
+                        <option value="ervas">Ervas</option>
+                        <option value="condimentos">Condimentos</option>
+                        <option value="molhos">Molhos</option>
+                        <option value="oleos">Óleos</option>
+                        <option value="vinagres">Vinagres</option>
+                        <option value="bebidas">Bebidas</option>
+                        <option value="sucos">Sucos</option>
+                        <option value="refrigerantes">Refrigerantes</option>
+                        <option value="cervejas">Cervejas</option>
+                        <option value="vinhos">Vinhos</option>
+                        <option value="licores">Licores</option>
+                        <option value="doces">Doces</option>
+                        <option value="sobremesas">Sobremesas</option>
+                        <option value="chocolates">Chocolates</option>
+                        <option value="acucares">Açúcares</option>
+                        <option value="mel">Mel</option>
+                        <option value="geleias">Geleias</option>
+                        <option value="farinhas">Farinhas</option>
+                        <option value="massa">Massas</option>
+                        <option value="paes">Pães</option>
+                        <option value="bolos">Bolos</option>
+                        <option value="biscoitos">Biscoitos</option>
+                        <option value="conservas">Conservas</option>
+                        <option value="enlatados">Enlatados</option>
+                        <option value="congelados">Congelados</option>
+                        <option value="desidratados">Desidratados</option>
+                        <option value="suplementos">Suplementos</option>
+                        <option value="vitaminas">Vitaminas</option>
+                        <option value="minerais">Minerais</option>
+                        <option value="aditivos">Aditivos</option>
+                        <option value="conservantes">Conservantes</option>
+                        <option value="corantes">Corantes</option>
+                        <option value="aromatizantes">Aromatizantes</option>
+                        <option value="estabilizantes">Estabilizantes</option>
+                        <option value="embalagens">Embalagens</option>
+                        <option value="utensilios">Utensílios</option>
+                        <option value="equipamentos">Equipamentos</option>
+                        <option value="limpeza">Limpeza</option>
+                        <option value="higiene">Higiene</option>
+                        <option value="seguranca">Segurança</option>
+                        <option value="outros">Outros</option>
                     </select>
                 </div>
 
                 <div class="campos-linha">
                     <div class="div-input">
-                        <label for="min-ingrediente">Valor mínimo</label>
-                        <input type="number" id="min-ingrediente" name="min-ingrediente" min="0" step="0.1"
+                        <label for="custo-ingrediente">Custo Unitário</label>
+                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" placeholder="R$ 0,00"
+                            autocomplete="off">
+                    </div>
+                    <div class="div-input">
+                        <label for="unidade-ingrediente">Unidade</label>
+                        <select id="unidade-ingrediente" name="unidade-ingrediente"
+                            placeholder="kg, g, L, ml, etc." autocomplete="off">
+                            <option value="">Selecione uma unidade</option>
+                            <option value="un">un</option>
+                            <option value="kg">kg</option>
+                            <option value="g">g</option>
+                            <option value="L">L</option>
+                            <option value="ml">ml</option>
+                        </select>
+                    </div>
+                </div>
+
+
+                <div class="campos-linha">
+                    <div class="div-input">
+                        <label for="estoque-minimo-ingrediente">Estoque Mínimo</label>
+                        <input type="number" id="estoque-minimo-ingrediente" name="estoque-minimo-ingrediente" min="0" step="0.1"
                             autocomplete="off">
                     </div>
 
                     <div class="div-input">
-                        <label for="max-ingrediente">Valor máximo</label>
-                        <input type="number" id="max-ingrediente" name="max-ingrediente" min="0" step="0.1"
+                        <label for="estoque-maximo-ingrediente">Estoque Máximo</label>
+                        <input type="number" id="estoque-maximo-ingrediente" name="estoque-maximo-ingrediente" min="0" step="0.1"
                             autocomplete="off">
                     </div>
                 </div>
@@ -837,8 +932,14 @@
                     </div>
 
                     <div class="div-input">
-                        <label for="preco-produto">Preço</label>
+                        <label for="preco-produto">Preço de Venda</label>
                         <input type="text" id="preco-produto" name="preco-produto" placeholder="R$ 0,00"
+                            autocomplete="off">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="preco-custo-produto">Preço de Custo</label>
+                        <input type="text" id="preco-custo-produto" name="preco-custo-produto" placeholder="R$ 0,00"
                             autocomplete="off">
                     </div>
 
@@ -855,8 +956,8 @@
                         </div>
 
                         <div class="div-input">
-                            <label for="tempo-produto">Tempo (min)</label>
-                            <input type="number" id="tempo-produto" name="tempo-produto" placeholder="0"
+                            <label for="tempo-preparo-produto">Tempo de Preparo (min)</label>
+                            <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto" placeholder="0"
                                 autocomplete="off">
                         </div>
                     </div>
@@ -865,47 +966,46 @@
                 <div class="secao-receita">
                     <h3>Receita</h3>
 
-                    <div class="ingredientes-container">
-                        <div class="ingrediente-item">
+                    <div class="ingredientes-receita">
+                        <!-- Os ingredientes serão adicionados dinamicamente -->
+                    </div>
+
+                    <div class="adicionar-ingrediente-form">
+                        <div class="div-input">
+                            <label for="ingrediente-select">Ingrediente</label>
+                            <select id="ingrediente-select" name="ingrediente-select" autocomplete="off">
+                                <option value="">Selecione um ingrediente</option>
+                            </select>
+                        </div>
+
+                        <div class="sep-select ingredientes-quantidade">
                             <div class="div-input">
-                                <label for="ingrediente-1">Ingrediente</label>
-                                <select id="ingrediente-1" name="ingrediente-1">
-                                    <option value="">Selecione um ingrediente</option>
-                                    <option value="pao">Pão</option>
-                                    <option value="carne">Carne</option>
-                                    <option value="queijo">Queijo</option>
-                                    <option value="alface">Alface</option>
-                                    <option value="tomate">Tomate</option>
+                                <label for="quantidade-ingrediente">Quantidade</label>
+                                <input type="number" id="quantidade-ingrediente" name="quantidade-ingrediente" min="0" step="0.1" autocomplete="off">
+                            </div>
+
+                            <div class="div-input">
+                                <label for="unidade-ingrediente">Unidade</label>
+                                <select id="unidade-ingrediente" name="unidade-ingrediente" autocomplete="off">
+                                    <option value="">Selecione uma unidade</option>
+                                    <option value="un">un</option>
+                                    <option value="kg">kg</option>
+                                    <option value="g">g</option>
+                                    <option value="L">L</option>
+                                    <option value="ml">ml</option>
                                 </select>
                             </div>
 
-                            <div class="sep-select ingredientes-quantidade">
-                                <div class="div-input">
-                                    <label for="quantidade-1">Quantidade</label>
-                                    <input type="text" id="quantidade-1" name="quantidade-1" autocomplete="off">
-                                </div>
-
-                                <div class="div-input">
-                                    <label for="observacao-1">Unidade</label>
-                                    <select type="text" id="observacao-1" name="observacao-1" autocomplete="off">
-                                        <option value="">Selecione uma unidade</option>
-                                        <option value="un">un</option>
-                                        <option value="kg">kg</option>
-                                        <option value="g">g</option>
-                                        <option value="L">L</option>
-                                        <option value="ml">ml</option>
-                                    </select>
-                                </div>
-                                <button type="button" class="btn-remover-ingrediente">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </div>
+                            <button type="button" class="btn-adicionar-ingrediente" onclick="cardapioManager.addIngredientToRecipe()">
+                                <i class="fa-solid fa-plus"></i>
+                                <p>Adicionar</p>
+                            </button>
                         </div>
                     </div>
 
-                    <div type="button" class="btn-adicionar-ingrediente">
-                        <i class="fa-solid fa-plus"></i>
-                        <p>Adicionar ingrediente</p>
+                    <div class="custo-receita">
+                        <h4>Custo Estimado da Receita:</h4>
+                        <span id="custo-estimado">R$ 0,00</span>
                     </div>
                 </div>
             </div>

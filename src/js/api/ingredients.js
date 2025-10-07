@@ -36,9 +36,16 @@ export const getIngredients = async (options = {}) => {
  * @returns {Promise<Object>} Dados do ingrediente
  */
 export const getIngredientById = async (ingredientId) => {
-    return await apiRequest(`/api/ingredients/${ingredientId}/`, {
-        method: 'GET'
-    });
+    // Como o endpoint GET /api/ingredients/{id} não está implementado,
+    // vamos buscar todos os ingredientes e filtrar pela ID
+    const response = await getIngredients({ page_size: 1000 });
+    const ingredient = response.items.find(ing => ing.id === ingredientId);
+    
+    if (!ingredient) {
+        throw new Error(`Ingrediente com ID ${ingredientId} não encontrado`);
+    }
+    
+    return ingredient;
 };
 
 /**
@@ -50,6 +57,7 @@ export const getIngredientById = async (ingredientId) => {
  * @param {number} ingredientData.current_stock - Estoque atual
  * @param {string} ingredientData.stock_unit - Unidade de estoque
  * @param {number} ingredientData.min_stock_threshold - Estoque mínimo
+ * @param {string} ingredientData.supplier - Fornecedor do ingrediente
  * @returns {Promise<Object>} Ingrediente criado
  */
 export const createIngredient = async (ingredientData) => {
