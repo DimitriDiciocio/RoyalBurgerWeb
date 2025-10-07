@@ -1,5 +1,5 @@
 import { logout, fetchMe, toggle2FA, confirm2FAEnable, get2FAStatus } from "../api/auth.js";
-import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress } from "../api/user.js";
+import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress, changePassword } from "../api/user.js";
 import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage, showToast } from "./alerts.js";
 
@@ -872,6 +872,365 @@ $(document).ready(function () {
         isProcessing2FA = false;
         console.log('Flag isProcessing2FA resetada para false');
     };
+
+    // ====== FUNCIONALIDADES DA MODAL DE ALTERAR SENHA ======
+    
+    // Função para validar força da senha (igual ao cadastro)
+    function validarSenhaForte(senha) {
+        const requisitos = {
+            maiuscula: /[A-Z]/.test(senha),
+            numero: /\d/.test(senha),
+            especial: /[!@#$%^&*(),.?":{}|<>]/.test(senha),
+            tamanho: senha.length >= 8
+        };
+
+        // Atualizar visual dos requisitos
+        const reqMaiuscula = document.getElementById('req-maiuscula-alt');
+        const reqNumero = document.getElementById('req-numero-alt');
+        const reqEspecial = document.getElementById('req-especial-alt');
+        const reqTamanho = document.getElementById('req-tamanho-alt');
+
+        if (reqMaiuscula) reqMaiuscula.classList.toggle('valid', requisitos.maiuscula);
+        if (reqNumero) reqNumero.classList.toggle('valid', requisitos.numero);
+        if (reqEspecial) reqEspecial.classList.toggle('valid', requisitos.especial);
+        if (reqTamanho) reqTamanho.classList.toggle('valid', requisitos.tamanho);
+
+        return Object.values(requisitos).every(req => req);
+    }
+
+    // Função para configurar toggle de visibilidade da senha
+    function configurarToggleSenha(input, mostrar, ocultar) {
+        mostrar.addEventListener('click', function () {
+            input.type = 'text';
+            mostrar.style.display = 'none';
+            ocultar.style.display = 'flex';
+        });
+
+        ocultar.addEventListener('click', function () {
+            input.type = 'password';
+            mostrar.style.display = 'flex';
+            ocultar.style.display = 'none';
+        });
+    }
+
+    // Configurar toggles de senha para a modal de alterar senha
+    function configurarTogglesSenha() {
+        // Senha atual
+        const senhaAtualInput = document.getElementById('senha-atual');
+        const mostrarSenhaAtual = document.getElementById('mostrarSenhaAtual');
+        const ocultarSenhaAtual = document.getElementById('ocultarSenhaAtual');
+
+        if (senhaAtualInput && mostrarSenhaAtual && ocultarSenhaAtual) {
+            configurarToggleSenha(senhaAtualInput, mostrarSenhaAtual, ocultarSenhaAtual);
+        }
+
+        // Nova senha
+        const novaSenhaInput = document.getElementById('nova-senha');
+        const mostrarNovaSenha = document.getElementById('mostrarNovaSenha');
+        const ocultarNovaSenha = document.getElementById('ocultarNovaSenha');
+
+        if (novaSenhaInput && mostrarNovaSenha && ocultarNovaSenha) {
+            configurarToggleSenha(novaSenhaInput, mostrarNovaSenha, ocultarNovaSenha);
+        }
+
+        // Confirmar senha
+        const confirmaSenhaInput = document.getElementById('confirma-senha-alter');
+        const mostrarConfirmaSenha = document.getElementById('mostrarConfirmaSenhaAlt');
+        const ocultarConfirmaSenha = document.getElementById('ocultarConfirmaSenhaAlt');
+
+        if (confirmaSenhaInput && mostrarConfirmaSenha && ocultarConfirmaSenha) {
+            configurarToggleSenha(confirmaSenhaInput, mostrarConfirmaSenha, ocultarConfirmaSenha);
+        }
+    }
+
+    // Função para revalidar botão de alterar senha
+    function revalidarBotaoAlterarSenha() {
+        const btnAlterarSenha = document.getElementById('btn-confirmar-alterar-senha');
+        if (!btnAlterarSenha) return;
+
+        const senhaAtual = document.getElementById('senha-atual')?.value?.trim() || '';
+        const novaSenha = document.getElementById('nova-senha')?.value?.trim() || '';
+        const confirmaSenha = document.getElementById('confirma-senha-alter')?.value?.trim() || '';
+
+        const senhaAtualPreenchida = senhaAtual !== '';
+        const novaSenhaValida = novaSenha !== '' && validarSenhaForte(novaSenha);
+        const senhasCoincidem = novaSenha === confirmaSenha && confirmaSenha !== '';
+        const senhasDiferentes = senhaAtual !== novaSenha;
+
+        const todosValidos = senhaAtualPreenchida && novaSenhaValida && senhasCoincidem && senhasDiferentes;
+
+        if (todosValidos) {
+            btnAlterarSenha.classList.remove('inativo');
+            btnAlterarSenha.disabled = false;
+        } else {
+            btnAlterarSenha.classList.add('inativo');
+            btnAlterarSenha.disabled = true;
+        }
+    }
+
+    // Configurar validações em tempo real
+    function configurarValidacoesSenha() {
+        const senhaAtualInput = document.getElementById('senha-atual');
+        const novaSenhaInput = document.getElementById('nova-senha');
+        const confirmaSenhaInput = document.getElementById('confirma-senha-alter');
+
+        // Validação da nova senha em tempo real
+        if (novaSenhaInput) {
+            novaSenhaInput.addEventListener('input', function () {
+                const senha = this.value;
+                validarSenhaForte(senha);
+                revalidarBotaoAlterarSenha();
+            });
+
+            novaSenhaInput.addEventListener('blur', function () {
+                const senha = this.value;
+                const senhaAtual = document.getElementById('senha-atual')?.value || '';
+                
+                if (senha && senha === senhaAtual) {
+                    showToast('A nova senha deve ser diferente da senha atual.', { type: 'error' });
+                    this.classList.add('error');
+                    this.classList.remove('valid');
+                } else if (senha && validarSenhaForte(senha)) {
+                    this.classList.remove('error');
+                    this.classList.add('valid');
+                }
+                
+                revalidarBotaoAlterarSenha();
+            });
+        }
+
+        // Validação da confirmação de senha
+        if (confirmaSenhaInput) {
+            confirmaSenhaInput.addEventListener('blur', function () {
+                const novaSenha = document.getElementById('nova-senha')?.value || '';
+                const confirmaSenha = this.value;
+
+                if (confirmaSenha && novaSenha !== confirmaSenha) {
+                    this.classList.add('error');
+                    this.classList.remove('valid');
+                    showToast('As senhas não coincidem.', { type: 'error' });
+                } else if (confirmaSenha && novaSenha === confirmaSenha) {
+                    this.classList.remove('error');
+                    this.classList.add('valid');
+                } else {
+                    this.classList.remove('error', 'valid');
+                }
+
+                revalidarBotaoAlterarSenha();
+            });
+        }
+
+        // Validação da senha atual
+        if (senhaAtualInput) {
+            senhaAtualInput.addEventListener('input', revalidarBotaoAlterarSenha);
+        }
+    }
+
+    // Função para mostrar erro abaixo do input (padrão do cadastro)
+    function mostrarErroInput(inputId, mensagem) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        
+        const divInput = input.closest('.div-input');
+        if (!divInput) return;
+        
+        const mensagemErro = divInput.querySelector('.mensagem-erro');
+        
+        // Adicionar classe de erro
+        input.classList.add('error');
+        input.classList.remove('valid');
+        
+        if (!mensagemErro) {
+            const erro = document.createElement('div');
+            erro.className = 'mensagem-erro';
+            erro.textContent = mensagem;
+            divInput.appendChild(erro);
+        } else {
+            mensagemErro.textContent = mensagem;
+        }
+    }
+
+    // Função para limpar erro do input (padrão do cadastro)
+    function limparErroInput(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        
+        const divInput = input.closest('.div-input');
+        if (!divInput) return;
+        
+        const mensagemErro = divInput.querySelector('.mensagem-erro');
+        
+        // Remover classe de erro
+        input.classList.remove('error');
+        
+        if (mensagemErro) {
+            mensagemErro.remove();
+        }
+    }
+
+    // Função para limpar todos os erros da modal de alterar senha
+    function limparTodosErrosSenha() {
+        limparErroInput('senha-atual');
+        limparErroInput('nova-senha');
+        limparErroInput('confirma-senha-alter');
+    }
+
+    // Função para alterar senha
+    async function alterarSenha() {
+        const senhaAtual = document.getElementById('senha-atual')?.value?.trim() || '';
+        const novaSenha = document.getElementById('nova-senha')?.value?.trim() || '';
+        const confirmaSenha = document.getElementById('confirma-senha-alter')?.value?.trim() || '';
+
+        // Limpar erros anteriores
+        limparTodosErrosSenha();
+
+        // Validações finais
+        if (!senhaAtual) {
+            mostrarErroInput('senha-atual', 'Por favor, digite sua senha atual.');
+            return;
+        }
+
+        if (!novaSenha) {
+            mostrarErroInput('nova-senha', 'Por favor, digite a nova senha.');
+            return;
+        }
+
+        if (!validarSenhaForte(novaSenha)) {
+            mostrarErroInput('nova-senha', 'A nova senha não atende aos requisitos de segurança.');
+            return;
+        }
+
+        if (novaSenha !== confirmaSenha) {
+            mostrarErroInput('confirma-senha-alter', 'As senhas não coincidem.');
+            return;
+        }
+
+        if (senhaAtual === novaSenha) {
+            mostrarErroInput('nova-senha', 'A nova senha deve ser diferente da senha atual.');
+            return;
+        }
+
+        const btnAlterarSenha = document.getElementById('btn-confirmar-alterar-senha');
+        
+        try {
+            // Desabilitar botão e mostrar loading
+            btnAlterarSenha.disabled = true;
+            btnAlterarSenha.textContent = 'Alterando...';
+
+            // Chamar API
+            const result = await changePassword(senhaAtual, novaSenha);
+            
+            showToast('Senha alterada com sucesso!', { type: 'success' });
+            
+            // Fechar modal
+            fecharModal('alterar-senha');
+            
+        } catch (error) {
+            console.error('Erro ao alterar senha:', error);
+            
+            // Tratar erros específicos da API
+            const errorMessage = error?.payload?.error || error?.message || 'Falha ao alterar senha.';
+            
+            if (errorMessage.toLowerCase().includes('senha atual') || 
+                errorMessage.toLowerCase().includes('senha incorreta') ||
+                errorMessage.toLowerCase().includes('credenciais')) {
+                mostrarErroInput('senha-atual', errorMessage);
+            } else if (errorMessage.toLowerCase().includes('nova senha') ||
+                       errorMessage.toLowerCase().includes('senha fraca') ||
+                       errorMessage.toLowerCase().includes('requisitos')) {
+                mostrarErroInput('nova-senha', errorMessage);
+            } else {
+                // Erro geral - mostrar no campo de senha atual
+                mostrarErroInput('senha-atual', errorMessage);
+            }
+        } finally {
+            // Reabilitar botão
+            btnAlterarSenha.disabled = false;
+            btnAlterarSenha.textContent = 'Alterar Senha';
+        }
+    }
+
+    // Configurar botão de alterar senha
+    function configurarBotaoAlterarSenha() {
+        const btnAlterarSenha = document.getElementById('btn-confirmar-alterar-senha');
+        if (btnAlterarSenha) {
+            btnAlterarSenha.addEventListener('click', alterarSenha);
+        }
+    }
+
+    // Configurar validação e limpeza de erros
+    function configurarValidacaoInputs() {
+        const inputs = [
+            { id: 'senha-atual', validacao: validarSenhaAtual },
+            { id: 'nova-senha', validacao: validarNovaSenha },
+            { id: 'confirma-senha-alter', validacao: validarConfirmacaoSenha }
+        ];
+        
+        inputs.forEach(({ id, validacao }) => {
+            const input = document.getElementById(id);
+            if (input) {
+                // Limpar erro ao digitar
+                input.addEventListener('input', () => {
+                    limparErroInput(id);
+                });
+                
+                // Validar ao sair do campo (blur)
+                input.addEventListener('blur', () => {
+                    validacao(input);
+                });
+            }
+        });
+    }
+
+    // Função para validar senha atual
+    function validarSenhaAtual(input) {
+        const senha = input.value.trim();
+        if (senha && senha.length < 6) {
+            mostrarErroInput('senha-atual', 'A senha deve ter pelo menos 6 caracteres.');
+            return false;
+        }
+        return true;
+    }
+
+    // Função para validar nova senha
+    function validarNovaSenha(input) {
+        const senha = input.value.trim();
+        if (senha && !validarSenhaForte(senha)) {
+            mostrarErroInput('nova-senha', 'A nova senha não atende aos requisitos de segurança.');
+            return false;
+        }
+        return true;
+    }
+
+    // Função para validar confirmação de senha
+    function validarConfirmacaoSenha(input) {
+        const confirmaSenha = input.value.trim();
+        const novaSenha = document.getElementById('nova-senha')?.value?.trim() || '';
+        
+        if (confirmaSenha && novaSenha && confirmaSenha !== novaSenha) {
+            mostrarErroInput('confirma-senha-alter', 'As senhas não coincidem.');
+            return false;
+        }
+        return true;
+    }
+
+    // Inicializar funcionalidades da modal de alterar senha
+    function inicializarModalAlterarSenha() {
+        configurarTogglesSenha();
+        configurarValidacoesSenha();
+        configurarBotaoAlterarSenha();
+        configurarValidacaoInputs();
+        
+        // Revalidar botão inicialmente
+        revalidarBotaoAlterarSenha();
+    }
+
+    // Chamar inicialização quando a modal for aberta
+    $(document).on('click', '.edita:contains("Alterar senha")', function() {
+        setTimeout(() => {
+            inicializarModalAlterarSenha();
+        }, 100);
+    });
 
 
     // mostra "dados da conta" ao entrar

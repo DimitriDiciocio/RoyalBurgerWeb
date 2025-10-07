@@ -127,10 +127,18 @@ document.addEventListener('DOMContentLoaded', function () {
             if (botaoAcao) {
                 const inputsObrigatorios = form.querySelectorAll('input[required], select[required], textarea[required]');
                 let todosPreenchidos = true;
+                let temErroValidacao = false;
 
                 inputsObrigatorios.forEach(input => {
                     if (input.value.trim() === '') {
                         todosPreenchidos = false;
+                    }
+                    
+                    // Verificar se há mensagens de erro visíveis
+                    const divInput = input.closest('.div-input');
+                    const mensagemErro = divInput?.querySelector('.mensagem-erro');
+                    if (mensagemErro) {
+                        temErroValidacao = true;
                     }
                 });
 
@@ -143,7 +151,33 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
 
-                if (todosPreenchidos) {
+                // Verificar validações específicas
+                const email = document.getElementById('email');
+                const telefone = document.getElementById('telefone');
+                const nascimento = document.getElementById('nascimento');
+                
+                if (email && email.value.trim() !== '') {
+                    const validacaoEmail = validarEmail(email.value);
+                    if (!validacaoEmail.valido) {
+                        temErroValidacao = true;
+                    }
+                }
+                
+                if (telefone && telefone.value.trim() !== '') {
+                    const validacaoTelefone = validarTelefone(telefone.value);
+                    if (!validacaoTelefone.valido) {
+                        temErroValidacao = true;
+                    }
+                }
+                
+                if (nascimento && nascimento.value.trim() !== '') {
+                    const validacaoNascimento = validarDataNascimento(nascimento.value);
+                    if (!validacaoNascimento.valido) {
+                        temErroValidacao = true;
+                    }
+                }
+
+                if (todosPreenchidos && !temErroValidacao) {
                     botaoAcao.classList.remove('inativo');
                     botaoAcao.disabled = false;
                 } else {
@@ -154,20 +188,25 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Aplicar validação quando a senha for digitada
+    // Aplicar validação quando a senha for digitada (apenas visual dos requisitos)
     if (senhaInput) {
         senhaInput.addEventListener('input', function () {
             const senha = this.value;
             validarSenhaForte(senha);
+        });
 
-            // Verificar se as senhas coincidem
+        // Validar senha ao perder o foco
+        senhaInput.addEventListener('blur', function () {
+            const senha = this.value;
             const confirmaSenha = document.getElementById('confirma-senha');
-            if (confirmaSenha) {
-                const confirmaSenhaValue = confirmaSenha.value;
-                if (confirmaSenhaValue && senha !== confirmaSenhaValue) {
-                    confirmaSenha.style.borderColor = '#dc3545';
+            
+            if (confirmaSenha && confirmaSenha.value) {
+                if (senha !== confirmaSenha.value) {
+                    confirmaSenha.classList.add('error');
+                    confirmaSenha.classList.remove('valid');
                 } else {
-                    confirmaSenha.style.borderColor = '#e0e1e4';
+                    confirmaSenha.classList.remove('error');
+                    confirmaSenha.classList.add('valid');
                 }
             }
 
@@ -176,16 +215,20 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Verificar coincidência de senhas
+    // Verificar coincidência de senhas ao perder o foco
     if (confirmaSenhaInput) {
-        confirmaSenhaInput.addEventListener('input', function () {
+        confirmaSenhaInput.addEventListener('blur', function () {
             const senha = document.getElementById('senha')?.value || '';
             const confirmaSenha = this.value;
 
             if (confirmaSenha && senha !== confirmaSenha) {
-                this.style.borderColor = '#dc3545';
+                this.classList.add('error');
+                this.classList.remove('valid');
+            } else if (confirmaSenha && senha === confirmaSenha) {
+                this.classList.remove('error');
+                this.classList.add('valid');
             } else {
-                this.style.borderColor = '#e0e1e4';
+                this.classList.remove('error', 'valid');
             }
 
             // Revalidar botões
@@ -193,23 +236,268 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- 4. Máscara para telefone ---
+    // --- 4. Validação e Máscara para Telefone ---
+    function validarTelefone(telefone) {
+        const telefoneLimpo = telefone.replace(/\D/g, '');
+        
+        // Verificar se tem pelo menos 10 dígitos (telefone fixo) ou 11 dígitos (celular)
+        if (telefoneLimpo.length < 10) {
+            return { valido: false, mensagem: 'Telefone deve ter pelo menos 10 dígitos' };
+        }
+        
+        // Verificar se tem mais de 11 dígitos
+        if (telefoneLimpo.length > 11) {
+            return { valido: false, mensagem: 'Telefone deve ter no máximo 11 dígitos' };
+        }
+        
+        // Verificar se é um celular (11 dígitos) e se o nono dígito é 9
+        if (telefoneLimpo.length === 11 && telefoneLimpo.charAt(2) !== '9') {
+            return { valido: false, mensagem: 'Celular deve começar com 9' };
+        }
+        
+        // Verificar DDD válido (11-99)
+        const ddd = telefoneLimpo.substring(0, 2);
+        if (parseInt(ddd) < 11 || parseInt(ddd) > 99) {
+            return { valido: false, mensagem: 'DDD inválido' };
+        }
+        
+        return { valido: true, mensagem: '' };
+    }
+
+    function aplicarMascaraTelefone(value) {
+        let valorLimpo = value.replace(/\D/g, '');
+        
+        // Limitar a 11 dígitos
+        if (valorLimpo.length > 11) {
+            valorLimpo = valorLimpo.substring(0, 11);
+        }
+        
+        if (valorLimpo.length >= 11) {
+            return valorLimpo.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else if (valorLimpo.length >= 7) {
+            return valorLimpo.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+        } else if (valorLimpo.length >= 3) {
+            return valorLimpo.replace(/(\d{2})(\d{0,5})/, '($1) $2');
+        }
+        return valorLimpo;
+    }
+
     const telefoneInput = document.getElementById('telefone');
     if (telefoneInput) {
+        // Aplicar máscara em tempo real
         telefoneInput.addEventListener('input', function () {
-            let value = this.value.replace(/\D/g, '');
-            if (value.length >= 11) {
-                value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-            } else if (value.length >= 7) {
-                value = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
-            } else if (value.length >= 3) {
-                value = value.replace(/(\d{2})(\d{0,5})/, '($1) $2');
+            const valorOriginal = this.value;
+            const valorComMascara = aplicarMascaraTelefone(valorOriginal);
+            this.value = valorComMascara;
+        });
+        
+        // Validar apenas ao perder o foco
+        telefoneInput.addEventListener('blur', function () {
+            if (this.value.trim() !== '') {
+                const validacao = validarTelefone(this.value);
+                const telefoneDiv = this.closest('.div-input');
+                const mensagemErro = telefoneDiv.querySelector('.mensagem-erro');
+                
+                if (!validacao.valido) {
+                    this.classList.add('error');
+                    this.classList.remove('valid');
+                    if (!mensagemErro) {
+                        const erro = document.createElement('div');
+                        erro.className = 'mensagem-erro';
+                        erro.textContent = validacao.mensagem;
+                        telefoneDiv.appendChild(erro);
+                    } else {
+                        mensagemErro.textContent = validacao.mensagem;
+                    }
+                } else {
+                    this.classList.remove('error');
+                    this.classList.add('valid');
+                    if (mensagemErro) {
+                        mensagemErro.remove();
+                    }
+                }
+                
+                // Revalidar botões
+                revalidarBotoes();
             }
-            this.value = value;
         });
     }
 
-    // --- 5. Animações dos labels são gerenciadas pela função utilitária ---
+    // --- 5. Validação de Email ---
+    function validarEmail(email) {
+        
+        // Verificar se não está vazio
+        if (!email || email.trim() === '') {
+            return { valido: false, mensagem: 'Email é obrigatório' };
+        }
+        
+        // Regex mais robusta para validação de email
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        
+        if (!emailRegex.test(email)) {
+            return { valido: false, mensagem: 'Formato de email inválido' };
+        }
+        
+        // Verificar se não tem espaços
+        if (email.includes(' ')) {
+            return { valido: false, mensagem: 'Email não pode conter espaços' };
+        }
+        
+        // Verificar se não tem caracteres consecutivos inválidos
+        if (email.includes('..') || email.includes('@@')) {
+            return { valido: false, mensagem: 'Email contém caracteres inválidos' };
+        }
+        
+        // Verificar se termina com domínio válido
+        const partes = email.split('@');
+        if (partes.length !== 2) {
+            return { valido: false, mensagem: 'Email deve ter um @' };
+        }
+        
+        const dominio = partes[1];
+        if (!dominio.includes('.') || dominio.endsWith('.') || dominio.startsWith('.')) {
+            return { valido: false, mensagem: 'Domínio do email inválido' };
+        }
+        
+        return { valido: true, mensagem: '' };
+    }
+
+    const emailInput = document.getElementById('email');
+    if (emailInput) {
+        // Limitar caracteres em tempo real
+        emailInput.addEventListener('input', function () {
+            if (this.value.length > 254) {
+                this.value = this.value.substring(0, 254);
+            }
+        });
+        
+        // Validar apenas ao perder o foco
+        emailInput.addEventListener('blur', function () {
+            if (this.value.trim() !== '') {
+                const validacao = validarEmail(this.value);
+                const emailDiv = this.closest('.div-input');
+                const mensagemErro = emailDiv.querySelector('.mensagem-erro');
+                
+                if (!validacao.valido) {
+                    this.classList.add('error');
+                    this.classList.remove('valid');
+                    if (!mensagemErro) {
+                        const erro = document.createElement('div');
+                        erro.className = 'mensagem-erro';
+                        erro.textContent = validacao.mensagem;
+                        emailDiv.appendChild(erro);
+                    } else {
+                        mensagemErro.textContent = validacao.mensagem;
+                    }
+                } else {
+                    this.classList.remove('error');
+                    this.classList.add('valid');
+                    if (mensagemErro) {
+                        mensagemErro.remove();
+                    }
+                }
+                
+                // Revalidar botões
+                revalidarBotoes();
+            }
+        });
+    }
+
+    // --- 6. Validação de Data de Nascimento ---
+    function validarDataNascimento(data) {
+        if (!data || data.trim() === '') {
+            return { valido: false, mensagem: 'Data de nascimento é obrigatória' };
+        }
+        
+        const dataSelecionada = new Date(data);
+        const hoje = new Date();
+        const dataMinima = new Date('1850-01-01');
+        
+        // Verificar se a data é válida
+        if (isNaN(dataSelecionada.getTime())) {
+            return { valido: false, mensagem: 'Data inválida' };
+        }
+        
+        // Verificar se a data não é no futuro
+        if (dataSelecionada > hoje) {
+            return { valido: false, mensagem: 'Data de nascimento não pode ser no futuro' };
+        }
+        
+        // Verificar se a data não é muito antiga (antes de 1850)
+        if (dataSelecionada < dataMinima) {
+            return { valido: false, mensagem: 'Data de nascimento muito antiga' };
+        }
+        
+        // Verificar se a pessoa tem pelo menos 13 anos
+        const idade = hoje.getFullYear() - dataSelecionada.getFullYear();
+        const mesAtual = hoje.getMonth();
+        const mesNascimento = dataSelecionada.getMonth();
+        const diaAtual = hoje.getDate();
+        const diaNascimento = dataSelecionada.getDate();
+        
+        let idadeReal = idade;
+        if (mesNascimento > mesAtual || (mesNascimento === mesAtual && diaNascimento > diaAtual)) {
+            idadeReal--;
+        }
+        
+        if (idadeReal < 18) {
+            return { valido: false, mensagem: 'Você deve ter pelo menos 18 anos' };
+        }
+        
+        // Verificar se a pessoa não é muito velha (mais de 120 anos)
+        if (idadeReal > 120) {
+            return { valido: false, mensagem: 'Idade inválida' };
+        }
+        
+        return { valido: true, mensagem: '' };
+    }
+
+    const nascimentoInput = document.getElementById('nascimento');
+    if (nascimentoInput) {
+        // Definir data máxima como hoje
+        const hoje = new Date();
+        const dataMaxima = hoje.toISOString().split('T')[0];
+        nascimentoInput.setAttribute('max', dataMaxima);
+        
+        // Definir data mínima como 120 anos atrás
+        const dataMinima = new Date();
+        dataMinima.setFullYear(hoje.getFullYear() - 120);
+        const dataMinimaString = dataMinima.toISOString().split('T')[0];
+        nascimentoInput.setAttribute('min', dataMinimaString);
+        
+        // Validar apenas ao perder o foco
+        nascimentoInput.addEventListener('blur', function () {
+            if (this.value.trim() !== '') {
+                const validacao = validarDataNascimento(this.value);
+                const nascimentoDiv = this.closest('.div-input');
+                const mensagemErro = nascimentoDiv.querySelector('.mensagem-erro');
+                
+                if (!validacao.valido) {
+                    this.classList.add('error');
+                    this.classList.remove('valid');
+                    if (!mensagemErro) {
+                        const erro = document.createElement('div');
+                        erro.className = 'mensagem-erro';
+                        erro.textContent = validacao.mensagem;
+                        nascimentoDiv.appendChild(erro);
+                    } else {
+                        mensagemErro.textContent = validacao.mensagem;
+                    }
+                } else {
+                    this.classList.remove('error');
+                    this.classList.add('valid');
+                    if (mensagemErro) {
+                        mensagemErro.remove();
+                    }
+                }
+                
+                // Revalidar botões
+                revalidarBotoes();
+            }
+        });
+    }
+
+    // --- 7. Animações dos labels são gerenciadas pela função utilitária ---
 
     // --- 6. Integração com API: Login e Cadastro ---
     function normalizarTelefone(valor) {
@@ -232,6 +520,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const senha = document.getElementById('senha')?.value || '';
             const confirma = document.getElementById('confirma-senha')?.value || '';
             const nascimento = document.getElementById('nascimento')?.value?.trim();
+            const nascimentoFormatado = nascimento ? nascimento.split('-').reverse().join('-') : '';
             const telefone = normalizarTelefone(document.getElementById('telefone')?.value || '');
 
             const isCadastro = Boolean(nome || nascimento || telefone || document.getElementById('confirma-senha'));
@@ -244,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         email,
                         password: senha,
                         password_confirmation: confirma,
-                        date_of_birth: nascimento,
+                        date_of_birth: nascimentoFormatado,
                         phone: telefone
                     };
                     const resp = await registerCustomer(payload);

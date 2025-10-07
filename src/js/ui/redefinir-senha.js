@@ -146,6 +146,102 @@ document.addEventListener('DOMContentLoaded', function () {
         atualizarBotao();
     });
 
+    // Função para mostrar erro abaixo do input (padrão do cadastro)
+    function mostrarErroInput(inputId, mensagem) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        
+        const divInput = input.closest('.div-input');
+        if (!divInput) return;
+        
+        const mensagemErro = divInput.querySelector('.mensagem-erro');
+        
+        // Adicionar classe de erro
+        input.classList.add('error');
+        input.classList.remove('valid');
+        
+        if (!mensagemErro) {
+            const erro = document.createElement('div');
+            erro.className = 'mensagem-erro';
+            erro.textContent = mensagem;
+            divInput.appendChild(erro);
+        } else {
+            mensagemErro.textContent = mensagem;
+        }
+    }
+
+    // Função para limpar erro do input (padrão do cadastro)
+    function limparErroInput(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        
+        const divInput = input.closest('.div-input');
+        if (!divInput) return;
+        
+        const mensagemErro = divInput.querySelector('.mensagem-erro');
+        
+        // Remover classe de erro
+        input.classList.remove('error');
+        
+        if (mensagemErro) {
+            mensagemErro.remove();
+        }
+    }
+
+    // Função para limpar todos os erros
+    function limparTodosErros() {
+        limparErroInput('senha');
+        limparErroInput('confirma-senha');
+    }
+
+    // Configurar validação e limpeza de erros
+    function configurarValidacaoInputs() {
+        const inputs = [
+            { id: 'senha', validacao: validarSenha },
+            { id: 'confirma-senha', validacao: validarConfirmacaoSenha }
+        ];
+        
+        inputs.forEach(({ id, validacao }) => {
+            const input = document.getElementById(id);
+            if (input) {
+                // Limpar erro ao digitar
+                input.addEventListener('input', () => {
+                    limparErroInput(id);
+                });
+                
+                // Validar ao sair do campo (blur)
+                input.addEventListener('blur', () => {
+                    validacao(input);
+                });
+            }
+        });
+    }
+
+    // Função para validar senha
+    function validarSenha(input) {
+        const senha = input.value.trim();
+        if (senha && !validarSenhaForte(senha)) {
+            mostrarErroInput('senha', 'A senha não atende aos requisitos mínimos de segurança.');
+            return false;
+        }
+        return true;
+    }
+
+    // Função para validar confirmação de senha
+    function validarConfirmacaoSenha(input) {
+        const confirmaSenha = input.value.trim();
+        const senha = document.getElementById('senha')?.value?.trim() || '';
+        
+        if (confirmaSenha && senha && confirmaSenha !== senha) {
+            mostrarErroInput('confirma-senha', 'As senhas não coincidem.');
+            return false;
+        }
+        return true;
+    }
+
+    // Configurar validação de inputs
+    configurarValidacaoInputs();
+
     // Handler do formulário
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -153,13 +249,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const senha = senhaInput.value;
         const confirmaSenha = confirmaSenhaInput.value;
 
+        // Limpar erros anteriores
+        limparTodosErros();
+
         if (!validarSenhaForte(senha)) {
-            showToast('A senha não atende aos requisitos mínimos de segurança.', { type: 'error' });
+            mostrarErroInput('senha', 'A senha não atende aos requisitos mínimos de segurança.');
             return;
         }
 
         if (senha !== confirmaSenha) {
-            showToast('As senhas não coincidem.', { type: 'error' });
+            mostrarErroInput('confirma-senha', 'As senhas não coincidem.');
             return;
         }
 
@@ -194,7 +293,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.location.href = 'login.html';
             }, 2000);
         } catch (err) {
-            toastFromApiError(err);
+            // Tratar erros específicos da API
+            const errorMessage = err?.payload?.error || err?.message || 'Falha ao redefinir senha.';
+            
+            if (errorMessage.toLowerCase().includes('senha') && 
+                errorMessage.toLowerCase().includes('fraca')) {
+                mostrarErroInput('senha', errorMessage);
+            } else if (errorMessage.toLowerCase().includes('código') ||
+                       errorMessage.toLowerCase().includes('code') ||
+                       errorMessage.toLowerCase().includes('inválido')) {
+                // Erro de código - mostrar no campo de senha
+                mostrarErroInput('senha', errorMessage);
+            } else {
+                // Erro geral - mostrar no campo de senha
+                mostrarErroInput('senha', errorMessage);
+            }
             
             // Reabilitar botão
             btnRedefinir.disabled = false;
