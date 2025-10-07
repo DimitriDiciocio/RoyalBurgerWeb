@@ -286,6 +286,15 @@ export async function changePassword(current_password, new_password) {
     });
 }
 
+
+// Alteração de senha com revogação de todos os tokens
+export async function changePasswordWithLogout(current_password, new_password) {
+    return apiRequest('/api/users/change-password', {
+        method: 'PUT',
+        body: { current_password, new_password, revoke_all_tokens: true }
+    });
+}
+
 // Alteração de email (requer verificação)
 // export async function requestEmailChange(current_email, new_email) {
 //     return apiRequest('/api/users/request-email-change', {
