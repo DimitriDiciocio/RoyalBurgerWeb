@@ -63,7 +63,7 @@ main {
     #secao-cardapio,
     #secao-estoque,
     #secao-relatorios,
-    #secao-finaceiro,
+    #secao-financeiro,
     #secao-funcionarios,
     #secao-configuracoes {
         width: 100%;
@@ -971,59 +971,6 @@ main {
 #secao-funcionarios {
     padding-bottom: 50px;
     gap: 20px;
-
-    & .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 20px;
-
-        & .texto {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-
-            & .titulo-secao {
-                font-size: 24px;
-                font-weight: 700;
-                color: var(--color-texto-black);
-                margin: 0;
-            }
-
-            & .descricao-secao {
-                font-size: 14px;
-                color: var(--color-texto-erased);
-                margin: 0;
-            }
-        }
-
-        & .adicionar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background-color: var(--color-texto-black);
-            color: var(--color-texto-white);
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.3s;
-
-            &:hover {
-                background-color: rgb(55, 55, 55);
-            }
-
-            &:active {
-                background-color: rgb(147, 147, 147);
-            }
-
-            & i {
-                font-size: 12px;
-            }
-        }
-    }
 
     & .filtros {
         display: flex;
