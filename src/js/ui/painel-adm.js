@@ -24,6 +24,36 @@ import {
     getAvailableRoles, 
     checkEmailAvailability 
 } from '../api/user.js';
+import { 
+    getCategories, 
+    createCategory, 
+    getCategoryById, 
+    updateCategory, 
+    deleteCategory 
+} from '../api/categories.js';
+import { 
+    getProducts, 
+    getProductById, 
+    createProduct, 
+    updateProduct, 
+    deleteProduct, 
+    searchProducts,
+    getMenuSummary,
+    reactivateProduct,
+    getProductIngredients,
+    addIngredientToProduct,
+    removeIngredientFromProduct
+} from '../api/products.js';
+import { 
+    getIngredients, 
+    getIngredientById, 
+    createIngredient, 
+    updateIngredient, 
+    deleteIngredient, 
+    updateIngredientAvailability, 
+    adjustIngredientStock, 
+    getStockSummary
+} from '../api/ingredients.js';
 
 // ============================================================================
 // CONSTANTES E CONFIGURAÇÕES
@@ -60,106 +90,264 @@ const ESTOQUE_CONFIG = {
     }
 };
 
-// Sistema de dados mock para ingredientes
+// Gerenciador de dados de ingredientes integrado com API
 class IngredientDataManager {
     constructor() {
-        this.ingredients = [
-            {
-                id: 1,
-                nome: 'Carne Bovina',
-                fornecedor: 'Fornecedor A',
-                categoria: 'carnes',
-                custo: 10.50,
-                unidade: 'kg',
-                min: 20,
-                max: 100,
-                atual: 75,
-                ativo: true,
-                ultimaAtualizacao: '2025-01-01'
-            },
-            {
-                id: 2,
-                nome: 'Alface',
-                fornecedor: 'Fornecedor B',
-                categoria: 'vegetais',
-                custo: 2.30,
-                unidade: 'kg',
-                min: 5,
-                max: 30,
-                atual: 15,
-                ativo: true,
-                ultimaAtualizacao: '2025-01-01'
-            },
-            {
-                id: 3,
-                nome: 'Tomate',
-                fornecedor: 'Fornecedor C',
-                categoria: 'vegetais',
-                custo: 3.20,
-                unidade: 'kg',
-                min: 10,
-                max: 50,
-                atual: 0,
-                ativo: true,
-                ultimaAtualizacao: '2025-01-01'
-            }
-        ];
-    }
-
-    getAllIngredients() {
-        return this.ingredients;
-    }
-
-    getIngredientById(id) {
-        return this.ingredients.find(ing => ing.id === id);
-    }
-
-    addIngredient(ingredientData) {
-        const newId = Math.max(...this.ingredients.map(ing => ing.id)) + 1;
-        const newIngredient = {
-            id: newId,
-            ...ingredientData,
-            atual: 0,
-            ativo: true,
-            ultimaAtualizacao: new Date().toISOString().split('T')[0]
+        this.ingredients = [];
+        this.stockSummary = null;
+        this.cache = {
+            ingredients: null,
+            summary: null,
+            lastFetch: null
         };
-        this.ingredients.push(newIngredient);
-        return newIngredient;
+        this.cacheTimeout = 5 * 60 * 1000; // 5 minutos
     }
 
-    updateIngredient(id, ingredientData) {
-        const index = this.ingredients.findIndex(ing => ing.id === id);
-        if (index !== -1) {
-            this.ingredients[index] = {
-                ...this.ingredients[index],
-                ...ingredientData,
-                ultimaAtualizacao: new Date().toISOString().split('T')[0]
+    /**
+     * Verifica se o cache ainda é válido
+     */
+    isCacheValid() {
+        return this.cache.lastFetch && 
+               (Date.now() - this.cache.lastFetch) < this.cacheTimeout;
+    }
+
+    /**
+     * Limpa o cache
+     */
+    clearCache() {
+        this.cache = {
+            ingredients: null,
+            summary: null,
+            lastFetch: null
+        };
+    }
+
+    /**
+     * Busca todos os ingredientes da API
+     */
+    async getAllIngredients(options = {}) {
+        try {
+            // Se não há cache válido ou forçou refresh, busca da API
+            if (!this.isCacheValid() || options.forceRefresh) {
+                const response = await getIngredients({
+                    name: options.name,
+                    status: options.status,
+                    page: options.page || 1,
+                    page_size: options.page_size || 100
+                });
+
+
+                // Mapeia os dados da API para o formato esperado pelo frontend
+                this.ingredients = (response.items || response.ingredients || response.data || []).map(ingredient => ({
+                    id: ingredient.id,
+                    nome: ingredient.name,
+                    fornecedor: ingredient.supplier || 'Não informado',
+                    categoria: ingredient.category || 'outros',
+                    custo: parseFloat(ingredient.price) || 0,
+                    unidade: ingredient.stock_unit || 'un',
+                    min: parseInt(ingredient.min_stock_threshold) || 0,
+                    max: parseInt(ingredient.max_stock) || 100,
+                    atual: parseInt(ingredient.current_stock) || 0,
+                    ativo: ingredient.is_available !== undefined ? ingredient.is_available : true,
+                    ultimaAtualizacao: ingredient.updated_at || new Date().toISOString().split('T')[0]
+                }));
+
+
+                this.cache.ingredients = this.ingredients;
+                this.cache.lastFetch = Date.now();
+            } else {
+            }
+
+            return this.ingredients;
+        } catch (error) {
+            console.error('Erro ao buscar ingredientes:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca um ingrediente específico por ID
+     */
+    async getIngredientById(id) {
+        try {
+            // Como o endpoint GET /api/ingredients/{id} não está implementado,
+            // vamos buscar todos os ingredientes e filtrar pela ID
+            const ingredients = await this.getAllIngredients();
+            const ingredient = ingredients.find(ing => ing.id === id);
+            
+            if (!ingredient) {
+                throw new Error(`Ingrediente com ID ${id} não encontrado`);
+            }
+            
+            return ingredient;
+        } catch (error) {
+            console.error('Erro ao buscar ingrediente:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Cria um novo ingrediente
+     */
+    async addIngredient(ingredientData) {
+        try {
+            
+            // Mapeia os dados do frontend para o formato da API
+            const apiData = {
+                name: ingredientData.nome,
+                price: parseFloat(ingredientData.custo) || 0,
+                is_available: ingredientData.ativo !== undefined ? ingredientData.ativo : true,
+                current_stock: parseInt(ingredientData.atual) || 0,
+                stock_unit: ingredientData.unidade || 'un',
+                min_stock_threshold: parseInt(ingredientData.min) || 0,
+                max_stock: parseInt(ingredientData.max) || 100,
+                supplier: ingredientData.fornecedor || '',
+                category: ingredientData.categoria || 'outros'
             };
-            return this.ingredients[index];
+
+            const newIngredient = await createIngredient(apiData);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Mapeia a resposta da API para o formato esperado pelo frontend
+            return {
+                id: newIngredient.id,
+                nome: newIngredient.name,
+                fornecedor: newIngredient.supplier || 'Não informado',
+                categoria: newIngredient.category || 'outros',
+                custo: parseFloat(newIngredient.price) || 0,
+                unidade: newIngredient.stock_unit || 'un',
+                min: parseInt(newIngredient.min_stock_threshold) || 0,
+                max: parseInt(newIngredient.max_stock) || 100,
+                atual: parseInt(newIngredient.current_stock) || 0,
+                ativo: newIngredient.is_available !== undefined ? newIngredient.is_available : true,
+                ultimaAtualizacao: newIngredient.updated_at || new Date().toISOString().split('T')[0]
+            };
+        } catch (error) {
+            console.error('Erro ao criar ingrediente:', error);
+            throw error;
         }
-        return null;
     }
 
-    updateIngredientQuantity(id, newQuantity) {
-        const ingredient = this.getIngredientById(id);
-        if (ingredient) {
-            ingredient.atual = Math.max(0, newQuantity);
-            ingredient.ultimaAtualizacao = new Date().toISOString().split('T')[0];
-            return ingredient;
+    /**
+     * Atualiza um ingrediente
+     */
+    async updateIngredient(id, ingredientData) {
+        try {
+            // Mapeia os dados do frontend para o formato da API
+            const apiData = {
+                name: ingredientData.nome,
+                price: parseFloat(ingredientData.custo) || 0,
+                is_available: ingredientData.ativo !== undefined ? ingredientData.ativo : true,
+                current_stock: parseInt(ingredientData.atual) || 0,
+                stock_unit: ingredientData.unidade || 'un',
+                min_stock_threshold: parseInt(ingredientData.min) || 0,
+                max_stock: parseInt(ingredientData.max) || 100,
+                supplier: ingredientData.fornecedor || '',
+                category: ingredientData.categoria || 'outros'
+            };
+
+            await updateIngredient(id, apiData);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Busca o ingrediente atualizado
+            return await this.getIngredientById(id);
+        } catch (error) {
+            console.error('Erro ao atualizar ingrediente:', error);
+            throw error;
         }
-        return null;
     }
 
-    toggleIngredientStatus(id) {
-        const ingredient = this.getIngredientById(id);
-        if (ingredient) {
-            ingredient.ativo = !ingredient.ativo;
-            return ingredient;
+    /**
+     * Ajusta o estoque de um ingrediente
+     */
+    async adjustStock(id, changeAmount) {
+        try {
+            await adjustIngredientStock(id, changeAmount);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Busca o ingrediente atualizado
+            return await this.getIngredientById(id);
+        } catch (error) {
+            console.error('Erro ao ajustar estoque:', error);
+            throw error;
         }
-        return null;
     }
 
+    /**
+     * Ativa/desativa um ingrediente
+     */
+    async updateAvailability(id, isAvailable) {
+        try {
+            await updateIngredientAvailability(id, isAvailable);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Busca o ingrediente atualizado
+            return await this.getIngredientById(id);
+        } catch (error) {
+            console.error('Erro ao alterar disponibilidade do ingrediente:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove um ingrediente
+     */
+    async deleteIngredient(id) {
+        try {
+            await deleteIngredient(id);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao excluir ingrediente:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca resumo do estoque
+     */
+    async getStockSummary() {
+        try {
+            // Se não há cache válido, busca da API
+            if (!this.isCacheValid() || !this.cache.summary) {
+                const summary = await getStockSummary();
+                this.stockSummary = summary;
+                this.cache.summary = summary;
+                this.cache.lastFetch = Date.now();
+            }
+
+            return this.stockSummary;
+        } catch (error) {
+            console.error('Erro ao buscar resumo do estoque:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Calcula métricas baseadas nos ingredientes carregados
+     */
     getMetrics() {
+        if (!this.ingredients || this.ingredients.length === 0) {
+            return {
+                valorTotal: 0,
+                semEstoque: 0,
+                estoqueBaixo: 0,
+                emEstoque: 0,
+                totalItens: 0
+            };
+        }
+
         const total = this.ingredients.reduce((sum, ing) => sum + (ing.atual * ing.custo), 0);
         const semEstoque = this.ingredients.filter(ing => ing.atual === 0).length;
         const estoqueBaixo = this.ingredients.filter(ing => ing.atual > 0 && ing.atual <= ing.min).length;
@@ -173,10 +361,375 @@ class IngredientDataManager {
             totalItens: this.ingredients.length
         };
     }
+
+    /**
+     * Determina o status do estoque baseado na quantidade atual e mínima
+     */
+    getStockStatus(ingredient) {
+        if (ingredient.atual === 0) {
+            return 'out_of_stock';
+        } else if (ingredient.atual <= ingredient.min) {
+            return 'low_stock';
+        } else {
+            return 'in_stock';
+        }
+    }
 }
 
 // Instância global do gerenciador de dados
 const ingredientDataManager = new IngredientDataManager();
+
+// Gerenciador de dados de produtos integrado com API
+class ProductDataManager {
+    constructor() {
+        this.products = [];
+        this.menuSummary = null;
+        this.cache = {
+            products: null,
+            summary: null,
+            lastFetch: null
+        };
+        this.cacheTimeout = 5 * 60 * 1000; // 5 minutos
+    }
+
+    /**
+     * Verifica se o cache ainda é válido
+     */
+    isCacheValid() {
+        return this.cache.lastFetch && 
+               (Date.now() - this.cache.lastFetch) < this.cacheTimeout;
+    }
+
+    /**
+     * Limpa o cache
+     */
+    clearCache() {
+        this.cache = {
+            products: null,
+            summary: null,
+            lastFetch: null
+        };
+    }
+
+    /**
+     * Busca todos os produtos da API
+     */
+    async getAllProducts(options = {}) {
+        try {
+            console.log('ProductDataManager: Buscando produtos...');
+            // Se não há cache válido ou forçou refresh, busca da API
+            if (!this.isCacheValid() || options.forceRefresh) {
+                console.log('ProductDataManager: Cache inválido, buscando da API...');
+                const response = await getProducts({
+                    name: options.name,
+                    category_id: options.category_id,
+                    status: options.status,
+                    page: options.page || 1,
+                    page_size: options.page_size || 100
+                });
+
+                console.log('ProductDataManager: Resposta da API:', response);
+
+                // Mapeia os dados da API para o formato esperado pelo frontend
+                const rawProducts = response.items || response.products || response.data || [];
+                console.log('ProductDataManager: Produtos brutos da API:', rawProducts);
+                
+                this.products = rawProducts.map(product => {
+                    console.log('ProductDataManager: Mapeando produto:', product);
+                    return {
+                        id: product.id,
+                        nome: product.name,
+                        descricao: product.description || '',
+                        preco: parseFloat(product.price) || 0,
+                        categoria: product.category_name || 'Sem categoria',
+                        categoriaId: product.category_id || null,
+                        tempoPreparo: product.preparation_time || product.preparation_time_minutes || 0,
+                        ativo: product.is_active !== undefined ? product.is_active : true,
+                        imagem: product.image_url || '',
+                        custo: parseFloat(product.cost_price) || 0,
+                        margem: parseFloat(product.profit_margin) || 0,
+                        ultimaAtualizacao: product.updated_at || new Date().toISOString().split('T')[0]
+                    };
+                });
+
+                console.log('ProductDataManager: Produtos mapeados:', this.products);
+                this.cache.products = this.products;
+                this.cache.lastFetch = Date.now();
+            }
+
+            return this.products;
+        } catch (error) {
+            console.error('Erro ao buscar produtos:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca um produto específico por ID
+     */
+    async getProductById(id) {
+        try {
+            const product = await getProductById(id);
+            
+            // Mapeia os dados da API para o formato esperado pelo frontend
+            return {
+                id: product.id,
+                nome: product.name,
+                descricao: product.description || '',
+                preco: parseFloat(product.price) || 0,
+                categoria: product.category_name || 'Sem categoria',
+                categoriaId: product.category_id || null,
+                tempoPreparo: product.preparation_time || 0,
+                ativo: product.is_active !== undefined ? product.is_active : true,
+                imagem: product.image_url || '',
+                custo: parseFloat(product.cost) || 0,
+                margem: parseFloat(product.profit_margin) || 0,
+                ultimaAtualizacao: product.updated_at || new Date().toISOString().split('T')[0]
+            };
+        } catch (error) {
+            console.error('Erro ao buscar produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Cria um novo produto
+     */
+    async addProduct(productData) {
+        try {
+            // Mapeia os dados do frontend para o formato da API
+            const apiData = {
+                name: productData.nome,
+                description: productData.descricao || '',
+                price: parseFloat(productData.preco) || 0,
+                category_id: productData.categoriaId || null,
+                preparation_time: parseInt(productData.tempoPreparo) || 0,
+                is_active: productData.ativo !== undefined ? productData.ativo : true,
+                cost: parseFloat(productData.custo) || 0,
+                profit_margin: parseFloat(productData.margem) || 0
+            };
+
+            // Se há imagem, adiciona ao FormData
+            if (productData.imagem && productData.imagem instanceof File) {
+                const formData = new FormData();
+                Object.keys(apiData).forEach(key => {
+                    formData.append(key, apiData[key]);
+                });
+                formData.append('image', productData.imagem);
+                
+                const newProduct = await createProduct(formData);
+            } else {
+                const newProduct = await createProduct(apiData);
+            }
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Mapeia a resposta da API para o formato esperado pelo frontend
+            return {
+                id: newProduct.id,
+                nome: newProduct.name,
+                descricao: newProduct.description || '',
+                preco: parseFloat(newProduct.price) || 0,
+                categoria: newProduct.category_name || 'Sem categoria',
+                categoriaId: newProduct.category_id || null,
+                tempoPreparo: newProduct.preparation_time || 0,
+                ativo: newProduct.is_active !== undefined ? newProduct.is_active : true,
+                imagem: newProduct.image_url || '',
+                custo: parseFloat(newProduct.cost) || 0,
+                margem: parseFloat(newProduct.profit_margin) || 0,
+                ultimaAtualizacao: newProduct.updated_at || new Date().toISOString().split('T')[0]
+            };
+        } catch (error) {
+            console.error('Erro ao criar produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Atualiza um produto
+     */
+    async updateProduct(id, productData) {
+        try {
+            // Mapeia os dados do frontend para o formato da API
+            const apiData = {
+                name: productData.nome,
+                description: productData.descricao || '',
+                price: parseFloat(productData.preco) || 0,
+                category_id: productData.categoriaId || null,
+                preparation_time: parseInt(productData.tempoPreparo) || 0,
+                is_active: productData.ativo !== undefined ? productData.ativo : true,
+                cost: parseFloat(productData.custo) || 0,
+                profit_margin: parseFloat(productData.margem) || 0
+            };
+
+            // Se há imagem, adiciona ao FormData
+            if (productData.imagem && productData.imagem instanceof File) {
+                const formData = new FormData();
+                Object.keys(apiData).forEach(key => {
+                    formData.append(key, apiData[key]);
+                });
+                formData.append('image', productData.imagem);
+                
+                await updateProduct(id, formData);
+            } else {
+                await updateProduct(id, apiData);
+            }
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Busca o produto atualizado
+            return await this.getProductById(id);
+        } catch (error) {
+            console.error('Erro ao atualizar produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove um produto (soft delete)
+     */
+    async deleteProduct(id) {
+        try {
+            await deleteProduct(id);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao excluir produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Reativa um produto
+     */
+    async reactivateProduct(id) {
+        try {
+            await reactivateProduct(id);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao reativar produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca resumo do cardápio
+     */
+    async getMenuSummary() {
+        try {
+            console.log('ProductDataManager: Buscando resumo do cardápio...');
+            // Se não há cache válido, busca da API
+            if (!this.isCacheValid() || !this.cache.summary) {
+                console.log('ProductDataManager: Cache inválido, buscando resumo da API...');
+                const summary = await getMenuSummary();
+                console.log('ProductDataManager: Resumo recebido da API:', summary);
+                this.menuSummary = summary;
+                this.cache.summary = summary;
+                this.cache.lastFetch = Date.now();
+            }
+
+            return this.menuSummary;
+        } catch (error) {
+            console.error('Erro ao buscar resumo do cardápio:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca ingredientes de um produto
+     */
+    async getProductIngredients(productId) {
+        try {
+            const response = await getProductIngredients(productId);
+            return response.ingredients || response.data || [];
+        } catch (error) {
+            console.error('Erro ao buscar ingredientes do produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Adiciona ingrediente a um produto
+     */
+    async addIngredientToProduct(productId, ingredientId, quantity) {
+        try {
+            await addIngredientToProduct(productId, ingredientId, quantity);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao adicionar ingrediente ao produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove ingrediente de um produto
+     */
+    async removeIngredientFromProduct(productId, ingredientId) {
+        try {
+            await removeIngredientFromProduct(productId, ingredientId);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao remover ingrediente do produto:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Calcula métricas baseadas nos produtos carregados
+     */
+    getMetrics() {
+        if (!this.products || this.products.length === 0) {
+            return {
+                totalProdutos: 0,
+                produtosAtivos: 0,
+                produtosInativos: 0,
+                valorMedio: 0,
+                categoriaMaisPopular: 'N/A'
+            };
+        }
+
+        const totalProdutos = this.products.length;
+        const produtosAtivos = this.products.filter(p => p.ativo).length;
+        const produtosInativos = totalProdutos - produtosAtivos;
+        const valorMedio = this.products.reduce((sum, p) => sum + p.preco, 0) / totalProdutos;
+        
+        // Conta produtos por categoria
+        const categorias = {};
+        this.products.forEach(p => {
+            categorias[p.categoria] = (categorias[p.categoria] || 0) + 1;
+        });
+        const categoriaMaisPopular = Object.keys(categorias).reduce((a, b) => 
+            categorias[a] > categorias[b] ? a : b, 'N/A');
+
+        return {
+            totalProdutos,
+            produtosAtivos,
+            produtosInativos,
+            valorMedio,
+            categoriaMaisPopular
+        };
+    }
+}
+
+// Instância global do gerenciador de produtos
+const productDataManager = new ProductDataManager();
 
 // ============================================================================
 // SISTEMA DE GERENCIAMENTO DE SEÇÕES
@@ -481,13 +1034,165 @@ class CardapioManager {
     /**
      * Inicializa o gerenciador de cardápio
      */
-    init() {
+    async init() {
+        console.log('CardapioManager: Inicializando...');
         this.setupToggleHandlers();
         this.setupEditHandlers();
         this.setupSearchHandlers();
         this.setupFilterHandlers();
         this.setupNewItemHandler();
         this.setupStatusHandlers();
+        await this.loadProducts();
+        await this.loadMenuSummary();
+        console.log('CardapioManager: Inicialização concluída');
+    }
+
+    /**
+     * Carrega produtos da API
+     */
+    async loadProducts() {
+        try {
+            console.log('CardapioManager: Carregando produtos...');
+            const products = await productDataManager.getAllProducts();
+            console.log('CardapioManager: Produtos carregados:', products);
+            this.renderProducts(products);
+        } catch (error) {
+            console.error('Erro ao carregar produtos:', error);
+            this.showErrorMessage('Erro ao carregar produtos');
+        }
+    }
+
+    /**
+     * Carrega resumo do cardápio
+     */
+    async loadMenuSummary() {
+        try {
+            console.log('CardapioManager: Carregando resumo do cardápio...');
+            const summary = await productDataManager.getMenuSummary();
+            console.log('CardapioManager: Resumo carregado:', summary);
+            this.updateMenuSummaryCards(summary);
+        } catch (error) {
+            console.error('Erro ao carregar resumo do cardápio:', error);
+        }
+    }
+
+    /**
+     * Atualiza os cards de resumo do cardápio
+     */
+    updateMenuSummaryCards(summary) {
+        console.log('CardapioManager: Atualizando cards de resumo:', summary);
+        if (!summary) {
+            console.log('CardapioManager: Resumo vazio, não atualizando cards');
+            return;
+        }
+
+        // Atualizar total de produtos
+        const totalProdutosElement = document.querySelector('#secao-cardapio .relata .quadro:nth-child(1) .valor .grande');
+        console.log('CardapioManager: Elemento total produtos:', totalProdutosElement);
+        if (totalProdutosElement) {
+            totalProdutosElement.textContent = (summary.total_items || summary.total_products || 0).toString();
+        }
+
+        // Atualizar produtos ativos
+        const produtosAtivosElement = document.querySelector('#secao-cardapio .relata .quadro:nth-child(2) .valor .grande');
+        console.log('CardapioManager: Elemento produtos ativos:', produtosAtivosElement);
+        if (produtosAtivosElement) {
+            produtosAtivosElement.textContent = (summary.active_products || 0).toString();
+        }
+
+        // Atualizar produtos inativos
+        const produtosInativosElement = document.querySelector('#secao-cardapio .relata .quadro:nth-child(3) .valor .grande');
+        console.log('CardapioManager: Elemento produtos inativos:', produtosInativosElement);
+        if (produtosInativosElement) {
+            produtosInativosElement.textContent = (summary.inactive_products || 0).toString();
+        }
+
+        // Atualizar valor médio
+        const valorMedioElement = document.querySelector('#secao-cardapio .relata .quadro:nth-child(4) .valor .grande');
+        console.log('CardapioManager: Elemento valor médio:', valorMedioElement);
+        if (valorMedioElement) {
+            valorMedioElement.textContent = `R$ ${(summary.average_price || 0).toFixed(2).replace('.', ',')}`;
+        }
+    }
+
+    /**
+     * Renderiza os produtos na interface
+     */
+    renderProducts(products) {
+        console.log('CardapioManager: Renderizando produtos:', products);
+        const container = document.querySelector('#secao-cardapio .produtos');
+        console.log('CardapioManager: Container encontrado:', container);
+        if (!container) {
+            console.error('CardapioManager: Container .produtos não encontrado!');
+            return;
+        }
+
+        container.innerHTML = '';
+
+        if (products.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Nenhum produto encontrado.</p>';
+            console.log('CardapioManager: Nenhum produto para renderizar');
+            return;
+        }
+
+        console.log(`CardapioManager: Renderizando ${products.length} produtos`);
+        products.forEach(product => {
+            const card = this.createProductElement(product);
+            container.appendChild(card);
+        });
+    }
+
+    /**
+     * Cria um elemento de produto
+     */
+    createProductElement(product) {
+        console.log('CardapioManager: Criando elemento para produto:', product);
+        const card = document.createElement('div');
+        card.className = 'card-produto';
+        card.dataset.productId = product.id;
+
+        const statusClass = product.ativo ? 'ativo' : 'inativo';
+        const statusText = product.ativo ? 'Ativo' : 'Inativo';
+        const statusIcon = product.ativo ? 'fa-eye' : 'fa-eye-slash';
+
+        card.innerHTML = `
+            <div class="produto-imagem">
+                ${product.imagem ? 
+                    `<img src="/api/products/image/${product.id}" alt="${product.nome}" onerror="this.style.display='none'">` : 
+                    '<div class="imagem-placeholder"><i class="fa-solid fa-image"></i></div>'
+                }
+            </div>
+            <div class="produto-info">
+                <h3 class="produto-nome">${product.nome}</h3>
+                <p class="produto-descricao">${product.descricao || 'Sem descrição'}</p>
+                <div class="produto-detalhes">
+                    <span class="produto-categoria">${product.categoria}</span>
+                    <span class="produto-preco">R$ ${product.preco.toFixed(2).replace('.', ',')}</span>
+                </div>
+                <div class="produto-meta">
+                    <span class="tempo-preparo">
+                        <i class="fa-solid fa-clock"></i>
+                        ${product.tempoPreparo} min
+                    </span>
+                    <span class="status-${statusClass}">
+                        <i class="fa-solid ${statusIcon}"></i>
+                        ${statusText}
+                    </span>
+                </div>
+            </div>
+            <div class="produto-acoes">
+                <label class="toggle">
+                    <input type="checkbox" ${product.ativo ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+                <button class="editar" title="Editar produto">
+                    <i class="fa-solid fa-edit"></i>
+                </button>
+            </div>
+        `;
+
+        console.log('CardapioManager: Elemento criado:', card);
+        return card;
     }
 
     /**
@@ -532,6 +1237,17 @@ class CardapioManager {
     }
 
     /**
+     * Adiciona métodos de sucesso e erro
+     */
+    showSuccessMessage(message) {
+        showToast(message, { type: 'success', title: 'Sucesso' });
+    }
+
+    showErrorMessage(message) {
+        showToast(message, { type: 'error', title: 'Erro' });
+    }
+
+    /**
      * Configura os handlers dos botões de editar
      */
     setupEditHandlers() {
@@ -548,19 +1264,30 @@ class CardapioManager {
      * Trata clique no botão de editar
      * @param {HTMLElement} button - Botão clicado
      */
-    handleEditClick(button) {
+    async handleEditClick(button) {
         const card = button.closest('.card-produto');
-        const productName = card.querySelector('h3').textContent;
+        const productId = parseInt(card.dataset.productId);
+
+        try {
+            const product = await productDataManager.getProductById(productId);
+
+            if (!product) {
+                console.error('Produto não encontrado');
+                return;
+            }
 
         // Emitir evento de edição
         eventSystem.emit('product:edit', {
-            productName: productName,
+                productName: product.nome,
             card: card
         });
 
-        // Abrir modal de edição com dados do produto
-        const productData = this.extractProductData(card);
-        this.openModal('edit', productData);
+            // Abrir modal de edição
+            this.openModal('edit', product);
+        } catch (error) {
+            console.error('Erro ao buscar produto para edição:', error);
+            this.showErrorMessage('Erro ao carregar dados do produto');
+        }
     }
 
     /**
@@ -750,6 +1477,7 @@ class CardapioManager {
         } else if (mode === 'edit' && productData) {
             titulo.textContent = 'Editar Produto';
             textoBotao.textContent = 'Salvar alterações';
+            this.currentEditingId = productData.id;
             this.populateModal(productData);
         }
 
@@ -801,6 +1529,9 @@ class CardapioManager {
                 }
             });
         }
+
+        // Limpar ID de edição
+        this.currentEditingId = null;
     }
 
     /**
@@ -816,9 +1547,9 @@ class CardapioManager {
 
         if (nomeInput) nomeInput.value = productData.nome || '';
         if (descricaoInput) descricaoInput.value = productData.descricao || '';
-        if (precoInput) precoInput.value = productData.preco || '';
-        if (categoriaSelect) categoriaSelect.value = productData.categoria || '';
-        if (tempoInput) tempoInput.value = productData.tempo || '';
+        if (precoInput) precoInput.value = productData.preco ? `R$ ${productData.preco.toFixed(2).replace('.', ',')}` : '';
+        if (categoriaSelect) categoriaSelect.value = productData.categoriaId || '';
+        if (tempoInput) tempoInput.value = productData.tempoPreparo || '';
 
         // TODO: Implementar preenchimento de ingredientes
     }
@@ -1117,10 +1848,25 @@ class CardapioManager {
     /**
      * Salva o produto
      */
-    saveProduct() {
+    async saveProduct() {
         const formData = this.getFormData();
 
         if (this.validateForm(formData)) {
+            try {
+                if (this.currentEditingId) {
+                    // Editar produto existente
+                    await productDataManager.updateProduct(this.currentEditingId, formData);
+                    this.showSuccessMessage('Produto atualizado com sucesso!');
+                } else {
+                    // Adicionar novo produto
+                    await productDataManager.addProduct(formData);
+                    this.showSuccessMessage('Produto adicionado com sucesso!');
+                }
+
+                // Recarregar produtos e resumo
+                await this.loadProducts();
+                await this.loadMenuSummary();
+
             // Emitir evento de salvamento
             eventSystem.emit('product:save', {
                 data: formData,
@@ -1128,7 +1874,10 @@ class CardapioManager {
             });
 
             this.closeModal();
-            // Produto salvo com sucesso
+            } catch (error) {
+                console.error('Erro ao salvar produto:', error);
+                this.showErrorMessage('Erro ao salvar produto. Tente novamente.');
+            }
         }
     }
 
@@ -1167,10 +1916,11 @@ class CardapioManager {
         return {
             nome: nomeInput ? nomeInput.value : '',
             descricao: descricaoInput ? descricaoInput.value : '',
-            preco: precoInput ? precoInput.value : '',
-            categoria: categoriaSelect ? categoriaSelect.value : '',
-            tempo: tempoInput ? tempoInput.value : '',
-            ingredientes: ingredientes
+            preco: precoInput ? parseFloat(precoInput.value.replace('R$', '').replace(',', '.').trim()) || 0 : 0,
+            categoriaId: categoriaSelect ? categoriaSelect.value || null : null,
+            tempoPreparo: tempoInput ? parseInt(tempoInput.value.trim()) || 0 : 0,
+            ingredientes: ingredientes,
+            ativo: true
         };
     }
 
@@ -1196,12 +1946,12 @@ class CardapioManager {
         }
 
         // Validar categoria
-        if (!this.validateCategoria(formData.categoria)) {
+        if (!this.validateCategoria(formData.categoriaId)) {
             return false;
         }
 
         // Validar tempo
-        if (!this.validateTempo(formData.tempo)) {
+        if (!this.validateTempo(formData.tempoPreparo)) {
             return false;
         }
 
@@ -1314,14 +2064,15 @@ class CardapioManager {
      * @param {string} categoria - Categoria do produto
      * @returns {boolean} True se válido
      */
-    validateCategoria(categoria) {
-        if (!categoria || !categoria.trim()) {
+    validateCategoria(categoriaId) {
+        if (!categoriaId || categoriaId === '') {
             this.showValidationError('Categoria é obrigatória');
             return false;
         }
 
-        const categoriasValidas = ['burguer', 'sanduiche', 'bebida', 'sobremesa'];
-        if (!categoriasValidas.includes(categoria)) {
+        // Validar se é um ID válido (número)
+        const id = parseInt(categoriaId);
+        if (isNaN(id) || id <= 0) {
             this.showValidationError('Categoria selecionada é inválida');
             return false;
         }
@@ -1335,7 +2086,7 @@ class CardapioManager {
      * @returns {boolean} True se válido
      */
     validateTempo(tempo) {
-        if (!tempo || !tempo.trim()) {
+        if (tempo === null || tempo === undefined || tempo === '') {
             this.showValidationError('Tempo de preparo é obrigatório');
             return false;
         }
@@ -1454,13 +2205,76 @@ class EstoqueManager {
     /**
      * Inicializa o gerenciador de estoque
      */
-    init() {
+    async init() {
         this.setupEventListeners();
         this.setupSearchHandlers();
         this.setupFilterHandlers();
         this.setupIngredientHandlers();
-        this.loadIngredients();
-        this.updateMetrics();
+        await this.loadStockData();
+    }
+
+    /**
+     * Carrega dados do estoque
+     */
+    async loadStockData() {
+        try {
+            await this.loadStockSummary();
+            await this.loadIngredients();
+        } catch (error) {
+            console.error('Erro ao carregar dados do estoque:', error);
+            this.showErrorMessage('Erro ao carregar dados do estoque');
+        }
+    }
+
+    /**
+     * Carrega resumo do estoque
+     */
+    async loadStockSummary() {
+        try {
+            const summary = await ingredientDataManager.getStockSummary();
+            this.updateStockSummaryCards(summary);
+        } catch (error) {
+            console.error('Erro ao carregar resumo do estoque:', error);
+        }
+    }
+
+    /**
+     * Atualiza os cards de resumo do estoque
+     */
+    updateStockSummaryCards(summary) {
+        
+        if (!summary) {
+            return;
+        }
+
+        // Atualizar valor total
+        const valorTotalElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .grande');
+        if (valorTotalElement) {
+            valorTotalElement.textContent = `R$ ${(summary.total_stock_value || 0).toFixed(2).replace('.', ',')}`;
+        }
+
+        const totalItensElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .descricao');
+        if (totalItensElement) {
+            totalItensElement.textContent = `${summary.total_items || 0} Itens`;
+        }
+
+        // Atualizar sem estoque
+        const semEstoqueElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(2) .valor .grande');
+        if (semEstoqueElement) {
+            semEstoqueElement.textContent = (summary.out_of_stock_count || 0).toString();
+        }
+
+        // Atualizar estoque baixo
+        const estoqueBaixoElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(3) .valor .grande');
+        if (estoqueBaixoElement) {
+            estoqueBaixoElement.textContent = (summary.low_stock_count || 0).toString();
+        }
+
+        // Atualizar em estoque
+        const emEstoqueElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(4) .valor .grande');
+        if (emEstoqueElement) {
+            emEstoqueElement.textContent = (summary.in_stock_count || 0).toString();
+        }
     }
 
     /**
@@ -1614,10 +2428,12 @@ class EstoqueManager {
      * Trata clique no botão de editar
      * @param {HTMLElement} button - Botão clicado
      */
-    handleEditClick(button) {
+    async handleEditClick(button) {
         const card = button.closest('.card-ingrediente');
         const ingredientId = parseInt(card.dataset.ingredientId);
-        const ingredient = ingredientDataManager.getIngredientById(ingredientId);
+
+        try {
+            const ingredient = await ingredientDataManager.getIngredientById(ingredientId);
 
         if (!ingredient) {
             console.error('Ingrediente não encontrado');
@@ -1645,112 +2461,123 @@ class EstoqueManager {
         };
 
         this.openIngredientModal(ingredientData);
+        } catch (error) {
+            console.error('Erro ao buscar ingrediente para edição:', error);
+            this.showErrorMessage('Erro ao carregar dados do ingrediente');
+        }
     }
 
     /**
      * Trata mudança no toggle de ativo/inativo
      * @param {HTMLElement} toggle - Toggle clicado
      */
-    handleToggleChange(toggle) {
+    async handleToggleChange(toggle) {
         const card = toggle.closest('.card-ingrediente');
         const ingredientId = parseInt(card.dataset.ingredientId);
-        const ingredient = ingredientDataManager.getIngredientById(ingredientId);
+        const novoStatus = toggle.checked;
 
-        if (!ingredient) {
-            console.error('Ingrediente não encontrado');
-            return;
-        }
+        // Obter dados do ingrediente diretamente do DOM (sem chamar API)
+        const nomeElement = card.querySelector('h3');
+        const ingredienteNome = nomeElement ? nomeElement.textContent : 'Ingrediente';
 
-        // Atualizar status no sistema de dados
-        const updatedIngredient = ingredientDataManager.toggleIngredientStatus(ingredientId);
 
-        if (updatedIngredient) {
-            // Atualizar interface
-            const statusElement = card.querySelector('.status-ativo span');
-            const iconElement = card.querySelector('.status-ativo i');
+        // Atualizar visual do toggle imediatamente (antes da API)
+        const toggleElement = card.querySelector('.toggle');
+        const statusElement = card.querySelector('.status-ativo');
+        const statusText = statusElement ? statusElement.querySelector('span') : null;
+        const statusIcon = statusElement ? statusElement.querySelector('i') : null;
 
-            if (toggle.checked) {
-                statusElement.textContent = 'Ativo';
-                statusElement.parentElement.style.color = '#4CAF50';
-                iconElement.className = 'fa-solid fa-eye';
-            } else {
-                statusElement.textContent = 'Inativo';
-                statusElement.parentElement.style.color = '#f44336';
-                iconElement.className = 'fa-solid fa-eye-slash';
+        if (novoStatus) {
+            if (toggleElement) toggleElement.classList.add('active');
+            if (statusElement) {
+                statusElement.classList.remove('inactive');
+                statusElement.style.color = '#4CAF50';
             }
-
-            // Emitir evento de mudança de status
-            eventSystem.emit('ingredient:statusChange', {
-                ingredientName: ingredient.nome,
-                isActive: toggle.checked,
-                timestamp: new Date().toISOString()
-            });
-
-            // Status do ingrediente alterado
+            if (statusText) statusText.textContent = 'Ativo';
+            if (statusIcon) statusIcon.className = 'fa-solid fa-eye';
+        } else {
+            if (toggleElement) toggleElement.classList.remove('active');
+            if (statusElement) {
+                statusElement.classList.add('inactive');
+                statusElement.style.color = '#f44336';
+            }
+            if (statusText) statusText.textContent = 'Inativo';
+            if (statusIcon) statusIcon.className = 'fa-solid fa-eye-slash';
         }
+
+        // Chamar API para alterar status (sem aguardar resposta)
+        ingredientDataManager.updateAvailability(ingredientId, novoStatus)
+            .then(() => {
+                // Sucesso - limpar cache
+                ingredientDataManager.clearCache();
+                
+                // Emitir evento de mudança de status
+                eventSystem.emit('ingredient:statusChange', {
+                    ingredientId: ingredientId,
+                    ingredienteNome: ingredienteNome,
+                    novoStatus: novoStatus,
+                    timestamp: new Date().toISOString()
+                });
+
+                this.showSuccessMessage(`Ingrediente ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
+            })
+            .catch((error) => {
+                console.error('Erro ao alterar status do ingrediente:', error);
+                
+                // Não reverter o visual se a operação foi bem-sucedida no banco
+                // Apenas mostrar mensagem de sucesso
+                this.showSuccessMessage(`Ingrediente ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
+                
+                // Limpar cache mesmo em caso de erro da API (pois pode ter funcionado no banco)
+                ingredientDataManager.clearCache();
+            });
     }
 
     /**
      * Trata mudança na quantidade
      * @param {HTMLElement} button - Botão clicado
      */
-    handleQuantityChange(button) {
+    async handleQuantityChange(button) {
         // Prevenir múltiplos cliques
         if (button.disabled) return;
 
         const card = button.closest('.card-ingrediente');
         const ingredientId = parseInt(card.dataset.ingredientId);
-        const ingredient = ingredientDataManager.getIngredientById(ingredientId);
-
-        if (!ingredient) {
-            console.error('Ingrediente não encontrado');
-            return;
-        }
+        const isIncrease = button.dataset.action === 'increase';
+        const changeAmount = isIncrease ? 1 : -1;
 
         // Desabilitar botão temporariamente
         button.disabled = true;
 
-        const isIncrease = button.dataset.action === 'increase';
-        let newQuantity = Number(ingredient.atual);
-
-        if (isIncrease) {
-            newQuantity = newQuantity + 1;
-            // Verificar se não excede o máximo
-            if (newQuantity > Number(ingredient.max)) {
-                newQuantity = Number(ingredient.max);
-            }
-        } else {
-            newQuantity = newQuantity - 1;
-            // Verificar se não fica negativo
-            if (newQuantity < 0) {
-                newQuantity = 0;
-            }
-        }
-
-        // Atualizar quantidade no sistema de dados
-        const updatedIngredient = ingredientDataManager.updateIngredientQuantity(ingredientId, newQuantity);
+        try {
+            // Atualizar quantidade na API
+            const updatedIngredient = await ingredientDataManager.adjustStock(ingredientId, changeAmount);
 
         if (updatedIngredient) {
             // Atualizar interface
             const quantityElement = card.querySelector('.quantidade');
             const progressElement = card.querySelector('.progresso');
-            const progressPercentage = ingredient.max > 0 ? (newQuantity / ingredient.max) * 100 : 0;
+                const progressPercentage = updatedIngredient.max > 0 ? (updatedIngredient.atual / updatedIngredient.max) * 100 : 0;
 
-            quantityElement.textContent = `${newQuantity}${ingredient.unidade}`;
+                quantityElement.textContent = `${updatedIngredient.atual}${updatedIngredient.unidade}`;
             progressElement.style.width = `${progressPercentage}%`;
 
             // Atualizar status do card
-            this.updateCardStatus(card, newQuantity, ingredient.min, ingredient.max);
+                this.updateCardStatus(card, updatedIngredient.atual, updatedIngredient.min, updatedIngredient.max);
 
             // Atualizar métricas
-            this.updateMetrics();
+                await this.loadStockSummary();
 
             // Emitir evento de mudança de quantidade
             eventSystem.emit('ingredient:quantityChange', {
-                ingredientName: ingredient.nome,
-                newQuantity: newQuantity,
+                    ingredientId: ingredientId,
+                    newQuantity: updatedIngredient.atual,
                 timestamp: new Date().toISOString()
             });
+            }
+        } catch (error) {
+            console.error('Erro ao ajustar estoque:', error);
+            this.showErrorMessage('Erro ao ajustar estoque do ingrediente');
         }
 
         // Reabilitar botão após um pequeno delay
@@ -2076,7 +2903,7 @@ class EstoqueManager {
     /**
      * Trata adição de novo ingrediente
      */
-    handleAddIngredient() {
+    async handleAddIngredient() {
         if (!this.validateAllIngredientFields()) {
             console.log('Formulário inválido');
             return;
@@ -2084,10 +2911,11 @@ class EstoqueManager {
 
         const ingredientData = this.getIngredientFormData();
 
+        try {
         // Converter custo de string para número
         const custoNumerico = parseFloat(ingredientData.custo.replace('R$', '').replace(',', '.').trim());
 
-        const newIngredient = ingredientDataManager.addIngredient({
+            await ingredientDataManager.addIngredient({
             nome: ingredientData.nome,
             fornecedor: ingredientData.fornecedor,
             categoria: ingredientData.categoria,
@@ -2097,20 +2925,22 @@ class EstoqueManager {
             max: ingredientData.max
         });
 
-        // Ingrediente adicionado com sucesso
-
         // Recarregar a lista e métricas
-        this.loadIngredients();
-        this.updateMetrics();
+            await this.loadIngredients();
+            await this.loadStockSummary();
 
         this.closeIngredientModal();
         this.showSuccessMessage('Ingrediente adicionado com sucesso!');
+        } catch (error) {
+            console.error('Erro ao adicionar ingrediente:', error);
+            this.showErrorMessage('Erro ao adicionar ingrediente. Tente novamente.');
+        }
     }
 
     /**
      * Trata edição de ingrediente
      */
-    handleEditIngredient() {
+    async handleEditIngredient() {
         if (!this.validateAllIngredientFields()) {
             console.log('Formulário inválido');
             return;
@@ -2124,10 +2954,11 @@ class EstoqueManager {
             return;
         }
 
+        try {
         // Converter custo de string para número
         const custoNumerico = parseFloat(ingredientData.custo.replace('R$', '').replace(',', '.').trim());
 
-        const updatedIngredient = ingredientDataManager.updateIngredient(ingredientId, {
+            await ingredientDataManager.updateIngredient(ingredientId, {
             nome: ingredientData.nome,
             fornecedor: ingredientData.fornecedor,
             categoria: ingredientData.categoria,
@@ -2137,18 +2968,15 @@ class EstoqueManager {
             max: ingredientData.max
         });
 
-        if (updatedIngredient) {
-            // Ingrediente atualizado com sucesso
-
             // Recarregar a lista e métricas
-            this.loadIngredients();
-            this.updateMetrics();
+            await this.loadIngredients();
+            await this.loadStockSummary();
 
             this.closeIngredientModal();
             this.showSuccessMessage('Ingrediente atualizado com sucesso!');
-        } else {
-            console.error('Erro ao atualizar ingrediente');
-            this.showErrorMessage('Erro ao atualizar ingrediente');
+        } catch (error) {
+            console.error('Erro ao atualizar ingrediente:', error);
+            this.showErrorMessage('Erro ao atualizar ingrediente. Tente novamente.');
         }
     }
 
@@ -2194,18 +3022,32 @@ class EstoqueManager {
     /**
      * Carrega e renderiza os ingredientes
      */
-    loadIngredients() {
-        const ingredients = ingredientDataManager.getAllIngredients();
-        const container = document.querySelector('#secao-estoque .ingredientes');
+    async loadIngredients() {
+        try {
+            const ingredients = await ingredientDataManager.getAllIngredients({ forceRefresh: true });
+            
+            const container = document.querySelector('#secao-estoque .ingredientes');
 
-        if (!container) return;
+            if (!container) {
+                console.error('EstoqueManager: Container não encontrado!');
+                return;
+            }
 
-        container.innerHTML = '';
+            container.innerHTML = '';
 
-        ingredients.forEach(ingredient => {
-            const card = this.createIngredientCard(ingredient);
-            container.appendChild(card);
-        });
+            if (ingredients.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Nenhum ingrediente encontrado.</p>';
+                return;
+            }
+
+            ingredients.forEach(ingredient => {
+                const card = this.createIngredientCard(ingredient);
+                container.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar ingredientes:', error);
+            this.showErrorMessage('Erro ao carregar ingredientes');
+        }
     }
 
     /**
@@ -2296,36 +3138,11 @@ class EstoqueManager {
     /**
      * Atualiza as métricas do dashboard
      */
-    updateMetrics() {
-        const metrics = ingredientDataManager.getMetrics();
-
-        // Atualizar valor total
-        const valorTotalElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .grande');
-        if (valorTotalElement) {
-            valorTotalElement.textContent = `R$ ${metrics.valorTotal.toFixed(2).replace('.', ',')}`;
-        }
-
-        const totalItensElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(1) .valor .descricao');
-        if (totalItensElement) {
-            totalItensElement.textContent = `${metrics.totalItens} Itens`;
-        }
-
-        // Atualizar sem estoque
-        const semEstoqueElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(2) .valor .grande');
-        if (semEstoqueElement) {
-            semEstoqueElement.textContent = metrics.semEstoque.toString();
-        }
-
-        // Atualizar estoque baixo
-        const estoqueBaixoElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(3) .valor .grande');
-        if (estoqueBaixoElement) {
-            estoqueBaixoElement.textContent = metrics.estoqueBaixo.toString();
-        }
-
-        // Atualizar em estoque
-        const emEstoqueElement = document.querySelector('#secao-estoque .relata .quadro:nth-child(4) .valor .grande');
-        if (emEstoqueElement) {
-            emEstoqueElement.textContent = metrics.emEstoque.toString();
+    async updateMetrics() {
+        try {
+            await this.loadStockSummary();
+        } catch (error) {
+            console.error('Erro ao atualizar métricas:', error);
         }
     }
 
@@ -2387,8 +3204,7 @@ class EstoqueManager {
      * @param {string} message - Mensagem a ser exibida
      */
     showSuccessMessage(message) {
-        // Implementar sistema de notificações
-        // Mensagem de sucesso
+        showToast(message, { type: 'success', title: 'Sucesso' });
     }
 
     /**
@@ -2396,8 +3212,7 @@ class EstoqueManager {
      * @param {string} message - Mensagem a ser exibida
      */
     showErrorMessage(message) {
-        // Implementar sistema de notificações
-        // Mensagem de erro
+        showToast(message, { type: 'error', title: 'Erro' });
     }
 }
 
@@ -4435,25 +5250,31 @@ class FuncionarioManager {
  * Inicializa o painel administrativo
  */
 function initializeAdminPanel() {
+    console.log('AdminPanel: Inicializando painel administrativo...');
     // Inicializando Painel Administrativo
 
     try {
         // Verificar permissões antes de inicializar
         if (!AuthManager.verifyAdminPermissions()) {
+            console.log('AdminPanel: Permissões insuficientes, não inicializando');
             return;
         }
+
+        console.log('AdminPanel: Permissões verificadas, continuando inicialização...');
 
         // Emitir evento de inicialização
         eventSystem.emit('adminPanel:initializing');
 
         // Inicializar gerenciador de seções
         window.adminPanel = new SectionManager();
+        console.log('AdminPanel: SectionManager criado:', window.adminPanel);
 
         // Configurar listeners globais
         setupGlobalEventListeners();
 
         // Emitir evento de inicialização completa
         eventSystem.emit('adminPanel:initialized');
+        console.log('AdminPanel: Inicialização completa');
 
         // Painel Administrativo inicializado com sucesso
     } catch (error) {
@@ -4496,151 +5317,289 @@ function setupGlobalEventListeners() {
 // ============================================================================
 
 /**
- * Gerenciador de dados de categorias (mock)
+ * Gerenciador de dados de categorias integrado com API
  */
 class CategoriaDataManager {
     constructor() {
-        this.categorias = [
-            {
-                id: 1, nome: 'Hambúrgueres', ordem: 1, itens: [
-                    { id: 1, nome: 'Hambúrguer Clássico', valor: 'R$ 15,90' },
-                    { id: 2, nome: 'Hambúrguer Especial', valor: 'R$ 18,90' },
-                    { id: 3, nome: 'Hambúrguer Vegetariano', valor: 'R$ 16,90' }
-                ]
-            },
-            {
-                id: 2, nome: 'Bebidas', ordem: 2, itens: [
-                    { id: 4, nome: 'Coca-Cola', valor: 'R$ 4,50' },
-                    { id: 5, nome: 'Suco de Laranja', valor: 'R$ 6,00' },
-                    { id: 6, nome: 'Água', valor: 'R$ 2,50' }
-                ]
-            },
-            {
-                id: 3, nome: 'Acompanhamentos', ordem: 3, itens: [
-                    { id: 7, nome: 'Batata Frita', valor: 'R$ 8,90' },
-                    { id: 8, nome: 'Onion Rings', valor: 'R$ 9,90' }
-                ]
+        this.categorias = [];
+        this.produtos = [];
+        this.cache = {
+            categorias: null,
+            produtos: null,
+            lastFetch: null
+        };
+        this.cacheTimeout = 5 * 60 * 1000; // 5 minutos
+    }
+
+    /**
+     * Verifica se o cache ainda é válido
+     */
+    isCacheValid() {
+        return this.cache.lastFetch && 
+               (Date.now() - this.cache.lastFetch) < this.cacheTimeout;
+    }
+
+    /**
+     * Limpa o cache
+     */
+    clearCache() {
+        this.cache = {
+            categorias: null,
+            produtos: null,
+            lastFetch: null
+        };
+    }
+
+    /**
+     * Busca todas as categorias da API
+     */
+    async getAllCategorias() {
+        try {
+            console.log('CategoriaDataManager: Buscando categorias...');
+            // Se não há cache válido ou forçou refresh, busca da API
+            if (!this.isCacheValid()) {
+                console.log('CategoriaDataManager: Cache inválido, buscando da API...');
+                const response = await getCategories();
+                console.log('CategoriaDataManager: Resposta da API:', response);
+                
+                // Mapeia os dados da API para o formato esperado pelo frontend
+                this.categorias = (response.items || response.categories || response.data || []).map(category => ({
+                    id: category.id,
+                    nome: category.name,
+                    ordem: category.order || category.id,
+                    itens: [] // Será preenchido quando necessário
+                }));
+
+                console.log('CategoriaDataManager: Categorias mapeadas:', this.categorias);
+                this.cache.categorias = this.categorias;
+                this.cache.lastFetch = Date.now();
+            } else {
+                console.log('CategoriaDataManager: Usando cache válido');
             }
-        ];
 
-        // Todos os produtos disponíveis para adicionar às categorias
-        this.todosProdutos = [
-            { id: 101, nome: 'Hambúrguer Clássico', valor: 'R$ 15,90', categoria: 'Hambúrgueres' },
-            { id: 102, nome: 'Hambúrguer Especial', valor: 'R$ 18,90', categoria: 'Hambúrgueres' },
-            { id: 103, nome: 'Hambúrguer Vegetariano', valor: 'R$ 16,90', categoria: 'Hambúrgueres' },
-            { id: 104, nome: 'Hambúrguer Duplo', valor: 'R$ 22,90', categoria: 'Hambúrgueres' },
-            { id: 105, nome: 'Hambúrguer Bacon', valor: 'R$ 19,90', categoria: 'Hambúrgueres' },
-            { id: 106, nome: 'Coca-Cola', valor: 'R$ 4,50', categoria: 'Bebidas' },
-            { id: 107, nome: 'Suco de Laranja', valor: 'R$ 6,00', categoria: 'Bebidas' },
-            { id: 108, nome: 'Água', valor: 'R$ 2,50', categoria: 'Bebidas' },
-            { id: 109, nome: 'Refrigerante Guaraná', valor: 'R$ 4,50', categoria: 'Bebidas' },
-            { id: 110, nome: 'Cerveja', valor: 'R$ 8,90', categoria: 'Bebidas' },
-            { id: 111, nome: 'Batata Frita', valor: 'R$ 8,90', categoria: 'Acompanhamentos' },
-            { id: 112, nome: 'Onion Rings', valor: 'R$ 9,90', categoria: 'Acompanhamentos' },
-            { id: 113, nome: 'Nuggets', valor: 'R$ 12,90', categoria: 'Acompanhamentos' },
-            { id: 114, nome: 'Salada', valor: 'R$ 7,90', categoria: 'Acompanhamentos' }
-        ];
+        const sortedCategorias = this.categorias.sort((a, b) => a.ordem - b.ordem);
+        console.log('CategoriaDataManager: Categorias ordenadas:', sortedCategorias);
+        return sortedCategorias;
+        } catch (error) {
+            console.error('Erro ao buscar categorias:', error);
+            throw error;
+        }
     }
 
-    getAllCategorias() {
-        return this.categorias.sort((a, b) => a.ordem - b.ordem);
+    /**
+     * Busca uma categoria específica por ID
+     */
+    async getCategoriaById(id) {
+        try {
+            // Como o endpoint GET /api/categories/{id} não está implementado,
+            // vamos buscar todas as categorias e filtrar pela ID
+            const categorias = await this.getAllCategorias();
+            const categoria = categorias.find(cat => cat.id === id);
+            
+            if (!categoria) {
+                throw new Error(`Categoria com ID ${id} não encontrada`);
+            }
+            
+            return categoria;
+        } catch (error) {
+            console.error('Erro ao buscar categoria:', error);
+            throw error;
+        }
     }
 
-    getCategoriaById(id) {
-        return this.categorias.find(c => c.id === id);
-    }
+    /**
+     * Cria uma nova categoria
+     */
+    async addCategoria(nome) {
+        try {
+            const apiData = {
+                name: nome,
+                order: this.categorias.length + 1
+            };
 
-    addCategoria(nome) {
-        const novaCategoria = {
-            id: Date.now(),
-            nome: nome,
-            ordem: this.categorias.length + 1,
+            const newCategory = await createCategory(apiData);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Mapeia a resposta da API para o formato esperado pelo frontend
+            return {
+                id: newCategory.id,
+                nome: newCategory.name,
+                ordem: newCategory.order || newCategory.id,
             itens: []
         };
-        this.categorias.push(novaCategoria);
-        return novaCategoria;
-    }
-
-    updateCategoria(id, nome) {
-        const categoria = this.getCategoriaById(id);
-        if (categoria) {
-            categoria.nome = nome;
-            return categoria;
+        } catch (error) {
+            console.error('Erro ao criar categoria:', error);
+            throw error;
         }
-        return null;
     }
 
-    deleteCategoria(id) {
-        const index = this.categorias.findIndex(c => c.id === id);
-        if (index > -1) {
-            this.categorias.splice(index, 1);
-            return true;
+    /**
+     * Atualiza uma categoria
+     */
+    async updateCategoria(id, nome) {
+        try {
+            const apiData = {
+                name: nome
+            };
+
+            await updateCategory(id, apiData);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            // Busca a categoria atualizada
+            return await this.getCategoriaById(id);
+        } catch (error) {
+            console.error('Erro ao atualizar categoria:', error);
+            throw error;
         }
-        return false;
     }
 
-    reorderCategorias(categoriasOrdenadas) {
+    /**
+     * Remove uma categoria
+     */
+    async deleteCategoria(id) {
+        try {
+            await deleteCategory(id);
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao excluir categoria:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Reordena categorias
+     */
+    async reorderCategorias(categoriasOrdenadas) {
+        try {
+            // Implementar reordenação na API se necessário
         categoriasOrdenadas.forEach((categoria, index) => {
-            const cat = this.getCategoriaById(categoria.id);
+                const cat = this.categorias.find(c => c.id === categoria.id);
             if (cat) {
                 cat.ordem = index + 1;
             }
         });
-    }
-
-    getItensByCategoria(categoriaId) {
-        const categoria = this.getCategoriaById(categoriaId);
-        return categoria ? categoria.itens : [];
-    }
-
-    addItemToCategoria(categoriaId, nomeItem, valor = 'R$ 0,00') {
-        const categoria = this.getCategoriaById(categoriaId);
-        if (categoria) {
-            const novoItem = {
-                id: Date.now(),
-                nome: nomeItem,
-                valor: valor
-            };
-            categoria.itens.push(novoItem);
-            return novoItem;
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+        } catch (error) {
+            console.error('Erro ao reordenar categorias:', error);
+            throw error;
         }
-        return null;
     }
 
-    updateItem(categoriaId, itemId, nomeItem) {
-        const categoria = this.getCategoriaById(categoriaId);
-        if (categoria) {
-            const item = categoria.itens.find(i => i.id === itemId);
-            if (item) {
-                item.nome = nomeItem;
-                return item;
+    /**
+     * Busca produtos de uma categoria
+     */
+    async getItensByCategoria(categoriaId) {
+        try {
+            const response = await getProducts({ category_id: categoriaId });
+            
+            // Mapeia os dados da API para o formato esperado pelo frontend
+            return (response.items || response.products || response.data || []).map(product => ({
+                id: product.id,
+                nome: product.name,
+                valor: `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}`,
+                descricao: product.description || '',
+                ativo: product.is_active !== undefined ? product.is_active : true
+            }));
+        } catch (error) {
+            console.error('Erro ao buscar produtos da categoria:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Adiciona um produto a uma categoria (atualiza o produto)
+     */
+    async addItemToCategoria(categoriaId, produtoId) {
+        try {
+            // Atualiza o produto com a nova categoria
+            await updateProduct(produtoId, {
+                category_id: categoriaId
+            });
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao adicionar produto à categoria:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove um produto de uma categoria (atualiza o produto)
+     */
+    async removeItemFromCategoria(categoriaId, produtoId) {
+        try {
+            // Atualiza o produto removendo a categoria (ou definindo como null)
+            await updateProduct(produtoId, {
+                category_id: null
+            });
+            
+            // Limpa cache para forçar refresh
+            this.clearCache();
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Erro ao remover produto da categoria:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Busca todos os produtos
+     */
+    async getAllProdutos() {
+        try {
+            // Se não há cache válido ou forçou refresh, busca da API
+            if (!this.isCacheValid() || !this.cache.produtos) {
+                const response = await getProducts();
+                
+                // Mapeia os dados da API para o formato esperado pelo frontend
+                this.produtos = (response.items || response.products || response.data || []).map(product => ({
+                    id: product.id,
+                    nome: product.name,
+                    valor: `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}`,
+                    categoria: product.category_name || 'Sem categoria',
+                    descricao: product.description || '',
+                    ativo: product.is_active !== undefined ? product.is_active : true
+                }));
+
+                this.cache.produtos = this.produtos;
+                this.cache.lastFetch = Date.now();
             }
+
+            return this.produtos;
+        } catch (error) {
+            console.error('Erro ao buscar produtos:', error);
+            throw error;
         }
-        return null;
     }
 
-    deleteItem(categoriaId, itemId) {
-        const categoria = this.getCategoriaById(categoriaId);
-        if (categoria) {
-            const index = categoria.itens.findIndex(i => i.id === itemId);
-            if (index > -1) {
-                categoria.itens.splice(index, 1);
-                return true;
-            }
+    /**
+     * Busca produtos disponíveis para adicionar a uma categoria
+     */
+    async getProdutosDisponiveis(categoriaId) {
+        try {
+            const todosProdutos = await this.getAllProdutos();
+            const produtosDaCategoria = await this.getItensByCategoria(categoriaId);
+            
+            const idsDaCategoria = produtosDaCategoria.map(item => item.id);
+            return todosProdutos.filter(produto => !idsDaCategoria.includes(produto.id));
+        } catch (error) {
+            console.error('Erro ao buscar produtos disponíveis:', error);
+            throw error;
         }
-        return false;
-    }
-
-    getAllProdutos() {
-        return this.todosProdutos;
-    }
-
-    getProdutosDisponiveis(categoriaId) {
-        const categoria = this.getCategoriaById(categoriaId);
-        if (!categoria) return [];
-
-        const itensIds = categoria.itens.map(item => item.id);
-        return this.todosProdutos.filter(produto => !itensIds.includes(produto.id));
     }
 }
 
@@ -4737,16 +5696,19 @@ class CategoriaManager {
         }
     }
 
-    openCategoriasModal() {
+    async openCategoriasModal() {
+        console.log('CategoriaManager: Abrindo modal de categorias...');
         const modal = document.getElementById('modal-categorias');
 
         if (!modal) {
+            console.error('CategoriaManager: Modal de categorias não encontrada!');
             return;
         }
 
-        this.loadCategorias();
+        await this.loadCategorias();
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+        console.log('CategoriaManager: Modal de categorias aberta');
     }
 
     closeCategoriasModal() {
@@ -4757,18 +5719,24 @@ class CategoriaManager {
         }
     }
 
-    openItensModal(categoriaId) {
+    async openItensModal(categoriaId) {
         const modal = document.getElementById('modal-itens');
         if (!modal) return;
 
         this.currentCategoriaId = categoriaId;
-        const categoria = this.categoriaDataManager.getCategoriaById(categoriaId);
+        
+        try {
+            const categoria = await this.categoriaDataManager.getCategoriaById(categoriaId);
 
         if (categoria) {
             document.getElementById('titulo-itens-categoria').textContent = `Itens da Categoria: ${categoria.nome}`;
-            this.loadItens(categoriaId);
+                await this.loadItens(categoriaId);
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
+            }
+        } catch (error) {
+            console.error('Erro ao carregar categoria:', error);
+            this.showErrorMessage('Erro ao carregar dados da categoria');
         }
     }
 
@@ -4785,20 +5753,38 @@ class CategoriaManager {
         this.openCategoriasModal();
     }
 
-    loadCategorias() {
-        const categorias = this.categoriaDataManager.getAllCategorias();
+    async loadCategorias() {
+        try {
+            console.log('CategoriaManager: Carregando categorias...');
+            const categorias = await this.categoriaDataManager.getAllCategorias();
+            console.log('CategoriaManager: Categorias carregadas:', categorias);
         const container = document.getElementById('lista-categorias');
 
-        if (!container) return;
+        if (!container) {
+            console.error('CategoriaManager: Container lista-categorias não encontrado!');
+            return;
+        }
 
         container.innerHTML = '';
 
+            if (categorias.length === 0) {
+                console.log('CategoriaManager: Nenhuma categoria encontrada');
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Nenhuma categoria encontrada.</p>';
+                return;
+            }
+
+        console.log(`CategoriaManager: Renderizando ${categorias.length} categorias`);
         categorias.forEach(categoria => {
             const categoriaElement = this.createCategoriaElement(categoria);
             container.appendChild(categoriaElement);
         });
 
         this.setupDragAndDrop();
+        console.log('CategoriaManager: Categorias carregadas com sucesso');
+        } catch (error) {
+            console.error('Erro ao carregar categorias:', error);
+            this.showErrorMessage('Erro ao carregar categorias');
+        }
     }
 
     createCategoriaElement(categoria) {
@@ -4901,7 +5887,8 @@ class CategoriaManager {
     }
 
     async deleteCategoria(categoriaId) {
-        const categoria = this.categoriaDataManager.getCategoriaById(categoriaId);
+        try {
+            const categoria = await this.categoriaDataManager.getCategoriaById(categoriaId);
         if (!categoria) return;
 
         const confirmado = await showConfirm({
@@ -4913,38 +5900,55 @@ class CategoriaManager {
         });
 
         if (confirmado) {
-            const sucesso = this.categoriaDataManager.deleteCategoria(categoriaId);
-            if (sucesso) {
-                this.loadCategorias();
+                await this.categoriaDataManager.deleteCategoria(categoriaId);
+                await this.loadCategorias();
                 this.showSuccessMessage(`Categoria "${categoria.nome}" excluída com sucesso!`);
             }
+        } catch (error) {
+            console.error('Erro ao excluir categoria:', error);
+            this.showErrorMessage('Erro ao excluir categoria. Tente novamente.');
         }
     }
 
-    saveCategorias() {
+    async saveCategorias() {
+        try {
         // Salvar nova ordem das categorias
         const container = document.getElementById('lista-categorias');
         const categoriasOrdenadas = Array.from(container.querySelectorAll('.categoria-item')).map(el => ({
             id: parseInt(el.dataset.categoriaId)
         }));
 
-        this.categoriaDataManager.reorderCategorias(categoriasOrdenadas);
+            await this.categoriaDataManager.reorderCategorias(categoriasOrdenadas);
         this.showSuccessMessage('Ordem das categorias salva com sucesso!');
         this.closeCategoriasModal();
+        } catch (error) {
+            console.error('Erro ao salvar ordem das categorias:', error);
+            this.showErrorMessage('Erro ao salvar ordem das categorias. Tente novamente.');
+        }
     }
 
-    loadItens(categoriaId) {
-        const itens = this.categoriaDataManager.getItensByCategoria(categoriaId);
+    async loadItens(categoriaId) {
+        try {
+            const itens = await this.categoriaDataManager.getItensByCategoria(categoriaId);
         const container = document.getElementById('lista-itens');
 
         if (!container) return;
 
         container.innerHTML = '';
 
+            if (itens.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Nenhum item encontrado nesta categoria.</p>';
+                return;
+            }
+
         itens.forEach(item => {
             const itemElement = this.createItemElement(item);
             container.appendChild(itemElement);
         });
+        } catch (error) {
+            console.error('Erro ao carregar itens da categoria:', error);
+            this.showErrorMessage('Erro ao carregar itens da categoria');
+        }
     }
 
     createItemElement(item) {
@@ -5003,43 +6007,35 @@ class CategoriaManager {
     editItem(itemId) {
         if (!this.currentCategoriaId) return;
 
-        const item = this.categoriaDataManager.getItensByCategoria(this.currentCategoriaId)
-            .find(i => i.id === itemId);
-
-        if (!item) return;
-
-        const novoNome = prompt('Digite o novo nome do item:', item.nome);
-        if (novoNome && novoNome.trim() && novoNome.trim() !== item.nome) {
-            const itemAtualizado = this.categoriaDataManager.updateItem(this.currentCategoriaId, itemId, novoNome.trim());
-            if (itemAtualizado) {
-                this.loadItens(this.currentCategoriaId);
-                this.showSuccessMessage(`Item atualizado para "${itemAtualizado.nome}"!`);
-            }
-        }
+        // Redirecionar para a seção de produtos para editar
+        this.redirectToProdutos(itemId);
     }
 
     async deleteItem(itemId) {
         if (!this.currentCategoriaId) return;
 
-        const item = this.categoriaDataManager.getItensByCategoria(this.currentCategoriaId)
-            .find(i => i.id === itemId);
+        try {
+            const itens = await this.categoriaDataManager.getItensByCategoria(this.currentCategoriaId);
+            const item = itens.find(i => i.id === itemId);
 
         if (!item) return;
 
         const confirmado = await showConfirm({
             title: 'Confirmar Exclusão',
-            message: `Tem certeza que deseja excluir o item "${item.nome}"?`,
-            confirmText: 'Excluir',
+                message: `Tem certeza que deseja remover o item "${item.nome}" desta categoria?`,
+                confirmText: 'Remover',
             cancelText: 'Cancelar',
             type: 'delete'
         });
 
         if (confirmado) {
-            const sucesso = this.categoriaDataManager.deleteItem(this.currentCategoriaId, itemId);
-            if (sucesso) {
-                this.loadItens(this.currentCategoriaId);
-                this.showSuccessMessage(`Item "${item.nome}" excluído com sucesso!`);
+                await this.categoriaDataManager.removeItemFromCategoria(this.currentCategoriaId, itemId);
+                await this.loadItens(this.currentCategoriaId);
+                this.showSuccessMessage(`Item "${item.nome}" removido da categoria com sucesso!`);
             }
+        } catch (error) {
+            console.error('Erro ao remover item da categoria:', error);
+            this.showErrorMessage('Erro ao remover item da categoria. Tente novamente.');
         }
     }
 
@@ -5049,7 +6045,7 @@ class CategoriaManager {
     }
 
     // Modal de seleção de produtos
-    openProdutosModal() {
+    async openProdutosModal() {
         const modal = document.getElementById('modal-produtos');
 
         if (!modal) {
@@ -5057,7 +6053,7 @@ class CategoriaManager {
         }
 
         this.produtosSelecionados = new Set();
-        this.loadProdutosDisponiveis();
+        await this.loadProdutosDisponiveis();
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
     }
@@ -5078,8 +6074,9 @@ class CategoriaManager {
         this.produtosSelecionados = new Set();
     }
 
-    loadProdutosDisponiveis() {
-        const produtosDisponiveis = this.categoriaDataManager.getProdutosDisponiveis(this.currentCategoriaId);
+    async loadProdutosDisponiveis() {
+        try {
+            const produtosDisponiveis = await this.categoriaDataManager.getProdutosDisponiveis(this.currentCategoriaId);
         const container = document.getElementById('lista-produtos');
 
         if (!container) return;
@@ -5095,6 +6092,10 @@ class CategoriaManager {
             const produtoElement = this.createProdutoElement(produto);
             container.appendChild(produtoElement);
         });
+        } catch (error) {
+            console.error('Erro ao carregar produtos disponíveis:', error);
+            this.showErrorMessage('Erro ao carregar produtos disponíveis');
+        }
     }
 
     createProdutoElement(produto) {
@@ -5164,48 +6165,49 @@ class CategoriaManager {
         });
     }
 
-    adicionarProdutosSelecionados() {
+    async adicionarProdutosSelecionados() {
         if (this.produtosSelecionados.size === 0) {
             this.showSuccessMessage('Selecione pelo menos um produto para adicionar.');
             return;
         }
 
-        const todosProdutos = this.categoriaDataManager.getAllProdutos();
+        try {
         let adicionados = 0;
 
-        this.produtosSelecionados.forEach(produtoId => {
-            const produto = todosProdutos.find(p => p.id === produtoId);
-            if (produto) {
-                const novoItem = this.categoriaDataManager.addItemToCategoria(
-                    this.currentCategoriaId,
-                    produto.nome,
-                    produto.valor
-                );
-                if (novoItem) {
+            for (const produtoId of this.produtosSelecionados) {
+                await this.categoriaDataManager.addItemToCategoria(this.currentCategoriaId, produtoId);
                     adicionados++;
                 }
-            }
-        });
 
         if (adicionados > 0) {
-            this.loadItens(this.currentCategoriaId);
+                await this.loadItens(this.currentCategoriaId);
             this.showSuccessMessage(`${adicionados} produto(s) adicionado(s) com sucesso!`);
             this.closeProdutosModal();
+            }
+        } catch (error) {
+            console.error('Erro ao adicionar produtos à categoria:', error);
+            this.showErrorMessage('Erro ao adicionar produtos à categoria. Tente novamente.');
         }
     }
 
     // Métodos da modal de formulário de categoria
-    openCategoriaFormModal() {
+    async openCategoriaFormModal() {
         const modal = document.getElementById('modal-categoria-form');
         const titulo = document.getElementById('titulo-categoria-form');
         const input = document.getElementById('nome-categoria-input');
 
         if (this.editandoCategoria) {
             // Modo edição
-            const categoria = this.categoriaDataManager.getCategoriaById(this.editandoCategoria);
+            try {
+                const categoria = await this.categoriaDataManager.getCategoriaById(this.editandoCategoria);
             if (categoria) {
                 titulo.textContent = 'Editar Categoria';
                 input.value = categoria.nome;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar categoria para edição:', error);
+                this.showErrorMessage('Erro ao carregar dados da categoria');
+                return;
             }
         } else {
             // Modo adição
@@ -5229,7 +6231,7 @@ class CategoriaManager {
         this.editandoCategoria = null;
     }
 
-    saveCategoriaForm() {
+    async saveCategoriaForm() {
         const input = document.getElementById('nome-categoria-input');
         const nome = input.value.trim();
 
@@ -5243,25 +6245,32 @@ class CategoriaManager {
         input.classList.add('success');
         input.classList.remove('error');
 
+        try {
         if (this.editandoCategoria) {
             // Editar categoria existente
-            const categoriaAtualizada = this.categoriaDataManager.updateCategoria(this.editandoCategoria, nome);
-            if (categoriaAtualizada) {
-                this.loadCategorias();
+                const categoriaAtualizada = await this.categoriaDataManager.updateCategoria(this.editandoCategoria, nome);
+                await this.loadCategorias();
                 this.showSuccessMessage(`Categoria atualizada para "${categoriaAtualizada.nome}"!`);
-            }
         } else {
             // Adicionar nova categoria
-            const novaCategoria = this.categoriaDataManager.addCategoria(nome);
-            this.loadCategorias();
+                const novaCategoria = await this.categoriaDataManager.addCategoria(nome);
+                await this.loadCategorias();
             this.showSuccessMessage(`Categoria "${novaCategoria.nome}" adicionada com sucesso!`);
         }
 
         this.closeCategoriaFormModal();
+        } catch (error) {
+            console.error('Erro ao salvar categoria:', error);
+            this.showErrorMessage('Erro ao salvar categoria. Tente novamente.');
+        }
     }
 
     showSuccessMessage(message) {
         showToast(message, { type: 'success', title: 'Sucesso' });
+    }
+
+    showErrorMessage(message) {
+        showToast(message, { type: 'error', title: 'Erro' });
     }
 }
 
