@@ -1799,6 +1799,44 @@ main {
                 }
             }
         }
+
+        & #secao-configuracoes {
+            & .secao {
+                margin: 10px 0px;
+
+                & .titulo {
+                    margin-bottom: 5px;
+                    font-size: 1rem;
+                }
+
+                & .info {
+                    padding: 10px 30px;
+                    font-size: 0.9rem;
+                    gap: 10px;
+                    
+                    & div:first-child{
+                        width: 90%;
+                    }
+
+                    & button {
+                        font-size: 0.9rem;
+                        padding: 5px 0px;
+                        width: 105px;
+                    }
+
+                    & .tempo {
+                        font-size: 0.9rem;
+                        text-wrap: nowrap;
+
+                        & i {
+                            font-size: 0.7rem;
+                            cursor: pointer;
+                        }
+                    }
+                }
+
+            }
+        }
     }
 }
 
@@ -2272,6 +2310,44 @@ main {
                         font-size: 0.85rem;
                     }
                 }
+            }
+        }
+
+        & #secao-configuracoes {
+            & .secao {
+                margin: 10px 0px;
+
+                & .titulo {
+                    margin-bottom: 5px;
+                    font-size: 1rem;
+                }
+
+                & .info {
+                    padding: 5px 20px;
+                    font-size: 0.8rem;
+                    gap: 10px;
+                    
+                    & div:first-child{
+                        width: 90%;
+                    }
+
+                    & button {
+                        font-size: 0.8rem;
+                        padding: 5px 0px;
+                        width: 105px;
+                    }
+
+                    & .tempo {
+                        font-size: 0.8rem;
+                        text-wrap: nowrap;
+
+                        & i {
+                            font-size: 0.7rem;
+                            cursor: pointer;
+                        }
+                    }
+                }
+
             }
         }
     }
@@ -2769,6 +2845,39 @@ main {
                 }
             }
         }
+
+        & #secao-configuracoes {
+            & .secao {
+                margin: 10px 0px;
+
+                & .titulo {
+                    margin-bottom: 5px;
+                    font-size: 1rem;
+                }
+
+                & .info {
+                    padding: 5px 5px;
+                    font-size: 0.8rem;
+
+                    & button {
+                        font-size: 0.8rem;
+                        padding: 5px 0px;
+                        width: 105px;
+                    }
+
+                    & .tempo {
+                        font-size: 0.8rem;
+                        text-wrap: nowrap;
+
+                        & i {
+                            font-size: 0.7rem;
+                            cursor: pointer;
+                        }
+                    }
+                }
+
+            }
+        }
     }
 }
 
@@ -3254,6 +3363,39 @@ main {
                         font-size: 0.65rem;
                     }
                 }
+            }
+        }
+
+        & #secao-configuracoes {
+            & .secao {
+                margin: 10px 0px;
+
+                & .titulo {
+                    margin-bottom: 5px;
+                    font-size: 0.9rem;
+                }
+
+                & .info {
+                    padding: 5px 5px;
+                    font-size: 0.7rem;
+
+                    & button {
+                        font-size: 0.8rem;
+                        padding: 5px 0px;
+                        width: 105px;
+                    }
+
+                    & .tempo {
+                        font-size: 0.8rem;
+                        text-wrap: nowrap;
+
+                        & i {
+                            font-size: 0.6rem;
+                            cursor: pointer;
+                        }
+                    }
+                }
+
             }
         }
     }
