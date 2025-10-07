@@ -2963,6 +2963,10 @@ class FuncionarioManager {
     handleSearch(searchTerm) {
         const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
         const term = searchTerm.toLowerCase().trim();
+        const container = document.querySelector('#secao-funcionarios .funcionarios');
+        
+        
+        let visibleCount = 0;
 
         cards.forEach(card => {
             const nomeElement = card.querySelector('.nome-funcionario');
@@ -2974,8 +2978,12 @@ class FuncionarioManager {
 
                 const matches = nome.includes(term) || email.includes(term);
                 card.style.display = matches ? 'block' : 'none';
+                if (matches) visibleCount++;
             }
         });
+
+        // Mostrar estado vazio se não há resultados
+        this.showEmptyState(container, visibleCount === 0 && term.length > 0, term);
 
         // Emitir evento de busca
         eventSystem.emit('funcionario:search', {
@@ -2984,8 +2992,80 @@ class FuncionarioManager {
         });
     }
 
+    showEmptyState(container, showEmpty, searchTerm = '') {
+        // Remover estado vazio anterior se existir
+        const existingEmptyState = container.querySelector('.empty-state');
+        if (existingEmptyState) {
+            existingEmptyState.remove();
+        }
+
+        if (showEmpty) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty-state';
+            // Determinar o tipo de filtro e mensagem apropriada
+            let message = '';
+            let clearButtonText = '';
+            
+            if (searchTerm.includes('cargo')) {
+                message = `Não encontramos funcionários com o cargo "<strong>${searchTerm.replace('cargo "', '').replace('"', '')}</strong>".`;
+                clearButtonText = 'Limpar filtro de cargo';
+            } else if (searchTerm.includes('status')) {
+                message = `Não encontramos funcionários com o status "<strong>${searchTerm.replace('status "', '').replace('"', '')}</strong>".`;
+                clearButtonText = 'Limpar filtro de status';
+            } else {
+                message = `Não encontramos funcionários que correspondam à sua busca por "<strong>${searchTerm}</strong>".`;
+                clearButtonText = 'Limpar busca';
+            }
+
+            emptyState.innerHTML = `
+                <div class="empty-state-content">
+                    <div class="empty-state-icon">
+                        <i class="fa-solid fa-search"></i>
+                    </div>
+                    <h3>Nenhum funcionário encontrado</h3>
+                    <p>${message}</p>
+                    <button class="btn-clear-search">
+                        <i class="fa-solid fa-times"></i>
+                        ${clearButtonText}
+                    </button>
+                </div>
+            `;
+
+            // Adicionar event listener para o botão de limpar busca/filtros
+            emptyState.querySelector('.btn-clear-search').addEventListener('click', () => {
+                if (searchTerm.includes('cargo')) {
+                    // Limpar filtro de cargo
+                    const cargoFilter = document.querySelector('#cargo-filtro');
+                    if (cargoFilter) {
+                        cargoFilter.value = '';
+                        this.handleCargoFilter('');
+                    }
+                } else if (searchTerm.includes('status')) {
+                    // Limpar filtro de status
+                    const statusFilter = document.querySelector('#status-funcionario');
+                    if (statusFilter) {
+                        statusFilter.value = '';
+                        this.handleStatusFilter('');
+                    }
+                } else {
+                    // Limpar busca por texto
+                    const searchInput = document.querySelector('#busca-funcionario');
+                    if (searchInput) {
+                        searchInput.value = '';
+                        this.handleSearch('');
+                    }
+                }
+            });
+
+            container.appendChild(emptyState);
+        }
+    }
+
     handleCargoFilter(cargo) {
         const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
+        const container = document.querySelector('#secao-funcionarios .funcionarios');
+        
+        let visibleCount = 0;
 
         cards.forEach(card => {
             const cargoElement = card.querySelector('.cargo');
@@ -2996,8 +3076,16 @@ class FuncionarioManager {
 
                 const shouldShow = !cargo || cardCargo === cargo;
                 card.style.display = shouldShow ? 'block' : 'none';
+                if (shouldShow) visibleCount++;
             }
         });
+
+        // Mostrar estado vazio se não há resultados
+        if (cargo) {
+            this.showEmptyState(container, visibleCount === 0, `cargo "${cargo}"`);
+        } else {
+            this.showEmptyState(container, false, '');
+        }
 
         // Emitir evento de filtro
         eventSystem.emit('funcionario:filter', {
@@ -3008,6 +3096,9 @@ class FuncionarioManager {
 
     handleStatusFilter(status) {
         const cards = document.querySelectorAll('#secao-funcionarios .card-funcionario');
+        const container = document.querySelector('#secao-funcionarios .funcionarios');
+        
+        let visibleCount = 0;
 
         cards.forEach(card => {
             const toggleElement = card.querySelector('.toggle');
@@ -3019,8 +3110,16 @@ class FuncionarioManager {
 
                 const shouldShow = !status || cardStatus === status;
                 card.style.display = shouldShow ? 'block' : 'none';
+                if (shouldShow) visibleCount++;
             }
         });
+
+        // Mostrar estado vazio se não há resultados
+        if (status) {
+            this.showEmptyState(container, visibleCount === 0, `status "${status}"`);
+        } else {
+            this.showEmptyState(container, false, '');
+        }
 
         // Emitir evento de filtro
         eventSystem.emit('funcionario:filter', {
@@ -3046,6 +3145,14 @@ class FuncionarioManager {
 
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+
+        // Definir data máxima como hoje
+        const nascimentoInput = document.getElementById('nascimento-funcionario');
+        if (nascimentoInput) {
+            const hoje = new Date();
+            const dataMaxima = hoje.toISOString().split('T')[0];
+            nascimentoInput.setAttribute('max', dataMaxima);
+        }
 
         if (funcionarioData) {
             titulo.textContent = 'Editar usuário';
@@ -3101,13 +3208,43 @@ class FuncionarioManager {
 
         // Limpar validações de senha
         this.clearPasswordValidation();
+        
+        // Validar requisitos de senha se houver valor
+        const senhaInput = document.getElementById('senha-funcionario');
+        if (senhaInput && senhaInput.value) {
+            this.validatePasswordRequirements();
+        }
     }
 
     populateFuncionarioModal(funcionarioData) {
+        // Converter data para o formato YYYY-MM-DD para o input date
+        let nascimentoFormatado = '';
+        if (funcionarioData.nascimento) {
+            // Se a data está no formato DD-MM-YYYY, converter para YYYY-MM-DD
+            if (funcionarioData.nascimento.includes('-') && funcionarioData.nascimento.split('-')[0].length === 2) {
+                nascimentoFormatado = funcionarioData.nascimento.split('-').reverse().join('-');
+            }
+            // Se a data está no formato YYYY-MM-DD, usar diretamente
+            else if (funcionarioData.nascimento.includes('-') && funcionarioData.nascimento.split('-')[0].length === 4) {
+                nascimentoFormatado = funcionarioData.nascimento;
+            }
+            // Se a data está em outro formato, tentar converter
+            else {
+                try {
+                    const date = new Date(funcionarioData.nascimento);
+                    if (!isNaN(date.getTime())) {
+                        nascimentoFormatado = date.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    console.warn('Erro ao converter data:', funcionarioData.nascimento);
+                }
+            }
+        }
+        
         const fields = {
             'nome-funcionario': funcionarioData.nome,
             'email-funcionario': funcionarioData.email,
-            'nascimento-funcionario': funcionarioData.nascimento || '',
+            'nascimento-funcionario': nascimentoFormatado,
             'telefone-funcionario': funcionarioData.telefone || '',
             'cargo-funcionario': funcionarioData.cargo
         };
@@ -3233,13 +3370,19 @@ class FuncionarioManager {
                         this.formatCPFInput(field);
                     }
                     
-                    
-                    this.validateFuncionarioField(field, config);
+                    // Apenas validação de senha em tempo real (para feedback visual dos requisitos)
                     if (id === 'senha-funcionario') {
                         this.validatePasswordRequirements();
                     }
                 });
-                field.addEventListener('blur', () => this.validateFuncionarioField(field, config));
+                field.addEventListener('blur', async () => {
+                    this.validateFuncionarioField(field, config);
+                    
+                    // Verificar email duplicado em tempo real
+                    if (id === 'email-funcionario' && field.value.trim()) {
+                        await this.validateEmailUniqueness(field);
+                    }
+                });
             }
         });
 
@@ -3328,33 +3471,60 @@ class FuncionarioManager {
         let isValid = true;
         let errorMessage = '';
 
+        // Se o campo não é obrigatório e está vazio, considerar válido
+        if (!config.required && !value) {
+            return true;
+        }
+
         // Validação obrigatória
         if (config.required && !value) {
             isValid = false;
-            errorMessage = 'Obrigatório';
+            errorMessage = 'Campo obrigatório';
+            this.showFieldValidation(field, isValid, errorMessage);
+            return isValid;
         }
 
-        // Validação de tamanho mínimo
-        if (isValid && config.minLength && value.length < config.minLength) {
-            isValid = false;
-            errorMessage = `Mín. ${config.minLength} caracteres`;
-        }
-
-        // Validação de email
-        if (isValid && config.type === 'email' && value) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
+        // Validação de nome
+        if (isValid && field.id === 'nome-funcionario' && value) {
+            if (value.length < 2) {
                 isValid = false;
-                errorMessage = 'Email inválido';
+                errorMessage = 'Nome deve ter pelo menos 2 caracteres';
+            } else if (value.length > 100) {
+                isValid = false;
+                errorMessage = 'Nome deve ter no máximo 100 caracteres';
+            } else if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(value)) {
+                isValid = false;
+                errorMessage = 'Nome deve conter apenas letras e espaços';
             }
         }
 
-        // Validação de telefone
+        // Validação de tamanho mínimo (apenas se o campo não estiver vazio)
+        if (isValid && value && config.minLength && value.length < config.minLength) {
+            isValid = false;
+            errorMessage = `Mínimo de ${config.minLength} caracteres`;
+        }
+
+        // Validação de email mais robusta
+        if (isValid && config.type === 'email' && value) {
+            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+            if (!emailRegex.test(value)) {
+                isValid = false;
+                errorMessage = 'Email inválido';
+            } else if (value.length > 254) {
+                isValid = false;
+                errorMessage = 'Email muito longo';
+            }
+        }
+
+        // Validação de telefone mais robusta
         if (isValid && config.type === 'tel' && value) {
             const cleanPhone = value.replace(/\D/g, '');
-            if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+            if (cleanPhone.length < 10) {
                 isValid = false;
-                errorMessage = 'Telefone inválido';
+                errorMessage = 'Telefone deve ter pelo menos 10 dígitos';
+            } else if (cleanPhone.length > 11) {
+                isValid = false;
+                errorMessage = 'Telefone deve ter no máximo 11 dígitos';
             } else {
                 const ddd = cleanPhone.substring(0, 2);
                 if (parseInt(ddd) < 11 || parseInt(ddd) > 99) {
@@ -3382,13 +3552,51 @@ class FuncionarioManager {
             }
         }
 
-        // Validação de data
+        // Validação de data mais robusta
         if (isValid && config.type === 'date' && value) {
+            // Verificar se a data é válida e existe
             const date = new Date(value);
             const today = new Date();
-            if (date >= today) {
+            const dataMinima = new Date('1850-01-01');
+            
+            // Verificar se a data é válida
+            if (isNaN(date.getTime())) {
                 isValid = false;
                 errorMessage = 'Data inválida';
+            } else {
+                // Verificar se a data realmente existe (ex: 29/02 em anos não bissextos)
+                const [year, month, day] = value.split('-').map(Number);
+                const actualDate = new Date(year, month - 1, day);
+                
+                if (actualDate.getFullYear() !== year || 
+                    actualDate.getMonth() !== month - 1 || 
+                    actualDate.getDate() !== day) {
+                    isValid = false;
+                    errorMessage = 'Esta data não existe';
+                } else if (date >= today) {
+                    isValid = false;
+                    errorMessage = 'Data não pode ser no futuro';
+                } else if (date < dataMinima) {
+                    isValid = false;
+                    errorMessage = 'Data muito antiga';
+                } else {
+                    // Verificar se a pessoa tem pelo menos 13 anos
+                    const idade = today.getFullYear() - date.getFullYear();
+                    const mesAtual = today.getMonth();
+                    const mesNascimento = date.getMonth();
+                    const diaAtual = today.getDate();
+                    const diaNascimento = date.getDate();
+                    
+                    let idadeReal = idade;
+                    if (mesAtual < mesNascimento || (mesAtual === mesNascimento && diaAtual < diaNascimento)) {
+                        idadeReal--;
+                    }
+                    
+                    if (idadeReal < 18) {
+                        isValid = false;
+                        errorMessage = 'Idade mínima de 18 anos';
+                    }
+                }
             }
         }
 
@@ -3396,7 +3604,7 @@ class FuncionarioManager {
         if (isValid && config.type === 'password' && value) {
             if (!this.isValidPassword(value)) {
                 isValid = false;
-                errorMessage = 'Senha fraca';
+                errorMessage = 'Senha não atende aos requisitos';
             }
         }
 
@@ -3405,17 +3613,46 @@ class FuncionarioManager {
             const matchField = document.getElementById(config.matchField);
             if (matchField && matchField.value !== value) {
                 isValid = false;
-                errorMessage = 'Senhas diferentes';
+                errorMessage = 'Senhas não coincidem';
             }
         }
 
-        // Feedback visual simples - apenas classes CSS
+        // Validação de cargo
+        if (isValid && field.id === 'cargo-funcionario' && value) {
+            const cargosValidos = ['atendente', 'gerente', 'entregador', 'admin', 'cliente'];
+            if (!cargosValidos.includes(value)) {
+                isValid = false;
+                errorMessage = 'Cargo inválido';
+            }
+        }
+
+        // Feedback visual e mensagem de erro
+        this.showFieldValidation(field, isValid, errorMessage);
+
+        return isValid;
+    }
+
+
+    showFieldValidation(field, isValid, errorMessage) {
+        // Remover mensagem de erro anterior
+        const existingMessage = field.parentNode.querySelector('.mensagem-erro');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+
+        // Aplicar classes visuais
         field.classList.remove('error', 'success');
-        if (value) {
+        if (field.value.trim()) {
             field.classList.add(isValid ? 'success' : 'error');
         }
 
-        return isValid;
+        // Mostrar mensagem de erro se houver
+        if (!isValid && errorMessage) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'mensagem-erro';
+            errorDiv.textContent = errorMessage;
+            field.parentNode.appendChild(errorDiv);
+        }
     }
 
     validateAllFuncionarioFields() {
@@ -3435,6 +3672,11 @@ class FuncionarioManager {
         fields.forEach(({ id, config }) => {
             const field = document.getElementById(id);
             if (field) {
+                // Se estiver editando e o campo de senha estiver vazio, pular a validação
+                if (isEditing && (id === 'senha-funcionario' || id === 'confirmar-senha-funcionario') && !field.value.trim()) {
+                    return; // Pular validação para campos de senha vazios durante edição
+                }
+                
                 const isValid = this.validateFuncionarioField(field, config);
                 if (!isValid) allValid = false;
             }
@@ -3449,8 +3691,27 @@ class FuncionarioManager {
             return;
         }
 
+        // Validações adicionais antes de enviar
+        const formData = this.getFuncionarioFormData();
+        
+        // Verificar se email já existe
         try {
-            const formData = this.getFuncionarioFormData();
+            const emailExists = await this.checkEmailExists(formData.email);
+            if (emailExists) {
+                this.showErrorMessage('Este email já está cadastrado no sistema');
+                const emailField = document.getElementById('email-funcionario');
+                if (emailField) {
+                    emailField.classList.add('error');
+                    emailField.classList.remove('success');
+                }
+                return;
+            }
+        } catch (error) {
+            console.warn('Erro ao verificar email:', error);
+            // Continuar mesmo se não conseguir verificar o email
+        }
+
+        try {
             await this.funcionarioDataManager.addFuncionario(formData);
 
             await this.loadFuncionarios();
@@ -3458,7 +3719,75 @@ class FuncionarioManager {
             this.showSuccessMessage('Funcionário adicionado com sucesso!');
         } catch (error) {
             console.error('Erro ao adicionar funcionário:', error);
-            this.showErrorMessage(error.message || 'Erro ao adicionar funcionário. Tente novamente.');
+            
+            // Tratar erros específicos da API
+            if (error.message && error.message.includes('email')) {
+                this.showErrorMessage('Este email já está cadastrado no sistema');
+            } else if (error.message && error.message.includes('CPF')) {
+                this.showErrorMessage('Este CPF já está cadastrado no sistema');
+            } else {
+                this.showErrorMessage(error.message || 'Erro ao adicionar funcionário. Tente novamente.');
+            }
+        }
+    }
+
+    async checkEmailExists(email) {
+        try {
+            const users = await this.funcionarioDataManager.getAllFuncionarios();
+            return users.some(user => user.email.toLowerCase() === email.toLowerCase());
+        } catch (error) {
+            console.error('Erro ao verificar email:', error);
+            return false;
+        }
+    }
+
+    async validateEmailUniqueness(emailField) {
+        const email = emailField.value.trim();
+        if (!email) return;
+
+        try {
+            const isEditing = this.currentEditingId !== null;
+            let emailExists = false;
+
+            if (isEditing) {
+                emailExists = await this.checkEmailExistsForEdit(email, this.currentEditingId);
+            } else {
+                emailExists = await this.checkEmailExists(email);
+            }
+
+            if (emailExists) {
+                emailField.classList.add('error');
+                emailField.classList.remove('success');
+                
+                // Remover mensagem anterior
+                const existingMessage = emailField.parentNode.querySelector('.mensagem-erro');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+
+                // Adicionar nova mensagem
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'mensagem-erro';
+                errorDiv.textContent = isEditing ? 
+                    'Este email já está cadastrado para outro usuário' : 
+                    'Este email já está cadastrado no sistema';
+                emailField.parentNode.appendChild(errorDiv);
+            }
+        } catch (error) {
+            console.warn('Erro ao verificar email:', error);
+        }
+    }
+
+    async checkEmailExistsForEdit(email, currentUserId) {
+        try {
+            const users = await this.funcionarioDataManager.getAllFuncionarios();
+            return users.some(user => 
+                user.email.toLowerCase() === email.toLowerCase() && 
+                user.id !== currentUserId
+            );
+        } catch (error) {
+            console.error('Erro ao verificar email:', error);
+            return false;
         }
     }
 
@@ -3468,8 +3797,27 @@ class FuncionarioManager {
             return;
         }
 
+        // Validações adicionais antes de enviar
+        const formData = this.getFuncionarioFormData();
+        
+        // Verificar se email já existe (exceto para o próprio usuário)
         try {
-            const formData = this.getFuncionarioFormData();
+            const emailExists = await this.checkEmailExistsForEdit(formData.email, this.currentEditingId);
+            if (emailExists) {
+                this.showErrorMessage('Este email já está cadastrado para outro usuário');
+                const emailField = document.getElementById('email-funcionario');
+                if (emailField) {
+                    emailField.classList.add('error');
+                    emailField.classList.remove('success');
+                }
+                return;
+            }
+        } catch (error) {
+            console.warn('Erro ao verificar email:', error);
+            // Continuar mesmo se não conseguir verificar o email
+        }
+
+        try {
             await this.funcionarioDataManager.updateFuncionario(this.currentEditingId, formData);
 
             await this.loadFuncionarios();
@@ -3477,15 +3825,27 @@ class FuncionarioManager {
             this.showSuccessMessage('Funcionário atualizado com sucesso!');
         } catch (error) {
             console.error('Erro ao atualizar funcionário:', error);
-            this.showErrorMessage(error.message || 'Erro ao atualizar funcionário. Tente novamente.');
+            
+            // Tratar erros específicos da API
+            if (error.message && error.message.includes('email')) {
+                this.showErrorMessage('Este email já está cadastrado para outro usuário');
+            } else if (error.message && error.message.includes('CPF')) {
+                this.showErrorMessage('Este CPF já está cadastrado para outro usuário');
+            } else {
+                this.showErrorMessage(error.message || 'Erro ao atualizar funcionário. Tente novamente.');
+            }
         }
     }
 
     getFuncionarioFormData() {
+        const nascimento = document.getElementById('nascimento-funcionario')?.value || '';
+        // Converter de YYYY-MM-DD (HTML input) para DD-MM-YYYY (API)
+        const nascimentoFormatado = nascimento ? nascimento.split('-').reverse().join('-') : null;
+        
         return {
             nome: document.getElementById('nome-funcionario')?.value || '',
             email: document.getElementById('email-funcionario')?.value || '',
-            nascimento: document.getElementById('nascimento-funcionario')?.value || '',
+            nascimento: nascimentoFormatado,
             telefone: document.getElementById('telefone-funcionario')?.value || '',
             cargo: document.getElementById('cargo-funcionario')?.value || '',
             senha: document.getElementById('senha-funcionario')?.value || ''
@@ -3614,13 +3974,13 @@ class FuncionarioManager {
                     <span class="cargo ${cargoClass}">${cargoText}</span>
                 </div>
                 <div class="controles-header">
-                    <button class="btn-editar ${funcionario.cargo === 'admin' ? 'disabled' : ''}" ${funcionario.cargo === 'admin' ? 'title="Não é possível editar administradores"' : ''}>
+                    <button class="btn-editar">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                     <div class="toggle-container">
-                        <div class="toggle ${statusClass} ${funcionario.cargo === 'admin' ? 'admin-protected' : ''}">
+                        <div class="toggle ${statusClass}">
                             <div class="toggle-slider"></div>
-                            <input type="checkbox" ${funcionario.ativo ? 'checked' : ''} style="display: none;" ${funcionario.cargo === 'admin' ? 'disabled' : ''}>
+                            <input type="checkbox" ${funcionario.ativo ? 'checked' : ''} style="display: none;">
                         </div>
                         <div class="status-text ${funcionario.ativo ? '' : 'inactive'}">
                             <i class="fa-solid ${statusIcon}"></i>
@@ -3631,7 +3991,7 @@ class FuncionarioManager {
             </div>
 
             <div class="footer-card">
-                <p class="link-metricas ${funcionario.cargo === 'admin' ? 'disabled' : ''}" ${funcionario.cargo === 'admin' ? 'title="Métricas de administradores não estão disponíveis"' : ''}>Exibir métricas</p>
+                <p class="link-metricas">Exibir métricas</p>
             </div>
         `;
 
@@ -3657,12 +4017,6 @@ class FuncionarioManager {
             const funcionario = await this.funcionarioDataManager.getFuncionarioById(funcionarioId);
 
             if (funcionario) {
-                // Verificar se é administrador
-                if (funcionario.cargo === 'admin') {
-                    this.showErrorMessage('Não é possível editar administradores');
-                    return;
-                }
-
                 this.currentEditingId = funcionarioId;
                 this.openFuncionarioModal(funcionario);
             }
@@ -3683,12 +4037,6 @@ class FuncionarioManager {
         const funcionarioNome = nomeElement ? nomeElement.textContent : 'Funcionário';
         const funcionarioCargo = cargoElement ? cargoElement.textContent.toLowerCase() : '';
 
-        // Verificar se é administrador e se está tentando desativar
-        if (funcionarioCargo === 'admin' && !novoStatus) {
-            this.showErrorMessage('Não é possível desativar administradores');
-            toggle.checked = true; // Reverter para ativo
-            return;
-        }
 
         // Atualizar visual do toggle imediatamente (antes da API)
         const toggleElement = card.querySelector('.toggle');
