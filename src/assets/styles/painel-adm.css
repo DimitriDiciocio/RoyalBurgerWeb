@@ -979,7 +979,6 @@ main {
    ============================================================================ */
 
 #secao-funcionarios {
-    padding-bottom: 50px;
     gap: 20px;
 
     & .filtros {
@@ -1082,6 +1081,7 @@ main {
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
         width: 100%;
+        padding: 30px 0px 50px 0px;
 
         & .card-funcionario {
             background-color: var(--cor-div-primary);
@@ -1289,7 +1289,7 @@ main {
                     transition: 0.3s;
 
                     &:hover {
-                        color: var(--color-secondary);
+                        color: var(--color-texto-light);
                     }
 
                     &.disabled {

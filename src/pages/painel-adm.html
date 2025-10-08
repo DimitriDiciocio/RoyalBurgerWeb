@@ -19,8 +19,7 @@
     <script src="../js/ui/header.js" type="module" defer></script>
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
-    <script src="../js/ui/painel-adm.js" type="module" defer></script>
-    <script src="../js/ui/ingredients-manager.js" type="module" defer></script>
+    <script src="../js/ui/admin/painel-adm.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -859,13 +858,12 @@
                 <div class="campos-linha">
                     <div class="div-input">
                         <label for="custo-ingrediente">Custo Unitário</label>
-                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" placeholder="R$ 0,00"
+                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" 
                             autocomplete="off">
                     </div>
                     <div class="div-input">
                         <label for="unidade-ingrediente">Unidade</label>
-                        <select id="unidade-ingrediente" name="unidade-ingrediente"
-                            placeholder="kg, g, L, ml, etc." autocomplete="off">
+                        <select id="unidade-ingrediente" name="unidade-ingrediente" autocomplete="off">
                             <option value="">Selecione uma unidade</option>
                             <option value="un">un</option>
                             <option value="kg">kg</option>
@@ -935,13 +933,13 @@
 
                     <div class="div-input">
                         <label for="preco-produto">Preço de Venda</label>
-                        <input type="text" id="preco-produto" name="preco-produto" placeholder="R$ 0,00"
+                        <input type="text" id="preco-produto" name="preco-produto"
                             autocomplete="off">
                     </div>
 
                     <div class="div-input">
                         <label for="preco-custo-produto">Preço de Custo</label>
-                        <input type="text" id="preco-custo-produto" name="preco-custo-produto" placeholder="R$ 0,00"
+                        <input type="text" id="preco-custo-produto" name="preco-custo-produto" 
                             autocomplete="off">
                     </div>
 
@@ -959,7 +957,7 @@
 
                         <div class="div-input">
                             <label for="tempo-preparo-produto">Tempo de Preparo (min)</label>
-                            <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto" placeholder="0"
+                            <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto"
                                 autocomplete="off">
                         </div>
                     </div>
@@ -1113,6 +1111,7 @@
         <div class="modal-content-metricas">
             <div class="header-modal">
                 <h2>Métricas</h2>
+                <i class="fa-solid fa-xmark fechar-modal"></i>
             </div>
 
             <div class="conteudo-modal">
@@ -1282,8 +1281,7 @@
                 <div class="filtros-produtos">
                     <div class="div-input">
                         <label for="busca-produto-modal">Buscar produto</label>
-                        <input type="text" id="busca-produto-modal" name="busca-produto-modal" autocomplete="off"
-                            placeholder="Digite o nome do produto">
+                        <input type="text" id="busca-produto-modal" name="busca-produto-modal" autocomplete="off">
                     </div>
                 </div>
 

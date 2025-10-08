@@ -609,6 +609,10 @@ function isLoginPage() {
       const ingredientsModule = await import('../api/ingredients.js');
       Object.assign(window, ingredientsModule);
       
+      // Carregar módulo de modais
+      const modaisModule = await import('./modais.js');
+      Object.assign(window, modaisModule);
+      
       console.log('✅ Módulos de API carregados com sucesso');
     } catch (error) {
       console.error('❌ Erro ao carregar módulos de API:', error);

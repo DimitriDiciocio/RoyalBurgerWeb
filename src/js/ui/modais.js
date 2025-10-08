@@ -63,6 +63,9 @@ function fecharModal(target) {
 window.abrirModal = abrirModal;
 window.fecharModal = fecharModal;
 
+// Exportar para uso em módulos
+export { abrirModal, fecharModal };
+
 // Delegação para abrir/fechar via atributos data-
 document.addEventListener('click', function (e) {
   const openBtn = e.target.closest('[data-open-modal]');
