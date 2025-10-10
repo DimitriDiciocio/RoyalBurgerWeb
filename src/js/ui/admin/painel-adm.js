@@ -377,15 +377,6 @@ class AdminPanelManager {
         await this.managers.insumos.init();
     }
 
-    /**
-     * Inicializa seção de categorias
-     */
-    async initializeCategoriasSection() {
-        if (!this.managers.categorias) {
-            this.managers.categorias = new CategoriaManager();
-        }
-        await this.managers.categorias.init();
-    }
 
     /**
      * Inicializa seção de dashboard
@@ -459,6 +450,33 @@ class AdminPanelManager {
             console.error('Promise rejeitada não tratada:', event.reason);
             this.showErrorMessage('Ocorreu um erro inesperado. Tente novamente.');
         });
+
+        // Event listener para botão de categorias
+        document.addEventListener('click', async (e) => {
+            if (e.target.matches('#btn-categorias')) {
+                e.preventDefault();
+                await this.openCategoriasModal();
+            }
+        });
+    }
+
+    /**
+     * Abre modal de categorias
+     */
+    async openCategoriasModal() {
+        try {
+            // Inicializar gerenciador de categorias se não existir
+            if (!this.managers.categorias) {
+                this.managers.categorias = new CategoriaManager();
+            }
+            await this.managers.categorias.init();
+            
+            // Abrir modal de categorias
+            await this.managers.categorias.openCategoriasModalPublic();
+        } catch (error) {
+            console.error('Erro ao abrir modal de categorias:', error);
+            this.showErrorMessage('Erro ao abrir modal de categorias');
+        }
     }
 
     /**
@@ -536,10 +554,10 @@ class AdminPanelManager {
      */
     getManager(sectionId) {
         const managerMap = {
+            'funcionarios': this.managers.usuarios,
             'usuarios': this.managers.usuarios,
             'cardapio': this.managers.produtos,
-            'estoque': this.managers.insumos,
-            'categorias': this.managers.categorias
+            'estoque': this.managers.insumos
         };
         
         return managerMap[sectionId] || null;

@@ -11,8 +11,8 @@ import {
     getCategoryById
 } from '../../api/categories.js';
 
-import { getProducts, updateProduct } from '../../api/products.js';
-import { showToast } from '../alerts.js';
+import { getProducts, updateProduct, getProductById } from '../../api/products.js';
+import { showToast, showConfirm } from '../alerts.js';
 
 /**
  * Gerenciador de dados de categorias
@@ -67,12 +67,19 @@ class CategoriaDataManager {
      */
     async getCategoriaById(id) {
         try {
-            const categoria = await getCategoryById(id);
+            // Como não há endpoint específico, busca na lista de categorias
+            const response = await getCategories();
+            const categorias = response.items || [];
+            const categoria = categorias.find(cat => cat.id === id);
+            
+            if (!categoria) {
+                throw new Error('Categoria não encontrada');
+            }
             
             return {
                 id: categoria.id,
                 nome: categoria.name,
-                ordem: categoria.order || 0,
+                ordem: categoria.display_order || 0,
                 ativo: categoria.is_active !== undefined ? categoria.is_active : true,
                 dataCriacao: categoria.created_at || new Date().toISOString().split('T')[0],
                 ultimaAtualizacao: categoria.updated_at || new Date().toISOString().split('T')[0]
@@ -163,14 +170,27 @@ class CategoriaDataManager {
             throw error;
         }
     }
-
-    /**
-     * Remove item da categoria (implementação simplificada)
-     */
     async removeItemFromCategoria(categoriaId, produtoId) {
         try {
-            // Implementação simplificada - remove a categoria do produto
-            await updateProduct(produtoId, { category_id: null });
+            // Primeiro, obtém o produto atual para manter os outros campos
+            const produto = await getProductById(produtoId);
+            
+            if (!produto) {
+                throw new Error(`Produto com ID ${produtoId} não encontrado`);
+            }
+            
+            // Cria um objeto de atualização que remove a categoria
+            // Usamos -1 como valor especial para indicar remoção de categoria
+            const updateData = {
+                name: produto.name,
+                description: produto.description,
+                price: parseFloat(produto.price),
+                cost_price: parseFloat(produto.cost_price || 0),
+                preparation_time_minutes: produto.preparation_time_minutes || 0,
+                category_id: -1 // Valor especial para indicar remoção
+            };
+            
+            await updateProduct(produtoId, updateData);
             this.clearCache();
         } catch (error) {
             console.error('Erro ao remover item da categoria:', error);
@@ -188,6 +208,7 @@ class CategoriaManager {
         this.currentCategoriaId = null;
         this.produtosSelecionados = new Set();
         this.produtosDisponiveis = [];
+        this.eventListeners = [];
     }
 
     /**
@@ -207,44 +228,45 @@ class CategoriaManager {
      * Configura event listeners
      */
     setupEventListeners() {
+        // Remove listeners existentes para evitar duplicação
+        this.removeEventListeners();
+        
         this.setupCategoriaHandlers();
         this.setupModalHandlers();
+    }
+
+    /**
+     * Remove event listeners existentes
+     */
+    removeEventListeners() {
+        // Remove listeners específicos se existirem
+        if (this.eventListeners) {
+            this.eventListeners.forEach(({ element, event, handler }) => {
+                element.removeEventListener(event, handler);
+            });
+            this.eventListeners = [];
+        }
     }
 
     /**
      * Configura handlers específicos de categorias
      */
     setupCategoriaHandlers() {
-        const section = document.getElementById('secao-categorias');
-        if (!section) return;
-
-        // Event delegation para botões de editar
-        section.addEventListener('click', (e) => {
-            if (e.target.matches('.editar-categoria')) {
+        // Event delegation centralizado para todos os botões de categoria
+        const handler = (e) => {
+            if (e.target.matches('#btn-editar-categoria, .fa-edit')) {
                 this.handleEditCategoria(e.target);
-            }
-        });
-
-        // Event delegation para botões de excluir
-        section.addEventListener('click', (e) => {
-            if (e.target.matches('.excluir-categoria')) {
+            } else if (e.target.matches('#btn-excluir-categoria, .fa-trash')) {
                 this.handleDeleteCategoria(e.target);
-            }
-        });
-
-        // Event delegation para botões de itens
-        section.addEventListener('click', (e) => {
-            if (e.target.matches('.gerenciar-itens')) {
+            } else if (e.target.matches('#btn-acessar-itens, .fa-list')) {
                 this.handleGerenciarItens(e.target);
-            }
-        });
-
-        // Event delegation para botão nova categoria
-        section.addEventListener('click', (e) => {
-            if (e.target.matches('.btn-nova-categoria')) {
+            } else if (e.target.matches('#btn-adicionar-categoria')) {
                 this.handleNovaCategoria();
             }
-        });
+        };
+
+        document.addEventListener('click', handler);
+        this.eventListeners.push({ element: document, event: 'click', handler });
     }
 
     /**
@@ -265,13 +287,13 @@ class CategoriaManager {
         if (!modal) return;
 
         // Botão fechar
-        const btnFechar = modal.querySelector('.fechar-modal');
+        const btnFechar = modal.querySelector('#cancelar-categorias');
         if (btnFechar) {
             btnFechar.addEventListener('click', () => this.closeCategoriasModal());
         }
 
         // Botão salvar ordem
-        const btnSalvar = modal.querySelector('.btn-salvar-ordem');
+        const btnSalvar = modal.querySelector('#salvar-categorias');
         if (btnSalvar) {
             btnSalvar.addEventListener('click', () => this.saveCategorias());
         }
@@ -291,19 +313,19 @@ class CategoriaManager {
         if (!modal) return;
 
         // Botão fechar
-        const btnFechar = modal.querySelector('.fechar-modal');
+        const btnFechar = modal.querySelector('#cancelar-itens');
         if (btnFechar) {
             btnFechar.addEventListener('click', () => this.closeItensModal());
         }
 
         // Botão voltar
-        const btnVoltar = modal.querySelector('.btn-voltar');
+        const btnVoltar = modal.querySelector('#voltar-categorias');
         if (btnVoltar) {
             btnVoltar.addEventListener('click', () => this.voltarParaCategorias());
         }
 
         // Botão adicionar itens
-        const btnAdicionar = modal.querySelector('.btn-adicionar-itens');
+        const btnAdicionar = modal.querySelector('#btn-adicionar-item');
         if (btnAdicionar) {
             btnAdicionar.addEventListener('click', () => this.openProdutosModal());
         }
@@ -323,13 +345,13 @@ class CategoriaManager {
         if (!modal) return;
 
         // Botão fechar
-        const btnFechar = modal.querySelector('.fechar-modal');
+        const btnFechar = modal.querySelector('#cancelar-categoria-form');
         if (btnFechar) {
             btnFechar.addEventListener('click', () => this.closeCategoriaFormModal());
         }
 
         // Botão salvar
-        const btnSalvar = modal.querySelector('.btn-salvar-categoria');
+        const btnSalvar = modal.querySelector('#salvar-categoria-form');
         if (btnSalvar) {
             btnSalvar.addEventListener('click', () => this.saveCategoriaForm());
         }
@@ -349,13 +371,13 @@ class CategoriaManager {
         if (!modal) return;
 
         // Botão fechar
-        const btnFechar = modal.querySelector('.fechar-modal');
+        const btnFechar = modal.querySelector('#cancelar-produtos');
         if (btnFechar) {
             btnFechar.addEventListener('click', () => this.closeProdutosModal());
         }
 
         // Botão adicionar selecionados
-        const btnAdicionar = modal.querySelector('.btn-adicionar-selecionados');
+        const btnAdicionar = modal.querySelector('#adicionar-produtos');
         if (btnAdicionar) {
             btnAdicionar.addEventListener('click', () => this.adicionarProdutosSelecionados());
         }
@@ -372,7 +394,8 @@ class CategoriaManager {
      */
     async loadCategorias() {
         try {
-            const categorias = await this.dataManager.getAllCategorias();
+            const response = await this.dataManager.getAllCategorias();
+            const categorias = response.items || [];
             this.renderCategoriaElements(categorias);
         } catch (error) {
             console.error('Erro ao carregar categorias:', error);
@@ -384,7 +407,7 @@ class CategoriaManager {
      * Renderiza elementos de categorias
      */
     renderCategoriaElements(categorias) {
-        const container = document.querySelector('#secao-categorias .categorias');
+        const container = document.querySelector('#lista-categorias');
         if (!container) return;
 
         container.innerHTML = '';
@@ -417,29 +440,23 @@ class CategoriaManager {
         element.dataset.categoriaId = categoria.id;
 
         element.innerHTML = `
-            <div class="categoria-header">
-                <div class="drag-handle">
-                    <i class="fa-solid fa-grip-vertical"></i>
-                </div>
-                <div class="categoria-info">
-                    <h3>${categoria.name}</h3>
-                    <p class="categoria-meta">
-                        <span class="item-count">${categoria.item_count || 0} itens</span>
-                        <span class="separator">•</span>
-                        <span class="created-date">Criada em ${this.formatDate(categoria.created_at)}</span>
-                    </p>
-                </div>
-                <div class="categoria-actions">
-                    <button class="btn btn-sm btn-secondary gerenciar-itens" title="Gerenciar itens">
-                        <i class="fa-solid fa-list"></i>
-                    </button>
-                    <button class="btn btn-sm btn-warning editar-categoria" title="Editar categoria">
-                        <i class="fa-solid fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger excluir-categoria" title="Excluir categoria">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </div>
+            <div class="info-categoria">
+                        <div class="drag-handle">
+                <i class="fa-solid fa-grip-vertical"></i>
+            </div>
+                <h3 class="nome-categoria">${categoria.name}</h3>
+            </div>
+            
+            <div class="acoes-categoria">
+                <button id="btn-acessar-itens" class="btn-acao btn-itens gerenciar-itens" title="Gerenciar itens"> Acessar itens
+                    <i class="fa-solid fa-list"></i>
+                </button>
+                <button id="btn-editar-categoria" class="btn-acao btn-editar editar-categoria" title="Editar categoria">
+                    <i class="fa-solid fa-edit"></i>
+                </button>
+                <button id="btn-excluir-categoria" class="btn-acao btn-excluir excluir-categoria" title="Excluir categoria">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
             </div>
         `;
 
@@ -450,7 +467,7 @@ class CategoriaManager {
      * Configura drag and drop
      */
     setupDragAndDrop() {
-        const container = document.querySelector('#secao-categorias .categorias');
+        const container = document.querySelector('#lista-categorias');
         if (!container) return;
 
         let draggedElement = null;
@@ -524,15 +541,23 @@ class CategoriaManager {
         const categoriaId = parseInt(element.dataset.categoriaId);
         const nome = element.querySelector('h3').textContent;
 
-        if (confirm(`Tem certeza que deseja excluir a categoria "${nome}"?`)) {
-            try {
+        try {
+            const confirmed = await showConfirm({
+                title: 'Confirmar Exclusão',
+                message: `Tem certeza que deseja excluir a categoria "${nome}"? Esta ação não pode ser desfeita.`,
+                confirmText: 'Excluir',
+                cancelText: 'Cancelar',
+                type: 'delete'
+            });
+
+            if (confirmed) {
                 await this.dataManager.deleteCategoria(categoriaId);
                 await this.loadCategorias();
                 this.showSuccessMessage(`Categoria "${nome}" excluída com sucesso!`);
-            } catch (error) {
-                console.error('Erro ao excluir categoria:', error);
-                this.showErrorMessage('Erro ao excluir categoria. Tente novamente.');
             }
+        } catch (error) {
+            console.error('Erro ao excluir categoria:', error);
+            this.showErrorMessage('Erro ao excluir categoria. Tente novamente.');
         }
     }
 
@@ -578,6 +603,13 @@ class CategoriaManager {
         if (!modal) return;
 
         try {
+            // Buscar dados da categoria para definir o título
+            const categoria = await this.dataManager.getCategoriaById(categoriaId);
+            const titulo = modal.querySelector('#titulo-itens-categoria');
+            if (titulo) {
+                titulo.textContent = `Itens da Categoria: ${categoria.nome}`;
+            }
+
             await this.loadItens(categoriaId);
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
@@ -624,7 +656,7 @@ class CategoriaManager {
      * Renderiza itens
      */
     renderItens(itens) {
-        const container = document.querySelector('#modal-itens .itens-container');
+        const container = document.querySelector('#lista-itens');
         if (!container) return;
 
         container.innerHTML = '';
@@ -650,20 +682,19 @@ class CategoriaManager {
      */
     createItemElement(item) {
         const element = document.createElement('div');
-        element.className = 'item-element';
+        element.className = 'item-categoria';
         element.dataset.itemId = item.id;
 
         element.innerHTML = `
-            <div class="item-info">
-                <h4>${item.name}</h4>
-                <p class="item-description">${item.description || 'Sem descrição'}</p>
-                <p class="item-price">R$ ${parseFloat(item.price).toFixed(2).replace('.', ',')}</p>
+            <div class="info-item">
+                <div class="item-header">
+                    <p class="nome-item">${item.name}</p>
+                    <span class="item-status">Ativo</span>
+                </div>
+                <p class="valor-item">R$ ${parseFloat(item.price).toFixed(2).replace('.', ',')}</p>
             </div>
-            <div class="item-actions">
-                <button class="btn btn-sm btn-warning editar-item" title="Editar item">
-                    <i class="fa-solid fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger remover-item" title="Remover da categoria">
+            <div class="acoes-item">
+                <button class="btn-excluir remover-item" title="Remover da categoria">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -691,9 +722,9 @@ class CategoriaManager {
         const modal = document.getElementById('modal-categoria-form');
         if (!modal) return;
 
-        const titulo = modal.querySelector('.modal-title');
-        const inputNome = modal.querySelector('#nome-categoria');
-        const btnSalvar = modal.querySelector('.btn-salvar-categoria');
+        const titulo = modal.querySelector('#titulo-categoria-form');
+        const inputNome = modal.querySelector('#nome-categoria-input');
+        const btnSalvar = modal.querySelector('#salvar-categoria-form');
 
         if (categoriaId) {
             titulo.textContent = 'Editar categoria';
@@ -726,8 +757,8 @@ class CategoriaManager {
      * Salva formulário de categoria
      */
     async saveCategoriaForm() {
-        const inputNome = document.querySelector('#nome-categoria');
-        const btnSalvar = document.querySelector('.btn-salvar-categoria');
+        const inputNome = document.querySelector('#nome-categoria-input');
+        const btnSalvar = document.querySelector('#salvar-categoria-form');
         const nome = inputNome.value.trim();
         const categoriaId = btnSalvar.dataset.categoriaId;
 
@@ -803,12 +834,13 @@ class CategoriaManager {
     }
 
     /**
-     * Carrega produtos disponíveis
+     * Carrega produtos disponíveis (sem categoria)
      */
     async loadProdutosDisponiveis() {
         try {
             const response = await getProducts();
-            this.produtosDisponiveis = response.items || [];
+            // Filtrar apenas produtos sem categoria
+            this.produtosDisponiveis = (response.items || []).filter(produto => !produto.category_id);
             this.renderProdutosDisponiveis();
         } catch (error) {
             console.error('Erro ao carregar produtos disponíveis:', error);
@@ -820,7 +852,7 @@ class CategoriaManager {
      * Renderiza produtos disponíveis
      */
     renderProdutosDisponiveis() {
-        const container = document.querySelector('#modal-produtos .produtos-container');
+        const container = document.querySelector('#lista-produtos');
         if (!container) return;
 
         container.innerHTML = '';
@@ -846,17 +878,14 @@ class CategoriaManager {
      */
     createProdutoElement(produto) {
         const element = document.createElement('div');
-        element.className = 'produto-element';
+        element.className = 'produto-item';
         element.dataset.produtoId = produto.id;
 
         element.innerHTML = `
-            <div class="produto-info">
-                <h4>${produto.name}</h4>
-                <p class="produto-description">${produto.description || 'Sem descrição'}</p>
-                <p class="produto-price">R$ ${parseFloat(produto.price).toFixed(2).replace('.', ',')}</p>
-            </div>
-            <div class="produto-actions">
-                <input type="checkbox" class="produto-checkbox" data-produto-id="${produto.id}">
+            <input type="checkbox" class="checkbox-produto produto-checkbox" data-produto-id="${produto.id}" title="Selecionar produto">
+            <div class="info-produto">
+                <p class="nome-produto">${produto.name}</p>
+                <p class="valor-produto">R$ ${parseFloat(produto.price).toFixed(2).replace('.', ',')}</p>
             </div>
         `;
 
@@ -865,8 +894,22 @@ class CategoriaManager {
         if (checkbox) {
             checkbox.addEventListener('change', (e) => {
                 this.toggleProdutoSelecao(produto.id, e.target.checked);
+                // Adiciona/remove classe de selecionado
+                if (e.target.checked) {
+                    element.classList.add('selecionado');
+                } else {
+                    element.classList.remove('selecionado');
+                }
             });
         }
+
+        // Event listener para clique no item (além do checkbox)
+        element.addEventListener('click', (e) => {
+            if (e.target !== checkbox) {
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        });
 
         return element;
     }
@@ -887,7 +930,7 @@ class CategoriaManager {
      * Atualiza botão de adicionar
      */
     updateBotaoAdicionar() {
-        const btnAdicionar = document.querySelector('.btn-adicionar-selecionados');
+        const btnAdicionar = document.querySelector('#adicionar-produtos');
         if (btnAdicionar) {
             const count = this.produtosSelecionados.size;
             btnAdicionar.textContent = count > 0 ? `Adicionar ${count} produto(s)` : 'Adicionar produtos';
@@ -913,7 +956,10 @@ class CategoriaManager {
 
             this.showSuccessMessage(`${adicionados} produto(s) adicionado(s) com sucesso!`);
             this.closeProdutosModal();
+            
+            // Recarregar itens da categoria e produtos disponíveis
             await this.loadItens(this.currentCategoriaId);
+            await this.loadProdutosDisponiveis();
         } catch (error) {
             console.error('Erro ao adicionar produtos à categoria:', error);
             this.showErrorMessage('Erro ao adicionar produtos à categoria. Tente novamente.');
@@ -944,10 +990,14 @@ class CategoriaManager {
         if (!this.currentCategoriaId) return;
 
         try {
-            const item = this.produtosDisponiveis.find(p => p.id === itemId);
+            // Buscar o item na lista de itens da categoria
+            const itens = await this.dataManager.getItensByCategoria(this.currentCategoriaId);
+            const item = itens.find(p => p.id === itemId);
+            
             if (item) {
                 await this.dataManager.removeItemFromCategoria(this.currentCategoriaId, itemId);
                 await this.loadItens(this.currentCategoriaId);
+                await this.loadProdutosDisponiveis(); // Recarregar produtos disponíveis
                 this.showSuccessMessage(`Item "${item.name}" removido da categoria com sucesso!`);
             }
         } catch (error) {
@@ -977,6 +1027,13 @@ class CategoriaManager {
      */
     showErrorMessage(message) {
         showToast(message, { type: 'error', title: 'Erro' });
+    }
+
+    /**
+     * Método público para abrir modal de categorias
+     */
+    async openCategoriasModalPublic() {
+        await this.openCategoriasModal();
     }
 }
 

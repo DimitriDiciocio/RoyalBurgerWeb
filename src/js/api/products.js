@@ -42,7 +42,7 @@ export const getProducts = async (options = {}) => {
  * @returns {Promise<Object>} Dados do produto
  */
 export const getProductById = async (productId) => {
-    return await apiRequest(`/api/products/${productId}/`, {
+    return await apiRequest(`/api/products/${productId}`, {
         method: 'GET'
     });
 };
@@ -110,13 +110,13 @@ export const updateProduct = async (productId, updateData) => {
         // Adiciona imagem
         formData.append('image', updateData.image);
         
-        return await apiRequest(`/api/products/${productId}/`, {
+        return await apiRequest(`/api/products/${productId}`, {
             method: 'PUT',
             body: formData,
             headers: {} // Remove Content-Type para FormData
         });
     } else {
-        return await apiRequest(`/api/products/${productId}/`, {
+        return await apiRequest(`/api/products/${productId}`, {
             method: 'PUT',
             body: JSON.stringify(updateData)
         });
@@ -129,7 +129,7 @@ export const updateProduct = async (productId, updateData) => {
  * @returns {Promise<Object>} Resultado da inativação
  */
 export const deleteProduct = async (productId) => {
-    return await apiRequest(`/api/products/${productId}/`, {
+    return await apiRequest(`/api/products/${productId}`, {
         method: 'DELETE'
     });
 };
@@ -140,7 +140,7 @@ export const deleteProduct = async (productId) => {
  * @returns {Promise<Object>} Resultado da reativação
  */
 export const reactivateProduct = async (productId) => {
-    return await apiRequest(`/api/products/${productId}/reactivate/`, {
+    return await apiRequest(`/api/products/${productId}/reactivate`, {
         method: 'POST'
     });
 };
@@ -151,7 +151,7 @@ export const reactivateProduct = async (productId) => {
  * @returns {Promise<Object>} Lista de ingredientes com custo estimado
  */
 export const getProductIngredients = async (productId) => {
-    return await apiRequest(`/api/products/${productId}/ingredients/`, {
+    return await apiRequest(`/api/products/${productId}/ingredients`, {
         method: 'GET'
     });
 };
@@ -165,7 +165,7 @@ export const getProductIngredients = async (productId) => {
  * @returns {Promise<Object>} Resultado da associação
  */
 export const addIngredientToProduct = async (productId, ingredientId, quantity, unit = null) => {
-    return await apiRequest(`/api/products/${productId}/ingredients/`, {
+    return await apiRequest(`/api/products/${productId}/ingredients`, {
         method: 'POST',
         body: JSON.stringify({
             ingredient_id: ingredientId,
@@ -184,7 +184,7 @@ export const addIngredientToProduct = async (productId, ingredientId, quantity, 
  * @returns {Promise<Object>} Resultado da atualização
  */
 export const updateProductIngredient = async (productId, ingredientId, quantity, unit) => {
-    return await apiRequest(`/api/products/${productId}/ingredients/${ingredientId}/`, {
+    return await apiRequest(`/api/products/${productId}/ingredients/${ingredientId}`, {
         method: 'PUT',
         body: JSON.stringify({
             quantity: quantity,
@@ -200,7 +200,7 @@ export const updateProductIngredient = async (productId, ingredientId, quantity,
  * @returns {Promise<Object>} Resultado da remoção
  */
 export const removeIngredientFromProduct = async (productId, ingredientId) => {
-    return await apiRequest(`/api/products/${productId}/ingredients/${ingredientId}/`, {
+    return await apiRequest(`/api/products/${productId}/ingredients/${ingredientId}`, {
         method: 'DELETE'
     });
 };

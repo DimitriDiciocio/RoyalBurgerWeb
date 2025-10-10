@@ -42,7 +42,7 @@ export async function createCategory(categoryData) {
  * @param {number} categoryId - ID da categoria
  */
 export async function getCategoryById(categoryId) {
-    return apiRequest(`${CATEGORY_BASE}/${categoryId}`, { method: 'GET' });
+    return apiRequest(`${CATEGORY_BASE}${categoryId}`, { method: 'GET' });
 }
 
 /**
@@ -52,7 +52,7 @@ export async function getCategoryById(categoryId) {
  * @param {string} updateData.name - Novo nome da categoria
  */
 export async function updateCategory(categoryId, updateData) {
-    return apiRequest(`${CATEGORY_BASE}/${categoryId}`, {
+    return apiRequest(`${CATEGORY_BASE}${categoryId}`, {
         method: 'PUT',
         body: updateData
     });
@@ -63,5 +63,5 @@ export async function updateCategory(categoryId, updateData) {
  * @param {number} categoryId - ID da categoria
  */
 export async function deleteCategory(categoryId) {
-    return apiRequest(`${CATEGORY_BASE}/${categoryId}`, { method: 'DELETE' });
+    return apiRequest(`${CATEGORY_BASE}${categoryId}`, { method: 'DELETE' });
 }
