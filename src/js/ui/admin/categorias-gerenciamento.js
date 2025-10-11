@@ -8,7 +8,8 @@ import {
     updateCategory, 
     deleteCategory,
     getCategories,
-    getCategoryById
+    getCategoryById,
+    reorderCategories
 } from '../../api/categories.js';
 
 import { getProducts, updateProduct, getProductById } from '../../api/products.js';
@@ -130,12 +131,16 @@ class CategoriaDataManager {
     }
 
     /**
-     * Reordena categorias (implementação simplificada)
+     * Reordena categorias
      */
     async reorderCategorias(categoriasOrdenadas) {
         try {
-            // Implementação simplificada - apenas atualiza a ordem localmente
-            console.log('Reordenação de categorias:', categoriasOrdenadas);
+            const categories = categoriasOrdenadas.map(cat => ({
+                id: cat.id,
+                display_order: cat.order
+            }));
+
+            await reorderCategories(categories);
             this.clearCache();
         } catch (error) {
             console.error('Erro ao reordenar categorias:', error);
@@ -471,29 +476,53 @@ class CategoriaManager {
         if (!container) return;
 
         let draggedElement = null;
+        let draggedIndex = null;
 
         container.addEventListener('dragstart', (e) => {
             if (e.target.classList.contains('categoria-item')) {
                 draggedElement = e.target;
+                draggedIndex = Array.from(container.children).indexOf(e.target);
+                e.target.classList.add('dragging');
                 e.target.style.opacity = '0.5';
             }
         });
 
         container.addEventListener('dragend', (e) => {
             if (e.target.classList.contains('categoria-item')) {
+                e.target.classList.remove('dragging');
                 e.target.style.opacity = '1';
+                
+                // Verifica se a posição mudou
+                const newIndex = Array.from(container.children).indexOf(e.target);
+                if (draggedIndex !== newIndex) {
+                    this.saveNewOrder();
+                }
+                
                 draggedElement = null;
+                draggedIndex = null;
             }
         });
 
         container.addEventListener('dragover', (e) => {
             e.preventDefault();
+            container.classList.add('drag-over');
             const afterElement = this.getDragAfterElement(container, e.clientY);
             if (afterElement == null) {
                 container.appendChild(draggedElement);
             } else {
                 container.insertBefore(draggedElement, afterElement);
             }
+        });
+
+        container.addEventListener('dragleave', (e) => {
+            if (!container.contains(e.relatedTarget)) {
+                container.classList.remove('drag-over');
+            }
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.classList.remove('drag-over');
         });
     }
 
@@ -513,6 +542,27 @@ class CategoriaManager {
                 return closest;
             }
         }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    /**
+     * Salva a nova ordem das categorias
+     */
+    async saveNewOrder() {
+        try {
+            const container = document.querySelector('#lista-categorias');
+            const categorias = Array.from(container.querySelectorAll('.categoria-item'));
+            
+            const categoriasOrdenadas = categorias.map((element, index) => ({
+                id: parseInt(element.dataset.categoriaId),
+                order: index + 1
+            }));
+
+            await this.dataManager.reorderCategorias(categoriasOrdenadas);
+            this.showSuccessMessage('Ordem das categorias atualizada!');
+        } catch (error) {
+            console.error('Erro ao salvar ordem das categorias:', error);
+            this.showErrorMessage('Erro ao salvar ordem das categorias. Tente novamente.');
+        }
     }
 
     /**

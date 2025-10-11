@@ -65,3 +65,16 @@ export async function updateCategory(categoryId, updateData) {
 export async function deleteCategory(categoryId) {
     return apiRequest(`${CATEGORY_BASE}${categoryId}`, { method: 'DELETE' });
 }
+
+/**
+ * Reordena categorias
+ * @param {Array} categories - Lista de categorias com nova ordem
+ * @param {number} categories[].id - ID da categoria
+ * @param {number} categories[].display_order - Nova ordem de exibição
+ */
+export async function reorderCategories(categories) {
+    return apiRequest(`${CATEGORY_BASE}reorder`, {
+        method: 'POST',
+        body: { categories }
+    });
+}

@@ -2413,3 +2413,41 @@
     accent-color: var(--color-primary);
   }
 }
+
+/* ====== Estilos para drag and drop de categorias ====== */
+
+.categoria-item {
+  &.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+  }
+
+  .drag-handle {
+    cursor: grab;
+    color: var(--color-texto-erased);
+    transition: color 0.3s ease;
+
+    &:hover {
+      color: var(--color-texto-black);
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &:hover .drag-handle {
+    color: var(--color-texto-black);
+  }
+}
+
+/* Feedback visual durante o drag */
+#lista-categorias {
+  &.drag-over {
+    background-color: #f8fafc;
+    border: 2px dashed var(--color-primary);
+    border-radius: 8px;
+  }
+}
