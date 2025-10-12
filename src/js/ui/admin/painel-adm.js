@@ -10,6 +10,7 @@ import { InsumoManager } from './insumos-gerenciamento.js';
 import { CategoriaManager } from './categorias-gerenciamento.js';
 
 import { showToast } from '../alerts.js';
+import { fetchMe } from '../../api/auth.js';
 
 /**
  * Configurações do painel administrativo
@@ -63,11 +64,19 @@ class AdminPanelManager {
      */
     async init() {
         try {
-
-            
             // Verificar permissões de administrador
-            if (!this.verifyAdminPermissions()) {
-                this.handleAuthError('Acesso negado. Permissões de administrador necessárias.');
+            try {
+                const hasPermission = await this.verifyAdminPermissions();
+                if (!hasPermission) {
+                    this.handleAuthError('Acesso negado. Permissões de administrador necessárias.');
+                    return;
+                }
+            } catch (error) {
+                if (error.message === 'TOKEN_EXPIRED') {
+                    this.handleTokenExpired();
+                    return;
+                }
+                this.handleAuthError('Erro ao verificar permissões. Tente fazer login novamente.');
                 return;
             }
 
@@ -94,8 +103,14 @@ class AdminPanelManager {
     /**
      * Verifica permissões de administrador
      */
-    verifyAdminPermissions() {
+    async verifyAdminPermissions() {
         try {
+            // Verificar se existe token
+            const token = localStorage.getItem('rb.token') || localStorage.getItem('token');
+            if (!token) {
+                return false;
+            }
+
             // Verificar diferentes chaves possíveis no localStorage
             const userData = localStorage.getItem('rb.user') || 
                            localStorage.getItem('userData') || 
@@ -106,14 +121,31 @@ class AdminPanelManager {
             }
 
             const user = JSON.parse(userData);
-            
             const normalizedRole = this.normalizeUserRole(user);
-            
             const hasPermission = normalizedRole === 'admin' || normalizedRole === 'gerente';
             
-            return hasPermission;
+            // Se não tem permissão baseada no localStorage, retornar false
+            if (!hasPermission) {
+                return false;
+            }
+
+            // Se tem permissão no localStorage, validar token com a API
+            try {
+                await fetchMe(); // Se der erro 401, será tratado pelo apiRequest
+                return true;
+            } catch (apiError) {
+                // Se for erro 401 (token expirado), tratar como token expirado
+                if (apiError.status === 401) {
+                    throw new Error('TOKEN_EXPIRED');
+                }
+                // Para outros erros, assumir que não tem permissão
+                return false;
+            }
         } catch (error) {
             console.error('Erro ao verificar permissões:', error);
+            if (error.message === 'TOKEN_EXPIRED') {
+                throw error; // Re-throw para ser tratado como token expirado
+            }
             return false;
         }
     }
@@ -166,6 +198,35 @@ class AdminPanelManager {
                 window.location.href = 'src/pages/login.html';
             }
         }, 3000);
+    }
+
+    /**
+     * Trata erro de token expirado
+     */
+    handleTokenExpired() {
+        console.warn('Token expirado detectado');
+        
+        // Limpar dados do usuário e token
+        localStorage.removeItem('rb.token');
+        localStorage.removeItem('rb.user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userData');
+        localStorage.removeItem('user');
+        
+        // Mostrar mensagem específica de token expirado
+        this.showErrorMessage('Sua sessão expirou. Faça login novamente para continuar.');
+        
+        // Redirecionar para login após 2 segundos
+        setTimeout(() => {
+            const currentPath = window.location.pathname;
+            const isInPagesFolder = currentPath.includes('/pages/');
+            
+            if (isInPagesFolder) {
+                window.location.href = 'login.html';
+            } else {
+                window.location.href = 'src/pages/login.html';
+            }
+        }, 2000);
     }
 
     /**
