@@ -5,6 +5,9 @@
 
 import { apiRequest } from './api.js';
 
+// Constantes para evitar hardcoding
+const MAX_PAGE_SIZE = 1000; // TODO: Implementar paginação adequada no backend
+
 /**
  * Lista todos os ingredientes com filtros opcionais
  * @param {Object} options - Opções de filtro e paginação
@@ -31,21 +34,34 @@ export const getIngredients = async (options = {}) => {
 };
 
 /**
- * Busca um ingrediente por ID
+ * Busca um ingrediente por ID-
  * @param {number} ingredientId - ID do ingrediente
  * @returns {Promise<Object>} Dados do ingrediente
  */
 export const getIngredientById = async (ingredientId) => {
-    // Como o endpoint GET /api/ingredients/{id} não está implementado,
-    // vamos buscar todos os ingredientes e filtrar pela ID
-    const response = await getIngredients({ page_size: 1000 });
-    const ingredient = response.items.find(ing => ing.id === ingredientId);
-    
-    if (!ingredient) {
-        throw new Error(`Ingrediente com ID ${ingredientId} não encontrado`);
+    try {
+        // Como o endpoint GET /api/ingredients/{id} não está implementado,
+        // vamos buscar todos os ingredientes e filtrar pela ID
+        const response = await getIngredients({ page_size: MAX_PAGE_SIZE }); // TODO: Implementar endpoint específico
+        
+        if (!response || !response.items) {
+            throw new Error('Resposta inválida da API');
+        }
+        
+        // Converter ingredientId para número para comparação
+        const targetId = parseInt(ingredientId);
+        const ingredient = response.items.find(ing => parseInt(ing.id) === targetId);
+        
+        if (!ingredient) {
+            const error = new Error(`Ingrediente com ID ${ingredientId} não encontrado`);
+            error.status = 404;
+            throw error;
+        }
+        
+        return ingredient;
+    } catch (error) {
+        throw error;
     }
-    
-    return ingredient;
 };
 
 /**
@@ -112,9 +128,17 @@ export const updateIngredientAvailability = async (ingredientId, isAvailable) =>
  * @returns {Promise<Object>} Resultado do ajuste
  */
 export const adjustIngredientStock = async (ingredientId, changeAmount) => {
+    // Garantir que changeAmount seja um número
+    const numericChange = parseFloat(changeAmount);
+    if (isNaN(numericChange)) {
+        throw new Error('Valor de mudança inválido');
+    }
+    
+    const payload = { change: numericChange };
+    
     return await apiRequest(`/api/ingredients/${ingredientId}/stock`, {
         method: 'POST',
-        body: JSON.stringify({ change: changeAmount })
+        body: JSON.stringify(payload)
     });
 };
 
@@ -136,71 +160,119 @@ export const addIngredientQuantity = async (ingredientId, quantity) => {
  * @returns {Promise<Object>} Resumo com métricas de estoque
  */
 export const getStockSummary = async () => {
-    
-    // Como não há endpoint específico, vamos calcular localmente
-    // ou implementar um endpoint no backend
-    const ingredients = await getIngredients({ page_size: 1000 });
-    
-    let totalValue = 0;
-    let outOfStock = 0;
-    let lowStock = 0;
-    let inStock = 0;
-    let totalItems = 0;
-    
-    if (ingredients.items && ingredients.items.length > 0) {
-        ingredients.items.forEach(ingredient => {
-            const currentStock = parseFloat(ingredient.current_stock) || 0;
-            const price = parseFloat(ingredient.price) || 0;
-            const minThreshold = parseFloat(ingredient.min_stock_threshold) || 0;
-            
-            const value = currentStock * price;
-            totalValue += value;
-            totalItems++;
-            
-            if (currentStock === 0) {
-                outOfStock++;
-            } else if (currentStock <= minThreshold) {
-                lowStock++;
-            } else {
-                inStock++;
-            }
-        });
+    try {
+        // Usar cálculo local diretamente (endpoint não implementado no backend)
+        const ingredients = await getIngredients({ page_size: MAX_PAGE_SIZE }); // TODO: Implementar endpoint de resumo
+        
+        let totalValue = 0;
+        let outOfStock = 0;
+        let lowStock = 0;
+        let inStock = 0;
+        let totalItems = 0;
+        
+        if (ingredients.items && ingredients.items.length > 0) {
+            ingredients.items.forEach(ingredient => {
+                // Considerar apenas insumos ativos (is_available = true)
+                const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
+                
+                if (!isActive) {
+                    return; // Pular insumos inativos
+                }
+                
+                const currentStock = parseFloat(ingredient.current_stock) || 0;
+                const price = parseFloat(ingredient.price) || 0;
+                const minThreshold = parseFloat(ingredient.min_stock_threshold) || 0;
+                
+                const value = currentStock * price;
+                totalValue += value;
+                totalItems++;
+                
+                if (currentStock === 0) {
+                    outOfStock++;
+                } else if (currentStock <= minThreshold) {
+                    lowStock++;
+                } else {
+                    inStock++;
+                }
+            });
+        }
+        
+        const summary = {
+            total_stock_value: totalValue,
+            total_items: totalItems,
+            out_of_stock_count: outOfStock,
+            low_stock_count: lowStock,
+            in_stock_count: inStock
+        };
+        
+        return summary;
+    } catch (error) {
+        console.error('Erro ao obter resumo do estoque:', error);
+        // Retornar valores padrão em caso de erro
+        return {
+            total_stock_value: 0,
+            total_items: 0,
+            out_of_stock_count: 0,
+            low_stock_count: 0,
+            in_stock_count: 0
+        };
     }
-    
-    const summary = {
-        total_stock_value: totalValue,
-        total_items: totalItems,
-        out_of_stock_count: outOfStock,
-        low_stock_count: lowStock,
-        in_stock_count: inStock
-    };
-    
-    return summary;
 };
 
 /**
- * Obtém ingredientes com estoque baixo
+ * Obtém ingredientes com estoque baixo (apenas ativos)
  * @returns {Promise<Array>} Lista de ingredientes com estoque baixo
  */
 export const getLowStockIngredients = async () => {
-    const response = await getIngredients({ status: 'low_stock', page_size: 1000 });
-    return response.items;
+    const response = await getIngredients({ page_size: MAX_PAGE_SIZE });
+    if (!response.items) return [];
+    
+    // Filtrar apenas insumos ativos com estoque baixo
+    return response.items.filter(ingredient => {
+        const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
+        if (!isActive) return false;
+        
+        const currentStock = parseFloat(ingredient.current_stock) || 0;
+        const minThreshold = parseFloat(ingredient.min_stock_threshold) || 0;
+        
+        return currentStock > 0 && currentStock <= minThreshold;
+    });
 };
 
 /**
- * Obtém ingredientes sem estoque
+ * Obtém ingredientes sem estoque (apenas ativos)
  * @returns {Promise<Array>} Lista de ingredientes sem estoque
  */
 export const getOutOfStockIngredients = async () => {
-    const response = await getIngredients({ status: 'out_of_stock', page_size: 1000 });
-    return response.items;
+    const response = await getIngredients({ page_size: MAX_PAGE_SIZE });
+    if (!response.items) return [];
+    
+    // Filtrar apenas insumos ativos sem estoque
+    return response.items.filter(ingredient => {
+        const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
+        if (!isActive) return false;
+        
+        const currentStock = parseFloat(ingredient.current_stock) || 0;
+        return currentStock === 0;
+    });
 };
 
 /**
- * Obtém ingredientes em estoque adequado
+ * Obtém ingredientes em estoque adequado (apenas ativos)
  * @returns {Promise<Array>} Lista de ingredientes em estoque
  */
 export const getInStockIngredients = async () => {
-    const response = await getIngredients({ status: 'in_stock', page_size: 1000 });
-    return response.items;
+    const response = await getIngredients({ page_size: MAX_PAGE_SIZE });
+    if (!response.items) return [];
+    
+    // Filtrar apenas insumos ativos com estoque adequado
+    return response.items.filter(ingredient => {
+        const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
+        if (!isActive) return false;
+        
+        const currentStock = parseFloat(ingredient.current_stock) || 0;
+        const minThreshold = parseFloat(ingredient.min_stock_threshold) || 0;
+        
+        return currentStock > minThreshold;
+    });
 };
