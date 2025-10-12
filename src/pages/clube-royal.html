@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
+
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <link rel="stylesheet" href="../assets/styles/modais.css">
+    <link rel="stylesheet" href="../assets/styles/clube-royal.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/modais.js" type="module" defer></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- importara header -->
+    <div id="header-container"></div>
+
+    <main>
+        <section class="imagem-fundo">
+            <div>
+                <div class="voltar">
+                    <i class="fa-solid fa-chevron-left"></i>
+                    <p>Voltar</p>
+                </div>
+                <p>Clube Royal</p>
+            </div>
+        </section>
+        
+        <section class="conteudo-1" style="display: flex;">
+            <div class="quadro-pontos-royal">
+                <p class="txt1">Seus pontos</p>
+
+                <div class="pontos">
+                    <i class="fa-solid fa-crown"></i>
+                    <p>100</p>
+                </div>
+
+                <p class="txt2">Faltam <span>XX</span> dias para seus pontos expirarem</p>
+
+                <button>Histórico de pontos</button>
+            </div>
+
+            <div class="informa">
+                <div>
+                    <div class="titulo">
+                        <i class="fa-solid fa-circle"></i>
+                        <p>Acumule pontos!</p>
+                    </div>
+
+                    <p class="descricao">Ao finalizar uma compra no app, você receberá a quantia gasta em pontos.</p>
+                </div>
+
+                <div>
+                    <div class="titulo">
+                        <i class="fa-solid fa-circle"></i>
+                        <p>Compre com descontos!</p>
+                    </div>
+
+                    <p class="descricao">Ao adicionar suas compras à cesta, é possível acionar os pontos e ganhar descontos.</p>
+                </div>
+
+                <div>
+                    <div class="titulo">
+                        <i class="fa-solid fa-circle"></i>
+                        <p>Como funciona a conversão?</p>
+                    </div>
+
+                    <p class="descricao">A cada 1 real gasto no app, você receberá 10 pontos Royal e a cada 100 pontos acumlados, você terá 1 real de desconto.</p>
+                </div>
+
+                <div>
+                    <div class="titulo">
+                        <i class="fa-solid fa-circle"></i>
+                        <p>Os pontos Royal expiram?</p>
+                    </div>
+
+                    <p class="descricao">Os pontos Royal expiram após 1 mês da sua última compra. Após realizar uma compra, os pontos se renovam por mais 1 mês.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="conteudo-2" style="display: none;">
+            <p class="vencimento">Seus pontos vencem daqui <span>42</span> dias</p>
+
+            <div class="quandro">
+                <div class="faixa">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+
+                <div class="texto">
+                    <p class="informa">
+                        Você comprou dois X-Tudão, um X-Bacon e uma Grapete por <span>R$ 108,00</span> e ganhou <span>1080 pontos</span>
+                    </p>
+                    <div class="descricao">
+                        <p class="escuro">R$ 20,00 gastos</p>
+                        <p class="escuro">200 pontos</p>
+                        <p class="claro">Valido até 26/10/2025</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <!-- importare footer -->
+    <div id="footer-container"></div>
+</body>
+
+</html>
