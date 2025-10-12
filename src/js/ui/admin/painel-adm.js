@@ -8,7 +8,6 @@ import { UsuarioManager } from './usuarios-gerenciamento.js';
 import { ProdutoManager } from './produtos-gerenciamento.js';
 import { InsumoManager } from './insumos-gerenciamento.js';
 import { CategoriaManager } from './categorias-gerenciamento.js';
-
 import { showToast } from '../alerts.js';
 
 /**
@@ -66,8 +65,8 @@ class AdminPanelManager {
 
             
             // Verificar permissões de administrador
-            if (!this.verifyAdminPermissions()) {
-                this.handleAuthError('Acesso negado. Permissões de administrador necessárias.');
+            if (!(await this.verifyAdminPermissions())) {
+                this.handleAuthError('Sessão expirada. Faça login novamente.');
                 return;
             }
 
@@ -94,8 +93,14 @@ class AdminPanelManager {
     /**
      * Verifica permissões de administrador
      */
-    verifyAdminPermissions() {
+    async verifyAdminPermissions() {
         try {
+            // Primeiro verificar se o token é válido
+            const isTokenValid = await this.verifyTokenValidity();
+            if (!isTokenValid) {
+                return false;
+            }
+
             // Verificar diferentes chaves possíveis no localStorage
             const userData = localStorage.getItem('rb.user') || 
                            localStorage.getItem('userData') || 
@@ -152,7 +157,14 @@ class AdminPanelManager {
      */
     handleAuthError(message) {
         console.error('Erro de autenticação:', message);
-        this.showErrorMessage(message);
+        
+        // Verificar se é erro de token expirado ou permissões
+        const isTokenExpired = message.includes('Sessão expirada') || message.includes('token expirado');
+        const errorMessage = isTokenExpired ? 
+            'Sua sessão expirou. Faça login novamente para continuar.' : 
+            'Acesso negado. Permissões de administrador necessárias.';
+            
+        this.showErrorMessage(errorMessage);
         
         // Redirecionar para login após 3 segundos
         setTimeout(() => {
