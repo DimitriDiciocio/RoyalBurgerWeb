@@ -1,0 +1,900 @@
+:root {
+    --color-primary: #FFC700;
+    --color-secondary: #FF0000;
+    --color-tertiary: #3D1807;
+    --color-quaternary: #F95A00;
+    --color-texto-white: #FFFFFF;
+    --color-texto-black: #101010;
+    --color-texto-light: #525252;
+    --color-texto-erased: #888888;
+    --cor-div-primary: #FFFFFF;
+    --cor-div-secondary: #101010;
+    --color-background: #F6F6F6;
+    --box-shadow: 0px 1px rgba(0,0,0,0.15);
+    --border-radius: 10px;
+  }
+
+main{
+    padding: 68px 0vh 0px 0vh;
+
+    & .imagem-fundo{
+        background-image: url("../img/banner-royal.png");
+        background-repeat: no-repeat;
+        background-size: contain;
+        object-fit: cover;
+        background-position: bottom center;
+        aspect-ratio: 1.44 / 0.29;
+        width: 100%;
+        user-select: none;
+        -webkit-user-drag: none;
+        padding: 40px;
+
+        & div{
+            font-size: 1.2rem;
+            color: var(--color-texto-black);
+            font-weight: 600;
+
+            & .voltar{
+                display: flex;
+                align-items: center;
+                color: var(--color-texto-black);
+                font-size: 1rem;
+                gap: 10px;
+
+                &:hover {
+                    color: rgb(55, 55, 55);
+                }
+
+                &:active {
+                    color: rgb(147, 147, 147);
+                }
+            }
+        }
+    }
+
+    & .conteudo-1{
+        padding: 40px 10vh;
+        min-height: 80vh;
+        display: flex;
+        justify-content: space-around;
+        align-items: first baseline;
+
+        & .quadro-pontos-royal {
+            background-color: var(--cor-div-primary);
+            padding: 20px 40px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            position: relative;
+            gap: 10px;
+            width: 18vw;
+
+            & .txt1 {
+                font-size: 1.1rem;
+                font-weight: 600;
+
+                display: flex;
+                justify-content: center;
+            }
+
+            & .pontos {
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+
+                gap: 10px;
+                font-size: 1.7rem;
+                margin: 20px 0px;
+                font-weight: 600;
+                color: var(--color-primary);
+            }
+
+            & .txt2 {
+                font-size: 0.9rem;
+                font-weight: 300;
+                text-align: center;
+
+                & span {
+                    font-weight: 600;
+                }
+            }
+
+            & button{
+                background-color: var(--color-primary);
+                color: var(--color-texto-black);
+                border-radius: 10px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                border: none;
+                padding: 10px 0px;
+                width: 100%;
+                transition: ease-out 0.1s;
+                cursor: pointer;
+
+                &:hover {
+                    background-color: #f7d660;
+                }
+
+                &:active {
+                    background-color: #d2a400;
+                }
+            }
+        }
+
+        & .informa{
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+
+            & .titulo{
+                display: flex;
+                gap: 20px;
+                align-items: center;
+
+                & i{
+                    font-size: 0.8rem;
+                    color: var(--color-texto-erased);
+                }
+
+                & p{
+                    font-size: 1.2rem;
+                    color: var(--color-texto-black);
+                    font-weight: 600;
+                }
+            }
+
+            & .descricao{
+                border-left: 2px solid var(--color-texto-erased);
+                color: var(--color-texto-light);
+                padding-left: 20px;
+                margin-left: 6px;
+                width: 40vw;
+            }
+        }
+    }
+
+    & .conteudo-2{
+        padding: 40px 20vh;
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        & .vencimento{
+            font-size: 0.9rem;
+            font-weight: 300;
+            text-align: center;
+            color: #888888;
+
+            & span {
+                font-weight: 600;
+            }
+        }
+
+        & .quandro{
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+
+            & .faixa{
+                background-color: var(--color-primary);
+                width: 100%;
+                border-radius: 10px 10px 0px 0px;
+
+                & i{
+                    padding: 10px;
+                    color: var(--cor-div-primary);
+                }
+            }
+
+            & .texto{
+                display: flex;
+                flex-direction: column;
+                padding: 10px 50px;
+                gap: 10px;
+
+                & .informa{
+                    font-size: 1rem;
+                    color: var(--color-texto-black);
+                    font-weight: 600;
+
+                    & span{
+                        color: var(--color-primary);
+                    }
+                }
+
+                & .descricao{
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    color: #888888;
+                    font-size: 0.8rem;
+
+                    & .escuro{
+                        font-weight: 600;
+                    }
+
+                    & .claro{
+                        font-weight: 400;
+                        display: flex;
+                        justify-content: end;
+                        width: 50%;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 1440px) {
+
+}
+
+@media (max-width: 1280px) {
+    main{
+        padding: 68px 0vh 68px 0vh;
+
+        & .imagem-fundo{
+            background-image: url("../img/banner-royal.png");
+            padding: 40px;
+
+            & div{
+                font-size: 1rem;
+
+                & .voltar{
+                    font-size: 0.9rem;
+                    gap: 10px;
+                }
+            }
+        }
+
+        & .conteudo-1{
+            padding: 30px 5vh;
+            min-height: 0vh;
+            display: flex;
+            align-items: center;
+            flex-direction: row;
+
+            & .quadro-pontos-royal {
+                padding: 20px 40px;
+                gap: 10px;
+                width: 35vw;
+
+                & .txt1 {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+
+                    display: flex;
+                    justify-content: center;
+                }
+
+                & .pontos {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+
+                    gap: 10px;
+                    font-size: 1.7rem;
+                    margin: 20px 0px;
+                    font-weight: 600;
+                    color: var(--color-primary);
+                }
+
+                & .txt2 {
+                    font-size: 0.9rem;
+                    font-weight: 300;
+                    text-align: center;
+
+                    & span {
+                        font-weight: 600;
+                    }
+                }
+            }
+
+            & .informa{
+                margin-top: 20px;
+                gap: 10px;
+
+                & .titulo{
+                    display: flex;
+                    gap: 20px;
+                    align-items: center;
+
+                    & i{
+                        font-size: 0.7rem;
+                    }
+
+                    & p{
+                        font-size: 1rem;
+                    }
+                }
+
+                & .descricao{
+                    font-size: 0.9rem;
+                    padding-left: 20px;
+                    margin-left: 6px;
+                    width: 40vw;
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 1024px) {
+    main{
+        padding: 68px 0vh 68px 0vh;
+
+        & .imagem-fundo{
+            background-image: url("../img/banner-royal.png");
+            padding: 40px;
+
+            & div{
+                font-size: 1rem;
+
+                & .voltar{
+                    font-size: 0.9rem;
+                    gap: 10px;
+                }
+            }
+        }
+
+        & .conteudo-1{
+            padding: 30px 5vh;
+            min-height: 0vh;
+            display: flex;
+            align-items: center;
+            flex-direction: row;
+
+            & .quadro-pontos-royal {
+                padding: 20px 40px;
+                gap: 10px;
+                width: 35vw;
+
+                & .txt1 {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+
+                    display: flex;
+                    justify-content: center;
+                }
+
+                & .pontos {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+
+                    gap: 10px;
+                    font-size: 1.7rem;
+                    margin: 20px 0px;
+                    font-weight: 600;
+                    color: var(--color-primary);
+                }
+
+                & .txt2 {
+                    font-size: 0.9rem;
+                    font-weight: 300;
+                    text-align: center;
+
+                    & span {
+                        font-weight: 600;
+                    }
+                }
+
+                & button{
+                    background-color: var(--color-primary);
+                    color: var(--color-texto-black);
+                    border-radius: 10px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    border: none;
+                    padding: 10px 0px;
+                    width: 100%;
+                    transition: ease-out 0.1s;
+                    cursor: pointer;
+
+                    &:hover {
+                        background-color: #f7d660;
+                    }
+
+                    &:active {
+                        background-color: #d2a400;
+                    }
+                }
+            }
+
+            & .informa{
+                margin-top: 20px;
+                gap: 10px;
+
+                & .titulo{
+                    display: flex;
+                    gap: 20px;
+                    align-items: center;
+
+                    & i{
+                        font-size: 0.7rem;
+                    }
+
+                    & p{
+                        font-size: 1rem;
+                    }
+                }
+
+                & .descricao{
+                    font-size: 0.9rem;
+                    padding-left: 20px;
+                    margin-left: 6px;
+                    width: 40vw;
+                }
+            }
+        }
+
+        & .conteudo-2{
+            padding: 20px 10vh;
+            min-height: 0vh;
+            gap: 20px;
+
+            & .vencimento{
+                font-size: 0.9rem;
+            }
+
+            & .quandro{
+                & .faixa{
+                    & i{
+                        padding: 10px;
+                        font-size: 0.8rem;
+                    }
+                }
+
+                & .texto{
+                    padding: 10px 15px;
+                    gap: 10px;
+
+                    & .informa{
+                        font-size: 0.9rem;
+                    }
+
+                    & .descricao{
+                        font-size: 0.7rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    main{
+        padding: 68px 0vh 68px 0vh;
+
+        & .imagem-fundo{
+            background-image: none;
+            padding: 20px;
+
+            & div{
+                font-size: 1rem;
+
+                & .voltar{
+                    font-size: 0.9rem;
+                    gap: 10px;
+                }
+            }
+        }
+
+        & .conteudo-1{
+            padding: 0px 5vh;
+            min-height: 0vh;
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+
+            & .quadro-pontos-royal {
+                padding: 20px 40px;
+                gap: 10px;
+                width: 58vw;
+
+                & .txt1 {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+
+                    display: flex;
+                    justify-content: center;
+                }
+
+                & .pontos {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+
+                    gap: 10px;
+                    font-size: 1.7rem;
+                    margin: 20px 0px;
+                    font-weight: 600;
+                    color: var(--color-primary);
+                }
+
+                & .txt2 {
+                    font-size: 0.9rem;
+                    font-weight: 300;
+                    text-align: center;
+
+                    & span {
+                        font-weight: 600;
+                    }
+                }
+
+                & button{
+                    background-color: var(--color-primary);
+                    color: var(--color-texto-black);
+                    border-radius: 10px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    border: none;
+                    padding: 10px 0px;
+                    width: 100%;
+                    transition: ease-out 0.1s;
+                    cursor: pointer;
+
+                    &:hover {
+                        background-color: #f7d660;
+                    }
+
+                    &:active {
+                        background-color: #d2a400;
+                    }
+                }
+            }
+
+            & .informa{
+                margin-top: 20px;
+                gap: 10px;
+
+                & .titulo{
+                    display: flex;
+                    gap: 20px;
+                    align-items: center;
+
+                    & i{
+                        font-size: 0.7rem;
+                    }
+
+                    & p{
+                        font-size: 1rem;
+                    }
+                }
+
+                & .descricao{
+                    font-size: 0.9rem;
+                    padding-left: 20px;
+                    margin-left: 6px;
+                    width: 80vw;
+                }
+            }
+        }
+
+        & .conteudo-2{
+            padding: 0px 5vh;
+            min-height: 0vh;
+            gap: 20px;
+
+            & .vencimento{
+                font-size: 0.9rem;
+            }
+
+            & .quandro{
+                & .faixa{
+                    & i{
+                        padding: 10px;
+                        font-size: 0.8rem;
+                    }
+                }
+
+                & .texto{
+                    padding: 10px 15px;
+                    gap: 10px;
+
+                    & .informa{
+                        font-size: 0.9rem;
+                    }
+
+                    & .descricao{
+                        font-size: 0.7rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    main{
+        padding: 68px 0vh 68px 0vh;
+
+        & .imagem-fundo{
+            background-image: none;
+            padding: 20px;
+
+            & div{
+                font-size: 1rem;
+
+                & .voltar{
+                    font-size: 0.9rem;
+                    gap: 10px;
+                }
+            }
+        }
+
+        & .conteudo-1{
+            padding: 0px 5vh;
+            min-height: 0vh;
+            display: flex;
+            flex-direction: column;
+
+            & .quadro-pontos-royal {
+                padding: 20px 40px;
+                gap: 10px;
+                width: 78vw;
+
+                & .txt1 {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+
+                    display: flex;
+                    justify-content: center;
+                }
+
+                & .pontos {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+
+                    gap: 10px;
+                    font-size: 1.7rem;
+                    margin: 20px 0px;
+                    font-weight: 600;
+                    color: var(--color-primary);
+                }
+
+                & .txt2 {
+                    font-size: 0.9rem;
+                    font-weight: 300;
+                    text-align: center;
+
+                    & span {
+                        font-weight: 600;
+                    }
+                }
+
+                & button{
+                    background-color: var(--color-primary);
+                    color: var(--color-texto-black);
+                    border-radius: 10px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    border: none;
+                    padding: 10px 0px;
+                    width: 100%;
+                    transition: ease-out 0.1s;
+                    cursor: pointer;
+
+                    &:hover {
+                        background-color: #f7d660;
+                    }
+
+                    &:active {
+                        background-color: #d2a400;
+                    }
+                }
+            }
+
+            & .informa{
+                margin-top: 20px;
+                gap: 10px;
+
+                & .titulo{
+                    display: flex;
+                    gap: 20px;
+                    align-items: center;
+
+                    & i{
+                        font-size: 0.7rem;
+                    }
+
+                    & p{
+                        font-size: 1rem;
+                    }
+                }
+
+                & .descricao{
+                    font-size: 0.9rem;
+                    padding-left: 20px;
+                    margin-left: 6px;
+                    width: 80vw;
+                }
+            }
+        }
+
+        & .conteudo-2{
+            padding: 0px 5vh;
+            min-height: 0vh;
+            gap: 20px;
+
+            & .vencimento{
+                font-size: 0.9rem;
+            }
+
+            & .quandro{
+                & .faixa{
+                    & i{
+                        padding: 10px;
+                        font-size: 0.8rem;
+                    }
+                }
+
+                & .texto{
+                    padding: 10px 15px;
+                    gap: 10px;
+
+                    & .informa{
+                        font-size: 0.9rem;
+                    }
+
+                    & .descricao{
+                        font-size: 0.7rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 320px){
+    main{
+        padding: 68px 0vh 68px 0vh;
+
+        & .imagem-fundo{
+            background-image: none;
+            padding: 20px;
+
+            & div{
+                font-size: 1rem;
+
+                & .voltar{
+                    font-size: 0.9rem;
+                    gap: 10px;
+                }
+            }
+        }
+
+        & .conteudo-1{
+            padding: 0px 3vh;
+            min-height: 0vh;
+            display: flex;
+            flex-direction: column;
+
+            & .quadro-pontos-royal {
+                padding: 20px 40px;
+                gap: 10px;
+                width: 78vw;
+
+                & .txt1 {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+
+                    display: flex;
+                    justify-content: center;
+                }
+
+                & .pontos {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+
+                    gap: 10px;
+                    font-size: 1.7rem;
+                    margin: 20px 0px;
+                    font-weight: 600;
+                    color: var(--color-primary);
+                }
+
+                & .txt2 {
+                    font-size: 0.9rem;
+                    font-weight: 300;
+                    text-align: center;
+
+                    & span {
+                        font-weight: 600;
+                    }
+                }
+
+                & button{
+                    background-color: var(--color-primary);
+                    color: var(--color-texto-black);
+                    border-radius: 10px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    border: none;
+                    padding: 10px 0px;
+                    width: 100%;
+                    transition: ease-out 0.1s;
+                    cursor: pointer;
+
+                    &:hover {
+                        background-color: #f7d660;
+                    }
+
+                    &:active {
+                        background-color: #d2a400;
+                    }
+                }
+            }
+
+            & .informa{
+                margin-top: 20px;
+                gap: 10px;
+
+                & .titulo{
+                    display: flex;
+                    gap: 20px;
+                    align-items: center;
+
+                    & i{
+                        font-size: 0.7rem;
+                    }
+
+                    & p{
+                        font-size: 1rem;
+                    }
+                }
+
+                & .descricao{
+                    font-size: 0.9rem;
+                    padding-left: 20px;
+                    margin-left: 6px;
+                    width: 80vw;
+                }
+            }
+        }
+
+        & .conteudo-2{
+            padding: 0px 3vh;
+            min-height: 0vh;
+            gap: 20px;
+
+            & .vencimento{
+                font-size: 0.9rem;
+            }
+
+            & .quandro{
+                & .faixa{
+                    & i{
+                        padding: 10px;
+                        font-size: 0.8rem;
+                    }
+                }
+
+                & .texto{
+                    padding: 10px 10px;
+                    gap: 10px;
+
+                    & .informa{
+                        font-size: 0.9rem;
+                    }
+
+                    & .descricao{
+                        font-size: 0.7rem;
+                    }
+                }
+            }
+        }
+    }
+}
