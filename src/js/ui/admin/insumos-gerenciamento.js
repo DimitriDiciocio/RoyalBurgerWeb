@@ -106,8 +106,9 @@ class InsumoDataManager {
                 category: insumoData.categoria || 'outros'
             };
 
-            await createIngredient(apiData);
+            const result = await createIngredient(apiData);
             this.clearCache();
+            return result;
         } catch (error) {
             console.error('Erro ao adicionar insumo:', error);
             throw error;
@@ -204,6 +205,7 @@ class InsumoManager {
         this.operationTimestamps = {};
         this.quantityChangeTimeout = null; // Para debounce
         this.mouseDownTimeout = null; // Para distinguir clique simples de segurado
+        this.ingredientes = []; // Lista de ingredientes para validação
     }
 
     /**
@@ -377,13 +379,13 @@ class InsumoManager {
 
         if (categoriaFilter) {
             categoriaFilter.addEventListener('change', (e) => {
-                this.handleCategoriaFilter(e.target.value);
+                this.applyAllFilters();
             });
         }
 
         if (statusFilter) {
             statusFilter.addEventListener('change', (e) => {
-                this.handleStatusFilter(e.target.value);
+                this.applyAllFilters();
             });
         }
     }
@@ -392,10 +394,10 @@ class InsumoManager {
      * Configura handlers de busca
      */
     setupSearchHandlers() {
-        const searchInput = document.getElementById('buscar-estoque');
+        const searchInput = document.getElementById('busca-ingrediente');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
-                this.handleSearch(e.target.value);
+                this.applyAllFilters();
             });
         }
     }
@@ -424,10 +426,37 @@ class InsumoManager {
                 ultimaAtualizacao: null
             }));
             
+            // Armazenar ingredientes para validação de nomes duplicados
+            this.ingredientes = insumos.map(insumo => ({
+                id: insumo.id,
+                name: insumo.name
+            }));
+            
             this.renderInsumoCards(insumosMapeados);
+            // Aplicar filtros após carregar os dados
+            this.applyAllFilters();
         } catch (error) {
             console.error('Erro ao carregar insumos:', error);
             this.showErrorMessage('Erro ao carregar insumos');
+        }
+    }
+
+    /**
+     * Carrega ingredientes apenas para validação de nomes duplicados
+     */
+    async loadIngredientesForValidation() {
+        try {
+            const response = await this.dataManager.getAllInsumos();
+            const insumos = response.items || [];
+            
+            // Armazenar apenas os dados necessários para validação
+            this.ingredientes = insumos.map(insumo => ({
+                id: insumo.id,
+                name: insumo.name
+            }));
+        } catch (error) {
+            console.error('Erro ao carregar ingredientes para validação:', error);
+            throw error;
         }
     }
 
@@ -1129,41 +1158,77 @@ class InsumoManager {
     }
 
     /**
-     * Trata filtro por categoria
+     * Aplica todos os filtros simultaneamente
      */
-    handleCategoriaFilter(categoria) {
+    applyAllFilters() {
+        const searchTerm = document.getElementById('busca-ingrediente')?.value?.toLowerCase() || '';
+        const categoriaFilter = document.getElementById('categoria-estoque')?.value || '';
+        const statusFilter = document.getElementById('status-estoque')?.value || 'todos';
+        
         const cards = document.querySelectorAll('.card-ingrediente');
+        
         cards.forEach(card => {
-            const cardCategoria = card.querySelector('.categoria-fornecedor span').textContent.toLowerCase();
-            const shouldShow = categoria === 'todos' || cardCategoria.includes(categoria.toLowerCase());
+            const shouldShow = this.checkSearchFilter(card, searchTerm) &&
+                              this.checkCategoryFilter(card, categoriaFilter) &&
+                              this.checkStatusFilter(card, statusFilter);
+            
             card.style.display = shouldShow ? 'block' : 'none';
         });
+        
+        this.updateVisibleProductsCount();
     }
 
     /**
-     * Trata filtro por status
+     * Verifica se o card corresponde ao filtro de busca
      */
-    handleStatusFilter(status) {
-        const cards = document.querySelectorAll('.card-ingrediente');
-        cards.forEach(card => {
-            const shouldShow = status === 'todos' || card.classList.contains(status);
-            card.style.display = shouldShow ? 'block' : 'none';
-        });
+    checkSearchFilter(card, searchTerm) {
+        if (!searchTerm) return true;
+        
+        const nome = card.querySelector('h3')?.textContent?.toLowerCase() || '';
+        const categoria = card.querySelector('.categoria-fornecedor span')?.textContent?.toLowerCase() || '';
+        
+        return nome.includes(searchTerm) || categoria.includes(searchTerm);
     }
 
     /**
-     * Trata busca
+     * Verifica se o card corresponde ao filtro de categoria
      */
-    handleSearch(searchTerm) {
-        const cards = document.querySelectorAll('.card-ingrediente');
-        const term = searchTerm.toLowerCase();
+    checkCategoryFilter(card, categoria) {
+        if (!categoria || categoria === 'todos') return true;
+        
+        const cardCategoria = card.querySelector('.categoria-fornecedor span')?.textContent?.toLowerCase() || '';
+        return cardCategoria.includes(categoria.toLowerCase());
+    }
 
-        cards.forEach(card => {
-            const nome = card.querySelector('h3').textContent.toLowerCase();
-            const categoria = card.querySelector('.categoria-fornecedor span').textContent.toLowerCase();
-            const shouldShow = nome.includes(term) || categoria.includes(term);
-            card.style.display = shouldShow ? 'block' : 'none';
-        });
+    /**
+     * Verifica se o card corresponde ao filtro de status
+     */
+    checkStatusFilter(card, status) {
+        if (status === 'todos') return true;
+        
+        const isActive = card.querySelector('.toggle input')?.checked || false;
+        
+        if (status === 'ativo') {
+            return isActive;
+        } else if (status === 'inativo') {
+            return !isActive;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Atualiza contador de produtos visíveis
+     */
+    updateVisibleProductsCount() {
+        const visibleCards = document.querySelectorAll('.card-ingrediente[style*="block"], .card-ingrediente:not([style*="none"])');
+        const totalCards = document.querySelectorAll('.card-ingrediente');
+        
+        // Atualizar contador se existir elemento para isso
+        const counterElement = document.getElementById('contador-produtos-visiveis');
+        if (counterElement) {
+            counterElement.textContent = `${visibleCards.length} de ${totalCards.length} insumos`;
+        }
     }
 
     /**
@@ -1300,7 +1365,7 @@ class InsumoManager {
      * Trata adição de insumo
      */
     async handleAddInsumo() {
-        if (!this.validateInsumoForm()) {
+        if (!(await this.validateInsumoForm())) {
             return;
         }
 
@@ -1310,7 +1375,7 @@ class InsumoManager {
             const newInsumo = await this.dataManager.addInsumo(insumoData);
             
             // Atualização automática otimizada
-            await this.addInsumoToUI(insumoData);
+            await this.addInsumoToUI(newInsumo);
             await this.updateResumoAfterAdd(insumoData);
             
             this.closeInsumoModal();
@@ -1324,7 +1389,7 @@ class InsumoManager {
      * Trata edição de insumo
      */
     async handleEditInsumo() {
-        if (!this.validateInsumoForm()) {
+        if (!(await this.validateInsumoForm())) {
             return;
         }
 
@@ -1403,7 +1468,7 @@ class InsumoManager {
     /**
      * Valida formulário de insumo
      */
-    validateInsumoForm() {
+    async validateInsumoForm() {
         const nome = document.getElementById('nome-ingrediente').value.trim();
         const categoria = document.getElementById('categoria-ingrediente').value;
         const custo = document.getElementById('custo-ingrediente').value.trim();
@@ -1444,6 +1509,30 @@ class InsumoManager {
         if (parseInt(min) > parseInt(max)) {
             this.showErrorMessage('Estoque mínimo não pode ser maior que o estoque máximo');
             return false;
+        }
+
+        // Verificar se o nome já existe (apenas para novos ingredientes)
+        if (!this.currentEditingId) {
+            // Se ingredientes não estão carregados, tentar carregar primeiro
+            if (!this.ingredientes || !Array.isArray(this.ingredientes)) {
+                try {
+                    await this.loadIngredientesForValidation();
+                } catch (error) {
+                    console.warn('Não foi possível carregar ingredientes para validação:', error);
+                    // Continuar sem validação frontend se não conseguir carregar
+                }
+            }
+            
+            // Verificar duplicação se ingredientes estão disponíveis
+            if (this.ingredientes && Array.isArray(this.ingredientes)) {
+                const existingIngredient = this.ingredientes.find(ing => 
+                    ing.name.toLowerCase() === nome.toLowerCase()
+                );
+                if (existingIngredient) {
+                    this.showErrorMessage(`Já existe um ingrediente com o nome "${nome}". Por favor, escolha um nome diferente.`);
+                    return false;
+                }
+            }
         }
 
         return true;
@@ -1649,7 +1738,13 @@ class InsumoManager {
         let message = 'Ocorreu um erro inesperado.';
         
         if (error.message) {
-            if (error.message.includes('não encontrado') || error.message.includes('not found')) {
+            // Tratamento específico para violação de chave única (Firebird)
+            if (error.message.includes('violation of PRIMARY or UNIQUE KEY constraint') || 
+                error.message.includes('INTEG_44') ||
+                error.message.includes('SQLCODE: -803')) {
+                title = 'Nome Duplicado';
+                message = 'Já existe um ingrediente com este nome. Por favor, escolha um nome diferente.';
+            } else if (error.message.includes('não encontrado') || error.message.includes('not found')) {
                 title = 'Item Não Encontrado';
                 message = 'O insumo solicitado não foi encontrado.';
             } else if (error.message.includes('já existe') || error.message.includes('already exists')) {
@@ -1684,10 +1779,11 @@ class InsumoManager {
         const container = document.querySelector('#secao-estoque .ingredientes');
         if (!container) return;
 
-        // Gerar ID temporário único para o novo insumo
-        // Usar timestamp + random para evitar colisões
-        const tempId = Date.now() + Math.floor(Math.random() * 1000);
-        const insumoWithId = { ...insumoData, id: tempId };
+        // Usar o ID real retornado pela API
+        const insumoWithId = {
+            ...insumoData,
+            id: insumoData.id || insumoData.ID
+        };
 
         // Criar e adicionar card
         const card = this.createInsumoCard(insumoWithId);

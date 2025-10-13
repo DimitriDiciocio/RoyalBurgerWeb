@@ -69,9 +69,13 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
     const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
 
     const baseHeaders = {
-        'Content-Type': 'application/json',
         ...headers
     };
+
+    // Só define Content-Type se não for FormData
+    if (!(body instanceof FormData)) {
+        baseHeaders['Content-Type'] = 'application/json';
+    }
 
     if (!skipAuth) {
         const token = getStoredToken();
@@ -79,10 +83,11 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
     }
 
     try {
+
         const response = await fetch(url, {
             method,
             headers: baseHeaders,
-            body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+            body: body ? (body instanceof FormData ? body : (typeof body === 'string' ? body : JSON.stringify(body))) : undefined,
             credentials: 'include',
             mode: 'cors' // Força modo CORS
         });

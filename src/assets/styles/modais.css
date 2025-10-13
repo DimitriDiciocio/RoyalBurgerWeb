@@ -387,6 +387,65 @@
         text-align: center;
       }
     }
+
+    & .preview-imagem {
+      width: 100%;
+      height: 150px;
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid var(--color-tertiary);
+
+      & img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      & .btn-remover-imagem {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background-color: rgba(255, 0, 0, 0.8);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background-color: rgba(255, 0, 0, 1);
+        }
+
+        & i {
+          font-size: 0.8rem;
+        }
+      }
+
+      &.existing-image {
+        border-color: var(--color-secondary);
+        border-style: dashed;
+
+        &::before {
+          content: "Imagem atual";
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          background-color: rgba(0, 123, 255, 0.9);
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 0.7rem;
+          font-weight: 500;
+          z-index: 1;
+        }
+      }
+    }
   }
 
   & .conteudo-modal {
@@ -394,8 +453,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 20px;
 
-    & .secao-informacoes,
-    & .secao-receita {
+    & .secao-informacoes {
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -406,6 +464,13 @@
         font-weight: 600;
         margin: 0 0 8px 0;
       }
+
+    }
+
+    & .adicionar-ingrediente-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     & .campos-linha {
@@ -423,17 +488,63 @@
 
       & .ingrediente-item {
         display: flex;
-        flex-direction: column;
-        gap: 8px;
-        align-items: end;
-        background-color: #f3f3f3;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--cor-div-primary);
         border: 1px solid #e0e1e4;
-        padding: 8px;
-        border-radius: 5px;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        transition: all 0.2s ease;
 
-        & .div-input {
-          & label {
-            background: #f3f3f3;
+        &:hover {
+          border-color: var(--color-primary);
+        }
+
+        & .ingrediente-info {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          flex: 1;
+
+          & .nome {
+            font-weight: 600;
+            color: var(--color-texto-black);
+            font-size: 14px;
+            margin: 0;
+          }
+
+          & .quantidade {
+            color: var(--color-texto-light);
+            font-size: 12px;
+            margin: 0;
+          }
+
+          & .custo {
+            color: var(--color-secondary);
+            font-weight: 600;
+            font-size: 13px;
+            margin: 0;
+          }
+        }
+
+        & .btn-remover-ingrediente {
+          background: none;
+          border: none;
+          color: var(--color-texto-erased);
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          margin-left: 12px;
+
+          &:hover {
+            color: var(--color-secondary);
+            background-color: #fef2f2;
+          }
+
+          & i {
+            font-size: 14px;
           }
         }
 
@@ -1029,11 +1140,13 @@
             font-weight: 600;
             margin: 0;
           }
-          & .info-categoria{
+
+          & .info-categoria {
             display: flex;
             align-items: center;
             gap: 12px;
           }
+
           & .acoes-categoria {
             display: flex;
             align-items: center;
@@ -1070,7 +1183,7 @@
               gap: 8px;
               width: 100%;
               color: var(--color-texto-black);
-              
+
               &:hover {
                 color: #1d4ed8;
                 background-color: #dbeafe;
@@ -2416,5 +2529,199 @@
     background-color: #f8fafc;
     border: 2px dashed var(--color-primary);
     border-radius: 8px;
+  }
+}
+
+/* ========================================
+   ESTILOS PARA SEÇÃO DE RECEITA DE PRODUTOS
+   ======================================== */
+
+.modal-content-produto {
+  & .secao-receita {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    & h3 {
+      color: var(--color-texto-black);
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    & .ingredientes-receita {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      max-height: 200px;
+      gap: 8px;
+      padding: 8px;
+      background-color: #f9fafb;
+      border-radius: 6px;
+      border: 1px solid #e0e1e4;
+
+      & .ingrediente-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f9fafb;
+        border: 1px solid #e0e1e4;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+
+        & .ingrediente-info {
+          display: flex;
+          gap: 4px;
+          flex: 1;
+
+          & .nome {
+            font-weight: 600;
+            color: var(--color-texto-black);
+            font-size: 14px;
+            margin: 0;
+          }
+
+          & .quantidade {
+            color: var(--color-texto-light);
+            font-size: 12px;
+            margin: 0;
+          }
+
+          & .custo {
+            color: #28a745;
+            font-weight: 600;
+            font-size: 13px;
+            margin: 0;
+          }
+
+        }
+
+        & .btn-remover-ingrediente {
+          background: none;
+          border: none;
+          color: var(--color-texto-erased);
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+
+          &:hover {
+            color: var(--color-secondary);
+            background-color: #fef2f2;
+          }
+
+          & i {
+            font-size: 14px;
+          }
+
+        }
+      }
+
+      /* Estado vazio */
+      &:empty::before {
+        content: "Nenhum ingrediente adicionado";
+        color: var(--color-texto-erased);
+        font-style: italic;
+        text-align: center;
+        padding: 20px;
+        font-size: 14px;
+      }
+    }
+
+    & .adicionar-ingrediente-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      background-color: #f9fafb;
+      border-radius: 6px;
+      border: 1px solid #e0e1e4;
+
+      & .div-input {
+        & label {
+          background: #f9fafb;
+        }
+      }
+
+      & .sep-select.ingredientes-quantidade {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 12px;
+      }
+
+      & .btn-adicionar-ingrediente {
+        background-color: var(--color-primary);
+        color: var(--color-texto-black);
+        border: none;
+        padding: 10px 16px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+
+        &:hover {
+          background-color: #ffd700;
+        }
+
+        & i {
+          font-size: 14px;
+        }
+
+        & p {
+          margin: 0;
+          font-size: 14px;
+        }
+      }
+    }
+
+    & .custo-receita {
+      background-color: #f9fafb;
+      border: 1px solid #e0e1e4;
+      border-radius: 6px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      & h4 {
+        color: var(--color-texto-black);
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+        align-items: center;
+        gap: 6px;
+
+        &::before {
+          content: "\f0d6";
+          /* fa-dollar-sign */
+          font-family: "Font Awesome 6 Free";
+          font-weight: 900;
+          font-size: 14px;
+          color: #28a745;
+        }
+      }
+
+      & span {
+        color: #28a745;
+        font-weight: 600;
+        font-size: 14px;
+        line-height: 1;
+        text-align: right;
+        width: 100%;
+        margin: 0;
+      }
+    }
   }
 }

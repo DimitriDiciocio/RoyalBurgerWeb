@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Royal Burguer</title>
-    <link rel="icon" href="../assets/svg/logo.svg">
+    <link rel="icon" href="../src/assets/svg/logo.svg">
 
     <!-- css -->
     <link rel="stylesheet" href="../assets/styles/header.css">
@@ -125,8 +125,8 @@
                     </div>
 
                     <div class="valor">
-                        <p class="grande">10</p>
-                        <p class="descricao">2 indisponíveis</p>
+                        <p class="grande">0</p>
+                        <p class="descricao">0 indisponíveis</p>
                     </div>
                 </div>
 
@@ -137,7 +137,7 @@
                     </div>
 
                     <div class="valor">
-                        <p class="grande">R$ 24,57</p>
+                        <p class="grande">R$0</p>
                         <p class="descricao">Ticket médio</p>
                     </div>
                 </div>
@@ -149,7 +149,7 @@
                     </div>
 
                     <div class="valor">
-                        <p class="grande">50%</p>
+                        <p class="grande">0%</p>
                         <p class="descricao">Lucro bruto</p>
                     </div>
                 </div>
@@ -161,7 +161,7 @@
                     </div>
 
                     <div class="valor">
-                        <p class="grande">12 min</p>
+                        <p class="grande">0 min</p>
                         <p class="descricao">Preparo</p>
                     </div>
                 </div>
@@ -177,20 +177,15 @@
                     <label for="categoria-filtro">Categorias</label>
                     <select id="categoria-filtro" name="categoria-filtro">
                         <option value="">Selecione uma categoria</option>
-                        <option value="burguer">Burguer</option>
-                        <option value="sanduiche">Sanduíche</option>
-                        <option value="bebida">Bebida</option>
-                        <option value="sobremesa">Sobremesa</option>
-                        <!-- será carregado as categorias definidas na configurações -->
                     </select>
                 </div>
 
                 <div class="div-input">
                     <label for="status-filtro">Status</label>
                     <select id="status-filtro" name="status-filtro">
-                        <option value="">Selecione um status</option>
-                        <option value="disponivel">Disponível</option>
-                        <option value="indisponivel">Indisponível</option>
+                        <option value="todos" selected>Todos</option>
+                        <option value="ativo">Ativo</option>
+                        <option value="inativo">Inativo</option>
                     </select>
                 </div>
             </div>
@@ -201,147 +196,6 @@
                     <i class="fa-solid fa-plus"></i>
                     <p>Novo Item</p>
                 </button>
-
-                <div class="card-produto">
-                    <div class="imagem-produto">
-                        <img src="../assets/img/tudo.jpeg" alt="Royal Burguer">
-                    </div>
-
-                    <div class="info-produto">
-                        <div class="cabecalho-produto">
-                            <h3>Royal Burguer</h3>
-                            <div class="controles-produto">
-                                <label class="toggle">
-                                    <input type="checkbox" checked>
-                                    <span class="slider"></span>
-                                </label>
-                                <i class="fa-solid fa-pen-to-square editar"></i>
-                            </div>
-                        </div>
-
-                        <p class="descricao-produto">Hamburguer artesanal com queijo, alface, tomate e molho especial
-                        </p>
-
-                        <div class="categoria-status">
-                            <div class="categoria">Burguer</div>
-                            <div class="status disponivel"><i class="fa-solid fa-eye"></i> Disponível</div>
-                        </div>
-
-                        <div class="detalhes-produto">
-                            <div class="detalhe">
-                                <span class="label">Preço:</span>
-                                <span class="valor preco">R$ 25,90</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Custo:</span>
-                                <span class="valor">R$ 12,50</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Preparo:</span>
-                                <span class="valor">10min</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Margem:</span>
-                                <span class="valor">51.7%</span>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                <div class="card-produto">
-                    <div class="imagem-produto">
-                        <img src="../assets/img/tudo.jpeg" alt="Royal Burguer">
-                    </div>
-
-                    <div class="info-produto">
-                        <div class="cabecalho-produto">
-                            <h3>Royal Burguer</h3>
-                            <div class="controles-produto">
-                                <label class="toggle">
-                                    <input type="checkbox">
-                                    <span class="slider"></span>
-                                </label>
-                                <i class="fa-solid fa-pen-to-square editar"></i>
-                            </div>
-                        </div>
-
-                        <p class="descricao-produto">Hamburguer artesanal com queijo, alface, tomate e molho especial
-                        </p>
-
-                        <div class="categoria-status">
-                            <div class="categoria">Burguer</div>
-                            <div class="status indisponivel"><i class="fa-solid fa-eye-slash"></i> Indisponível</div>
-                        </div>
-
-                        <div class="detalhes-produto">
-                            <div class="detalhe">
-                                <span class="label">Preço:</span>
-                                <span class="valor preco">R$ 25,90</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Custo:</span>
-                                <span class="valor">R$ 12,50</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Preparo:</span>
-                                <span class="valor">10min</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Margem:</span>
-                                <span class="valor">51.7%</span>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                <div class="card-produto">
-                    <div class="imagem-produto">
-                        <img src="../assets/img/tudo.jpeg" alt="Royal Burguer">
-                    </div>
-
-                    <div class="info-produto">
-                        <div class="cabecalho-produto">
-                            <h3>Royal Burguer</h3>
-                            <div class="controles-produto">
-                                <label class="toggle">
-                                    <input type="checkbox">
-                                    <span class="slider"></span>
-                                </label>
-                                <i class="fa-solid fa-pen-to-square editar"></i>
-                            </div>
-                        </div>
-
-                        <p class="descricao-produto">Hamburguer artesanal com queijo, alface, tomate e molho especial
-                        </p>
-
-                        <div class="categoria-status">
-                            <div class="categoria">Burguer</div>
-                            <div class="status disponivel"><i class="fa-solid fa-eye"></i> Disponível</div>
-                        </div>
-
-                        <div class="detalhes-produto">
-                            <div class="detalhe">
-                                <span class="label">Preço:</span>
-                                <span class="valor preco">R$ 25,90</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Custo:</span>
-                                <span class="valor">R$ 12,50</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Preparo:</span>
-                                <span class="valor">10min</span>
-                            </div>
-                            <div class="detalhe">
-                                <span class="label">Margem:</span>
-                                <span class="valor">51.7%</span>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
             </div>
         </section>
 
@@ -366,7 +220,7 @@
                         <i class="fa-solid fa-dollar-sign"></i>
                     </div>
                     <div class="valor">
-                        <p class="grande" id="valor-total-estoque">R$ 0,00</p>
+                        <p class="grande" id="valor-total-estoque">R$0</p>
                         <p class="descricao" id="total-itens-descricao">0 Itens</p>
                     </div>
                 </div>
@@ -777,7 +631,7 @@
         <div class="modal-content-ingrediente">
             <div class="header-modal">
                 <h2 id="titulo-modal-ingrediente">Adicione um novo ingrediente</h2>
-                <i class="fa-solid fa-xmark fechar-modal"></i>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-ingrediente"></i>
             </div>
 
             <div class="conteudo-modal">
@@ -865,7 +719,6 @@
                         <label for="unidade-ingrediente">Unidade</label>
                         <select id="unidade-ingrediente" name="unidade-ingrediente" autocomplete="off">
                             <option value="">Selecione uma unidade</option>
-                            <option value="un">un</option>
                             <option value="kg">kg</option>
                             <option value="g">g</option>
                             <option value="L">L</option>
@@ -907,13 +760,20 @@
         <div class="modal-content-produto">
             <div class="header-modal">
                 <h2 id="titulo-modal">Adicionar Produto</h2>
-                <i class="fa-solid fa-xmark" id="fechar-modal"></i>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-produto"></i>
             </div>
 
             <div class="upload-imagem">
-                <div class="area-upload">
+                <input type="file" id="imagem-produto" name="imagem-produto" accept="image/*" style="display: none;">
+                <div class="area-upload" id="area-upload">
                     <i class="fa-solid fa-arrow-up-from-line"></i>
                     <p>Clique para fazer upload da imagem</p>
+                </div>
+                <div class="preview-imagem" id="preview-imagem" style="display: none;">
+                    <img id="imagem-preview" src="" alt="Preview da imagem">
+                    <button type="button" id="remover-imagem" class="btn-remover-imagem">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
                 </div>
             </div>
 
@@ -937,11 +797,6 @@
                             autocomplete="off">
                     </div>
 
-                    <div class="div-input">
-                        <label for="preco-custo-produto">Preço de Custo</label>
-                        <input type="text" id="preco-custo-produto" name="preco-custo-produto" 
-                            autocomplete="off">
-                    </div>
 
                     <div class="campos-linha">
                         <div class="div-input">
@@ -985,22 +840,20 @@
                             </div>
 
                             <div class="div-input">
-                                <label for="unidade-ingrediente">Unidade</label>
-                                <select id="unidade-ingrediente" name="unidade-ingrediente" autocomplete="off">
+                                <label for="unidade-ingrediente-produto">Unidade</label>
+                                <select id="unidade-ingrediente-produto" name="unidade-ingrediente-produto" autocomplete="off">
                                     <option value="">Selecione uma unidade</option>
-                                    <option value="un">un</option>
                                     <option value="kg">kg</option>
                                     <option value="g">g</option>
                                     <option value="L">L</option>
                                     <option value="ml">ml</option>
                                 </select>
                             </div>
-
-                            <button type="button" class="btn-adicionar-ingrediente" onclick="cardapioManager.addIngredientToRecipe()">
-                                <i class="fa-solid fa-plus"></i>
-                                <p>Adicionar</p>
-                            </button>
                         </div>
+                        <button type="button" class="btn-adicionar-ingrediente" id="btn-adicionar-ingrediente">
+                            <i class="fa-solid fa-plus"></i>
+                            <p>Adicionar ingrediente</p>
+                        </button>
                     </div>
 
                     <div class="custo-receita">
@@ -1026,7 +879,7 @@
         <div class="modal-content-funcionario">
             <div class="header-modal">
                 <h2 id="titulo-modal-funcionario">Adicione um novo usuário</h2>
-                <i class="fa-solid fa-xmark fechar-modal"></i>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-funcionario"></i>
             </div>
 
             <div class="conteudo-modal">
@@ -1111,7 +964,7 @@
         <div class="modal-content-metricas">
             <div class="header-modal">
                 <h2>Métricas</h2>
-                <i class="fa-solid fa-xmark fechar-modal"></i>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-metricas"></i>
             </div>
 
             <div class="conteudo-modal">

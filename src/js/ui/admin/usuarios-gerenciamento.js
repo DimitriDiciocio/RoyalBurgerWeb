@@ -437,18 +437,18 @@ class UsuarioManager {
      * Configura handlers de filtros
      */
     setupFilterHandlers() {
-        const cargoFilter = document.getElementById('cargo-funcionarios');
-        const statusFilter = document.getElementById('status-usuarios');
+        const cargoFilter = document.getElementById('cargo-filtro');
+        const statusFilter = document.getElementById('status-funcionario');
 
         if (cargoFilter) {
             cargoFilter.addEventListener('change', (e) => {
-                this.handleCargoFilter(e.target.value);
+                this.applyAllFilters();
             });
         }
 
         if (statusFilter) {
             statusFilter.addEventListener('change', (e) => {
-                this.handleStatusFilter(e.target.value);
+                this.applyAllFilters();
             });
         }
     }
@@ -457,10 +457,10 @@ class UsuarioManager {
      * Configura handlers de busca
      */
     setupSearchHandlers() {
-        const searchInput = document.getElementById('buscar-usuarios');
+        const searchInput = document.getElementById('busca-funcionario');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
-                this.handleSearch(e.target.value);
+                this.applyAllFilters();
             });
         }
     }
@@ -472,6 +472,8 @@ class UsuarioManager {
         try {
             const usuarios = await this.dataManager.getAllUsuarios();
             this.renderUsuarioCards(usuarios);
+            // Aplicar filtros após carregar os dados
+            this.applyAllFilters();
         } catch (error) {
             console.error('Erro ao carregar usuários:', error);
             this.showErrorMessage('Erro ao carregar usuários');
@@ -654,44 +656,77 @@ class UsuarioManager {
     }
 
     /**
-     * Trata filtro por cargo
+     * Aplica todos os filtros simultaneamente
      */
-    handleCargoFilter(cargo) {
+    applyAllFilters() {
+        const searchTerm = document.getElementById('busca-funcionario')?.value?.toLowerCase() || '';
+        const cargoFilter = document.getElementById('cargo-filtro')?.value || '';
+        const statusFilter = document.getElementById('status-funcionario')?.value || 'todos';
+        
         const cards = document.querySelectorAll('.card-funcionario');
+        
         cards.forEach(card => {
-            const cardCargo = card.querySelector('.cargo').textContent.toLowerCase();
-            const shouldShow = cargo === 'todos' || cardCargo.includes(cargo.toLowerCase());
+            const shouldShow = this.checkSearchFilter(card, searchTerm) &&
+                              this.checkCargoFilter(card, cargoFilter) &&
+                              this.checkStatusFilter(card, statusFilter);
+            
             card.style.display = shouldShow ? 'block' : 'none';
         });
+        
+        this.updateVisibleUsersCount();
     }
 
     /**
-     * Trata filtro por status
+     * Verifica se o card corresponde ao filtro de busca
      */
-    handleStatusFilter(status) {
-        const cards = document.querySelectorAll('.card-funcionario');
-        cards.forEach(card => {
-            const isActive = card.querySelector('.toggle input').checked;
-            const shouldShow = status === 'todos' || 
-                             (status === 'ativo' && isActive) || 
-                             (status === 'inativo' && !isActive);
-            card.style.display = shouldShow ? 'block' : 'none';
-        });
+    checkSearchFilter(card, searchTerm) {
+        if (!searchTerm) return true;
+        
+        const nome = card.querySelector('h3')?.textContent?.toLowerCase() || '';
+        const email = card.querySelector('.email span')?.textContent?.toLowerCase() || '';
+        
+        return nome.includes(searchTerm) || email.includes(searchTerm);
     }
 
     /**
-     * Trata busca
+     * Verifica se o card corresponde ao filtro de cargo
      */
-    handleSearch(searchTerm) {
-        const cards = document.querySelectorAll('.card-funcionario');
-        const term = searchTerm.toLowerCase();
+    checkCargoFilter(card, cargo) {
+        if (!cargo || cargo === 'todos') return true;
+        
+        const cardCargo = card.querySelector('.cargo')?.textContent?.toLowerCase() || '';
+        return cardCargo.includes(cargo.toLowerCase());
+    }
 
-        cards.forEach(card => {
-            const nome = card.querySelector('h3').textContent.toLowerCase();
-            const email = card.querySelector('.info-item span').textContent.toLowerCase();
-            const shouldShow = nome.includes(term) || email.includes(term);
-            card.style.display = shouldShow ? 'block' : 'none';
-        });
+    /**
+     * Verifica se o card corresponde ao filtro de status
+     */
+    checkStatusFilter(card, status) {
+        if (status === 'todos') return true;
+        
+        const isActive = card.querySelector('.toggle input')?.checked || false;
+        
+        if (status === 'ativo') {
+            return isActive;
+        } else if (status === 'inativo') {
+            return !isActive;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Atualiza contador de usuários visíveis
+     */
+    updateVisibleUsersCount() {
+        const visibleCards = document.querySelectorAll('.card-funcionario[style*="block"], .card-funcionario:not([style*="none"])');
+        const totalCards = document.querySelectorAll('.card-funcionario');
+        
+        // Atualizar contador se existir elemento para isso
+        const counterElement = document.getElementById('contador-usuarios-visiveis');
+        if (counterElement) {
+            counterElement.textContent = `${visibleCards.length} de ${totalCards.length} usuários`;
+        }
     }
 
     /**

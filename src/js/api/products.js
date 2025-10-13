@@ -12,6 +12,7 @@ import { apiRequest } from './api.js';
  * @param {number} options.category_id - Filtro por categoria
  * @param {number} options.page - Página
  * @param {number} options.page_size - Itens por página
+ * @param {boolean} options.include_inactive - Incluir produtos inativos
  * @returns {Promise<Object>} Lista de produtos com paginação
  */
 export const getProducts = async (options = {}) => {
@@ -21,10 +22,10 @@ export const getProducts = async (options = {}) => {
     if (options.category_id) params.append('category_id', options.category_id);
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
+    if (options.include_inactive !== undefined) params.append('include_inactive', options.include_inactive);
     
     const queryString = params.toString();
     const url = `/api/products/${queryString ? `?${queryString}` : ''}`;
-    
     
     try {
         const response = await apiRequest(url, {
@@ -60,6 +61,7 @@ export const getProductById = async (productId) => {
  * @returns {Promise<Object>} Produto criado
  */
 export const createProduct = async (productData) => {
+    
     // Se há imagem, usa FormData, senão JSON
     if (productData.image) {
         const formData = new FormData();
@@ -68,12 +70,15 @@ export const createProduct = async (productData) => {
         if (productData.name) formData.append('name', productData.name);
         if (productData.description) formData.append('description', productData.description);
         if (productData.price) formData.append('price', productData.price);
-        if (productData.cost_price) formData.append('cost_price', productData.cost_price);
+        if (productData.cost_price !== undefined) formData.append('cost_price', productData.cost_price);
         if (productData.preparation_time_minutes) formData.append('preparation_time_minutes', productData.preparation_time_minutes);
         if (productData.category_id) formData.append('category_id', productData.category_id);
         
-        // Adiciona imagem
-        formData.append('image', productData.image);
+        // Adiciona imagem (o backend gerará o image_url automaticamente)
+        if (productData.image) {
+            formData.append('image', productData.image);
+        }
+        
         
         return await apiRequest('/api/products/', {
             method: 'POST',
@@ -81,6 +86,7 @@ export const createProduct = async (productData) => {
             headers: {} // Remove Content-Type para FormData
         });
     } else {
+        
         return await apiRequest('/api/products/', {
             method: 'POST',
             body: JSON.stringify(productData)
@@ -96,31 +102,28 @@ export const createProduct = async (productData) => {
  * @returns {Promise<Object>} Resultado da atualização
  */
 export const updateProduct = async (productId, updateData) => {
-    // Se há imagem, usa FormData, senão JSON
+    
+    // Sempre usa FormData para atualizações
+    const formData = new FormData();
+    
+    // Adiciona campos de texto
+    Object.keys(updateData).forEach(key => {
+        if (key !== 'image' && updateData[key] !== undefined) {
+            formData.append(key, updateData[key]);
+        }
+    });
+    
+    // Adiciona imagem se existir
     if (updateData.image) {
-        const formData = new FormData();
-        
-        // Adiciona campos de texto
-        Object.keys(updateData).forEach(key => {
-            if (key !== 'image' && updateData[key] !== undefined) {
-                formData.append(key, updateData[key]);
-            }
-        });
-        
-        // Adiciona imagem
         formData.append('image', updateData.image);
-        
-        return await apiRequest(`/api/products/${productId}`, {
-            method: 'PUT',
-            body: formData,
-            headers: {} // Remove Content-Type para FormData
-        });
-    } else {
-        return await apiRequest(`/api/products/${productId}`, {
-            method: 'PUT',
-            body: JSON.stringify(updateData)
-        });
     }
+    
+    
+    return await apiRequest(`/api/products/${productId}`, {
+        method: 'PUT',
+        body: formData,
+        headers: {} // Remove Content-Type para FormData
+    });
 };
 
 /**
@@ -212,6 +215,7 @@ export const removeIngredientFromProduct = async (productId, ingredientId) => {
  * @param {number} options.category_id - ID da categoria
  * @param {number} options.page - Página
  * @param {number} options.page_size - Itens por página
+ * @param {boolean} options.include_inactive - Incluir produtos inativos
  * @returns {Promise<Object>} Resultado da busca
  */
 export const searchProducts = async (options = {}) => {
@@ -221,6 +225,7 @@ export const searchProducts = async (options = {}) => {
     if (options.category_id) params.append('category_id', options.category_id);
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
+    if (options.include_inactive !== undefined) params.append('include_inactive', options.include_inactive);
     
     const queryString = params.toString();
     const url = `/api/products/search${queryString ? `?${queryString}` : ''}`;
