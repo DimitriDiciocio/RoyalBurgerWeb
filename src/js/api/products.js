@@ -291,3 +291,82 @@ export const getMenuSummary = async () => {
     
     return summary;
 };
+
+/**
+ * Atualiza a imagem de um produto
+ * @param {number} productId - ID do produto
+ * @param {File} imageFile - Arquivo de imagem (opcional)
+ * @param {boolean} removeImage - Se deve remover a imagem atual (opcional)
+ * @returns {Promise<Object>} Resposta da API
+ */
+export const updateProductImage = async (productId, imageFile = null, removeImage = false) => {
+    try {
+        // Se deve remover a imagem
+        if (removeImage) {
+            const formData = new FormData();
+            formData.append('remove_image', 'true');
+            
+            return await apiRequest(`/api/products/${productId}/image`, {
+                method: 'PUT',
+                body: formData
+            });
+        }
+        
+        // Se deve substituir a imagem
+        if (imageFile) {
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            
+            return await apiRequest(`/api/products/${productId}/image`, {
+                method: 'PUT',
+                body: formData
+            });
+        }
+        
+        throw new Error('Deve fornecer um arquivo de imagem ou marcar removeImage=true');
+        
+    } catch (error) {
+        console.error('Erro ao atualizar imagem do produto:', error);
+        throw error;
+    }
+};
+
+/**
+ * Atualiza um produto com possibilidade de alterar imagem
+ * @param {number} productId - ID do produto
+ * @param {Object} productData - Dados do produto
+ * @param {File} imageFile - Arquivo de imagem (opcional)
+ * @param {boolean} removeImage - Se deve remover a imagem atual (opcional)
+ * @returns {Promise<Object>} Resposta da API
+ */
+export const updateProductWithImage = async (productId, productData, imageFile = null, removeImage = false) => {
+    try {
+        const formData = new FormData();
+        
+        // Adiciona dados do produto
+        Object.keys(productData).forEach(key => {
+            if (productData[key] !== null && productData[key] !== undefined) {
+                formData.append(key, productData[key]);
+            }
+        });
+        
+        // Adiciona imagem se fornecida
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+        
+        // Adiciona flag para remover imagem se necessário
+        if (removeImage) {
+            formData.append('remove_image', 'true');
+        }
+        
+        return await apiRequest(`/api/products/${productId}`, {
+            method: 'PUT',
+            body: formData
+        });
+        
+    } catch (error) {
+        console.error('Erro ao atualizar produto com imagem:', error);
+        throw error;
+    }
+};

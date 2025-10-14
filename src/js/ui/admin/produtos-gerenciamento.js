@@ -12,7 +12,9 @@ import {
     reactivateProduct,
     addIngredientToProduct,
     removeIngredientFromProduct,
-    getProductIngredients
+    getProductIngredients,
+    updateProductImage,
+    updateProductWithImage
 } from '../../api/products.js';
 
 import { getIngredients } from '../../api/ingredients.js';
@@ -211,11 +213,21 @@ class ProdutoDataManager {
                 cost_price: this.safeParseFloat(produtoData.custoTotal),
                 preparation_time_minutes: this.safeParseInt(produtoData.tempoPreparo),
                 category_id: produtoData.categoriaId || null,
-                is_active: produtoData.ativo !== undefined ? produtoData.ativo : true,
-                image: produtoData.imagem
+                is_active: produtoData.ativo !== undefined ? produtoData.ativo : true
             };
 
-            await updateProduct(id, apiData);
+            // Verifica se há alteração na imagem
+            const imageFile = produtoData.imageFile || null;
+            const removeImage = produtoData.removeImage || false;
+
+            // Se há alteração na imagem, usa a nova função
+            if (imageFile || removeImage) {
+                await updateProductWithImage(id, apiData, imageFile, removeImage);
+            } else {
+                // Se não há alteração na imagem, usa a função normal
+                await updateProduct(id, apiData);
+            }
+
             this.clearCache();
         } catch (error) {
             console.error('Erro ao atualizar produto:', error);
@@ -225,6 +237,20 @@ class ProdutoDataManager {
                 throw new Error('Já existe um produto com este nome. Por favor, escolha um nome diferente.');
             }
             
+            throw error;
+        }
+    }
+
+    /**
+     * Atualiza apenas a imagem de um produto
+     */
+    async updateProdutoImagem(id, imageFile = null, removeImage = false) {
+        try {
+            const response = await updateProductImage(id, imageFile, removeImage);
+            this.clearCache();
+            return response;
+        } catch (error) {
+            console.error('Erro ao atualizar imagem do produto:', error);
             throw error;
         }
     }
@@ -348,6 +374,10 @@ class ProdutoManager {
         this.ingredientesDisponiveis = [];
         this.categorias = [];
         this.categoriaModalEventsSetup = false; // Flag para evitar duplicação de event listeners
+        this.modalOpening = false; // Flag para evitar abertura múltipla do modal
+        this.newImageFile = null; // Arquivo de nova imagem
+        this.imageToRemove = false; // Flag para remover imagem
+        this.isUpdating = false; // Flag para evitar atualizações simultâneas
     }
 
     /**
@@ -370,6 +400,9 @@ class ProdutoManager {
             this.loadCategoriasInSelect();
             this.loadCategoriasInFilterSelect();
             this.setupEventListeners();
+            
+            // Expor função global para atualização de produtos
+            window.refreshAllProducts = () => this.refreshAllProducts();
         } catch (error) {
             console.error('Erro ao inicializar módulo de produtos:', error);
             this.showErrorMessage('Erro ao carregar dados dos produtos');
@@ -560,7 +593,7 @@ class ProdutoManager {
         }
         
         // Base URL do servidor Flask (porta 5000)
-        const baseUrl = 'http://127.0.0.1:5000';
+        const baseUrl = 'http://192.168.1.137:5000';
         
         // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
         if (imagePath.startsWith('/api/uploads/products/')) {
@@ -588,11 +621,17 @@ class ProdutoManager {
         const imageUrl = this.buildImageUrl(produto.imagem);
         
         if (imageUrl) {
-            return `
-                <img src="${this.escapeHtml(imageUrl)}" 
-                     alt="${this.escapeHtml(produto.nome)}" 
-                     onerror="this.parentNode.innerHTML='<div class=\\"imagem-placeholder\\"><i class=\\"fa-solid fa-image\\"></i><p>Imagem não encontrada</p></div>
-            `;
+            // Usar createElement para evitar XSS
+            const img = document.createElement('img');
+            img.src = this.escapeHtml(imageUrl);
+            img.alt = this.escapeHtml(produto.nome || 'Produto');
+            img.onerror = () => {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'imagem-placeholder';
+                placeholder.innerHTML = '<i class="fa-solid fa-image"></i><p>Imagem não encontrada</p>';
+                img.parentNode?.replaceChild(placeholder, img);
+            };
+            return img.outerHTML;
         } else {
             return `
                 <div class="imagem-placeholder">
@@ -676,12 +715,24 @@ class ProdutoManager {
     }
 
     /**
-     * Utilitário para escapar HTML
+     * Utilitário para escapar HTML de forma segura
      */
     escapeHtml(text) {
+        if (typeof text !== 'string') return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Utilitário para sanitizar HTML de forma segura
+     */
+    sanitizeHtml(html) {
+        if (typeof html !== 'string') return '';
+        // Remove tags potencialmente perigosas
+        return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                  .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+                  .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '');
     }
 
     /**
@@ -693,10 +744,24 @@ class ProdutoManager {
     }
 
     /**
-     * Utilitário para formatar moeda
+     * Utilitário para formatar moeda de forma segura
      */
     formatCurrency(value) {
-        return (value || 0).toFixed(2).replace('.', ',');
+        const numValue = this.dataManager.safeParseFloat(value);
+        return numValue.toFixed(2).replace('.', ',');
+    }
+
+    /**
+     * Utilitário para logs seguros (remove dados sensíveis)
+     */
+    safeLog(message, data = null) {
+        if (process.env.NODE_ENV === 'development') {
+            if (data) {
+                console.log(message, data);
+            } else {
+                console.log(message);
+            }
+        }
     }
 
     /**
@@ -746,31 +811,9 @@ class ProdutoManager {
         try {
             await this.dataManager.toggleProdutoStatus(produtoId, novoStatus);
             
-            // Atualizar visual - usando seletores corretos baseados na nova estrutura
-            const statusElement = card.querySelector('.status');
-            const statusIcon = card.querySelector('.status i');
-            const statusText = statusElement ? statusElement.textContent.trim() : '';
+            // Atualizar todas as imagens e informações dos produtos
+            await this.updateAllProdutosInUI();
             
-            if (novoStatus) {
-                statusElement.className = 'status disponivel';
-                if (statusIcon) {
-                    statusIcon.className = 'fa-solid fa-eye';
-                }
-                // Atualizar texto do status
-                if (statusElement) {
-                    statusElement.innerHTML = '<i class="fa-solid fa-eye"></i> Disponível';
-                }
-            } else {
-                statusElement.className = 'status indisponivel';
-                if (statusIcon) {
-                    statusIcon.className = 'fa-solid fa-eye-slash';
-                }
-                // Atualizar texto do status
-                if (statusElement) {
-                    statusElement.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Indisponível';
-                }
-            }
-
             this.showSuccessMessage(`Produto ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
             await this.updateDashboard();
             
@@ -889,26 +932,44 @@ class ProdutoManager {
      * Abre modal de produto
      */
     async openProdutoModal(produtoData = null) {
-        const titulo = document.getElementById('titulo-modal');
-        const btnSalvar = document.getElementById('salvar-produto');
-
-        // Carregar ingredientes e categorias nos selects
-        this.loadIngredientesInSelect();
-        this.loadCategoriasInSelect();
-
-        if (produtoData) {
-            titulo.textContent = 'Editar produto';
-            btnSalvar.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
-            await this.populateProdutoForm(produtoData);
-        } else {
-            titulo.textContent = 'Adicionar novo produto';
-            btnSalvar.innerHTML = '<i class="fa-solid fa-plus"></i> Adicionar';
-            this.clearProdutoForm();
+        // Evitar abertura múltipla do modal
+        if (this.modalOpening) {
+            return;
         }
+        
+        this.modalOpening = true;
+        
+        try {
+            const titulo = document.getElementById('titulo-modal');
+            const btnSalvar = document.getElementById('salvar-produto');
 
-        // Usar sistema centralizado de modais
-        abrirModal('modal-produto');
-        this.setupProdutoModalListeners(produtoData);
+            // Inicializar variáveis de imagem
+            this.newImageFile = null;
+            this.imageToRemove = false;
+
+            // Carregar ingredientes e categorias nos selects
+            this.loadIngredientesInSelect();
+            this.loadCategoriasInSelect();
+
+            if (produtoData) {
+                titulo.textContent = 'Editar produto';
+                btnSalvar.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
+                await this.populateProdutoForm(produtoData);
+            } else {
+                titulo.textContent = 'Adicionar novo produto';
+                btnSalvar.innerHTML = '<i class="fa-solid fa-plus"></i> Adicionar';
+                this.clearProdutoForm();
+            }
+
+            // Usar sistema centralizado de modais
+            abrirModal('modal-produto');
+            this.setupProdutoModalListeners(produtoData);
+        } finally {
+            // Reset da flag após um pequeno delay
+            setTimeout(() => {
+                this.modalOpening = false;
+            }, 100);
+        }
     }
 
     /**
@@ -918,6 +979,10 @@ class ProdutoManager {
         // Usar sistema centralizado de modais
         fecharModal('modal-produto');
         this.currentEditingId = null;
+        
+        // Reset das variáveis de imagem
+        this.newImageFile = null;
+        this.imageToRemove = false;
     }
 
     /**
@@ -964,6 +1029,8 @@ class ProdutoManager {
         const custoElement = document.getElementById('custo-estimado');
         if (custoElement) {
             custoElement.textContent = 'R$ 0,00';
+        } else {
+            console.warn('Elemento custo-estimado não encontrado para limpeza');
         }
     }
 
@@ -971,6 +1038,9 @@ class ProdutoManager {
      * Configura listeners do modal
      */
     setupProdutoModalListeners(produtoData = null) {
+        // Remover listeners existentes para evitar duplicação
+        this.removeModalListeners();
+
         // Botão cancelar
         const btnCancelar = document.getElementById('cancelar-produto');
         if (btnCancelar) {
@@ -1003,6 +1073,9 @@ class ProdutoManager {
             });
         }
 
+        // Atualizar custo estimado inicial
+        this.updateEstimatedCost();
+
         // Event delegation para botões de remover ingrediente
         const modal = document.getElementById('modal-produto');
         if (modal) {
@@ -1011,6 +1084,26 @@ class ProdutoManager {
                     this.removeIngredientFromRecipe(e.target);
                 }
             });
+        }
+    }
+
+    /**
+     * Remove listeners do modal para evitar duplicação
+     */
+    removeModalListeners() {
+        // Remover listeners específicos se necessário
+        const btnCancelar = document.getElementById('cancelar-produto');
+        const btnSalvar = document.getElementById('salvar-produto');
+        const btnAdicionarIngrediente = document.getElementById('btn-adicionar-ingrediente');
+        
+        if (btnCancelar) {
+            btnCancelar.replaceWith(btnCancelar.cloneNode(true));
+        }
+        if (btnSalvar) {
+            btnSalvar.replaceWith(btnSalvar.cloneNode(true));
+        }
+        if (btnAdicionarIngrediente) {
+            btnAdicionarIngrediente.replaceWith(btnAdicionarIngrediente.cloneNode(true));
         }
     }
 
@@ -1062,6 +1155,14 @@ class ProdutoManager {
             fileInput.click();
         });
 
+        // Clique na imagem existente para trocar
+        previewImagem.addEventListener('click', (e) => {
+            // Evitar clique no botão de remover
+            if (!e.target.closest('#remover-imagem')) {
+                fileInput.click();
+            }
+        });
+
         // Drag and drop
         areaUpload.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -1094,7 +1195,8 @@ class ProdutoManager {
         });
 
         // Botão remover imagem
-        btnRemoverImagem.addEventListener('click', () => {
+        btnRemoverImagem.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar que o clique se propague para o preview
             this.removeImage();
         });
     }
@@ -1114,6 +1216,10 @@ class ProdutoManager {
             this.showErrorMessage('A imagem deve ter no máximo 5MB');
             return;
         }
+
+        // Armazenar arquivo para envio
+        this.newImageFile = file;
+        this.imageToRemove = false; // Reset flag de remoção
 
         // Criar URL para preview
         const reader = new FileReader();
@@ -1138,6 +1244,10 @@ class ProdutoManager {
             
             // Remover classe de imagem existente quando nova imagem for selecionada
             previewImagem.classList.remove('existing-image');
+            
+            // Manter cursor pointer para permitir troca
+            previewImagem.style.cursor = 'pointer';
+            previewImagem.title = 'Clique para trocar a imagem';
         }
     }
 
@@ -1155,7 +1265,13 @@ class ProdutoManager {
             areaUpload.style.display = 'flex';
             previewImagem.style.display = 'none';
             previewImagem.classList.remove('existing-image');
+            previewImagem.style.cursor = '';
+            previewImagem.title = '';
             imagemPreview.src = '';
+            
+            // Reset das variáveis de imagem
+            this.newImageFile = null;
+            this.imageToRemove = true;
         }
     }
 
@@ -1218,6 +1334,10 @@ class ProdutoManager {
                 
                 // Adicionar indicador de que é uma imagem existente
                 previewImagem.classList.add('existing-image');
+                
+                // Adicionar cursor pointer para indicar que é clicável
+                previewImagem.style.cursor = 'pointer';
+                previewImagem.title = 'Clique para trocar a imagem';
             } else {
                 this.removeImage();
             }
@@ -1236,7 +1356,10 @@ class ProdutoManager {
 
         try {
             await this.saveProductWithIngredients(produtoData);
-            await this.loadProdutos();
+            
+            // Atualizar todas as imagens e informações dos produtos
+            await this.updateAllProdutosInUI();
+            
             this.closeProdutoModal();
             this.showSuccessMessage('Produto adicionado com sucesso!');
             
@@ -1272,9 +1395,20 @@ class ProdutoManager {
             return;
         }
 
+        // Adicionar dados de imagem se houver alteração
+        if (this.newImageFile) {
+            produtoData.imageFile = this.newImageFile;
+        }
+        if (this.imageToRemove) {
+            produtoData.removeImage = true;
+        }
+
         try {
             await this.saveProductWithIngredients(produtoData);
-            await this.loadProdutos();
+            
+            // Atualizar todas as imagens e informações dos produtos
+            await this.updateAllProdutosInUI();
+            
             this.closeProdutoModal();
             this.showSuccessMessage('Produto atualizado com sucesso!');
             
@@ -1291,6 +1425,257 @@ class ProdutoManager {
             } else {
                 this.showErrorMessage('Erro ao atualizar produto. Tente novamente.');
             }
+        }
+    }
+
+    /**
+     * Atualiza todas as imagens e informações dos produtos na interface
+     */
+    async updateAllProdutosInUI() {
+        try {
+            // Prevenir múltiplas execuções simultâneas
+            if (this.isUpdating) {
+                return;
+            }
+            this.isUpdating = true;
+            
+            // Buscar todos os produtos atualizados
+            const response = await this.dataManager.getAllProdutos({ 
+                page_size: 1000, 
+                include_inactive: true 
+            });
+            
+            const produtosRaw = response.items || [];
+            const produtos = produtosRaw.map(produto => this.mapProdutoFromAPI(produto));
+            
+            // Criar mapa para lookup O(1) em vez de O(n)
+            const produtosMap = new Map(produtos.map(p => [p.id, p]));
+            
+            // Atualizar cada card existente de forma otimizada
+            const cards = document.querySelectorAll('.card-produto');
+            const updatePromises = Array.from(cards).map(card => {
+                const produtoId = parseInt(card.dataset.produtoId);
+                const produtoAtualizado = produtosMap.get(produtoId);
+                
+                if (produtoAtualizado) {
+                    return this.updateSingleProdutoCard(card, produtoAtualizado);
+                }
+                return Promise.resolve();
+            });
+            
+            await Promise.all(updatePromises);
+            
+        } catch (error) {
+            console.error('Erro ao atualizar produtos globalmente:', error);
+            // Fallback: recarregar todos os produtos
+            await this.loadProdutos();
+        } finally {
+            this.isUpdating = false;
+        }
+    }
+
+    /**
+     * Atualiza um card específico de produto
+     */
+    updateSingleProdutoCard(card, produtoAtualizado) {
+        try {
+            // Atualizar imagem com cache busting otimizado
+            const imagemContainer = card.querySelector('.imagem-produto');
+            if (imagemContainer) {
+                // Só aplicar cache busting se a imagem mudou
+                const currentImg = imagemContainer.querySelector('img');
+                const currentSrc = currentImg?.src;
+                const newSrc = this.buildImageUrl(produtoAtualizado.imagem);
+                
+                if (currentSrc !== newSrc) {
+                    const produtoComCacheBust = {
+                        ...produtoAtualizado,
+                        imagem: produtoAtualizado.imagem ? `${produtoAtualizado.imagem}?t=${Date.now()}` : produtoAtualizado.imagem
+                    };
+                    imagemContainer.innerHTML = this.createImageElement(produtoComCacheBust);
+                }
+            }
+            
+            // Atualizar informações do produto
+            this.updateProdutoInfo(card, produtoAtualizado);
+            
+            // Efeito visual de atualização
+            this.showImageUpdateEffect(card);
+        } catch (error) {
+            console.error('Erro ao atualizar card do produto:', error);
+        }
+    }
+
+    /**
+     * Atualiza as informações de um produto no card de forma otimizada
+     */
+    updateProdutoInfo(card, produto) {
+        try {
+            // Validação de entrada
+            if (!card || !produto) {
+                console.warn('Card ou produto inválido para atualização');
+                return;
+            }
+
+            // Atualizar nome
+            const nomeElement = card.querySelector('h3');
+            if (nomeElement && produto.nome) {
+                nomeElement.textContent = this.escapeHtml(produto.nome);
+            }
+            
+            // Atualizar descrição
+            const descricaoElement = card.querySelector('.descricao-produto');
+            if (descricaoElement) {
+                const descricaoLimitada = this.truncateText(produto.descricao || 'Sem descrição', 50);
+                descricaoElement.textContent = this.escapeHtml(descricaoLimitada);
+            }
+            
+            // Atualizar preço
+            const precoElement = card.querySelector('.preco');
+            if (precoElement) {
+                const precoVenda = this.dataManager.safeParseFloat(produto.preco);
+                precoElement.textContent = `R$ ${this.formatCurrency(precoVenda)}`;
+            }
+            
+            // Atualizar categoria
+            const categoriaElement = card.querySelector('.categoria');
+            if (categoriaElement) {
+                const categoriaNome = this.getCategoriaNome(produto.categoriaId);
+                categoriaElement.textContent = this.escapeHtml(categoriaNome);
+            }
+            
+            // Atualizar status de forma segura
+            this.updateProdutoStatus(card, produto);
+            
+            // Atualizar custo e margem se existirem
+            this.updateProdutoCostAndMargin(card, produto);
+            
+        } catch (error) {
+            console.error('Erro ao atualizar informações do produto:', error);
+            // Não quebrar o fluxo, apenas logar o erro
+        }
+    }
+
+    /**
+     * Atualiza o status do produto de forma segura
+     */
+    updateProdutoStatus(card, produto) {
+        const statusElement = card.querySelector('.status');
+        const toggleCheckbox = card.querySelector('.toggle input');
+        
+        if (statusElement && toggleCheckbox) {
+            const statusClass = produto.ativo ? 'disponivel' : 'indisponivel';
+            const statusText = produto.ativo ? 'Disponível' : 'Indisponível';
+            const iconClass = produto.ativo ? 'fa-eye' : 'fa-eye-slash';
+            
+            statusElement.className = `status ${statusClass}`;
+            statusElement.innerHTML = `<i class="fa-solid fa-${iconClass}"></i> ${this.escapeHtml(statusText)}`;
+            toggleCheckbox.checked = Boolean(produto.ativo);
+        }
+    }
+
+    /**
+     * Atualiza custo e margem do produto
+     */
+    updateProdutoCostAndMargin(card, produto) {
+        const custoElement = card.querySelector('.custo');
+        const margemElement = card.querySelector('.margem');
+        
+        if (custoElement) {
+            const custoEstimado = this.dataManager.safeParseFloat(produto.precoCusto);
+            custoElement.textContent = `R$ ${this.formatCurrency(custoEstimado)}`;
+        }
+        
+        if (margemElement) {
+            const custoEstimado = this.dataManager.safeParseFloat(produto.precoCusto);
+            const precoVenda = this.dataManager.safeParseFloat(produto.preco);
+            const margemLucro = this.calcularMargemLucro(precoVenda, custoEstimado);
+            margemElement.textContent = `${margemLucro.toFixed(1)}%`;
+        }
+    }
+
+    /**
+     * Atualiza a imagem do produto na interface sem recarregar a página
+     */
+    async updateProdutoImageInUI(produtoId) {
+        try {
+            // Encontrar o card do produto na interface
+            const card = document.querySelector(`[data-produto-id="${produtoId}"]`);
+            
+            if (card) {
+                // Mostrar indicador de carregamento
+                this.showImageLoadingIndicator(card);
+            }
+            
+            // Buscar dados atualizados do produto
+            const produtoAtualizado = await this.dataManager.getProdutoById(produtoId);
+            
+            if (produtoAtualizado) {
+                // Mapear dados da API para o formato do frontend
+                const produtoMapeado = this.mapProdutoFromAPI(produtoAtualizado);
+                
+                if (card) {
+                    // Atualizar apenas a imagem do card
+                    const imagemContainer = card.querySelector('.imagem-produto');
+                    if (imagemContainer) {
+                        // Adicionar cache busting para forçar reload da imagem
+                        const produtoComCacheBust = {
+                            ...produtoMapeado,
+                            imagem: produtoMapeado.imagem ? `${produtoMapeado.imagem}?t=${Date.now()}` : produtoMapeado.imagem
+                        };
+                        
+                        imagemContainer.innerHTML = this.createImageElement(produtoComCacheBust);
+                    }
+                    
+                    // Adicionar efeito visual de atualização
+                    this.showImageUpdateEffect(card);
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar imagem do produto na interface:', error);
+            // Se falhar, recarregar todos os produtos como fallback
+            await this.loadProdutos();
+        }
+    }
+
+    /**
+     * Mostra indicador de carregamento na imagem
+     */
+    showImageLoadingIndicator(card) {
+        const imagemContainer = card.querySelector('.imagem-produto');
+        if (imagemContainer) {
+            imagemContainer.innerHTML = `
+                <div class="imagem-loading">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <p>Atualizando imagem...</p>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Mostra efeito visual de atualização da imagem
+     */
+    showImageUpdateEffect(card) {
+        card.style.transition = 'opacity 0.3s ease';
+        card.style.opacity = '0.7';
+        
+        setTimeout(() => {
+            card.style.opacity = '1';
+        }, 300);
+    }
+
+    /**
+     * Função global para atualizar todos os produtos
+     * Pode ser chamada de qualquer lugar da aplicação
+     */
+    async refreshAllProducts() {
+        try {
+            console.log('Atualizando todos os produtos globalmente...');
+            await this.updateAllProdutosInUI();
+            console.log('Atualização global de produtos concluída');
+        } catch (error) {
+            console.error('Erro na atualização global de produtos:', error);
         }
     }
 
@@ -1560,22 +1945,32 @@ class ProdutoManager {
     }
 
     /**
-     * Atualiza custo estimado da receita
+     * Atualiza custo estimado da receita de forma otimizada
      */
     updateEstimatedCost() {
+        // Cache do elemento para evitar querySelector repetido
+        if (!this.custoElement) {
+            this.custoElement = document.getElementById('custo-estimado');
+        }
+        
         const ingredientes = document.querySelectorAll('.ingrediente-item');
         let custoTotal = 0;
 
-        ingredientes.forEach(ingrediente => {
-            const custoText = ingrediente.querySelector('.custo').textContent;
-            const custo = this.dataManager.safeParseFloat(custoText.replace('R$', '').replace(',', '.'));
-            custoTotal += custo;
-        });
+        // Usar for...of para melhor performance que forEach
+        for (const ingrediente of ingredientes) {
+            const custoElement = ingrediente.querySelector('.custo');
+            if (custoElement) {
+                const custoText = custoElement.textContent;
+                const custo = this.dataManager.safeParseFloat(custoText.replace('R$', '').replace(',', '.'));
+                custoTotal += custo;
+            }
+        }
 
-        // Atualizar exibição do custo (se houver elemento para isso)
-        const custoElement = document.querySelector('.custo-receita .valor');
-        if (custoElement) {
-            custoElement.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
+        // Atualizar exibição do custo estimado
+        if (this.custoElement) {
+            this.custoElement.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
+        } else {
+            console.warn('Elemento custo-estimado não encontrado');
         }
     }
 
@@ -1765,3 +2160,6 @@ class ProdutoManager {
 
 // Exporta a classe principal
 export { ProdutoManager };
+
+// Expor função global para atualização de produtos
+window.refreshAllProducts = null; // Será definida quando a instância for criada

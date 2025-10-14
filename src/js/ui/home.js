@@ -78,7 +78,7 @@ function buildImageUrl(imagePath) {
     }
     
     // Base URL do servidor Flask (porta 5000)
-    const baseUrl = 'http://127.0.0.1:5000';
+    const baseUrl = 'http://192.168.1.137:5000';
     
     // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
     if (imagePath.startsWith('/api/uploads/products/')) {
