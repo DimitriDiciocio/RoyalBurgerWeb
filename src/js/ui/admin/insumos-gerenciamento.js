@@ -107,6 +107,13 @@ class InsumoDataManager {
             };
 
             const result = await createIngredient(apiData);
+            
+            // Validar se a resposta contém dados válidos
+            if (!result || !result.id) {
+                console.error('Resposta inválida da API ao criar insumo:', result);
+                throw new Error('Resposta inválida da API ao criar insumo');
+            }
+            
             this.clearCache();
             return result;
         } catch (error) {
@@ -206,6 +213,7 @@ class InsumoManager {
         this.quantityChangeTimeout = null; // Para debounce
         this.mouseDownTimeout = null; // Para distinguir clique simples de segurado
         this.ingredientes = []; // Lista de ingredientes para validação
+        this.isSubmitting = false; // Evita envios duplicados
     }
 
     /**
@@ -446,17 +454,37 @@ class InsumoManager {
      */
     async loadIngredientesForValidation() {
         try {
-            const response = await this.dataManager.getAllInsumos();
+            const response = await this.dataManager.getAllInsumos({ forceRefresh: true });
             const insumos = response.items || [];
             
             // Armazenar apenas os dados necessários para validação
             this.ingredientes = insumos.map(insumo => ({
                 id: insumo.id,
-                name: insumo.name
-            }));
+                name: insumo.name || ''
+            })).filter(ing => ing.name && ing.name.trim() !== ''); // Filtrar nomes vazios
+            
+            // Ingredientes carregados para validação
         } catch (error) {
             console.error('Erro ao carregar ingredientes para validação:', error);
+            // Em caso de erro, usar lista vazia para não bloquear a operação
+            this.ingredientes = [];
             throw error;
+        }
+    }
+
+    /**
+     * Verifica se um nome de ingrediente já existe usando endpoint específico
+     */
+    async checkNameExists(name) {
+        try {
+            // Importar função da API
+            const { checkIngredientNameExists } = await import('../../api/ingredients.js');
+            
+            const response = await checkIngredientNameExists(name);
+            return response.exists || false;
+        } catch (error) {
+            console.warn('Erro ao verificar nome via API:', error);
+            return false; // Em caso de erro, permitir tentativa
         }
     }
 
@@ -1310,16 +1338,16 @@ class InsumoManager {
             btnCancelar.addEventListener('click', () => this.closeInsumoModal());
         }
 
-        // Botão salvar
+        // Botão salvar (evitar múltiplos listeners acumulados entre aberturas do modal)
         const btnSalvar = document.getElementById('salvar-ingrediente');
         if (btnSalvar) {
-            btnSalvar.addEventListener('click', () => {
+            btnSalvar.onclick = () => {
                 if (insumoData) {
                     this.handleEditInsumo();
                 } else {
                     this.handleAddInsumo();
                 }
-            });
+            };
         }
 
         // Overlay
@@ -1365,6 +1393,11 @@ class InsumoManager {
      * Trata adição de insumo
      */
     async handleAddInsumo() {
+        // Evitar envios simultâneos
+        if (this.isSubmitting) {
+            console.warn('Envio já em andamento.');
+            return;
+        }
         if (!(await this.validateInsumoForm())) {
             return;
         }
@@ -1372,16 +1405,65 @@ class InsumoManager {
         const insumoData = this.getInsumoFormData();
 
         try {
+            this.isSubmitting = true;
+            const btnSalvar = document.getElementById('salvar-ingrediente');
+            if (btnSalvar) {
+                btnSalvar.disabled = true;
+                btnSalvar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+            }
+            // Validação adicional antes de enviar para a API
+            await this.loadIngredientesForValidation();
+            const nomeNormalizado = insumoData.nome.toLowerCase().trim();
+            const existingIngredient = this.ingredientes.find(ing => {
+                if (!ing.name) return false;
+                const ingNormalizado = ing.name.toLowerCase().trim();
+                return ingNormalizado === nomeNormalizado;
+            });
+            
+            if (existingIngredient) {
+                this.showErrorMessage(`Já existe um ingrediente com o nome "${existingIngredient.name}". Por favor, escolha um nome diferente.`);
+                return;
+            }
+
+            // Validação adicional usando endpoint específico do backend
+            const nameExists = await this.checkNameExists(insumoData.nome);
+            if (nameExists) {
+                this.showErrorMessage(`Já existe um ingrediente com o nome "${insumoData.nome}". Por favor, escolha um nome diferente.`);
+                return;
+            }
+
+            // Criando insumo
+
             const newInsumo = await this.dataManager.addInsumo(insumoData);
             
-            // Atualização automática otimizada
-            await this.addInsumoToUI(newInsumo);
-            await this.updateResumoAfterAdd(insumoData);
-            
-            this.closeInsumoModal();
-            this.showSuccessMessage('Insumo adicionado com sucesso!');
+            // Só executar atualizações da UI se a API retornou sucesso
+            if (newInsumo && newInsumo.id) {
+                // Atualização automática otimizada
+                await this.addInsumoToUI(newInsumo);
+                await this.updateResumoAfterAdd(insumoData);
+                
+                this.closeInsumoModal();
+                this.showSuccessMessage('Insumo adicionado com sucesso!');
+            } else {
+                throw new Error('Resposta inválida da API ao criar insumo');
+            }
         } catch (error) {
-            this.handleApiError(error, 'adicionar insumo');
+            // Em caso de erro, NÃO executar nenhuma atualização da UI
+            console.error('Erro ao adicionar insumo - não atualizando UI:', error);
+            
+            // Se for erro 409 (conflito), não mostrar erro genérico, apenas a mensagem específica
+            if (error.status === 409) {
+                this.showErrorMessage('Já existe um ingrediente com este nome. Por favor, escolha um nome diferente.');
+            } else {
+                this.handleApiError(error, 'adicionar insumo');
+            }
+        } finally {
+            this.isSubmitting = false;
+            const btnSalvar = document.getElementById('salvar-ingrediente');
+            if (btnSalvar) {
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = this.currentEditingId ? '<i class="fa-solid fa-save"></i> Salvar' : '<i class="fa-solid fa-plus"></i> Adicionar';
+            }
         }
     }
 
@@ -1449,8 +1531,13 @@ class InsumoManager {
      */
     async deleteInsumo(insumoId) {
         try {
-            // Salvar dados do insumo antes de excluir para atualizar resumo
+            // Verificar se o insumo existe antes de tentar excluir
             const card = document.querySelector(`[data-ingredient-id="${insumoId}"]`);
+            if (!card) {
+                throw new Error('Insumo não encontrado na interface. Ele pode já ter sido removido.');
+            }
+            
+            // Salvar dados do insumo antes de excluir para atualizar resumo
             const insumoData = this.extractInsumoDataFromCard(card);
             
             await this.dataManager.deleteInsumo(insumoId);
@@ -1461,6 +1548,14 @@ class InsumoManager {
             
         } catch (error) {
             console.error('Erro ao excluir insumo:', error);
+            
+            // Se o erro for 404, remover o card da UI mesmo assim
+            if (error.status === 404) {
+                console.warn('Insumo não encontrado no servidor, removendo da interface...');
+                this.removeInsumoFromUI(insumoId);
+                return; // Não re-throw o erro para não mostrar mensagem de erro
+            }
+            
             throw error;
         }
     }
@@ -1513,25 +1608,46 @@ class InsumoManager {
 
         // Verificar se o nome já existe (apenas para novos ingredientes)
         if (!this.currentEditingId) {
-            // Se ingredientes não estão carregados, tentar carregar primeiro
-            if (!this.ingredientes || !Array.isArray(this.ingredientes)) {
-                try {
-                    await this.loadIngredientesForValidation();
-                } catch (error) {
-                    console.warn('Não foi possível carregar ingredientes para validação:', error);
-                    // Continuar sem validação frontend se não conseguir carregar
-                }
+            // Sempre tentar carregar ingredientes para validação
+            try {
+                await this.loadIngredientesForValidation();
+            } catch (error) {
+                console.warn('Não foi possível carregar ingredientes para validação:', error);
+                // Continuar sem validação frontend se não conseguir carregar
             }
             
             // Verificar duplicação se ingredientes estão disponíveis
             if (this.ingredientes && Array.isArray(this.ingredientes)) {
-                const existingIngredient = this.ingredientes.find(ing => 
-                    ing.name.toLowerCase() === nome.toLowerCase()
-                );
+                const nomeNormalizado = nome.toLowerCase().trim();
+                const existingIngredient = this.ingredientes.find(ing => {
+                    if (!ing.name) return false;
+                    const ingNormalizado = ing.name.toLowerCase().trim();
+                    return ingNormalizado === nomeNormalizado;
+                });
+                
                 if (existingIngredient) {
-                    this.showErrorMessage(`Já existe um ingrediente com o nome "${nome}". Por favor, escolha um nome diferente.`);
+                    this.showErrorMessage(`Já existe um ingrediente com o nome "${existingIngredient.name}". Por favor, escolha um nome diferente.`);
                     return false;
                 }
+            }
+        } else {
+            // Para edição, verificar se o nome mudou e se já existe outro com o mesmo nome
+            try {
+                await this.loadIngredientesForValidation();
+                
+                if (this.ingredientes && Array.isArray(this.ingredientes)) {
+                    const existingIngredient = this.ingredientes.find(ing => 
+                        ing.id !== this.currentEditingId && 
+                        ing.name && 
+                        ing.name.toLowerCase().trim() === nome.toLowerCase().trim()
+                    );
+                    if (existingIngredient) {
+                        this.showErrorMessage(`Já existe outro ingrediente com o nome "${nome}". Por favor, escolha um nome diferente.`);
+                        return false;
+                    }
+                }
+            } catch (error) {
+                console.warn('Não foi possível validar nome duplicado na edição:', error);
             }
         }
 
@@ -1737,7 +1853,31 @@ class InsumoManager {
         let title = 'Erro';
         let message = 'Ocorreu um erro inesperado.';
         
-        if (error.message) {
+        // Tratamento específico por status HTTP
+        if (error.status === 409) {
+            title = 'Nome Duplicado';
+            message = 'Já existe um ingrediente com este nome. Por favor, escolha um nome diferente.';
+        } else if (error.status === 404) {
+            if (operation.includes('excluir') || operation.includes('delete')) {
+                title = 'Insumo Não Encontrado';
+                message = 'O insumo que você está tentando excluir não foi encontrado. Ele pode já ter sido removido.';
+            } else {
+                title = 'Item Não Encontrado';
+                message = 'O insumo solicitado não foi encontrado.';
+            }
+        } else if (error.status === 400) {
+            title = 'Dados Inválidos';
+            message = 'Verifique os dados informados e tente novamente.';
+        } else if (error.status === 401) {
+            title = 'Sessão Expirada';
+            message = 'Sua sessão expirou. Faça login novamente.';
+        } else if (error.status === 403) {
+            title = 'Acesso Negado';
+            message = 'Você não tem permissão para realizar esta operação.';
+        } else if (error.status === 500) {
+            title = 'Erro do Servidor';
+            message = 'Ocorreu um erro interno no servidor. Tente novamente em alguns instantes.';
+        } else if (error.message) {
             // Tratamento específico para violação de chave única (Firebird)
             if (error.message.includes('violation of PRIMARY or UNIQUE KEY constraint') || 
                 error.message.includes('INTEG_44') ||
@@ -1777,13 +1917,40 @@ class InsumoManager {
      */
     async addInsumoToUI(insumoData) {
         const container = document.querySelector('#secao-estoque .ingredientes');
-        if (!container) return;
+        if (!container) {
+            console.error('Container de ingredientes não encontrado');
+            return;
+        }
 
-        // Usar o ID real retornado pela API
+        // Validar se os dados são válidos antes de criar o card
+        if (!insumoData || !insumoData.id) {
+            console.error('Dados do insumo inválidos:', insumoData);
+            throw new Error('Dados do insumo inválidos para criar card');
+        }
+
+        // Verificar se já existe um card com este ID (evitar duplicatas)
+        const existingCard = container.querySelector(`[data-ingredient-id="${insumoData.id}"]`);
+        if (existingCard) {
+            console.warn(`Card para insumo ID ${insumoData.id} já existe, não criando duplicata`);
+            return;
+        }
+
+        // Usar o ID real retornado pela API e garantir que todos os campos necessários existam
         const insumoWithId = {
-            ...insumoData,
-            id: insumoData.id || insumoData.ID
+            id: insumoData.id || insumoData.ID,
+            nome: insumoData.name || insumoData.nome || 'Nome não informado',
+            categoria: insumoData.category || insumoData.categoria || 'outros',
+            custo: parseFloat(insumoData.price || insumoData.custo) || 0,
+            unidade: insumoData.stock_unit || insumoData.unidade || 'un',
+            min: parseInt(insumoData.min_stock_threshold || insumoData.min) || 0,
+            max: parseInt(insumoData.max_stock || insumoData.max) || 100,
+            atual: parseInt(insumoData.current_stock || insumoData.atual) || 0,
+            ativo: insumoData.is_available !== undefined ? insumoData.is_available : true,
+            fornecedor: insumoData.supplier || insumoData.fornecedor || 'Não informado',
+            ultimaAtualizacao: null
         };
+
+        // Criando card para insumo
 
         // Criar e adicionar card
         const card = this.createInsumoCard(insumoWithId);

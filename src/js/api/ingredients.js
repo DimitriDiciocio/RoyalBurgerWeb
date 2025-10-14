@@ -276,3 +276,15 @@ export const getInStockIngredients = async () => {
         return currentStock > minThreshold;
     });
 };
+
+/**
+ * Verifica se um nome de ingrediente já existe
+ * @param {string} name - Nome do ingrediente a verificar
+ * @returns {Promise<Object>} Resultado da verificação
+ */
+export const checkIngredientNameExists = async (name) => {
+    return await apiRequest('/api/ingredients/check-name', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim() })
+    });
+};
