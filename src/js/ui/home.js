@@ -8,6 +8,14 @@ let productsCache = null;
 let categoriesCache = null;
 
 /**
+ * Limpa o cache de produtos (útil quando produtos são atualizados)
+ */
+function clearProductsCache() {
+    productsCache = null;
+    console.log('Cache de produtos limpo');
+}
+
+/**
  * Carrega todos os produtos da API
  */
 async function loadProducts() {
@@ -21,7 +29,17 @@ async function loadProducts() {
             include_inactive: false 
         });
         
-        productsCache = response.items || [];
+        // Filtrar apenas produtos ativos (dupla verificação)
+        const allProducts = response.items || [];
+        const activeProducts = allProducts.filter(product => {
+            // Verificar se o produto está ativo (is_active deve ser true ou undefined/null)
+            const isActive = product.is_active !== false && product.is_active !== 0 && product.is_active !== 'false';
+            return isActive;
+        });
+        
+        console.log(`Produtos carregados: ${allProducts.length} total, ${activeProducts.length} ativos`);
+        
+        productsCache = activeProducts;
         return productsCache;
     } catch (error) {
         console.error('Erro ao carregar produtos:', error);
@@ -295,6 +313,20 @@ function addCategoryListeners() {
 }
 
 /**
+ * Força a atualização da home (limpa cache e recarrega)
+ */
+async function refreshHome() {
+    try {
+        console.log('🔄 Atualizando home...');
+        clearProductsCache();
+        await updateProductSections();
+        console.log('✅ Home atualizada com sucesso');
+    } catch (error) {
+        console.error('❌ Erro ao atualizar home:', error);
+    }
+}
+
+/**
  * Inicializa a funcionalidade da home
  */
 async function initHome() {
@@ -324,3 +356,5 @@ if (document.readyState === 'loading') {
 // Expor funções para uso global
 window.initHome = initHome;
 window.updateProductSections = updateProductSections;
+window.clearProductsCache = clearProductsCache;
+window.refreshHome = refreshHome;

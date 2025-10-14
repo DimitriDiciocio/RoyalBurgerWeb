@@ -773,6 +773,11 @@ class ProdutoManager {
 
             this.showSuccessMessage(`Produto ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
             await this.updateDashboard();
+            
+            // Atualizar a home se estiver disponível
+            if (typeof window.refreshHome === 'function') {
+                window.refreshHome();
+            }
         } catch (error) {
             console.error('Erro ao alterar status do produto:', error);
             this.showErrorMessage('Erro ao alterar status do produto');
@@ -1234,6 +1239,11 @@ class ProdutoManager {
             await this.loadProdutos();
             this.closeProdutoModal();
             this.showSuccessMessage('Produto adicionado com sucesso!');
+            
+            // Atualizar a home se estiver disponível
+            if (typeof window.refreshHome === 'function') {
+                window.refreshHome();
+            }
         } catch (error) {
             console.error('Erro ao adicionar produto:', error);
             
@@ -1267,6 +1277,11 @@ class ProdutoManager {
             await this.loadProdutos();
             this.closeProdutoModal();
             this.showSuccessMessage('Produto atualizado com sucesso!');
+            
+            // Atualizar a home se estiver disponível
+            if (typeof window.refreshHome === 'function') {
+                window.refreshHome();
+            }
         } catch (error) {
             console.error('Erro ao atualizar produto:', error);
             
