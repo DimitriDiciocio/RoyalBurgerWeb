@@ -111,6 +111,10 @@
             background-color: var(--color-texto-white);
             border-radius: 5px;
             box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.15);
+            width: 250px;
+            height: 310px;
+            display: flex;
+            flex-direction: column;
 
             & #foto {
                 width: 250px;
@@ -120,37 +124,56 @@
                 object-fit: cover;
                 background-position: bottom center;
                 border-radius: 5px 5px 0px 0px;
+                flex-shrink: 0;
             }
 
             & .informa {
                 padding: 5px 15px;
                 height: 170px;
-
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
+                flex: 1;
 
                 & #nome {
                     font-size: 20px;
                     color: var(--color-texto-black);
+                    margin: 0;
+                    line-height: 1.2;
+                    height: 24px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
                 }
 
                 & #descricao {
                     font-size: 16px;
-                    color: var(--color-texto-erased)
+                    color: var(--color-texto-erased);
+                    margin: 8px 0;
+                    line-height: 1.3;
+                    height: 42px;
+                    overflow: hidden;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    text-overflow: ellipsis;
                 }
 
                 & #preco {
                     font-size: 16px;
                     color: var(--color-texto-black);
+                    margin: 0;
+                    font-weight: 600;
                 }
 
                 & #tempo {
                     font-size: 14px;
-                    color: var(--color-texto-erased)
+                    color: var(--color-texto-erased);
+                    margin: 4px 0 0 0;
                 }
             }
         }
+
     }
 
 }
@@ -209,6 +232,7 @@
                 border-radius: 5px;
                 background-color: var(--cor-div-primary);
                 width: 560px;
+                height: 170px;
                 box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.15);
 
                 & #foto {
@@ -219,37 +243,56 @@
                     object-fit: cover;
                     background-position: bottom center;
                     border-radius: 5px 0px 0px 5px;
+                    flex-shrink: 0;
                 }
 
                 & .informa {
                     padding: 15px 15px;
                     height: 170px;
-
                     display: flex;
                     flex-direction: column;
                     justify-content: space-between;
+                    flex: 1;
 
                     & #nome {
                         font-size: 20px;
                         color: var(--color-texto-black);
+                        margin: 0;
+                        line-height: 1.2;
+                        height: 24px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
                     }
 
                     & #descricao {
                         font-size: 16px;
-                        color: var(--color-texto-erased)
+                        color: var(--color-texto-erased);
+                        margin: 8px 0;
+                        line-height: 1.3;
+                        height: 65px;
+                        overflow: hidden;
+                        display: -webkit-box;
+                        -webkit-line-clamp: 3;
+                        -webkit-box-orient: vertical;
+                        text-overflow: ellipsis;
                     }
 
                     & #preco {
                         font-size: 16px;
                         color: var(--color-texto-black);
+                        margin: 0;
+                        font-weight: 600;
                     }
 
                     & #tempo {
                         font-size: 14px;
-                        color: var(--color-texto-erased)
+                        color: var(--color-texto-erased);
+                        margin: 4px 0 0 0;
                     }
                 }
             }
+
         }
     }
 }
@@ -336,6 +379,8 @@
             gap: 25px;
 
             & #ficha-produto {
+                width: 250px;
+                height: 280px;
 
                 & #foto {
                     width: 250px;
@@ -345,14 +390,17 @@
 
                 & .informa {
                     padding: 5px 15px;
-                    height: 170px;
+                    height: 140px;
 
                     & #nome {
                         font-size: 1.2rem;
+                        height: 22px;
                     }
 
                     & #descricao {
                         font-size: 1.1rem;
+                        height: 38px;
+                        -webkit-line-clamp: 2;
                     }
 
                     & #preco {
@@ -364,6 +412,7 @@
                     }
                 }
             }
+
         }
 
     }
@@ -400,27 +449,30 @@
 
                 & #ficha-produto {
                     border-radius: 5px;
-                    height: 170px;
+                    height: 150px;
                     width: 42vw;
                     min-width: 100%;
 
                     & #foto {
                         border-radius: 5px 0px 0px 5px;
-                        width: 170px;
-                        height: 170px;
+                        width: 150px;
+                        height: 150px;
                     }
 
                     & .informa {
-                        padding: 15px 15px;
-                        height: 170px;
-                        gap: 10px;
+                        padding: 12px 15px;
+                        height: 150px;
+                        gap: 8px;
 
                         & #nome {
                             font-size: 1.2rem;
+                            height: 22px;
                         }
 
                         & #descricao {
                             font-size: 1.1rem;
+                            height: 55px;
+                            -webkit-line-clamp: 3;
                         }
 
                         & #preco {
@@ -432,6 +484,7 @@
                         }
                     }
                 }
+
             }
         }
     }
@@ -513,6 +566,8 @@
             gap: 25px;
 
             & #ficha-produto {
+                width: 202px;
+                height: 250px;
 
                 & #foto {
                     width: 202px;
@@ -522,14 +577,17 @@
 
                 & .informa {
                     padding: 5px 15px;
-                    height: 150px;
+                    height: 124px;
 
                     & #nome {
                         font-size: 1rem;
+                        height: 20px;
                     }
 
                     & #descricao {
                         font-size: 0.9rem;
+                        height: 36px;
+                        -webkit-line-clamp: 2;
                     }
 
                     & #preco {
@@ -541,6 +599,7 @@
                     }
                 }
             }
+
         }
 
     }
@@ -589,15 +648,18 @@
 
                     & .informa {
                         padding: 7px 10px;
-                        height: 0px;
-                        gap: 10px;
+                        height: 120px;
+                        gap: 6px;
 
                         & #nome {
                             font-size: 1rem;
+                            height: 18px;
                         }
 
                         & #descricao {
                             font-size: 0.9rem;
+                            height: 45px;
+                            -webkit-line-clamp: 2;
                         }
 
                         & #preco {
