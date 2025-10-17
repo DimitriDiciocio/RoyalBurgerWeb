@@ -1,6 +1,12 @@
 /**
  * API de Ingredientes (Insumos)
  * Gerencia operações CRUD para ingredientes/insumos
+ * 
+ * Sistema de Porções Padronizadas:
+ * - Cada ingrediente possui uma porção base definida (ex: 100g, 1 unidade)
+ * - Os produtos trabalham com número de porções ao invés de quantidades diretas
+ * - Cálculo automático: quantidade real = porções × quantidade da porção base
+ * - Campos obrigatórios: base_portion_quantity e base_portion_unit
  */
 
 import { apiRequest } from './api.js';
@@ -75,12 +81,45 @@ export const getIngredientById = async (ingredientId) => {
  * @param {number} ingredientData.min_stock_threshold - Estoque mínimo
  * @param {number} ingredientData.max_stock - Estoque máximo
  * @param {string} ingredientData.supplier - Fornecedor do ingrediente
+ * @param {string} ingredientData.category - Categoria do ingrediente
+ * @param {number} ingredientData.base_portion_quantity - Quantidade da porção base padronizada
+ * @param {string} ingredientData.base_portion_unit - Unidade da porção base (g, kg, L, ml, un)
  * @returns {Promise<Object>} Ingrediente criado
  */
 export const createIngredient = async (ingredientData) => {
+    // Validação mais robusta dos dados obrigatórios
+    if (!ingredientData || typeof ingredientData !== 'object') {
+        throw new Error('Dados do ingrediente são obrigatórios');
+    }
+    
+    if (!ingredientData.name || typeof ingredientData.name !== 'string' || ingredientData.name.trim().length === 0) {
+        throw new Error('Nome do ingrediente é obrigatório e deve ser uma string válida');
+    }
+    
+    if (!ingredientData.price || isNaN(ingredientData.price) || ingredientData.price < 0) {
+        throw new Error('Preço é obrigatório e deve ser um número positivo');
+    }
+    
+    // Validar campos de porção base
+    if (!ingredientData.base_portion_quantity || isNaN(ingredientData.base_portion_quantity) || ingredientData.base_portion_quantity <= 0) {
+        throw new Error('Quantidade da porção base é obrigatória e deve ser um número positivo');
+    }
+    
+    if (!ingredientData.base_portion_unit || typeof ingredientData.base_portion_unit !== 'string' || ingredientData.base_portion_unit.trim().length === 0) {
+        throw new Error('Unidade da porção base é obrigatória e deve ser uma string válida');
+    }
+    
+    // Sanitizar dados de entrada
+    const sanitizedData = {
+        ...ingredientData,
+        name: ingredientData.name.trim().substring(0, 100), // Limitar tamanho e remover espaços
+        supplier: ingredientData.supplier ? ingredientData.supplier.trim().substring(0, 100) : '',
+        category: ingredientData.category ? ingredientData.category.trim().substring(0, 50) : 'outros'
+    };
+
     return await apiRequest('/api/ingredients', {
         method: 'POST',
-        body: JSON.stringify(ingredientData)
+        body: JSON.stringify(sanitizedData)
     });
 };
 
@@ -88,6 +127,18 @@ export const createIngredient = async (ingredientData) => {
  * Atualiza um ingrediente existente
  * @param {number} ingredientId - ID do ingrediente
  * @param {Object} updateData - Dados para atualização
+ * @param {string} [updateData.name] - Nome do ingrediente
+ * @param {string} [updateData.description] - Descrição
+ * @param {number} [updateData.price] - Preço por unidade
+ * @param {number} [updateData.current_stock] - Estoque atual
+ * @param {string} [updateData.stock_unit] - Unidade de estoque
+ * @param {number} [updateData.min_stock_threshold] - Estoque mínimo
+ * @param {number} [updateData.max_stock] - Estoque máximo
+ * @param {string} [updateData.supplier] - Fornecedor do ingrediente
+ * @param {string} [updateData.category] - Categoria do ingrediente
+ * @param {boolean} [updateData.is_available] - Status de disponibilidade
+ * @param {number} [updateData.base_portion_quantity] - Quantidade da porção base padronizada
+ * @param {string} [updateData.base_portion_unit] - Unidade da porção base (g, kg, L, ml, un)
  * @returns {Promise<Object>} Resultado da atualização
  */
 export const updateIngredient = async (ingredientId, updateData) => {

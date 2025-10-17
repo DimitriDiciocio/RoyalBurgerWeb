@@ -82,6 +82,8 @@ class InsumoDataManager {
                 atual: parseInt(insumo.current_stock) || 0,
                 ativo: insumo.is_available !== undefined ? insumo.is_available : true,
                 fornecedor: insumo.supplier || 'Não informado',
+                quantidade_porcao: parseFloat(insumo.base_portion_quantity) || 1,
+                unidade_porcao: insumo.base_portion_unit || 'un',
                 ultimaAtualizacao: null
             };
         } catch (error) {
@@ -103,7 +105,9 @@ class InsumoDataManager {
                 min_stock_threshold: parseInt(insumoData.min) || 0,
                 max_stock: parseInt(insumoData.max) || 100,
                 supplier: insumoData.fornecedor || '',
-                category: insumoData.categoria || 'outros'
+                category: insumoData.categoria || 'outros',
+                base_portion_quantity: parseFloat(insumoData.quantidade_porcao) || 1,
+                base_portion_unit: insumoData.unidade_porcao || 'un'
             };
 
             const result = await createIngredient(apiData);
@@ -136,7 +140,9 @@ class InsumoDataManager {
                 min_stock_threshold: parseInt(insumoData.min) || 0,
                 max_stock: parseInt(insumoData.max) || 100,
                 supplier: insumoData.fornecedor || '',
-                category: insumoData.categoria || 'outros'
+                category: insumoData.categoria || 'outros',
+                base_portion_quantity: parseFloat(insumoData.quantidade_porcao) || 1,
+                base_portion_unit: insumoData.unidade_porcao || 'un'
             };
 
             await updateIngredient(id, apiData);
@@ -234,7 +240,7 @@ class InsumoManager {
     canExecuteOperation(operationType) {
         const now = Date.now();
         const lastExecution = this.operationTimestamps[operationType];
-        const minInterval = 2000; // 1 segundo entre operações do mesmo tipo
+        const minInterval = 2000; // 2 segundos entre operações do mesmo tipo
 
         if (lastExecution && (now - lastExecution) < minInterval) {
             return false;
@@ -431,6 +437,8 @@ class InsumoManager {
                 atual: parseInt(insumo.current_stock) || 0,
                 ativo: insumo.is_available !== undefined ? insumo.is_available : true,
                 fornecedor: insumo.supplier || 'Não informado',
+                quantidade_porcao: parseFloat(insumo.base_portion_quantity) || 1,
+                unidade_porcao: insumo.base_portion_unit || 'un',
                 ultimaAtualizacao: null
             }));
             
@@ -619,7 +627,11 @@ class InsumoManager {
             <div class="info-adicional">
                 <div class="custo">
                     <div class="label">Custo Unit.</div>
-                    <div class="valor">R$ ${(insumo.custo || 0).toFixed(2).replace('.', ',')}</div>
+                    <div class="valor">R$ ${(insumo.custo || 0).toFixed(2).replace('.', ',')}/${insumo.unidade || 'un'}</div>
+                </div>
+                <div class="porcao-base custo">
+                    <div class="label">Porção Base</div>
+                    <div class="valor">${(insumo.quantidade_porcao || 1).toFixed(1)} ${insumo.unidade_porcao || 'un'}</div>
                 </div>
             </div>
         `;
@@ -789,17 +801,58 @@ class InsumoManager {
         const maxElement = card.querySelector('.limites span:last-child');
         const maxValue = maxElement ? parseFloat(maxElement.textContent.split(': ')[1]) : 100;
         this.updateProgressBarColor(card, newValue, maxValue);
+        
+        // CORREÇÃO: Atualizar status do card
+        const minElement = card.querySelector('.limites span:first-child');
+        const minValue = minElement ? parseFloat(minElement.textContent.split(': ')[1]) : 0;
+        
+        // Criar objeto temporário para calcular status
+        const tempInsumo = {
+            atual: newValue,
+            min: minValue,
+            max: maxValue
+        };
+        
+        const newStatusClass = this.getStatusClass(tempInsumo);
+        const newStatusText = this.getStatusText(tempInsumo);
+        
+        // Remover classes de status antigas
+        card.classList.remove('sem-estoque', 'estoque-baixo', 'em-estoque', 'estoque-alto');
+        // Adicionar nova classe de status
+        card.classList.add(newStatusClass);
+        
+        // Atualizar texto de status
+        const statusElement = card.querySelector('.tag-status');
+        if (statusElement) {
+            statusElement.className = `tag-status ${newStatusClass}`;
+            statusElement.textContent = newStatusText;
+        }
     }
 
     /**
      * Atualiza cache local com novo valor
+     * Adicionada validação de dados e tratamento de erro
      */
     updateLocalCache(insumoId, newValue) {
-        if (this.dataManager.cache.data && this.dataManager.cache.data.items) {
-            const insumo = this.dataManager.cache.data.items.find(item => item.id === insumoId);
-            if (insumo) {
-                insumo.current_stock = newValue;
+        try {
+            //Validar parâmetros de entrada
+            if (!insumoId || isNaN(newValue)) {
+                console.warn('Parâmetros inválidos para updateLocalCache:', { insumoId, newValue });
+                return;
             }
+
+            if (this.dataManager.cache.data && this.dataManager.cache.data.items) {
+                const insumo = this.dataManager.cache.data.items.find(item => item.id === insumoId);
+                if (insumo) {
+                    insumo.current_stock = newValue;
+                    // CORREÇÃO: Marcar cache como modificado para invalidar na próxima verificação
+                    this.dataManager.cache.lastFetch = Date.now() - this.dataManager.cacheTimeout;
+                } else {
+                    console.warn(`Insumo com ID ${insumoId} não encontrado no cache`);
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar cache local:', error);
         }
     }
 
@@ -832,12 +885,20 @@ class InsumoManager {
 
     /**
      * Valida se a mudança de quantidade é válida
+     *  Adicionada validação de NaN e verificação de limites máximos
      */
     validateQuantityChange(card, changeAmount) {
         const quantidadeElement = card.querySelector('.quantidade');
         if (!quantidadeElement) return false;
 
         const currentValue = parseFloat(quantidadeElement.textContent.split(' ')[0]);
+        
+        // Validar se currentValue é um número válido
+        if (isNaN(currentValue)) {
+            console.error('Valor de estoque inválido:', quantidadeElement.textContent);
+            return false;
+        }
+        
         const newValue = currentValue + changeAmount;
 
         // Não permitir estoque negativo
@@ -846,6 +907,14 @@ class InsumoManager {
             return false;
         }
 
+        // Validar limite máximo para evitar valores absurdos
+        const maxElement = card.querySelector('.limites span:last-child');
+        const maxValue = maxElement ? parseFloat(maxElement.textContent.split(': ')[1]) : Infinity;
+        
+        if (!isNaN(maxValue) && newValue > maxValue * 2) { // Permitir até 2x o máximo para flexibilidade
+            this.showErrorMessage('Valor muito alto para o estoque');
+            return false;
+        }
 
         return true;
     }
@@ -1305,6 +1374,8 @@ class InsumoManager {
         document.getElementById('categoria-ingrediente').value = insumoData.categoria || '';
         document.getElementById('custo-ingrediente').value = insumoData.custo ? `R$ ${insumoData.custo.toFixed(2).replace('.', ',')}` : '';
         document.getElementById('unidade-ingrediente').value = insumoData.unidade || '';
+        document.getElementById('quantidade-porcao-ingrediente').value = insumoData.quantidade_porcao || '';
+        document.getElementById('unidade-porcao-ingrediente').value = insumoData.unidade_porcao || '';
         document.getElementById('estoque-minimo-ingrediente').value = insumoData.min || '';
         document.getElementById('estoque-maximo-ingrediente').value = insumoData.max || '';
     }
@@ -1318,6 +1389,8 @@ class InsumoManager {
         document.getElementById('categoria-ingrediente').value = '';
         document.getElementById('custo-ingrediente').value = '';
         document.getElementById('unidade-ingrediente').value = '';
+        document.getElementById('quantidade-porcao-ingrediente').value = '';
+        document.getElementById('unidade-porcao-ingrediente').value = '';
         document.getElementById('estoque-minimo-ingrediente').value = '';
         document.getElementById('estoque-maximo-ingrediente').value = '';
     }
@@ -1568,6 +1641,8 @@ class InsumoManager {
         const categoria = document.getElementById('categoria-ingrediente').value;
         const custo = document.getElementById('custo-ingrediente').value.trim();
         const unidade = document.getElementById('unidade-ingrediente').value.trim();
+        const quantidadePorcao = document.getElementById('quantidade-porcao-ingrediente').value;
+        const unidadePorcao = document.getElementById('unidade-porcao-ingrediente').value;
         const min = document.getElementById('estoque-minimo-ingrediente').value;
         const max = document.getElementById('estoque-maximo-ingrediente').value;
 
@@ -1587,7 +1662,17 @@ class InsumoManager {
         }
 
         if (!unidade) {
-            this.showErrorMessage('Unidade é obrigatória');
+            this.showErrorMessage('Unidade de estoque é obrigatória');
+            return false;
+        }
+
+        if (!quantidadePorcao || parseFloat(quantidadePorcao) <= 0) {
+            this.showErrorMessage('Quantidade da porção base deve ser maior que zero');
+            return false;
+        }
+
+        if (!unidadePorcao) {
+            this.showErrorMessage('Unidade da porção base é obrigatória');
             return false;
         }
 
@@ -1666,6 +1751,8 @@ class InsumoManager {
             categoria: document.getElementById('categoria-ingrediente').value,
             custo: parseFloat(custo) || 0,
             unidade: document.getElementById('unidade-ingrediente').value.trim(),
+            quantidade_porcao: parseFloat(document.getElementById('quantidade-porcao-ingrediente').value) || 1,
+            unidade_porcao: document.getElementById('unidade-porcao-ingrediente').value.trim(),
             min: parseInt(document.getElementById('estoque-minimo-ingrediente').value) || 0,
             max: parseInt(document.getElementById('estoque-maximo-ingrediente').value) || 0,
             atual: this.currentEditingId ? this.preserveCurrentStock() : 0, // Preservar estoque atual na edição
@@ -1947,6 +2034,8 @@ class InsumoManager {
             atual: parseInt(insumoData.current_stock || insumoData.atual) || 0,
             ativo: insumoData.is_available !== undefined ? insumoData.is_available : true,
             fornecedor: insumoData.supplier || insumoData.fornecedor || 'Não informado',
+            quantidade_porcao: parseFloat(insumoData.base_portion_quantity || insumoData.quantidade_porcao) || 1,
+            unidade_porcao: insumoData.base_portion_unit || insumoData.unidade_porcao || 'un',
             ultimaAtualizacao: null
         };
 
@@ -1975,16 +2064,41 @@ class InsumoManager {
         const categoriaElement = card.querySelector('.categoria-fornecedor span');
         const fornecedorElement = card.querySelectorAll('.categoria-fornecedor span')[1];
         const custoElement = card.querySelector('.valor');
+        const porcaoBaseElement = card.querySelector('.porcao-base .valor');
 
         if (nomeElement) nomeElement.textContent = insumoData.nome || 'Nome não informado';
         if (categoriaElement) categoriaElement.textContent = this.getCategoriaNome(insumoData.categoria);
         if (fornecedorElement) fornecedorElement.textContent = insumoData.fornecedor || 'Não informado';
-        if (custoElement) custoElement.textContent = `R$ ${(insumoData.custo || 0).toFixed(2).replace('.', ',')}`;
+        if (custoElement) custoElement.textContent = `R$ ${(insumoData.custo || 0).toFixed(2).replace('.', ',')}/${insumoData.unidade || 'un'}`;
+        if (porcaoBaseElement) porcaoBaseElement.textContent = `${(insumoData.quantidade_porcao || 1).toFixed(1)} ${insumoData.unidade_porcao || 'un'}`;
 
         // Atualizar limites
         const limitesElements = card.querySelectorAll('.limites span');
         if (limitesElements[0]) limitesElements[0].textContent = `Min: ${(insumoData.min || 0).toFixed(1)}`;
         if (limitesElements[1]) limitesElements[1].textContent = `Max: ${(insumoData.max || 100).toFixed(1)}`;
+
+        // CORREÇÃO: Atualizar status visual do card
+        const newStatusClass = this.getStatusClass(insumoData);
+        const newStatusText = this.getStatusText(insumoData);
+        
+        // Remover classes de status antigas
+        card.classList.remove('sem-estoque', 'estoque-baixo', 'em-estoque', 'estoque-alto');
+        // Adicionar nova classe de status
+        card.classList.add(newStatusClass);
+        
+        // Atualizar texto de status
+        const statusElement = card.querySelector('.tag-status');
+        if (statusElement) {
+            statusElement.className = `tag-status ${newStatusClass}`;
+            statusElement.textContent = newStatusText;
+        }
+
+        // CORREÇÃO: Atualizar barra de progresso
+        const progressElement = card.querySelector('.progresso');
+        if (progressElement) {
+            const progress = this.calculateProgress(insumoData);
+            progressElement.style.width = `${progress}%`;
+        }
 
         // Atualizar estado dos botões
         this.updateQuantityButtonsState(card);
@@ -2084,17 +2198,28 @@ class InsumoManager {
         try {
             const nome = card.querySelector('h3')?.textContent?.trim() || '';
             const quantidadeElement = card.querySelector('.quantidade');
-            const quantidade = quantidadeElement ? 
-                parseFloat(quantidadeElement.textContent.split(' ')[0]) || 0 : 0;
             const custoElement = card.querySelector('.valor');
-            const custo = custoElement ? 
-                parseFloat(custoElement.textContent.replace('R$', '').replace(',', '.').trim()) || 0 : 0;
 
-            // Sanitizar dados extraídos
+            // Validação mais robusta dos dados extraídos
+            let quantidade = 0;
+            if (quantidadeElement) {
+                const quantidadeText = quantidadeElement.textContent.split(' ')[0];
+                const parsedQuantidade = parseFloat(quantidadeText);
+                quantidade = isNaN(parsedQuantidade) ? 0 : Math.max(0, parsedQuantidade);
+            }
+
+            let custo = 0;
+            if (custoElement) {
+                const custoText = custoElement.textContent.replace('R$', '').replace(',', '.').trim();
+                const parsedCusto = parseFloat(custoText);
+                custo = isNaN(parsedCusto) ? 0 : Math.max(0, parsedCusto);
+            }
+
+            // Sanitização mais robusta
             return {
-                nome: nome.substring(0, 100), // Limitar tamanho do nome
-                quantidade: Math.max(0, quantidade), // Garantir não negativo
-                custo: Math.max(0, custo) // Garantir não negativo
+                nome: nome.substring(0, 100).replace(/[<>]/g, ''), // Limitar tamanho e remover HTML
+                quantidade: quantidade,
+                custo: custo
             };
         } catch (error) {
             console.error('Erro ao extrair dados do card:', error);

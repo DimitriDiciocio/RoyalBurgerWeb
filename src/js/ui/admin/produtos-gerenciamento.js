@@ -14,7 +14,9 @@ import {
     removeIngredientFromProduct,
     getProductIngredients,
     updateProductImage,
-    updateProductWithImage
+    updateProductWithImage,
+    canDeleteProduct,
+    permanentDeleteProduct
 } from '../../api/products.js';
 
 import { getIngredients } from '../../api/ingredients.js';
@@ -107,38 +109,17 @@ class ProdutoDataManager {
     }
 
     /**
-     * Busca produtos inativos (método temporário até a API suportar)
+     * Busca produtos inativos
      */
     async getInactiveProducts() {
         try {
-            // Por enquanto, vamos simular alguns produtos inativos para teste
-            // Quando a API suportar, implementar aqui
-            const produtosInativosSimulados = [
-                {
-                    id: 999,
-                    name: "Produto Inativo 1",
-                    description: "Este é um produto inativo para teste",
-                    price: "15.50",
-                    cost_price: "8.00",
-                    preparation_time_minutes: 5,
-                    category_id: null,
-                    is_active: false,
-                    image_url: null
-                },
-                {
-                    id: 998,
-                    name: "Produto Inativo 2", 
-                    description: "Outro produto inativo para teste",
-                    price: "22.90",
-                    cost_price: "12.00",
-                    preparation_time_minutes: 8,
-                    category_id: null,
-                    is_active: false,
-                    image_url: null
-                }
-            ];
-            
-            return { items: produtosInativosSimulados };
+            // Buscar produtos inativos da API
+            const response = await getProducts({ 
+                page_size: 1000, 
+                include_inactive: true,
+                active_only: false 
+            });
+            return response;
         } catch (error) {
             console.error('Erro ao buscar produtos inativos:', error);
             return { items: [] };
@@ -273,6 +254,33 @@ class ProdutoDataManager {
     }
 
     /**
+     * Verifica se um produto pode ser excluído permanentemente
+     */
+    async canDeleteProduct(productId) {
+        try {
+            const response = await canDeleteProduct(productId);
+            return response;
+        } catch (error) {
+            console.error('Erro ao verificar se produto pode ser excluído:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Exclui um produto permanentemente
+     */
+    async permanentDeleteProduct(productId) {
+        try {
+            const response = await permanentDeleteProduct(productId);
+            this.clearCache();
+            return response;
+        } catch (error) {
+            console.error('Erro ao excluir produto permanentemente:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Busca ingredientes do produto
      */
     async getIngredientesProduto(productId) {
@@ -288,19 +296,19 @@ class ProdutoDataManager {
     /**
      * Adiciona ingrediente ao produto
      */
-    async addIngredienteAoProduto(productId, ingredientId, quantity, unit) {
+    async addIngredienteAoProduto(productId, ingredientId, portions) {
         try {
             // Validar dados antes de enviar
-            if (!productId || !ingredientId || !quantity || !unit) {
+            if (!productId || !ingredientId || !portions) {
                 throw new Error('Dados inválidos para adicionar ingrediente');
             }
             
             // Converter para os tipos corretos
             const productIdNum = this.safeParseInt(productId);
             const ingredientIdNum = this.safeParseInt(ingredientId);
-            const quantityNum = this.safeParseFloat(quantity);
+            const portionsNum = this.safeParseFloat(portions);
             
-            await addIngredientToProduct(productIdNum, ingredientIdNum, quantityNum, unit);
+            await addIngredientToProduct(productIdNum, ingredientIdNum, portionsNum);
             this.clearCache();
         } catch (error) {
             console.error('Erro ao adicionar ingrediente ao produto:', error);
@@ -427,8 +435,15 @@ class ProdutoManager {
 
         // Event delegation para botões de editar
         section.addEventListener('click', (e) => {
-            if (e.target.matches('.editar')) {
+            if (e.target.matches('.editar, .fa-edit')) {
                 this.handleEditClick(e.target);
+            }
+        });
+
+        // Event delegation para botões de exclusão permanente
+        section.addEventListener('click', (e) => {
+            if (e.target.matches('.excluir, .fa-trash')) {
+                this.handlePermanentDeleteClick(e.target);
             }
         });
 
@@ -532,7 +547,19 @@ class ProdutoManager {
     async loadIngredientesDisponiveis() {
         try {
             const response = await this.dataManager.getIngredientes();
-            this.ingredientesDisponiveis = response.items || response || [];
+            const ingredientesRaw = response.items || response || [];
+            
+            // Mapear dados para garantir campos corretos
+            this.ingredientesDisponiveis = ingredientesRaw.map(ingrediente => ({
+                id: ingrediente.id,
+                name: ingrediente.name,
+                price: ingrediente.price,
+                base_portion_quantity: ingrediente.base_portion_quantity || 1,
+                base_portion_unit: ingrediente.base_portion_unit || 'un',
+                stock_unit: ingrediente.stock_unit || 'un',
+                is_available: ingrediente.is_available !== undefined ? ingrediente.is_available : true
+            }));
+            
         } catch (error) {
             console.error('Erro ao carregar ingredientes:', error);
             this.ingredientesDisponiveis = [];
@@ -581,6 +608,7 @@ class ProdutoManager {
         return Math.max(0, margem); // Não permite margem negativa
     }
 
+
     /**
      * Constrói URL correta para imagem do produto
      */
@@ -592,9 +620,18 @@ class ProdutoManager {
             return imagePath;
         }
         
-        // Base URL do servidor Flask (porta 5000)
-        const baseUrl = 'http://192.168.1.137:5000';
+        // URL base dinâmica baseada na origem atual
+        const currentOrigin = window.location.origin;
+        let baseUrl;
         
+        // Se estamos em localhost, usar localhost:5000
+        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
+            baseUrl = 'http://localhost:5000';
+        } else {
+            // Para outros ambientes, usar a mesma origem mas porta 5000
+            const hostname = window.location.hostname;
+            baseUrl = `http://${hostname}:5000`;
+        }
         // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
         if (imagePath.startsWith('/api/uploads/products/')) {
             return `${baseUrl}${imagePath}`;
@@ -605,8 +642,8 @@ class ProdutoManager {
             return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}`;
         }
         
-        // Se é apenas o nome do arquivo (ID.jpeg)
-        if (imagePath.match(/^\d+\.jpeg$/)) {
+        // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
+        if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
             return `${baseUrl}/api/uploads/products/${imagePath}`;
         }
         
@@ -625,12 +662,33 @@ class ProdutoManager {
             const img = document.createElement('img');
             img.src = this.escapeHtml(imageUrl);
             img.alt = this.escapeHtml(produto.nome || 'Produto');
+            img.className = 'produto-imagem';
+            img.loading = 'lazy'; // CORREÇÃO: Lazy loading para melhor performance
+            
+            // CORREÇÃO: Melhor tratamento de erro com timeout
+            let errorTimeout;
+            img.onload = () => {
+                if (errorTimeout) clearTimeout(errorTimeout);
+            };
+            
             img.onerror = () => {
+                if (errorTimeout) clearTimeout(errorTimeout);
                 const placeholder = document.createElement('div');
                 placeholder.className = 'imagem-placeholder';
                 placeholder.innerHTML = '<i class="fa-solid fa-image"></i><p>Imagem não encontrada</p>';
                 img.parentNode?.replaceChild(placeholder, img);
             };
+            
+            // Timeout para detectar imagens que não carregam
+            errorTimeout = setTimeout(() => {
+                if (!img.complete || img.naturalHeight === 0) {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'imagem-placeholder';
+                    placeholder.innerHTML = '<i class="fa-solid fa-image"></i><p>Carregando...</p>';
+                    img.parentNode?.replaceChild(placeholder, img);
+                }
+            }, 5000); // 5 segundos de timeout
+            
             return img.outerHTML;
         } else {
             return `
@@ -676,7 +734,8 @@ class ProdutoManager {
                             <input type="checkbox" ${produto.ativo ? 'checked' : ''}>
                             <span class="slider"></span>
                         </label>
-                        <i class="fa-solid fa-pen-to-square editar"></i>
+                        <i class="fa-solid fa-pen-to-square editar" title="Editar produto"></i>
+                        <!-- <i class="fa-solid fa-trash excluir" title="Excluir permanentemente"></i> -->
                     </div>
                 </div>
                 
@@ -797,6 +856,229 @@ class ProdutoManager {
         } catch (error) {
             console.error('Erro ao buscar produto para edição:', error);
             this.showErrorMessage('Erro ao carregar dados do produto');
+        }
+    }
+
+    /**
+     * Trata clique no botão de exclusão permanente
+     */
+    async handlePermanentDeleteClick(button) {
+        const card = button.closest('.card-produto');
+        const produtoId = parseInt(card.dataset.produtoId);
+        const produtoNome = card.querySelector('h3').textContent;
+
+        try {
+            // Primeiro verificar se pode excluir
+            const canDelete = await this.dataManager.canDeleteProduct(produtoId);
+            
+            if (!canDelete.can_delete) {
+                // Mostrar modal de informações sobre por que não pode excluir
+                this.showCannotDeleteModal(produtoNome, canDelete.reasons, canDelete.details);
+                return;
+            }
+
+            // Mostrar modal de confirmação
+            const confirmed = await this.showDeleteConfirmationModal(produtoNome, canDelete.details);
+            
+            if (confirmed) {
+                // Executar exclusão permanente
+                await this.executePermanentDelete(produtoId, produtoNome);
+            }
+        } catch (error) {
+            console.error('Erro ao processar exclusão permanente:', error);
+            this.showErrorMessage('Erro ao processar exclusão permanente');
+        }
+    }
+
+    /**
+     * Mostra modal informando por que o produto não pode ser excluído
+     */
+    showCannotDeleteModal(produtoNome, reasons, details) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>⚠️ Não é possível excluir</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>${produtoNome}</strong> não pode ser excluído permanentemente pelos seguintes motivos:</p>
+                    <ul class="reasons-list">
+                        ${reasons.map(reason => `<li>${reason}</li>`).join('')}
+                    </ul>
+                    <div class="details-info">
+                        <h4>Detalhes:</h4>
+                        <p>• Pedidos ativos: ${details.active_orders}</p>
+                        <p>• Itens no carrinho: ${details.cart_items}</p>
+                        <p>• Ingredientes relacionados: ${details.ingredients_count}</p>
+                    </div>
+                    <div class="actions-info">
+                        <h4>Para excluir este produto:</h4>
+                        <p>1. Finalize ou cancele todos os pedidos ativos</p>
+                        <p>2. Remova o produto de todos os carrinhos</p>
+                        <p>3. Tente novamente a exclusão</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary close-modal">Entendi</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+
+        // Event listeners para fechar modal
+        modal.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.body.removeChild(modal);
+                document.body.style.overflow = 'auto';
+            });
+        });
+
+        // Fechar ao clicar no overlay
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+                document.body.style.overflow = 'auto';
+            }
+        });
+    }
+
+    /**
+     * Mostra modal de confirmação para exclusão permanente
+     */
+    async showDeleteConfirmationModal(produtoNome, details) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🗑️ Exclusão Permanente</h3>
+                        <button class="close-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="warning-box">
+                            <i class="fa-solid fa-exclamation-triangle"></i>
+                            <p><strong>ATENÇÃO:</strong> Esta operação é irreversível!</p>
+                        </div>
+                        <p>Você está prestes a excluir permanentemente o produto:</p>
+                        <p class="product-name"><strong>${produtoNome}</strong></p>
+                        <div class="deletion-details">
+                            <h4>Serão removidos:</h4>
+                            <p>• Ingredientes relacionados: ${details.ingredients_count}</p>
+                            <p>• Histórico de pedidos</p>
+                            <p>• Itens de carrinho</p>
+                            <p>• Imagem do produto</p>
+                        </div>
+                        <div class="confirmation-text">
+                            <label>
+                                <input type="checkbox" id="confirm-deletion" required>
+                                Eu entendo que esta ação é irreversível e desejo continuar
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary cancel-delete">Cancelar</button>
+                        <button class="btn btn-danger confirm-delete" disabled>Excluir Permanentemente</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            document.body.style.overflow = 'hidden';
+
+            const confirmCheckbox = modal.querySelector('#confirm-deletion');
+            const confirmBtn = modal.querySelector('.confirm-delete');
+            const cancelBtn = modal.querySelector('.cancel-delete');
+            const closeBtns = modal.querySelectorAll('.close-modal');
+
+            // Habilitar botão de confirmação apenas quando checkbox estiver marcado
+            confirmCheckbox.addEventListener('change', () => {
+                confirmBtn.disabled = !confirmCheckbox.checked;
+            });
+
+            // Event listeners
+            confirmBtn.addEventListener('click', () => {
+                document.body.removeChild(modal);
+                document.body.style.overflow = 'auto';
+                resolve(true);
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                document.body.removeChild(modal);
+                document.body.style.overflow = 'auto';
+                resolve(false);
+            });
+
+            closeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.body.removeChild(modal);
+                    document.body.style.overflow = 'auto';
+                    resolve(false);
+                });
+            });
+
+            // Fechar ao clicar no overlay
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                    document.body.style.overflow = 'auto';
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    /**
+     * Executa a exclusão permanente do produto
+     */
+    async executePermanentDelete(produtoId, produtoNome) {
+        try {
+            // Mostrar loading
+            const loadingToast = showToast('Excluindo produto permanentemente...', { 
+                type: 'info', 
+                duration: 0 
+            });
+
+            const result = await this.dataManager.permanentDeleteProduct(produtoId);
+            
+            // Remover loading
+            if (loadingToast && loadingToast.remove) {
+                loadingToast.remove();
+            }
+
+            // Remover card da interface
+            const card = document.querySelector(`[data-produto-id="${produtoId}"]`);
+            if (card) {
+                card.remove();
+            }
+
+            // Mostrar sucesso
+            showToast(`Produto "${produtoNome}" excluído permanentemente!`, { 
+                type: 'success',
+                title: 'Exclusão Concluída'
+            });
+
+            // Atualizar contadores se necessário
+            this.updateVisibleProductsCount();
+
+        } catch (error) {
+            console.error('Erro ao executar exclusão permanente:', error);
+            
+            let errorMessage = 'Erro ao excluir produto permanentemente';
+            
+            if (error.status === 404) {
+                errorMessage = 'Produto não encontrado';
+            } else if (error.status === 409) {
+                errorMessage = 'Produto não pode ser excluído devido a dependências ativas';
+            } else if (error.status === 403) {
+                errorMessage = 'Você não tem permissão para excluir produtos permanentemente';
+            }
+
+            this.showErrorMessage(errorMessage);
         }
     }
 
@@ -1029,8 +1311,6 @@ class ProdutoManager {
         const custoElement = document.getElementById('custo-estimado');
         if (custoElement) {
             custoElement.textContent = 'R$ 0,00';
-        } else {
-            console.warn('Elemento custo-estimado não encontrado para limpeza');
         }
     }
 
@@ -1073,6 +1353,14 @@ class ProdutoManager {
             });
         }
 
+        // Listener para select de ingredientes - atualizar info da porção base
+        const selectIngrediente = document.getElementById('ingrediente-select');
+        if (selectIngrediente) {
+            selectIngrediente.addEventListener('change', (e) => {
+                this.updateIngredientePorcaoInfo(e.target);
+            });
+        }
+
         // Atualizar custo estimado inicial
         this.updateEstimatedCost();
 
@@ -1084,6 +1372,41 @@ class ProdutoManager {
                     this.removeIngredientFromRecipe(e.target);
                 }
             });
+        }
+    }
+
+    /**
+     * Atualiza informações da porção base do ingrediente selecionado
+     */
+    updateIngredientePorcaoInfo(selectElement) {
+        const infoPorcaoField = document.getElementById('info-porcao-ingrediente');
+        const infoPorcaoSpan = document.getElementById('info-porcao-ingrediente-span');
+        
+        if (!infoPorcaoField && !infoPorcaoSpan) return;
+
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const quantidade = selectedOption.dataset.porcaoQuantidade || '1';
+            const unidade = selectedOption.dataset.porcaoUnidade || 'un';
+            const porcaoTexto = `${quantidade} ${unidade}`;
+            
+            // Atualizar o campo de input se existir
+            if (infoPorcaoField) {
+                infoPorcaoField.value = porcaoTexto;
+            }
+            
+            // Atualizar o span se existir
+            if (infoPorcaoSpan) {
+                infoPorcaoSpan.textContent = porcaoTexto;
+            }
+        } else {
+            // Limpar os campos
+            if (infoPorcaoField) {
+                infoPorcaoField.value = '';
+            }
+            if (infoPorcaoSpan) {
+                infoPorcaoSpan.textContent = '100g'; // Valor padrão
+            }
         }
     }
 
@@ -1280,11 +1603,9 @@ class ProdutoManager {
      */
     async loadExistingIngredients(productId) {
         try {
-            
             // Buscar ingredientes do produto
             const response = await this.dataManager.getIngredientesProduto(productId);
             const ingredientes = response.items || [];
-            
             
             // Limpar lista atual de ingredientes
             const ingredientesContainer = document.querySelector('.ingredientes-receita');
@@ -1298,10 +1619,7 @@ class ProdutoManager {
                 const ingredienteCompleto = this.ingredientesDisponiveis.find(ing => ing.id == ingrediente.ingredient_id);
                 
                 if (ingredienteCompleto) {
-                    
                     this.addIngredientToList(ingredienteCompleto, ingrediente.quantity, ingrediente.unit);
-                } else {
-                    console.warn('Ingrediente não encontrado na lista disponível:', ingrediente.ingredient_id);
                 }
             }
             
@@ -1310,7 +1628,6 @@ class ProdutoManager {
             
         } catch (error) {
             console.error('Erro ao carregar ingredientes existentes:', error);
-            // Não mostrar erro para o usuário, apenas log
         }
     }
 
@@ -1513,7 +1830,6 @@ class ProdutoManager {
         try {
             // Validação de entrada
             if (!card || !produto) {
-                console.warn('Card ou produto inválido para atualização');
                 return;
             }
 
@@ -1671,9 +1987,7 @@ class ProdutoManager {
      */
     async refreshAllProducts() {
         try {
-            console.log('Atualizando todos os produtos globalmente...');
             await this.updateAllProdutosInUI();
-            console.log('Atualização global de produtos concluída');
         } catch (error) {
             console.error('Erro na atualização global de produtos:', error);
         }
@@ -1814,30 +2128,24 @@ class ProdutoManager {
      */
     addIngredientToRecipe() {
         const ingredienteSelect = document.getElementById('ingrediente-select');
-        const quantidadeInput = document.getElementById('quantidade-ingrediente');
-        const unidadeSelect = document.getElementById('unidade-ingrediente-produto');
+        const quantidadePorcoesInput = document.getElementById('quantidade-porcoes-ingrediente');
+        const infoPorcaoField = document.getElementById('info-porcao-ingrediente');
 
-        if (!ingredienteSelect || !quantidadeInput || !unidadeSelect) {
+        if (!ingredienteSelect || !quantidadePorcoesInput || !infoPorcaoField) {
             this.showErrorMessage('Erro: Campos de ingrediente não encontrados');
             return;
         }
 
         const ingredienteId = ingredienteSelect.value;
-        const quantidade = this.dataManager.safeParseFloat(quantidadeInput.value);
-        const unidade = unidadeSelect.value;
+        const quantidadePorcoes = this.dataManager.safeParseFloat(quantidadePorcoesInput.value);
 
         if (!ingredienteId) {
             this.showErrorMessage('Selecione um ingrediente');
             return;
         }
 
-        if (!quantidadeInput.value || quantidade <= 0) {
-            this.showErrorMessage('Digite uma quantidade válida');
-            return;
-        }
-
-        if (!unidade) {
-            this.showErrorMessage('Selecione uma unidade');
+        if (!quantidadePorcoesInput.value || quantidadePorcoes <= 0) {
+            this.showErrorMessage('Digite um número de porções válido');
             return;
         }
 
@@ -1855,13 +2163,13 @@ class ProdutoManager {
             return;
         }
 
-        // Adicionar à lista de ingredientes
-        this.addIngredientToList(ingrediente, quantidade, unidade);
+        // Adicionar à lista de ingredientes (usando porções)
+        this.addIngredientToList(ingrediente, quantidadePorcoes, 'porções');
 
         // Limpar formulário
         ingredienteSelect.value = '';
-        quantidadeInput.value = '';
-        unidadeSelect.value = '';
+        quantidadePorcoesInput.value = '';
+        infoPorcaoField.value = '';
 
         // Atualizar custo estimado
         this.updateEstimatedCost();
@@ -1869,30 +2177,40 @@ class ProdutoManager {
 
     /**
      * Converte o preço unitário do ingrediente para a unidade da receita
+     * Adicionada validação robusta e tratamento de casos extremos
      */
     convertPriceToRecipeUnit(precoUnitario, ingredienteUnidade, receitaUnidade) {
+        // Validação de parâmetros de entrada
+        if (!precoUnitario || precoUnitario <= 0 || isNaN(precoUnitario)) {
+            return 0;
+        }
+        
+        if (!ingredienteUnidade || !receitaUnidade) {
+            return precoUnitario;
+        }
+
         // Se as unidades são iguais, não precisa converter
-        if (ingredienteUnidade === receitaUnidade) {
+        if (ingredienteUnidade.toLowerCase() === receitaUnidade.toLowerCase()) {
             return precoUnitario;
         }
 
         // Conversões de kg para g
-        if (ingredienteUnidade === 'kg' && receitaUnidade === 'g') {
+        if (ingredienteUnidade.toLowerCase() === 'kg' && receitaUnidade.toLowerCase() === 'g') {
             return precoUnitario / 1000; // R$ 10/kg = R$ 0,01/g
         }
 
         // Conversões de g para kg
-        if (ingredienteUnidade === 'g' && receitaUnidade === 'kg') {
+        if (ingredienteUnidade.toLowerCase() === 'g' && receitaUnidade.toLowerCase() === 'kg') {
             return precoUnitario * 1000; // R$ 0,01/g = R$ 10/kg
         }
 
         // Conversões de L para ml
-        if (ingredienteUnidade === 'L' && receitaUnidade === 'ml') {
+        if (ingredienteUnidade.toLowerCase() === 'l' && receitaUnidade.toLowerCase() === 'ml') {
             return precoUnitario / 1000; // R$ 8/L = R$ 0,008/ml
         }
 
         // Conversões de ml para L
-        if (ingredienteUnidade === 'ml' && receitaUnidade === 'L') {
+        if (ingredienteUnidade.toLowerCase() === 'ml' && receitaUnidade.toLowerCase() === 'l') {
             return precoUnitario * 1000; // R$ 0,008/ml = R$ 8/L
         }
 
@@ -1903,10 +2221,24 @@ class ProdutoManager {
     /**
      * Adiciona ingrediente à lista visual
      */
-    addIngredientToList(ingrediente, quantidade, unidade) {
+    addIngredientToList(ingrediente, quantidadePorcoes, unidade) {
+        // Validação robusta de parâmetros
+        if (!ingrediente || !ingrediente.id) {
+            return;
+        }
+        
+        if (!quantidadePorcoes || quantidadePorcoes <= 0 || isNaN(quantidadePorcoes)) {
+            return;
+        }
+
         const container = document.querySelector('.ingredientes-receita');
         if (!container) {
-            console.error('Container .ingredientes-receita não encontrado');
+            return;
+        }
+
+        // Verificar se ingrediente já existe na lista
+        const existingItem = container.querySelector(`[data-ingrediente-id="${ingrediente.id}"]`);
+        if (existingItem) {
             return;
         }
 
@@ -1914,15 +2246,33 @@ class ProdutoManager {
         ingredienteElement.className = 'ingrediente-item';
         ingredienteElement.dataset.ingredienteId = ingrediente.id;
 
-        // Converter preço unitário para a unidade da receita
-        const precoOriginal = this.dataManager.safeParseFloat(ingrediente.price);
-        const precoConvertido = this.convertPriceToRecipeUnit(precoOriginal, ingrediente.stock_unit || 'g', unidade);
-        const custoTotal = precoConvertido * quantidade;
+        // Calcular custo baseado em porções
+        const precoUnitario = this.dataManager.safeParseFloat(ingrediente.price);
+        const quantidadePorcaoBase = this.dataManager.safeParseFloat(ingrediente.base_portion_quantity) || 1;
+        const unidadePorcaoBase = ingrediente.base_portion_unit || 'un';
+        const stockUnit = ingrediente.stock_unit || 'un';
+        
+        // Usar função de conversão centralizada
+        const precoPorUnidadeBase = this.convertPriceToRecipeUnit(precoUnitario, stockUnit, unidadePorcaoBase);
+        
+        // Custo por porção = preço por unidade base * quantidade da porção base
+        const custoPorPorcao = precoPorUnidadeBase * quantidadePorcaoBase;
+        // Custo total = custo por porção * número de porções
+        const custoTotal = custoPorPorcao * quantidadePorcoes;
+        
+        // Validar resultado do cálculo
+        if (isNaN(custoTotal) || !isFinite(custoTotal)) {
+            return;
+        }
+        
 
         ingredienteElement.innerHTML = `
             <div class="ingrediente-info">
+                <div class="ingrediente-info-content">
                 <span class="nome">${this.escapeHtml(ingrediente.name)}</span>
-                <span class="quantidade">${quantidade} ${unidade}</span>
+                <span class="quantidade">${quantidadePorcoes} porções (${quantidadePorcaoBase} ${unidadePorcaoBase} cada)</span>
+                
+                </div> 
                 <span class="custo">R$ ${this.formatCurrency(custoTotal)}</span>
             </div>
             <button type="button" class="btn-remover-ingrediente">
@@ -1969,8 +2319,6 @@ class ProdutoManager {
         // Atualizar exibição do custo estimado
         if (this.custoElement) {
             this.custoElement.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
-        } else {
-            console.warn('Elemento custo-estimado não encontrado');
         }
     }
 
@@ -1980,7 +2328,6 @@ class ProdutoManager {
     loadIngredientesInSelect() {
         const select = document.getElementById('ingrediente-select');
         if (!select) {
-            console.error('Select ingrediente-select não encontrado');
             return;
         }
 
@@ -1989,7 +2336,9 @@ class ProdutoManager {
         this.ingredientesDisponiveis.forEach(ingrediente => {
             const option = document.createElement('option');
             option.value = ingrediente.id;
-            option.textContent = ingrediente.name;
+            option.textContent = `${ingrediente.name} (${ingrediente.base_portion_quantity || 1} ${ingrediente.base_portion_unit || 'un'})`;
+            option.dataset.porcaoQuantidade = ingrediente.base_portion_quantity || 1;
+            option.dataset.porcaoUnidade = ingrediente.base_portion_unit || 'un';
             select.appendChild(option);
         });
     }
@@ -2050,20 +2399,17 @@ class ProdutoManager {
             for (const ingrediente of ingredientes) {
                 const ingredienteId = ingrediente.dataset.ingredienteId;
                 const quantidadeText = ingrediente.querySelector('.quantidade').textContent;
-                const [quantidadeStr, unidade] = quantidadeText.split(' ');
-                const quantidade = this.dataManager.safeParseFloat(quantidadeStr);
+                
+                // Extrair número de porções do texto (ex: "2 porções (100g cada)")
+                const match = quantidadeText.match(/(\d+(?:\.\d+)?)\s+porções/);
+                const quantidadePorcoes = match ? this.dataManager.safeParseFloat(match[1]) : 0;
 
                 // Validar dados antes de enviar
-                if (!ingredienteId || !quantidade || !unidade) {
-                    console.error('Dados inválidos do ingrediente:', {
-                        ingredienteId,
-                        quantidade,
-                        unidade
-                    });
+                if (!ingredienteId || !quantidadePorcoes) {
                     continue; // Pular este ingrediente e continuar com os outros
                 }
                 
-                await this.dataManager.addIngredienteAoProduto(produtoId, ingredienteId, quantidade, unidade);
+                await this.dataManager.addIngredienteAoProduto(produtoId, ingredienteId, quantidadePorcoes);
             }
 
             return true;

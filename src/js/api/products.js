@@ -163,35 +163,44 @@ export const getProductIngredients = async (productId) => {
  * Adiciona um ingrediente a um produto
  * @param {number} productId - ID do produto
  * @param {number} ingredientId - ID do ingrediente
- * @param {number} quantity - Quantidade
- * @param {string} unit - Unidade (opcional)
+ * @param {number} portions - Número de porções
  * @returns {Promise<Object>} Resultado da associação
  */
-export const addIngredientToProduct = async (productId, ingredientId, quantity, unit = null) => {
+export const addIngredientToProduct = async (productId, ingredientId, portions) => {
+    // Validação robusta dos parâmetros
+    if (!productId || isNaN(productId) || productId <= 0) {
+        throw new Error('ID do produto é obrigatório e deve ser um número positivo');
+    }
+    
+    if (!ingredientId || isNaN(ingredientId) || ingredientId <= 0) {
+        throw new Error('ID do ingrediente é obrigatório e deve ser um número positivo');
+    }
+    
+    if (!portions || isNaN(portions) || portions <= 0) {
+        throw new Error('Número de porções é obrigatório e deve ser um número positivo');
+    }
+    
     return await apiRequest(`/api/products/${productId}/ingredients`, {
         method: 'POST',
         body: JSON.stringify({
             ingredient_id: ingredientId,
-            quantity: quantity,
-            unit: unit
+            portions: portions
         })
     });
 };
 
 /**
- * Atualiza a quantidade/unidade de um ingrediente em um produto
+ * Atualiza o número de porções de um ingrediente em um produto
  * @param {number} productId - ID do produto
  * @param {number} ingredientId - ID do ingrediente
- * @param {number} quantity - Nova quantidade
- * @param {string} unit - Nova unidade
+ * @param {number} portions - Novo número de porções
  * @returns {Promise<Object>} Resultado da atualização
  */
-export const updateProductIngredient = async (productId, ingredientId, quantity, unit) => {
+export const updateProductIngredient = async (productId, ingredientId, portions) => {
     return await apiRequest(`/api/products/${productId}/ingredients/${ingredientId}`, {
         method: 'PUT',
         body: JSON.stringify({
-            quantity: quantity,
-            unit: unit
+            portions: portions
         })
     });
 };
@@ -369,4 +378,31 @@ export const updateProductWithImage = async (productId, productData, imageFile =
         console.error('Erro ao atualizar produto com imagem:', error);
         throw error;
     }
+};
+
+/**
+ * Verifica se um produto pode ser excluído permanentemente
+ * @param {number} productId - ID do produto
+ * @returns {Promise<Object>} Resultado da verificação
+ */
+export const canDeleteProduct = async (productId) => {
+    // Validação do parâmetro de entrada
+    if (!productId || isNaN(productId) || productId <= 0) {
+        throw new Error('ID do produto é obrigatório e deve ser um número positivo');
+    }
+    
+    return await apiRequest(`/api/products/${productId}/can-delete`, {
+        method: 'GET'
+    });
+};
+
+/**
+ * Exclui um produto permanentemente
+ * @param {number} productId - ID do produto
+ * @returns {Promise<Object>} Resultado da exclusão
+ */
+export const permanentDeleteProduct = async (productId) => {
+    return await apiRequest(`/api/products/${productId}/permanent-delete`, {
+        method: 'DELETE'
+    });
 };
