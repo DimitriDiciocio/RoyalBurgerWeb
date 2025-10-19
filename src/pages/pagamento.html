@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Burguer</title>
+    <link rel="icon" href="../assets/svg/logo.svg">
+
+    <!-- css -->
+    <link rel="stylesheet" href="../assets/styles/header.css">
+    <link rel="stylesheet" href="../assets/styles/global.css">
+    <link rel="stylesheet" href="../assets/styles/footer.css">
+    <link rel="stylesheet" href="../assets/styles/mensagens.css">
+    <link rel="stylesheet" href="../assets/styles/modais.css">
+    <link rel="stylesheet" href="../assets/styles/pagamento.css">
+    <!-- js sistema -->
+    <script src="../js/utils.js" type="module" defer></script>
+    <script src="../js/ui/header.js" type="module" defer></script>
+    <script src="../js/ui/alerts.js" type="module" defer></script>
+    <script src="../js/ui/imports.js" type="module" defer></script>
+    <script src="../js/ui/modais.js" type="module" defer></script>
+    <!-- js complementares -->
+    <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- importara header -->
+    <div id="header-container"></div>
+
+    <main>
+        <section class="esquerda" style="width: 50%;">
+            <div class="endereco">
+                <div class="informa">
+                    <p class="titulo">Enderço</p>
+                    <p class="tempo">40 - 50 min</p>
+                </div>
+
+                <div class="quadro-endereco">
+                    <div style="display: flex; align-items: center; gap: 20px">
+                        <i class="fa-solid fa-location-dot"></i>
+
+                        <div>
+                            <p class="titulo">R. Nome da Rua, 1000</p>
+                            <p class="descricao">Bairro - Complemento</p>
+                        </div>
+                    </div>
+
+                    <i class="fa-solid fa-angle-down"></i>
+                </div>
+            </div>
+
+            <div class="pagamento">
+                <div class="informa">
+                    <p class="titulo">Formas de pagamento</p>
+                    <p class="detalhe">O pagamento é feito na entrega</p>
+                </div>
+
+                <div class="formas-pagamento">
+                    <div class="quadro-forma selecionado">
+                        <p>Pix</p>
+                        <i class="fa-brands fa-pix"></i>
+                    </div>
+
+                    <div class="quadro-forma">
+                        <p>Cartão</p>
+                        <i class="fa-solid fa-credit-card"></i>
+                    </div>
+
+                    <div class="quadro-forma">
+                        <p>Dinheiro</p>
+                        <i class="fa-solid fa-money-bill"></i>
+                    </div>
+                </div>
+
+                <div class="cpf-nota">
+                    <p>Deseja CPF na nota?</p>
+
+                    <div class="div-input">
+                        <label for="cpf">CPF</label>
+                        <input type="number" name="cpf" required autocomplete="off">
+                    </div>
+                </div>
+
+                <button>Fazer pedido</button>
+            </div>
+        </section>
+
+        <section class="direita" style="width: 50%;">
+            <div class="quadro-pedido">
+                <p>Itens adicionados</p>
+
+                <div class="itens">
+                    <div class="item">
+                        <img src="../assets/img/tudo.jpeg" alt="">
+
+                        <div>
+                            <p class="nome">Nome do produto</p>
+                            <p class="descricao">Descrição dos produtos</p>
+                            <p class="adicional">1 item adicional</p>
+                        </div>
+                    </div>
+
+                    <div class="total">
+                        <p>R$ 50,00</p>
+                    </div>
+                </div>
+
+                <div class="resumo">
+                    <p>Resumo de valores</p>
+                    
+                    <div class="valor">
+                        <p>Subtotal</p>
+                        <p>R$ 100,00</p>
+                    </div>
+                    <div class="valor">
+                        <p>Taxa de entrega</p>
+                        <p>R$ 5,00</p>
+                    </div>
+                    <div class="valor">
+                        <p>Taxa de serviço</p>
+                        <p>R$ 1,00</p>
+                    </div>
+                    <div class="valor">
+                        <p>Descontos</p>
+                        <p>R$ 00,00</p>
+                    </div>
+
+                    <div class="pontos-royal">
+                        <div class="esquerda">
+                            <div>
+                                <p>Usar Pontos Royal</p>
+                                <p>Você tem <span>100</span> pontos Royal</p>
+                            </div>
+
+                            <i class="fa-solid fa-circle-info"></i>
+                        </div>
+
+                        <div class="direita">
+                            <label class="checa">
+                                <input type="checkbox">
+                                <span class="bolinha"></span>
+                            </label>
+
+                            <p>-R$ 1,00</p>
+                        </div>
+                    </div>
+
+                    <div class="total">
+                        <div>
+                            <p>Total</p>
+                            <p>Nessa compra, você ganhará <span>20</span> pontos Royal</p>
+                        </div>
+
+                        <p>R$ 56,00</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <!-- importare footer -->
+    <div id="footer-container"></div>
+</body>
+
+</html>
