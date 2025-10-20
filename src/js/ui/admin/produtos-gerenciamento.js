@@ -386,6 +386,7 @@ class ProdutoManager {
         this.newImageFile = null; // Arquivo de nova imagem
         this.imageToRemove = false; // Flag para remover imagem
         this.isUpdating = false; // Flag para evitar atualizações simultâneas
+        this.modalClickHandler = null; // Handler para delegação de eventos no modal
     }
 
     /**
@@ -594,6 +595,8 @@ class ProdutoManager {
         produtos.forEach(produto => {
             const card = this.createProdutoCard(produto);
             container.appendChild(card);
+            // Atualiza custo estimado real baseado nos ingredientes
+            this.refreshProductEstimatedCost(produto.id, card);
         });
     }
 
@@ -713,8 +716,8 @@ class ProdutoManager {
         const statusText = produto.ativo ? 'Ativo' : 'Inativo';
         const categoriaNome = this.getCategoriaNome(produto.categoriaId);
         
-        // Calcular custo estimado e margem de lucro
-        const custoEstimado = this.dataManager.safeParseFloat(produto.precoCusto);
+        // custo inicial 0; será atualizado via refreshProductEstimatedCost() com dados do backend
+        const custoEstimado = 0;
         const precoVenda = this.dataManager.safeParseFloat(produto.preco);
         const margemLucro = this.calcularMargemLucro(precoVenda, custoEstimado);
         
@@ -744,8 +747,8 @@ class ProdutoManager {
                 <div class="categoria-status">
                     <div class="categoria">${this.escapeHtml(categoriaNome)}</div>
                     <div class="status ${produto.ativo ? 'disponivel' : 'indisponivel'}">
-                        <i class="fa-solid fa-${produto.ativo ? 'eye' : 'eye-slash'}"></i> 
-                        ${produto.ativo ? 'Disponível' : 'Indisponível'}
+                        <i class="fa-solid fa-${produto.ativo ? 'eye' : 'eye-slash'}"></i>
+                        <span class="status-text">${produto.ativo ? 'Disponível' : 'Indisponível'}</span>
                     </div>
                 </div>
 
@@ -1092,9 +1095,8 @@ class ProdutoManager {
 
         try {
             await this.dataManager.toggleProdutoStatus(produtoId, novoStatus);
-            
-            // Atualizar todas as imagens e informações dos produtos
-            await this.updateAllProdutosInUI();
+            // Atualiza imediatamente o status visual do card (ícone/label/toggle)
+            this.updateProdutoStatus(card, { ativo: novoStatus });
             
             this.showSuccessMessage(`Produto ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`);
             await this.updateDashboard();
@@ -1367,11 +1369,18 @@ class ProdutoManager {
         // Event delegation para botões de remover ingrediente
         const modal = document.getElementById('modal-produto');
         if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target.matches('.btn-remover-ingrediente') || e.target.closest('.btn-remover-ingrediente')) {
-                    this.removeIngredientFromRecipe(e.target);
+            // Remover handler anterior se existir para evitar duplicação
+            if (this.modalClickHandler) {
+                modal.removeEventListener('click', this.modalClickHandler);
+            }
+            // Criar e registrar novo handler
+            this.modalClickHandler = (e) => {
+                const removeBtn = e.target.closest('.btn-remover-ingrediente');
+                if (removeBtn) {
+                    this.removeIngredientFromRecipe(removeBtn);
                 }
-            });
+            };
+            modal.addEventListener('click', this.modalClickHandler);
         }
     }
 
@@ -1418,6 +1427,7 @@ class ProdutoManager {
         const btnCancelar = document.getElementById('cancelar-produto');
         const btnSalvar = document.getElementById('salvar-produto');
         const btnAdicionarIngrediente = document.getElementById('btn-adicionar-ingrediente');
+        const modal = document.getElementById('modal-produto');
         
         if (btnCancelar) {
             btnCancelar.replaceWith(btnCancelar.cloneNode(true));
@@ -1427,6 +1437,11 @@ class ProdutoManager {
         }
         if (btnAdicionarIngrediente) {
             btnAdicionarIngrediente.replaceWith(btnAdicionarIngrediente.cloneNode(true));
+        }
+        // Remover delegação de eventos do modal se existir
+        if (modal && this.modalClickHandler) {
+            modal.removeEventListener('click', this.modalClickHandler);
+            this.modalClickHandler = null;
         }
     }
 
@@ -1617,9 +1632,16 @@ class ProdutoManager {
             for (const ingrediente of ingredientes) {
                 // Buscar dados completos do ingrediente
                 const ingredienteCompleto = this.ingredientesDisponiveis.find(ing => ing.id == ingrediente.ingredient_id);
-                
+
                 if (ingredienteCompleto) {
-                    this.addIngredientToList(ingredienteCompleto, ingrediente.quantity, ingrediente.unit);
+                    // API pode retornar 'portions' (modelo novo) ou 'quantity' (legado)
+                    const porcoes = this.dataManager.safeParseFloat(
+                        ingrediente.portions !== undefined ? ingrediente.portions : ingrediente.quantity
+                    );
+
+                    if (porcoes > 0) {
+                        this.addIngredientToList(ingredienteCompleto, porcoes, 'porções', true /* persisted */);
+                    }
                 }
             }
             
@@ -1674,8 +1696,8 @@ class ProdutoManager {
         try {
             await this.saveProductWithIngredients(produtoData);
             
-            // Atualizar todas as imagens e informações dos produtos
-            await this.updateAllProdutosInUI();
+            // Recarregar a lista para incluir o novo card imediatamente
+            await this.loadProdutos();
             
             this.closeProdutoModal();
             this.showSuccessMessage('Produto adicionado com sucesso!');
@@ -1818,8 +1840,59 @@ class ProdutoManager {
             
             // Efeito visual de atualização
             this.showImageUpdateEffect(card);
+
+            // Atualizar custo estimado real baseado nos ingredientes
+            this.refreshProductEstimatedCost(produtoAtualizado.id, card);
         } catch (error) {
             console.error('Erro ao atualizar card do produto:', error);
+        }
+    }
+
+    /**
+     * Busca o custo estimado pelo backend (somando porções dos ingredientes)
+     * e atualiza o card (custo e margem) sem depender do cost_price salvo.
+     */
+    async refreshProductEstimatedCost(productId, cardEl = null) {
+        try {
+            const card = cardEl || document.querySelector(`[data-produto-id="${productId}"]`);
+            if (!card) return;
+
+            const response = await this.dataManager.getIngredientesProduto(productId);
+            let estimatedCost = response && (response.estimated_cost ?? response.total_cost);
+            // Salvaguarda: alguns backends retornam valor em centavos (inteiro sem decimais).
+            // Se parecer centavos (inteiro grande), dividir por 100.
+            if (typeof estimatedCost === 'number') {
+                const hasDecimal = Math.abs(estimatedCost % 1) > 0;
+                if (!hasDecimal && Math.abs(estimatedCost) >= 1000) {
+                    estimatedCost = estimatedCost / 1000; // centavos -> reais
+                }
+            } else if (typeof estimatedCost === 'string') {
+                estimatedCost = this.dataManager.safeParseFloat(estimatedCost.replace('R$', '').replace(/\./g, '').replace(',', '.'));
+            } else {
+                estimatedCost = 0;
+            }
+
+            // Atualiza custo
+            const custoElement = card.querySelector('.custo-estimado');
+            if (custoElement) {
+                custoElement.textContent = `R$ ${this.formatCurrency(estimatedCost)}`;
+            }
+
+            // Atualiza margem usando o preço de venda do card
+            const precoElement = card.querySelector('.preco');
+            const margemElement = card.querySelector('.margem');
+            if (precoElement && margemElement) {
+                const precoTexto = precoElement.textContent
+                    .replace('R$', '')
+                    .replace(/\./g, '')
+                    .replace(',', '.');
+                const precoVenda = this.dataManager.safeParseFloat(precoTexto);
+                const margem = this.calcularMargemLucro(precoVenda, estimatedCost);
+                margemElement.textContent = `${margem.toFixed(1)}%`;
+                margemElement.className = `valor margem ${this.getMarginClass(margem)}`;
+            }
+        } catch (error) {
+            // Silencioso: se falhar, mantém valores atuais do card
         }
     }
 
@@ -1885,7 +1958,18 @@ class ProdutoManager {
             const iconClass = produto.ativo ? 'fa-eye' : 'fa-eye-slash';
             
             statusElement.className = `status ${statusClass}`;
-            statusElement.innerHTML = `<i class="fa-solid fa-${iconClass}"></i> ${this.escapeHtml(statusText)}`;
+            const iconEl = statusElement.querySelector('i');
+            const textEl = statusElement.querySelector('.status-text');
+            if (iconEl) {
+                iconEl.className = `fa-solid fa-${iconClass}`;
+            } else {
+                statusElement.insertAdjacentHTML('afterbegin', `<i class="fa-solid fa-${iconClass}"></i>`);
+            }
+            if (textEl) {
+                textEl.textContent = this.escapeHtml(statusText);
+            } else {
+                statusElement.insertAdjacentHTML('beforeend', ` <span class="status-text">${this.escapeHtml(statusText)}</span>`);
+            }
             toggleCheckbox.checked = Boolean(produto.ativo);
         }
     }
@@ -2221,7 +2305,7 @@ class ProdutoManager {
     /**
      * Adiciona ingrediente à lista visual
      */
-    addIngredientToList(ingrediente, quantidadePorcoes, unidade) {
+    addIngredientToList(ingrediente, quantidadePorcoes, unidade, persisted = false) {
         // Validação robusta de parâmetros
         if (!ingrediente || !ingrediente.id) {
             return;
@@ -2245,6 +2329,7 @@ class ProdutoManager {
         const ingredienteElement = document.createElement('div');
         ingredienteElement.className = 'ingrediente-item';
         ingredienteElement.dataset.ingredienteId = ingrediente.id;
+        ingredienteElement.dataset.persisted = persisted ? 'true' : 'false';
 
         // Calcular custo baseado em porções
         const precoUnitario = this.dataManager.safeParseFloat(ingrediente.price);
@@ -2286,9 +2371,32 @@ class ProdutoManager {
     /**
      * Remove ingrediente da receita
      */
-    removeIngredientFromRecipe(button) {
+    async removeIngredientFromRecipe(button) {
         const ingredienteElement = button.closest('.ingrediente-item');
-        if (ingredienteElement) {
+        if (!ingredienteElement) return;
+
+        const ingredienteId = ingredienteElement.dataset.ingredienteId;
+        const isPersisted = ingredienteElement.dataset.persisted === 'true';
+
+        // Se estamos editando um produto existente, remover também no backend
+        if (this.currentEditingId && ingredienteId && isPersisted) {
+            try {
+                // Evitar cliques repetidos
+                button.disabled = true;
+                await this.dataManager.removeIngredienteDoProduto(this.currentEditingId, ingredienteId);
+
+                // Remover da UI e atualizar custo
+                ingredienteElement.remove();
+                this.updateEstimatedCost();
+                this.showSuccessMessage('Ingrediente removido do produto');
+            } catch (error) {
+                console.error('Erro ao remover ingrediente do produto:', error);
+                this.showErrorMessage('Falha ao remover ingrediente');
+            } finally {
+                button.disabled = false;
+            }
+        } else {
+            // Caso seja um produto novo (ainda não salvo), apenas remove da UI
             ingredienteElement.remove();
             this.updateEstimatedCost();
         }
@@ -2412,7 +2520,7 @@ class ProdutoManager {
                 await this.dataManager.addIngredienteAoProduto(produtoId, ingredienteId, quantidadePorcoes);
             }
 
-            return true;
+            return produtoId;
         } catch (error) {
             console.error('Erro ao salvar produto com ingredientes:', error);
             throw error;
