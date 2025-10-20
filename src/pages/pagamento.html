@@ -162,6 +162,82 @@
     </main>
     <!-- importare footer -->
     <div id="footer-container"></div>
+
+    <!-- MODAL TROCO -->
+    <div id="modal-troco" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-metricas">
+            <div class="header-modal">
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-metricas"></i>
+                <h2>Vai precisar de troco?</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <p>
+                    Digite o valor em dinheiro que será usado para pagar o pedido, 
+                    para que assim, caso seja necessário troco, o entregaor levar.
+                </p>
+
+                <div class="div-input">
+                    <label for="valor">Valor</label>
+                    <input type="number" id="valor" name="valor" required autocomplete="off">
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-fechar" id="fechar-metricas">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TREVISANDO O PEDIDO -->
+    <div id="modal-revisao" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-metricas">
+            <div class="header-modal">
+                <h2>Revise o seu pedido</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div>
+                    <i class="fa-solid fa-motorcycle"></i>
+
+                    <div>
+                        <p>Entrega hoje</p>
+                        <p>Hoje, 40 - 50 min</p>
+                    </div>
+                </div>
+
+                <div>
+                    <i class="fa-solid fa-location-dot"></i>
+
+                    <div>
+                        <p>R. Antônio Simões, 4</p>
+                        <p>Centro  - Fateb</p>
+                    </div>
+                </div>
+
+                <div>
+                    <i class="fa-brands fa-pix" style="display: flex;"></i>
+                    <i class="fa-solid fa-credit-card" style="display: none;"></i>
+                    <i class="fa-solid fa-money-bill" style="display: none;"></i>
+
+                    <div>
+                        <p>Pagamento na entraga</p>
+                        <p>PIX</p>
+                        <p style="display: none;">Cartão</p>
+                        <p style="display: none;">Dinheiro - Troco para R$100,00</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-fechar" id="fechar-metricas">Confirmar pedido</button>
+
+                <p>Alterar pedido</p>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
