@@ -153,9 +153,9 @@ class CategoriaDataManager {
      */
     async getItensByCategoria(categoriaId) {
         try {
-            // Implementação simplificada - retorna produtos da categoria
-            const response = await getProducts({ category_id: categoriaId });
-            return response.items || [];
+            const response = await getProducts({ category_id: categoriaId, include_inactive: true, page_size: 1000 });
+            const itens = response.items || [];
+            return itens;
         } catch (error) {
             console.error('Erro ao buscar itens da categoria:', error);
             throw error;
@@ -707,7 +707,10 @@ class CategoriaManager {
      */
     renderItens(itens) {
         const container = document.querySelector('#lista-itens');
-        if (!container) return;
+        if (!container) {
+            console.error('Container #lista-itens não encontrado!');
+            return;
+        }
 
         container.innerHTML = '';
 
@@ -715,12 +718,11 @@ class CategoriaManager {
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-box-open"></i>
-                    <p>Nenhum item encontrado nesta categoria</p>
+                    <p>Esta categoria não possui produtos associados.</p>
                 </div>
             `;
             return;
         }
-
         itens.forEach(item => {
             const element = this.createItemElement(item);
             container.appendChild(element);
@@ -884,13 +886,15 @@ class CategoriaManager {
     }
 
     /**
-     * Carrega produtos disponíveis (sem categoria)
+     * Carrega produtos disponíveis (sem categoria ou de outras categorias)
      */
     async loadProdutosDisponiveis() {
         try {
-            const response = await getProducts();
-            // Filtrar apenas produtos sem categoria
-            this.produtosDisponiveis = (response.items || []).filter(produto => !produto.category_id);
+            const response = await getProducts({ include_inactive: true, page_size: 1000 });
+            // Filtrar produtos sem categoria OU que não sejam da categoria atual
+            this.produtosDisponiveis = (response.items || []).filter(produto => 
+                !produto.category_id || produto.category_id !== this.currentCategoriaId
+            );
             this.renderProdutosDisponiveis();
         } catch (error) {
             console.error('Erro ao carregar produtos disponíveis:', error);
