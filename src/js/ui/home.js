@@ -77,8 +77,18 @@ function buildImageUrl(imagePath) {
         return imagePath;
     }
     
-    // Base URL do servidor Flask (porta 5000)
-    const baseUrl = 'http://192.168.1.137:5000';
+    // URL base dinâmica baseada na origem atual
+    const currentOrigin = window.location.origin;
+    let baseUrl;
+    
+    // Se estamos em localhost, usar localhost:5000
+    if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
+        baseUrl = 'http://localhost:5000';
+    } else {
+        // Para outros ambientes, usar a mesma origem mas porta 5000
+        const hostname = window.location.hostname;
+        baseUrl = `http://${hostname}:5000`;
+    }
     
     // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
     if (imagePath.startsWith('/api/uploads/products/')) {
@@ -90,8 +100,8 @@ function buildImageUrl(imagePath) {
         return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}`;
     }
     
-    // Se é apenas o nome do arquivo (ID.jpeg)
-    if (imagePath.match(/^\d+\.jpeg$/)) {
+    // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
+    if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
         return `${baseUrl}/api/uploads/products/${imagePath}`;
     }
     
