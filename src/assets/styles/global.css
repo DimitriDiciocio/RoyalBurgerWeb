@@ -98,6 +98,7 @@ main {
         z-index: 99;
         font-size: 1.1rem;
         color: var(--color-texto-erased);
+        transition: opacity 0.2s ease, visibility 0.2s ease;
 
         &:hover {
             color: var(--color-texto-black);

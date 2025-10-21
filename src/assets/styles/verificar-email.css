@@ -4,6 +4,19 @@ main {
     padding: 80px;
 }
 
+/* Fix para os ícones de senha na página de redefinir senha */
+.verification-card .div-input {
+    position: relative;
+}
+
+.verification-card .div-input > i {
+    position: absolute;
+    top: 23px;
+    right: 20px;
+    transform: translateY(-50%);
+    z-index: 99;
+}
+
 .verification-container {
     display: flex;
     justify-content: center;

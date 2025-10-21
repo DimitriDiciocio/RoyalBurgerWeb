@@ -3,7 +3,7 @@ import { inicializarGerenciamentoInputs } from '../utils.js';
 import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
 import { resetPassword, changePasswordWithCode, verifyResetCode } from '../api/user.js';
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
     // Inicializar gerenciamento de inputs
     inicializarGerenciamentoInputs();
 
@@ -82,14 +82,22 @@ document.addEventListener('DOMContentLoaded', function () {
     function configurarToggleSenha(input, mostrar, ocultar) {
         mostrar.addEventListener('click', function () {
             input.type = 'text';
-            mostrar.style.display = 'none';
-            ocultar.style.display = 'flex';
+            mostrar.style.visibility = 'hidden';
+            mostrar.style.opacity = '0';
+            mostrar.style.pointerEvents = 'none';
+            ocultar.style.visibility = 'visible';
+            ocultar.style.opacity = '1';
+            ocultar.style.pointerEvents = 'auto';
         });
 
         ocultar.addEventListener('click', function () {
             input.type = 'password';
-            mostrar.style.display = 'flex';
-            ocultar.style.display = 'none';
+            mostrar.style.visibility = 'visible';
+            mostrar.style.opacity = '1';
+            mostrar.style.pointerEvents = 'auto';
+            ocultar.style.visibility = 'hidden';
+            ocultar.style.opacity = '0';
+            ocultar.style.pointerEvents = 'none';
         });
     }
 
