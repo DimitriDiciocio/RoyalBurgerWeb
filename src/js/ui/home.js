@@ -66,10 +66,13 @@ async function loadCategories() {
 }
 
 
+// Cache local para evitar recarregamento desnecessário de imagens
+const imageCache = new Map();
+
 /**
- * Constrói URL correta para imagem do produto (mesma lógica do painel admin)
+ * Constrói URL correta para imagem do produto com cache inteligente
  */
-function buildImageUrl(imagePath) {
+function buildImageUrl(imagePath, imageHash = null) {
     if (!imagePath) return 'src/assets/img/tudo.jpeg';
     
     // Se já é uma URL completa, usar diretamente
@@ -90,30 +93,54 @@ function buildImageUrl(imagePath) {
         baseUrl = `http://${hostname}:5000`;
     }
     
+    // Usa hash da imagem se disponível, senão usa timestamp
+    const cacheParam = imageHash || new Date().getTime();
+    
     // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
     if (imagePath.startsWith('/api/uploads/products/')) {
-        return `${baseUrl}${imagePath}`;
+        return `${baseUrl}${imagePath}?v=${cacheParam}`;
     }
     
     // Se é um caminho antigo (/uploads/products/ID.jpeg)
     if (imagePath.startsWith('/uploads/products/')) {
-        return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}`;
+        return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
     }
     
     // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
     if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
-        return `${baseUrl}/api/uploads/products/${imagePath}`;
+        return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
     }
     
     // Fallback: assumir que é um caminho relativo
-    return `${baseUrl}/api/uploads/products/${imagePath}`;
+    return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
+}
+
+/**
+ * Verifica se a imagem mudou e atualiza apenas se necessário
+ */
+function updateImageIfChanged(imgElement, newImagePath, newImageHash) {
+    if (!imgElement || !newImagePath) return;
+    
+    const currentSrc = imgElement.src;
+    const newSrc = buildImageUrl(newImagePath, newImageHash);
+    
+    // Se a URL mudou, atualiza a imagem
+    if (currentSrc !== newSrc) {
+        // Verifica se a imagem já está carregada para evitar piscar
+        const tempImg = new Image();
+        tempImg.onload = () => {
+            imgElement.src = newSrc;
+            imgElement.alt = imgElement.alt || 'Produto';
+        };
+        tempImg.src = newSrc;
+    }
 }
 
 /**
  * Cria o HTML de um produto (mantendo formatação original)
  */
 function createProductHTML(product) {
-    const imageUrl = buildImageUrl(product.image_url);
+    const imageUrl = buildImageUrl(product.image_url, product.image_hash);
     const price = product.price ? `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
     const prepTime = product.preparation_time_minutes ? `${product.preparation_time_minutes} - ${product.preparation_time_minutes + 10} min` : '40 - 50 min';
     const deliveryFee = 'R$ 5,00';
@@ -139,6 +166,24 @@ function createProductHTML(product) {
 
 
 /**
+ * Atualiza imagens de produtos existentes de forma inteligente
+ */
+function updateExistingProductImages(products) {
+    // Busca todas as imagens de produtos na página
+    const productImages = document.querySelectorAll('#ficha-produto img');
+    
+    productImages.forEach(img => {
+        const productId = img.closest('a')?.href?.match(/id=(\d+)/)?.[1];
+        if (productId) {
+            const product = products.find(p => p.id == productId);
+            if (product) {
+                updateImageIfChanged(img, product.image_url, product.image_hash);
+            }
+        }
+    });
+}
+
+/**
  * Atualiza as seções de produtos na home (versão simplificada)
  */
 async function updateProductSections() {
@@ -156,6 +201,9 @@ async function updateProductSections() {
         
         // Atualizar menu de categorias com categorias reais
         updateCategoryMenu(categories);
+        
+        // Atualizar imagens existentes de forma inteligente
+        updateExistingProductImages(products);
         
     } catch (error) {
         console.error('Erro ao atualizar seções de produtos:', error);

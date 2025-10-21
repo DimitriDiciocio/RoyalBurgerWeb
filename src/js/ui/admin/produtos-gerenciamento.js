@@ -387,6 +387,7 @@ class ProdutoManager {
         this.imageToRemove = false; // Flag para remover imagem
         this.isUpdating = false; // Flag para evitar atualizações simultâneas
         this.modalClickHandler = null; // Handler para delegação de eventos no modal
+        this.imageCache = new Map(); // Cache para imagens
     }
 
     /**
@@ -613,9 +614,9 @@ class ProdutoManager {
 
 
     /**
-     * Constrói URL correta para imagem do produto
+     * Constrói URL correta para imagem do produto com cache inteligente
      */
-    buildImageUrl(imagePath) {
+    buildImageUrl(imagePath, imageHash = null) {
         if (!imagePath) return null;
         
         // Se já é uma URL completa, usar diretamente
@@ -635,30 +636,55 @@ class ProdutoManager {
             const hostname = window.location.hostname;
             baseUrl = `http://${hostname}:5000`;
         }
+        
+        // Usa hash da imagem se disponível, senão usa timestamp
+        const cacheParam = imageHash || new Date().getTime();
+        
         // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
         if (imagePath.startsWith('/api/uploads/products/')) {
-            return `${baseUrl}${imagePath}`;
+            return `${baseUrl}${imagePath}?v=${cacheParam}`;
         }
         
         // Se é um caminho antigo (/uploads/products/ID.jpeg)
         if (imagePath.startsWith('/uploads/products/')) {
-            return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}`;
+            return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
         }
         
         // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
         if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
-            return `${baseUrl}/api/uploads/products/${imagePath}`;
+            return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
         }
         
         // Fallback: assumir que é um caminho relativo
-        return `${baseUrl}/api/uploads/products/${imagePath}`;
+        return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
+    }
+
+    /**
+     * Verifica se a imagem mudou e atualiza apenas se necessário
+     */
+    updateImageIfChanged(imgElement, newImagePath, newImageHash) {
+        if (!imgElement || !newImagePath) return;
+        
+        const currentSrc = imgElement.src;
+        const newSrc = this.buildImageUrl(newImagePath, newImageHash);
+        
+        // Se a URL mudou, atualiza a imagem
+        if (currentSrc !== newSrc) {
+            // Verifica se a imagem já está carregada para evitar piscar
+            const tempImg = new Image();
+            tempImg.onload = () => {
+                imgElement.src = newSrc;
+                imgElement.alt = imgElement.alt || 'Produto';
+            };
+            tempImg.src = newSrc;
+        }
     }
 
     /**
      * Cria elemento de imagem com fallback
      */
     createImageElement(produto) {
-        const imageUrl = this.buildImageUrl(produto.imagem);
+        const imageUrl = this.buildImageUrl(produto.imagem, produto.image_hash);
         
         if (imageUrl) {
             // Usar createElement para evitar XSS
