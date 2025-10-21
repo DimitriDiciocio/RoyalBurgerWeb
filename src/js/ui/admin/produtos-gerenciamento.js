@@ -163,13 +163,35 @@ class ProdutoDataManager {
                 cost_price: this.safeParseFloat(produtoData.custoTotal),
                 preparation_time_minutes: this.safeParseInt(produtoData.tempoPreparo),
                 category_id: produtoData.categoriaId || null,
-                is_active: produtoData.ativo !== undefined ? produtoData.ativo : true,
-                image: produtoData.imagem
+                is_active: produtoData.ativo !== undefined ? produtoData.ativo : true
             };
 
-            const response = await createProduct(apiData);
-            this.clearCache();
-            return response;
+            // Verifica se há imagem para upload
+            const imageFile = produtoData.imageFile || produtoData.imagem || null;
+            const removeImage = produtoData.removeImage || false;
+
+            // Se há imagem, usa FormData, senão JSON
+            if (imageFile) {
+                const formData = new FormData();
+                
+                // Adiciona campos de texto
+                Object.keys(apiData).forEach(key => {
+                    if (apiData[key] !== null && apiData[key] !== undefined) {
+                        formData.append(key, apiData[key]);
+                    }
+                });
+                
+                // Adiciona imagem
+                formData.append('image', imageFile);
+                
+                const response = await createProduct({ ...apiData, image: imageFile });
+                this.clearCache();
+                return response;
+            } else {
+                const response = await createProduct(apiData);
+                this.clearCache();
+                return response;
+            }
         } catch (error) {
             console.error('Erro ao adicionar produto:', error);
             
@@ -1718,6 +1740,14 @@ class ProdutoManager {
         }
 
         const produtoData = this.getProdutoFormData();
+
+        // Adicionar dados de imagem se houver
+        if (this.newImageFile) {
+            produtoData.imageFile = this.newImageFile;
+        }
+        if (this.imageToRemove) {
+            produtoData.removeImage = true;
+        }
 
         try {
             await this.saveProductWithIngredients(produtoData);
