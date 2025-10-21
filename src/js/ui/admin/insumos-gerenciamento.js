@@ -76,6 +76,7 @@ class InsumoDataManager {
                 nome: insumo.name,
                 categoria: insumo.category || 'outros',
                 custo: parseFloat(insumo.price) || 0,
+                preco_adicional: parseFloat(insumo.additional_price) || 0,
                 unidade: insumo.stock_unit || 'un',
                 min: parseInt(insumo.min_stock_threshold) || 0,
                 max: parseInt(insumo.max_stock) || 100,
@@ -100,6 +101,7 @@ class InsumoDataManager {
             const apiData = {
                 name: insumoData.nome,
                 price: parseFloat(insumoData.custo) || 0,
+                additional_price: parseFloat(insumoData.preco_adicional) || 0,
                 current_stock: parseInt(insumoData.atual) || 0,
                 stock_unit: insumoData.unidade || 'un',
                 min_stock_threshold: parseInt(insumoData.min) || 0,
@@ -134,6 +136,7 @@ class InsumoDataManager {
             const apiData = {
                 name: insumoData.nome,
                 price: parseFloat(insumoData.custo) || 0,
+                additional_price: parseFloat(insumoData.preco_adicional) || 0,
                 is_available: insumoData.ativo !== undefined ? insumoData.ativo : true,
                 current_stock: parseInt(insumoData.atual) || 0,
                 stock_unit: insumoData.unidade || 'un',
@@ -431,6 +434,7 @@ class InsumoManager {
                 nome: insumo.name,
                 categoria: insumo.category || 'outros',
                 custo: parseFloat(insumo.price) || 0,
+                preco_adicional: parseFloat(insumo.additional_price) || 0,
                 unidade: insumo.stock_unit || 'un',
                 min: parseInt(insumo.min_stock_threshold) || 0,
                 max: parseInt(insumo.max_stock) || 100,
@@ -625,11 +629,15 @@ class InsumoManager {
                 </div>
                 
             <div class="info-adicional">
-                <div class="custo">
+                <div class="info">
                     <div class="label">Custo Unit.</div>
                     <div class="valor">R$ ${(insumo.custo || 0).toFixed(2).replace('.', ',')}/${insumo.unidade || 'un'}</div>
                 </div>
-                <div class="porcao-base custo">
+                <div class="info">
+                    <div class="label">Preço Adicional</div>
+                    <div class="valor">R$ ${(insumo.preco_adicional || 0).toFixed(2).replace('.', ',')}</div>
+                </div>
+                <div class="porcao-base info">
                     <div class="label">Porção Base</div>
                     <div class="valor">${(insumo.quantidade_porcao || 1).toFixed(1)} ${insumo.unidade_porcao || 'un'}</div>
                 </div>
@@ -1373,6 +1381,7 @@ class InsumoManager {
         document.getElementById('fornecedor-ingrediente').value = insumoData.fornecedor || '';
         document.getElementById('categoria-ingrediente').value = insumoData.categoria || '';
         document.getElementById('custo-ingrediente').value = insumoData.custo ? `R$ ${insumoData.custo.toFixed(2).replace('.', ',')}` : '';
+        document.getElementById('preco-adicional-ingrediente').value = insumoData.preco_adicional ? `R$ ${insumoData.preco_adicional.toFixed(2).replace('.', ',')}` : '';
         document.getElementById('unidade-ingrediente').value = insumoData.unidade || '';
         document.getElementById('quantidade-porcao-ingrediente').value = insumoData.quantidade_porcao || '';
         document.getElementById('unidade-porcao-ingrediente').value = insumoData.unidade_porcao || '';
@@ -1388,6 +1397,7 @@ class InsumoManager {
         document.getElementById('fornecedor-ingrediente').value = '';
         document.getElementById('categoria-ingrediente').value = '';
         document.getElementById('custo-ingrediente').value = '';
+        document.getElementById('preco-adicional-ingrediente').value = '';
         document.getElementById('unidade-ingrediente').value = '';
         document.getElementById('quantidade-porcao-ingrediente').value = '';
         document.getElementById('unidade-porcao-ingrediente').value = '';
@@ -1440,6 +1450,13 @@ class InsumoManager {
         const custoField = document.getElementById('custo-ingrediente');
         if (custoField) {
             custoField.addEventListener('input', (e) => {
+                this.formatCurrencyInput(e.target);
+            });
+        }
+
+        const precoAdicionalField = document.getElementById('preco-adicional-ingrediente');
+        if (precoAdicionalField) {
+            precoAdicionalField.addEventListener('input', (e) => {
                 this.formatCurrencyInput(e.target);
             });
         }
@@ -1744,12 +1761,14 @@ class InsumoManager {
      */
     getInsumoFormData() {
         const custo = document.getElementById('custo-ingrediente').value.replace('R$', '').replace(',', '.').trim();
+        const precoAdicional = document.getElementById('preco-adicional-ingrediente').value.replace('R$', '').replace(',', '.').trim();
 
         return {
             nome: document.getElementById('nome-ingrediente').value.trim(),
             fornecedor: document.getElementById('fornecedor-ingrediente').value.trim(),
             categoria: document.getElementById('categoria-ingrediente').value,
             custo: parseFloat(custo) || 0,
+            preco_adicional: parseFloat(precoAdicional) || 0,
             unidade: document.getElementById('unidade-ingrediente').value.trim(),
             quantidade_porcao: parseFloat(document.getElementById('quantidade-porcao-ingrediente').value) || 1,
             unidade_porcao: document.getElementById('unidade-porcao-ingrediente').value.trim(),
@@ -2028,6 +2047,7 @@ class InsumoManager {
             nome: insumoData.name || insumoData.nome || 'Nome não informado',
             categoria: insumoData.category || insumoData.categoria || 'outros',
             custo: parseFloat(insumoData.price || insumoData.custo) || 0,
+            preco_adicional: parseFloat(insumoData.additional_price || insumoData.preco_adicional) || 0,
             unidade: insumoData.stock_unit || insumoData.unidade || 'un',
             min: parseInt(insumoData.min_stock_threshold || insumoData.min) || 0,
             max: parseInt(insumoData.max_stock || insumoData.max) || 100,
@@ -2064,12 +2084,14 @@ class InsumoManager {
         const categoriaElement = card.querySelector('.categoria-fornecedor span');
         const fornecedorElement = card.querySelectorAll('.categoria-fornecedor span')[1];
         const custoElement = card.querySelector('.valor');
+        const precoAdicionalElement = card.querySelector('.info-adicional .info:nth-child(2) .valor'); // Preço adicional
         const porcaoBaseElement = card.querySelector('.porcao-base .valor');
 
         if (nomeElement) nomeElement.textContent = insumoData.nome || 'Nome não informado';
         if (categoriaElement) categoriaElement.textContent = this.getCategoriaNome(insumoData.categoria);
         if (fornecedorElement) fornecedorElement.textContent = insumoData.fornecedor || 'Não informado';
         if (custoElement) custoElement.textContent = `R$ ${(insumoData.custo || 0).toFixed(2).replace('.', ',')}/${insumoData.unidade || 'un'}`;
+        if (precoAdicionalElement) precoAdicionalElement.textContent = `R$ ${(insumoData.preco_adicional || 0).toFixed(2).replace('.', ',')}`;
         if (porcaoBaseElement) porcaoBaseElement.textContent = `${(insumoData.quantidade_porcao || 1).toFixed(1)} ${insumoData.unidade_porcao || 'un'}`;
 
         // Atualizar limites
