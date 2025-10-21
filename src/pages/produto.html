@@ -14,12 +14,16 @@
   <link rel="stylesheet" href="../assets/styles/mensagens.css">
   <!-- js sistema -->
   <script src="../js/utils.js" type="module" defer></script>
+  <script src="../js/ui/imports.js" type="module" defer></script>
   <script src="../js/ui/header.js" type="module" defer></script>
-  <script src="../js/ui/footer.js" type="module" defer></script>
   <script src="../js/ui/alerts.js" type="module" defer></script>
   <script src="../js/ui/log-cadas.js" type="module" defer></script>
+<<<<<<< Updated upstream
   <script src="../js/ui/produto.js" type="module" defer></script>
     <!-- js complementares -->
+=======
+  <!-- js complementares -->
+>>>>>>> Stashed changes
   <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
@@ -55,16 +59,33 @@
       <div class="direita">
         <h1 id="nome-produto">Nome do produto</h1>
 
-        <p id="descricao-produto">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam auctor pellentesque urna nec tincidunt. Phasellus ultricies elementum tristique. Nullam ante leo, eleifend blandit tempus nec, viverra at nulla. Donec tincidunt lacus nisi, non sollicitudin mi suscipit luctus. Proin ac arcu pellentesque, bibendum massa nec, varius arcu.</p>
+        <p id="descricao-produto">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam auctor pellentesque urna
+          nec tincidunt. Phasellus ultricies elementum tristique. Nullam ante leo, eleifend blandit tempus nec, viverra
+          at nulla. Donec tincidunt lacus nisi, non sollicitudin mi suscipit luctus. Proin ac arcu pellentesque,
+          bibendum massa nec, varius arcu.</p>
 
         <div class="monte">
           <p>Monte do seu jeito!</p>
 
           <div class="rolagem">
             <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
+              </div>
 
-              <img src="../assets/img/ingredientes/pao.png" alt="">
+              <div class="quantidade">
+                <i class="fa-solid fa-minus dessativo"></i>
+                <p id="quantidade">01</p>
+                <i class="fa-solid fa-plus"></i>
+              </div>
+            </div>
+
+            <div class="item">
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
+              </div>
 
               <div class="quantidade">
                 <i class="fa-solid fa-minus"></i>
@@ -74,9 +95,10 @@
             </div>
 
             <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
-
-              <img src="../assets/img/ingredientes/alface.png" alt="">
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
+              </div>
 
               <div class="quantidade">
                 <i class="fa-solid fa-minus"></i>
@@ -86,9 +108,10 @@
             </div>
 
             <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
-
-              <img src="../assets/img/ingredientes/tomate.png" alt="">
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
+              </div>
 
               <div class="quantidade">
                 <i class="fa-solid fa-minus"></i>
@@ -98,9 +121,10 @@
             </div>
 
             <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
-
-              <img src="../assets/img/ingredientes/carne.png" alt="">
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
+              </div>
 
               <div class="quantidade">
                 <i class="fa-solid fa-minus"></i>
@@ -110,9 +134,10 @@
             </div>
 
             <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
-
-              <img src="../assets/img/ingredientes/bacon.png" alt="">
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
+              </div>
 
               <div class="quantidade">
                 <i class="fa-solid fa-minus"></i>
@@ -122,21 +147,10 @@
             </div>
 
             <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
-
-              <img src="../assets/img/ingredientes/calabresa.png" alt="">
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
+              <div class="item-adicional-container">
+                <p class="nome-adicional">Item produtor</p>
+                <p class="preco-adicional">+ R$ 0.00</p>
               </div>
-            </div>
-
-            <div class="item">
-              <p class="item-adicional">Item produtor + R$ 0.00</p>
-
-              <img src="../assets/img/ingredientes/cebola.png" alt="">
 
               <div class="quantidade">
                 <i class="fa-solid fa-minus"></i>
