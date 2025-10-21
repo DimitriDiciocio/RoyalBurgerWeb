@@ -53,10 +53,10 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Mostrar mensagem de sucesso
             showToast(
-                'Se um usuário com este e-mail existir, um link de recuperação foi enviado. Verifique sua caixa de entrada.',
+                resp.msg || 'Código de recuperação enviado! Verifique sua caixa de entrada e spam.',
                 { 
                     type: 'success',
-                    title: 'E-mail Enviado',
+                    title: 'Código Enviado',
                     autoClose: 5000
                 }
             );
@@ -69,7 +69,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.location.href = `verificar-email.html?email=${encodeURIComponent(email)}&type=password-reset`;
             }, 2000);
         } catch (err) {
-            toastFromApiError(err);
+            // Tratar erros específicos
+            const errorData = err?.payload || {};
+            const errorCode = errorData.error_code;
+            const errorMsg = errorData.error || err?.message || 'Erro ao enviar código de recuperação';
+            const suggestion = errorData.suggestion;
+            
+            let toastMessage = errorMsg;
+            if (suggestion) {
+                toastMessage += ` ${suggestion}`;
+            }
+            
+            showToast(toastMessage, { 
+                type: 'error',
+                title: 'Erro ao Enviar Código',
+                autoClose: 7000
+            });
+            
             // Reabilitar botão
             btnEnviar.disabled = false;
             btnEnviar.textContent = textoOriginal;

@@ -1,6 +1,6 @@
 // Gerenciamento da verificação de email usando sistema genérico
 import { createEmailVerification } from './code-verification.js';
-import { verifyEmailCode, resendVerificationCode, requestEmailVerification, verifyPasswordChangeCode, requestPasswordChangeCode, requestPasswordReset } from '../api/user.js';
+import { verifyEmailCode, resendVerificationCode, requestEmailVerification, verifyPasswordChangeCode, requestPasswordChangeCode, requestPasswordReset, verifyResetCode } from '../api/user.js';
 import { verify2FACode } from '../api/auth.js';
 import { showToast } from './alerts.js';
 
@@ -65,9 +65,37 @@ document.addEventListener('DOMContentLoaded', async function () {
             showChangeEmailLink: false,
             autoRequest: false, // Não solicitar automaticamente pois já foi solicitado
             onVerify: async (email, code) => {
-                // Para reset de senha, redirecionar diretamente para página de nova senha
-                window.location.href = `redefinir-senha.html?type=reset&email=${encodeURIComponent(email)}&reset_code=${code}`;
-                return true;
+                try {
+                    // Primeiro verifica se o código é válido
+                    const resp = await verifyResetCode(email, code);
+                    // Se chegou até aqui, o código é válido - redirecionar para página de nova senha
+                    showToast(resp.msg || 'Código válido! Redirecionando...', { 
+                        type: 'success',
+                        autoClose: 2000
+                    });
+                    setTimeout(() => {
+                        window.location.href = `redefinir-senha.html?type=reset&email=${encodeURIComponent(email)}&reset_code=${code}`;
+                    }, 1500);
+                    return true;
+                } catch (err) {
+                    // Tratar erros específicos
+                    const errorData = err?.payload || {};
+                    const errorCode = errorData.error_code;
+                    const errorMsg = errorData.error || err?.message || 'Código inválido ou expirado';
+                    const suggestion = errorData.suggestion;
+                    
+                    let toastMessage = errorMsg;
+                    if (suggestion) {
+                        toastMessage += ` ${suggestion}`;
+                    }
+                    
+                    showToast(toastMessage, { 
+                        type: 'error',
+                        title: 'Erro na Verificação',
+                        autoClose: 5000
+                    });
+                    return false;
+                }
             },
             onResend: async (email) => {
                 return await requestPasswordReset(email);

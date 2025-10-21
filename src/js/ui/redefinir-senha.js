@@ -1,7 +1,7 @@
 // Gerenciamento da página de redefinir senha
 import { inicializarGerenciamentoInputs } from '../utils.js';
 import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
-import { resetPassword, changePasswordWithCode } from '../api/user.js';
+import { resetPassword, changePasswordWithCode, verifyResetCode } from '../api/user.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     // Inicializar gerenciamento de inputs
@@ -48,6 +48,32 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => {
                 window.location.href = 'esqueceu-senha.html';
             }, 2000);
+            return;
+        }
+        
+        // Verificar se o código ainda é válido
+        try {
+            await verifyResetCode(email, reset_code);
+        } catch (err) {
+            // Tratar erros específicos
+            const errorData = err?.payload || {};
+            const errorCode = errorData.error_code;
+            const errorMsg = errorData.error || err?.message || 'Código expirado ou inválido';
+            const suggestion = errorData.suggestion;
+            
+            let toastMessage = errorMsg;
+            if (suggestion) {
+                toastMessage += ` ${suggestion}`;
+            }
+            
+            showToast(toastMessage, { 
+                type: 'error',
+                title: 'Código Inválido',
+                autoClose: 5000
+            });
+            setTimeout(() => {
+                window.location.href = 'esqueceu-senha.html';
+            }, 3000);
             return;
         }
     }
@@ -285,7 +311,16 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 // Reset de senha por código
                 resp = await resetPassword(email, reset_code, senha);
-                toastFromApiSuccess(resp, 'Senha redefinida com sucesso! Redirecionando para o login...');
+                
+                // Mostrar mensagem de sucesso personalizada
+                showToast(
+                    resp.msg || 'Senha redefinida com sucesso! Redirecionando para o login...',
+                    { 
+                        type: 'success',
+                        title: 'Sucesso!',
+                        autoClose: 3000
+                    }
+                );
             }
             
             // Redirecionar para login após sucesso
@@ -294,19 +329,36 @@ document.addEventListener('DOMContentLoaded', function () {
             }, 2000);
         } catch (err) {
             // Tratar erros específicos da API
-            const errorMessage = err?.payload?.error || err?.message || 'Falha ao redefinir senha.';
+            const errorData = err?.payload || {};
+            const errorCode = errorData.error_code;
+            const errorMsg = errorData.error || err?.message || 'Falha ao redefinir senha';
+            const suggestion = errorData.suggestion;
             
-            if (errorMessage.toLowerCase().includes('senha') && 
-                errorMessage.toLowerCase().includes('fraca')) {
-                mostrarErroInput('senha', errorMessage);
-            } else if (errorMessage.toLowerCase().includes('código') ||
-                       errorMessage.toLowerCase().includes('code') ||
-                       errorMessage.toLowerCase().includes('inválido')) {
-                // Erro de código - mostrar no campo de senha
-                mostrarErroInput('senha', errorMessage);
+            let toastMessage = errorMsg;
+            if (suggestion) {
+                toastMessage += ` ${suggestion}`;
+            }
+            
+            if (errorCode === 'WEAK_PASSWORD' || 
+                (errorMsg.toLowerCase().includes('senha') && errorMsg.toLowerCase().includes('fraca'))) {
+                mostrarErroInput('senha', errorMsg);
+            } else if (errorCode === 'CODE_EXPIRED' || errorCode === 'CODE_ALREADY_USED' || errorCode === 'INVALID_CODE' ||
+                       errorMsg.toLowerCase().includes('código') || errorMsg.toLowerCase().includes('code') ||
+                       errorMsg.toLowerCase().includes('inválido')) {
+                showToast(toastMessage, { 
+                    type: 'error',
+                    title: 'Código Inválido',
+                    autoClose: 5000
+                });
+                setTimeout(() => {
+                    window.location.href = 'esqueceu-senha.html';
+                }, 3000);
             } else {
-                // Erro geral - mostrar no campo de senha
-                mostrarErroInput('senha', errorMessage);
+                showToast(toastMessage, { 
+                    type: 'error',
+                    title: 'Erro ao Redefinir Senha',
+                    autoClose: 7000
+                });
             }
             
             // Reabilitar botão
