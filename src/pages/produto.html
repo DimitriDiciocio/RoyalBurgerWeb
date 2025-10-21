@@ -30,9 +30,12 @@
 
   <main>
     <div class="informa">
-
       <div class="esquerda">
-        <img src="../assets/img/tudo.jpeg" alt="">
+        <a href="../../index.html" class="voltar">
+          <i class="fa-solid fa-chevron-left"></i>
+          <p>Voltar</p>
+        </a>
+        <img id="imagem-produto" src="" alt="">
 
         <div class="area-adicionar">
           <p class="valor">A partir de <span>R$ 50,00</span></p>
@@ -161,9 +164,11 @@
         </div>
 
         <div class="observacao">
-          <p class="limite">0/140</p>
-          <label>Observações</label>
-          <input>
+          <div class="div-input">
+            <label>Observações</label>
+            <input type="text" maxlength="140" placeholder="Adicione observações especiais para seu pedido">
+            <p class="limite">0/140</p>
+          </div>
         </div>
 
       </div>

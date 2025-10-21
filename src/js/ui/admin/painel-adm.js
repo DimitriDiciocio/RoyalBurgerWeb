@@ -836,5 +836,329 @@ export {
     eventSystem 
 };
 
+/**
+ * Gerenciador do Formulário de Produto Reestruturado
+ */
+class ProdutoFormManager {
+    constructor() {
+        this.currentPart = 1;
+        this.totalParts = 2;
+        this.selectedGroups = [];
+        this.formData = {
+            informacoes: {},
+            receita: [],
+            extras: []
+        };
+        this.init();
+    }
+
+    init() {
+        this.bindEvents();
+        this.updateNavigation();
+    }
+
+    bindEvents() {
+        // Navegação entre partes
+        const btnProximo = document.getElementById('btn-proximo');
+        const btnAnterior = document.getElementById('btn-anterior');
+        const btnSalvar = document.getElementById('salvar-produto');
+        const btnAdicionarGrupo = document.getElementById('btn-adicionar-grupo');
+
+        if (btnProximo) {
+            btnProximo.addEventListener('click', () => this.nextPart());
+        }
+
+        if (btnAnterior) {
+            btnAnterior.addEventListener('click', () => this.previousPart());
+        }
+
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', () => this.saveProduct());
+        }
+
+        if (btnAdicionarGrupo) {
+            btnAdicionarGrupo.addEventListener('click', () => this.openGroupsModal());
+        }
+
+        // Modal de grupos de extras
+        this.bindGroupsModalEvents();
+    }
+
+    bindGroupsModalEvents() {
+        const modal = document.getElementById('modal-grupos-extras');
+        const btnConfirmar = document.getElementById('confirmar-grupos');
+        const btnFechar = modal?.querySelector('[data-close-modal="modal-grupos-extras"]');
+
+        if (btnConfirmar) {
+            btnConfirmar.addEventListener('click', () => this.confirmGroupsSelection());
+        }
+
+        if (btnFechar) {
+            btnFechar.addEventListener('click', () => this.closeGroupsModal());
+        }
+
+        // Seleção de grupos
+        const grupoItems = modal?.querySelectorAll('.grupo-item');
+        grupoItems?.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleGroupSelection(item);
+            });
+        });
+    }
+
+    nextPart() {
+        if (this.validateCurrentPart()) {
+            this.saveCurrentPartData();
+            this.currentPart++;
+            this.showPart(this.currentPart);
+            this.updateNavigation();
+        }
+    }
+
+    previousPart() {
+        this.currentPart--;
+        this.showPart(this.currentPart);
+        this.updateNavigation();
+    }
+
+    showPart(partNumber) {
+        const parteInformacoes = document.getElementById('parte-informacoes');
+        const parteReceita = document.getElementById('parte-receita');
+
+        if (partNumber === 1) {
+            parteInformacoes.style.display = 'block';
+            parteInformacoes.setAttribute('aria-expanded', 'true');
+            parteReceita.style.display = 'none';
+            parteReceita.setAttribute('aria-expanded', 'false');
+        } else if (partNumber === 2) {
+            parteInformacoes.style.display = 'none';
+            parteInformacoes.setAttribute('aria-expanded', 'false');
+            parteReceita.style.display = 'block';
+            parteReceita.setAttribute('aria-expanded', 'true');
+        }
+    }
+
+    updateNavigation() {
+        const btnAnterior = document.getElementById('btn-anterior');
+        const btnProximo = document.getElementById('btn-proximo');
+        const btnSalvar = document.getElementById('salvar-produto');
+
+        // Mostrar/ocultar botões conforme a parte atual
+        if (this.currentPart === 1) {
+            btnAnterior.style.display = 'none';
+            btnProximo.style.display = 'flex';
+            btnSalvar.style.display = 'none';
+        } else if (this.currentPart === this.totalParts) {
+            btnAnterior.style.display = 'flex';
+            btnProximo.style.display = 'none';
+            btnSalvar.style.display = 'flex';
+        }
+    }
+
+    validateCurrentPart() {
+        if (this.currentPart === 1) {
+            return this.validateInformacoes();
+        } else if (this.currentPart === 2) {
+            return this.validateReceita();
+        }
+        return true;
+    }
+
+    validateInformacoes() {
+        const requiredFields = [
+            'nome-produto',
+            'preco-produto',
+            'categoria-produto'
+        ];
+
+        let isValid = true;
+
+        requiredFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            const divInput = field?.closest('.div-input');
+            
+            if (!field?.value.trim()) {
+                divInput?.classList.add('error');
+                isValid = false;
+            } else {
+                divInput?.classList.remove('error');
+            }
+        });
+
+        if (!isValid) {
+            showToast('Preencha todos os campos obrigatórios', { 
+                type: 'error', 
+                title: 'Campos obrigatórios' 
+            });
+        }
+
+        return isValid;
+    }
+
+    validateReceita() {
+        // Validação básica - pode ser expandida conforme necessário
+        return true;
+    }
+
+    saveCurrentPartData() {
+        if (this.currentPart === 1) {
+            this.formData.informacoes = {
+                nome: document.getElementById('nome-produto')?.value || '',
+                descricao: document.getElementById('descricao-produto')?.value || '',
+                preco: document.getElementById('preco-produto')?.value || '',
+                categoria: document.getElementById('categoria-produto')?.value || '',
+                tempoPreparo: document.getElementById('tempo-preparo-produto')?.value || ''
+            };
+        } else if (this.currentPart === 2) {
+            this.formData.receita = this.getReceitaData();
+            this.formData.extras = this.selectedGroups;
+        }
+    }
+
+    getReceitaData() {
+        // Implementar coleta de dados da receita
+        return [];
+    }
+
+    openGroupsModal() {
+        const modal = document.getElementById('modal-grupos-extras');
+        if (modal) {
+            modal.style.display = 'flex';
+            this.loadAvailableGroups();
+        }
+    }
+
+    closeGroupsModal() {
+        const modal = document.getElementById('modal-grupos-extras');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    loadAvailableGroups() {
+        // Simular carregamento de grupos disponíveis
+        // Em implementação real, buscar da API
+        console.log('Carregando grupos disponíveis...');
+    }
+
+    toggleGroupSelection(item) {
+        const grupoId = item.getAttribute('data-grupo-id');
+        const isSelected = item.classList.contains('selecionado');
+
+        if (isSelected) {
+            item.classList.remove('selecionado');
+            this.selectedGroups = this.selectedGroups.filter(id => id !== grupoId);
+        } else {
+            item.classList.add('selecionado');
+            this.selectedGroups.push(grupoId);
+        }
+    }
+
+    confirmGroupsSelection() {
+        this.updateSelectedGroupsDisplay();
+        this.closeGroupsModal();
+        
+        showToast(`${this.selectedGroups.length} grupo(s) selecionado(s)`, { 
+            type: 'success', 
+            title: 'Grupos adicionados' 
+        });
+    }
+
+    updateSelectedGroupsDisplay() {
+        const gruposExtras = document.querySelector('.grupos-extras');
+        if (!gruposExtras) return;
+
+        if (this.selectedGroups.length === 0) {
+            gruposExtras.innerHTML = '<p class="empty-message">Nenhum grupo selecionado</p>';
+            gruposExtras.classList.add('empty');
+        } else {
+            gruposExtras.classList.remove('empty');
+            gruposExtras.innerHTML = this.selectedGroups.map(grupoId => {
+                const grupoName = this.getGroupName(grupoId);
+                return `
+                    <div class="grupo-selecionado" data-grupo-id="${grupoId}">
+                        <span class="grupo-nome">${grupoName}</span>
+                        <button type="button" class="btn-remover-grupo" onclick="produtoFormManager.removeGroup('${grupoId}')">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    getGroupName(grupoId) {
+        const groupNames = {
+            '1': 'Queijos',
+            '2': 'Molhos',
+            '3': 'Vegetais'
+        };
+        return groupNames[grupoId] || 'Grupo';
+    }
+
+    removeGroup(grupoId) {
+        this.selectedGroups = this.selectedGroups.filter(id => id !== grupoId);
+        this.updateSelectedGroupsDisplay();
+    }
+
+    saveProduct() {
+        if (this.validateCurrentPart()) {
+            this.saveCurrentPartData();
+            
+            // Simular salvamento
+            console.log('Dados do produto:', this.formData);
+            
+            showToast('Produto salvo com sucesso!', { 
+                type: 'success', 
+                title: 'Sucesso' 
+            });
+            
+            // Fechar modal e limpar formulário
+            this.closeModal();
+        }
+    }
+
+    closeModal() {
+        const modal = document.querySelector('#modal-produto');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        this.resetForm();
+    }
+
+    resetForm() {
+        this.currentPart = 1;
+        this.selectedGroups = [];
+        this.formData = {
+            informacoes: {},
+            receita: [],
+            extras: []
+        };
+        
+        // Limpar formulário
+        document.querySelectorAll('input, select, textarea').forEach(field => {
+            if (field.type !== 'button') {
+                field.value = '';
+            }
+        });
+        
+        // Remover classes de erro
+        document.querySelectorAll('.div-input.error').forEach(div => {
+            div.classList.remove('error');
+        });
+        
+        this.showPart(1);
+        this.updateNavigation();
+    }
+}
+
 // Inicializar quando o script for carregado
-setupGlobalEventListeners();
+document.addEventListener('DOMContentLoaded', () => {
+    setupGlobalEventListeners();
+    
+    // Inicializar gerenciador do formulário de produto
+    if (document.getElementById('modal-produto')) {
+        window.produtoFormManager = new ProdutoFormManager();
+    }
+});
