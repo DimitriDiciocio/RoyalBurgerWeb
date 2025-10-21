@@ -4,6 +4,13 @@
     padding: 50px 20px;
 
     & .esquerda {
+        display: flex;
+        width: 550px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 20px;
+
         & img {
             height: 480px;
             width: 550px;
@@ -15,14 +22,17 @@
         }
 
         & .area-adicionar {
-            margin-top: 10px;
-
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
             & .valor {
                 color: var(--color-texto-light);
                 font-size: 16px;
                 display: flex;
-                align-items: flex-end;
-                margin-left: 20px;
+                align-items: center;
+                justify-content: start;
+                margin-left: 25px;
 
                 & span {
                     color: var(--color-texto-black);
@@ -34,11 +44,12 @@
             & .quadro {
                 background-color: var(--cor-div-primary);
                 padding: 17px 20px;
+                width: 550px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 box-shadow: var(--box-shadow);
-                border-radius: var(--border-radius);
+                border-radius: 20px;
 
                 & .quantidade {
                     background-color: #ECECEC;
@@ -109,21 +120,19 @@
         }
 
         & .monte {
-            margin-top: 20px;
-            border-top: 1px solid var(--color-texto-erased);
-            border-bottom: 1px solid var(--color-texto-erased);
-            padding: 10px 0px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 25px 0;
 
             & p {
                 color: var(--color-texto-black);
                 font-size: 26px;
-                margin-bottom: 10px;
             }
 
             & .rolagem {
                 overflow-y: scroll;
-                scrollbar-width: none;
-                -ms-overflow-style: none;
+                padding-right: 10px;
                 height: 200px;
 
 
@@ -135,19 +144,27 @@
                     border-bottom: 0.5px solid #D9D9D9;
                     border-top: 0.5px solid #D9D9D9;
 
-                    & .item-adicional {
-                        font-size: 14px;
-                        color: var(--color-texto-black);
+                    & .item-adicional-container{
+                        display: flex;
+                        flex-direction: column;
+                        gap: 5px;
+
+                        & .nome-adicional {
+                            font-size: 1rem;
+                            font-weight: 500;
+                            color: var(--color-texto-black);
+                        }
+
+                        & .preco-adicional {
+                            font-size: 0.8rem;
+                            font-weight: 400;
+                            color: var(--color-texto-light);
+                        }
                     }
 
                     & img {
-                        background-repeat: no-repeat;
-                        background-size: cover;
-                        object-fit: cover;
-                        background-position: bottom center;
-                        border-radius: 5px;
-                        width: 40px;
-                        height: 40px;
+                        width: 30px;
+                        height: 30px;
                     }
 
                     & .quantidade {
@@ -167,6 +184,11 @@
                             &:hover {
                                 color: #be0000;
                             }
+
+                            &.dessativo {
+                                color: #cccccc;
+                                cursor: not-allowed;
+                            }
                         }
 
                         & p {
@@ -181,15 +203,16 @@
                 background-color: var(--color-texto-black);
                 color: var(--color-texto-white);
                 border: none;
+                width: 165px;
                 font-size: 14px;
                 border-radius: 8px;
+                font-weight: 500;
                 padding: 5px 25px;
-                margin: 20px 0px;
                 cursor: pointer;
-
                 display: flex;
-                justify-self: center;
+                justify-content: center;
                 align-items: center;
+                margin: 0 auto;
 
                 &:hover {
                     background-color: rgb(55, 55, 55);
@@ -207,7 +230,6 @@
             flex-direction: column;
             position: relative;
             width: 100%;
-            margin-top: 40px;
 
             & label {
                 font-size: 0.85rem;

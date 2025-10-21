@@ -244,6 +244,14 @@ export async function requestPasswordReset(email) {
     });
 }
 
+export async function verifyResetCode(email, reset_code) {
+    return apiRequest('/api/users/verify-reset-code', {
+        method: 'POST',
+        body: { email, reset_code },
+        skipAuth: true
+    });
+}
+
 export async function resetPassword(email, reset_code, new_password) {
     return apiRequest('/api/users/reset-password', {
         method: 'POST',
