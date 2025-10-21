@@ -201,23 +201,636 @@ main{
 
             & .footer{
                 display: flex;
-                flex-direction: column;
-                justify-content: center;
+                flex-direction: row;
+                justify-content: space-evenly;
                 align-items: center;
                 border-top: 1px solid #D9D9D9;
                 padding: 10px;
+                gap: 10px;
                 margin-top: 10px;
 
-                & p:first-child{
-                    color: var(--color-texto-black);
-                    font-size: 0.8rem;
-                    font-weight: 400;
+                & button{
+                    color: var(--color-texto-white);
+                    background-color: var(--color-texto-black);
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    cursor: pointer;
+                    align-items: center;
+                    gap: 10px;
+                    border: none;
+                    font-size: 14px;
+                    border-radius: 8px;
+                    padding: 5px 25px;
+
+                    &:hover {
+                        background-color: rgb(55, 55, 55);
+                    }
+
+                    &:active {
+                        background-color: rgb(147, 147, 147);
+                    }
                 }
 
-                & p:last-child{
-                    color: var(--color-texto-black);
-                    font-size: 0.8rem;
-                    font-weight: 500;
+                & div{
+                    & p:first-child{
+                        color: var(--color-texto-black);
+                        font-size: 0.8rem;
+                        font-weight: 400;
+                    }
+
+                    & p:last-child{
+                        color: var(--color-texto-black);
+                        font-size: 0.8rem;
+                        font-weight: 500;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 1440px) {
+    main{
+        padding-bottom: 20px;
+
+        & section:first-child{
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin: 20px 0px;
+
+            & div{
+                align-items: center;
+                gap: 7px;
+                font-size: 1rem;
+            }
+        }
+
+        & section:last-child{
+            gap: 20px;
+
+            & .quadro-pedido{
+                width: 30vw;
+                max-width: 350px;
+
+                & .header{
+                    margin-bottom: 20px;
+                    padding: 0px 20px;
+
+                    & .div1{
+                        & .principal{
+                            gap: 10px;
+
+                            & .n-pedido{
+                                font-size: 0.9rem;
+                            }
+
+                            & .status-pedido{
+                                font-size: 0.65rem;
+                                border-radius: 5px;
+                                width: 80px;
+                            }
+                        }
+
+                        & .prazo{
+                            font-size: 0.7rem;
+                            gap: 5px;
+                        }
+                    }
+
+                    & .tempo-pedido{
+                        font-size: 0.8rem;
+                    }
+                }
+
+                & .main{
+                    padding: 0px 20px;
+
+                    & .div-1{
+                        & .div-2{
+                            font-size: 0.9rem;
+
+                            & .fone{
+                                font-size: 0.7rem;
+                                gap: 5px;
+                            }
+                        }
+
+                        & .endereco{
+                            gap: 10px;
+                            font-size: 0.7rem;
+                        }
+                    }
+
+                    & .pedidos{
+                        & .pedido{
+                            & div{
+                                gap: 10px;
+
+                                & .qtd{
+                                    font-size: 0.6rem;
+                                    width: 17px;
+                                    height: 17px;
+                                }
+
+                                & .nome{
+                                    color: var(--color-texto-black);
+                                    font-size: 0.8rem;
+                                    font-weight: 500;
+                                }
+                            }
+
+                            & .preco{
+                                font-size: 0.8rem;
+                            }
+                        }
+                    }
+                }
+
+                & .footer{
+                    padding: 10px;
+                    margin-top: 10px;
+
+                    & p:first-child{
+                        font-size: 0.8rem;
+                    }
+
+                    & p:last-child{
+                        font-size: 0.8rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 1280px) {
+    
+}
+
+@media (max-width: 1024px) {
+    main{
+        padding-bottom: 20px;
+
+        & section:first-child{
+            font-size: 1rem;
+            font-weight: 500;
+            margin: 20px 0px;
+
+            & div{
+                align-items: center;
+                gap: 7px;
+                font-size: 0.8rem;
+            }
+        }
+
+        & section:last-child{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            
+            gap: 20px;
+
+            & .quadro-pedido{
+                width: 40vw;
+                max-width: 300px;
+
+                & .header{
+                    margin-bottom: 20px;
+                    padding: 0px 10px;
+
+                    & .div1{
+                        & .principal{
+                            gap: 5px;
+
+                            & .n-pedido{
+                                font-size: 0.8rem;
+                            }
+
+                            & .status-pedido{
+                                font-size: 0.65rem;
+                                border-radius: 5px;
+                                width: 65px;
+                            }
+                        }
+
+                        & .prazo{
+                            font-size: 0.7rem;
+                            gap: 5px;
+                        }
+                    }
+
+                    & .tempo-pedido{
+                        font-size: 0.7rem;
+                    }
+                }
+
+                & .main{
+                    padding: 0px 10px;
+
+                    & .div-1{
+                        & .div-2{
+                            font-size: 0.8rem;
+
+                            & .fone{
+                                font-size: 0.6rem;
+                                gap: 5px;
+                            }
+                        }
+
+                        & .endereco{
+                            gap: 5px;
+                            font-size: 0.6rem;
+                        }
+                    }
+
+                    & .pedidos{
+                        & .pedido{
+                            & div{
+                                gap: 5px;
+
+                                & .qtd{
+                                    font-size: 0.6rem;
+                                    width: 12px;
+                                    height: 12px;
+                                }
+
+                                & .nome{
+                                    color: var(--color-texto-black);
+                                    font-size: 0.7rem;
+                                    font-weight: 500;
+                                }
+                            }
+
+                            & .preco{
+                                font-size: 0.7rem;
+                            }
+                        }
+                    }
+                }
+
+                & .footer{
+                    padding: 5px;
+                    margin-top: 5px;
+
+                    & p:first-child{
+                        font-size: 0.7rem;
+                    }
+
+                    & p:last-child{
+                        font-size: 0.7rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 768px) {
+   main{
+        padding-bottom: 20px;
+
+        & section:first-child{
+            font-size: 1rem;
+            font-weight: 500;
+            margin: 20px 0px;
+
+            & div{
+                align-items: center;
+                gap: 7px;
+                font-size: 0.8rem;
+            }
+        }
+
+        & section:last-child{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            
+            gap: 20px;
+
+            & .quadro-pedido{
+                width: 40vw;
+
+                & .header{
+                    margin-bottom: 20px;
+                    padding: 0px 10px;
+
+                    & .div1{
+                        & .principal{
+                            gap: 5px;
+
+                            & .n-pedido{
+                                font-size: 0.7rem;
+                            }
+
+                            & .status-pedido{
+                                font-size: 0.45rem;
+                                border-radius: 3px;
+                                width: 55px;
+                            }
+                        }
+
+                        & .prazo{
+                            font-size: 0.6rem;
+                            gap: 5px;
+                        }
+                    }
+
+                    & .tempo-pedido{
+                        font-size: 0.5rem;
+                    }
+                }
+
+                & .main{
+                    padding: 0px 10px;
+
+                    & .div-1{
+                        & .div-2{
+                            font-size: 0.7rem;
+
+                            & .fone{
+                                font-size: 0.5rem;
+                                gap: 5px;
+                            }
+                        }
+
+                        & .endereco{
+                            gap: 5px;
+                            font-size: 0.5rem;
+                        }
+                    }
+
+                    & .pedidos{
+                        & .pedido{
+                            & div{
+                                gap: 5px;
+
+                                & .qtd{
+                                    font-size: 0.5rem;
+                                    width: 12px;
+                                    height: 12px;
+                                }
+
+                                & .nome{
+                                    color: var(--color-texto-black);
+                                    font-size: 0.6rem;
+                                    font-weight: 500;
+                                }
+                            }
+
+                            & .preco{
+                                font-size: 0.6rem;
+                            }
+                        }
+                    }
+                }
+
+                & .footer{
+                    padding: 5px;
+                    margin-top: 5px;
+
+                    & p:first-child{
+                        font-size: 0.6rem;
+                    }
+
+                    & p:last-child{
+                        font-size: 0.6rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    main{
+        padding-bottom: 20px;
+
+        & section:first-child{
+            font-size: 1rem;
+            font-weight: 500;
+            margin: 20px 0px;
+
+            & div{
+                align-items: center;
+                gap: 7px;
+                font-size: 0.8rem;
+            }
+        }
+
+        & section:last-child{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            
+            gap: 20px;
+
+            & .quadro-pedido{
+                width: 78vw;
+
+                & .header{
+                    margin-bottom: 20px;
+                    padding: 0px 10px;
+
+                    & .div1{
+                        & .principal{
+                            gap: 5px;
+
+                            & .n-pedido{
+                                font-size: 0.8rem;
+                            }
+
+                            & .status-pedido{
+                                font-size: 0.65rem;
+                                border-radius: 5px;
+                                width: 65px;
+                            }
+                        }
+
+                        & .prazo{
+                            font-size: 0.7rem;
+                            gap: 5px;
+                        }
+                    }
+
+                    & .tempo-pedido{
+                        font-size: 0.7rem;
+                    }
+                }
+
+                & .main{
+                    padding: 0px 10px;
+
+                    & .div-1{
+                        & .div-2{
+                            font-size: 0.8rem;
+
+                            & .fone{
+                                font-size: 0.6rem;
+                                gap: 5px;
+                            }
+                        }
+
+                        & .endereco{
+                            gap: 5px;
+                            font-size: 0.6rem;
+                        }
+                    }
+
+                    & .pedidos{
+                        & .pedido{
+                            & div{
+                                gap: 5px;
+
+                                & .qtd{
+                                    font-size: 0.6rem;
+                                    width: 12px;
+                                    height: 12px;
+                                }
+
+                                & .nome{
+                                    color: var(--color-texto-black);
+                                    font-size: 0.7rem;
+                                    font-weight: 500;
+                                }
+                            }
+
+                            & .preco{
+                                font-size: 0.7rem;
+                            }
+                        }
+                    }
+                }
+
+                & .footer{
+                    padding: 5px;
+                    margin-top: 5px;
+
+                    & p:first-child{
+                        font-size: 0.7rem;
+                    }
+
+                    & p:last-child{
+                        font-size: 0.7rem;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 320px){
+    main{
+        padding-bottom: 20px;
+
+        & section:first-child{
+            font-size: 1rem;
+            font-weight: 500;
+            margin: 20px 0px;
+
+            & div{
+                align-items: center;
+                gap: 7px;
+                font-size: 0.8rem;
+            }
+        }
+
+        & section:last-child{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            
+            gap: 20px;
+
+            & .quadro-pedido{
+                width: 83vw;
+
+                & .header{
+                    margin-bottom: 20px;
+                    padding: 0px 10px;
+
+                    & .div1{
+                        & .principal{
+                            gap: 5px;
+
+                            & .n-pedido{
+                                font-size: 0.7rem;
+                            }
+
+                            & .status-pedido{
+                                font-size: 0.55rem;
+                                border-radius: 5px;
+                                width: 65px;
+                            }
+                        }
+
+                        & .prazo{
+                            font-size: 0.6rem;
+                            gap: 5px;
+                        }
+                    }
+
+                    & .tempo-pedido{
+                        font-size: 0.6rem;
+                    }
+                }
+
+                & .main{
+                    padding: 0px 10px;
+
+                    & .div-1{
+                        & .div-2{
+                            font-size: 0.7rem;
+
+                            & .fone{
+                                font-size: 0.5rem;
+                                gap: 5px;
+                            }
+                        }
+
+                        & .endereco{
+                            gap: 5px;
+                            font-size: 0.5rem;
+                        }
+                    }
+
+                    & .pedidos{
+                        & .pedido{
+                            & div{
+                                gap: 5px;
+
+                                & .qtd{
+                                    font-size: 0.5rem;
+                                    width: 12px;
+                                    height: 12px;
+                                }
+
+                                & .nome{
+                                    color: var(--color-texto-black);
+                                    font-size: 0.6rem;
+                                    font-weight: 500;
+                                }
+                            }
+
+                            & .preco{
+                                font-size: 0.6rem;
+                            }
+                        }
+                    }
+                }
+
+                & .footer{
+                    padding: 5px;
+                    margin-top: 5px;
+
+                    & p:first-child{
+                        font-size: 0.6rem;
+                    }
+
+                    & p:last-child{
+                        font-size: 0.6rem;
+                    }
                 }
             }
         }
