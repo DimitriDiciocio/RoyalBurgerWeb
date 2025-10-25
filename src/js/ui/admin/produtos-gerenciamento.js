@@ -23,6 +23,7 @@ import { getIngredients } from '../../api/ingredients.js';
 import { getCategories } from '../../api/categories.js';
 import { showToast } from '../alerts.js';
 import { abrirModal, fecharModal } from '../modais.js';
+import { ProdutoExtrasManager } from './produto-extras-manager.js';
 
 /**
  * Gerenciador de dados de produtos
@@ -166,6 +167,11 @@ class ProdutoDataManager {
                 is_active: produtoData.ativo !== undefined ? produtoData.ativo : true
             };
 
+            // Adicionar ingredientes se fornecidos (receita + extras unificados)
+            if (produtoData.ingredients && Array.isArray(produtoData.ingredients)) {
+                apiData.ingredients = produtoData.ingredients;
+            }
+
             // Verifica se há imagem para upload
             const imageFile = produtoData.imageFile || produtoData.imagem || null;
             const removeImage = produtoData.removeImage || false;
@@ -177,7 +183,13 @@ class ProdutoDataManager {
                 // Adiciona campos de texto
                 Object.keys(apiData).forEach(key => {
                     if (apiData[key] !== null && apiData[key] !== undefined) {
-                        formData.append(key, apiData[key]);
+                        // Para arrays/objects, converte para JSON string
+                        if (typeof apiData[key] === 'object') {
+                            const jsonString = JSON.stringify(apiData[key]);
+                            formData.append(key, jsonString);
+                        } else {
+                            formData.append(key, apiData[key]);
+                        }
                     }
                 });
                 
@@ -218,6 +230,11 @@ class ProdutoDataManager {
                 category_id: produtoData.categoriaId || null,
                 is_active: produtoData.ativo !== undefined ? produtoData.ativo : true
             };
+
+            // Adicionar ingredientes se fornecidos (receita + extras unificados)
+            if (produtoData.ingredients && Array.isArray(produtoData.ingredients)) {
+                apiData.ingredients = produtoData.ingredients;
+            }
 
             // Verifica se há alteração na imagem
             const imageFile = produtoData.imageFile || null;
@@ -410,6 +427,7 @@ class ProdutoManager {
         this.isUpdating = false; // Flag para evitar atualizações simultâneas
         this.modalClickHandler = null; // Handler para delegação de eventos no modal
         this.imageCache = new Map(); // Cache para imagens
+        this.extrasManager = null; // Gerenciador de extras (inicializado quando necessário)
     }
 
     /**
@@ -578,11 +596,14 @@ class ProdutoManager {
                 id: ingrediente.id,
                 name: ingrediente.name,
                 price: ingrediente.price,
+                additional_price: ingrediente.additional_price || 0,
                 base_portion_quantity: ingrediente.base_portion_quantity || 1,
                 base_portion_unit: ingrediente.base_portion_unit || 'un',
                 stock_unit: ingrediente.stock_unit || 'un',
                 is_available: ingrediente.is_available !== undefined ? ingrediente.is_available : true
             }));
+            
+            
             
         } catch (error) {
             console.error('Erro ao carregar ingredientes:', error);
@@ -1295,7 +1316,7 @@ class ProdutoManager {
 
             // Usar sistema centralizado de modais
             abrirModal('modal-produto');
-            this.setupProdutoModalListeners(produtoData);
+            await this.setupProdutoModalListeners(produtoData);
         } finally {
             // Reset da flag após um pequeno delay
             setTimeout(() => {
@@ -1321,6 +1342,11 @@ class ProdutoManager {
      * Popula formulário de produto
      */
     async populateProdutoForm(produtoData) {
+        // Garantir que o extrasManager esteja inicializado antes de carregar ingredientes
+        if (!this.extrasManager) {
+            this.extrasManager = new ProdutoExtrasManager();
+            await this.extrasManager.init();
+        }
         document.getElementById('nome-produto').value = produtoData.nome || '';
         document.getElementById('descricao-produto').value = produtoData.descricao || '';
         document.getElementById('preco-produto').value = produtoData.preco ? `R$ ${produtoData.preco.toFixed(2).replace('.', ',')}` : '';
@@ -1357,6 +1383,11 @@ class ProdutoManager {
             ingredientesContainer.innerHTML = '';
         }
         
+        // Limpar extras do extrasManager
+        if (this.extrasManager) {
+            this.extrasManager.limparExtras();
+        }
+        
         // Limpar custo estimado
         const custoElement = document.getElementById('custo-estimado');
         if (custoElement) {
@@ -1367,9 +1398,15 @@ class ProdutoManager {
     /**
      * Configura listeners do modal
      */
-    setupProdutoModalListeners(produtoData = null) {
+    async setupProdutoModalListeners(produtoData = null) {
         // Remover listeners existentes para evitar duplicação
         this.removeModalListeners();
+
+        // Inicializar gerenciador de extras se ainda não foi inicializado
+        if (!this.extrasManager) {
+            this.extrasManager = new ProdutoExtrasManager();
+            await this.extrasManager.init();
+        }
 
         // Botão cancelar
         const btnCancelar = document.getElementById('cancelar-produto');
@@ -1395,26 +1432,18 @@ class ProdutoManager {
         // Upload de imagem
         this.setupImageUpload();
 
-        // Botão adicionar ingrediente
-        const btnAdicionarIngrediente = document.getElementById('btn-adicionar-ingrediente');
-        if (btnAdicionarIngrediente) {
-            btnAdicionarIngrediente.addEventListener('click', () => {
-                this.addIngredientToRecipe();
-            });
-        }
-
-        // Listener para select de ingredientes - atualizar info da porção base
-        const selectIngrediente = document.getElementById('ingrediente-select');
-        if (selectIngrediente) {
-            selectIngrediente.addEventListener('change', (e) => {
-                this.updateIngredientePorcaoInfo(e.target);
+        // Botão adicionar ingrediente (abre modal)
+        const btnAdicionarIngredienteReceita = document.getElementById('btn-adicionar-ingrediente-receita');
+        if (btnAdicionarIngredienteReceita) {
+            btnAdicionarIngredienteReceita.addEventListener('click', () => {
+                this.abrirModalIngredienteReceita();
             });
         }
 
         // Atualizar custo estimado inicial
         this.updateEstimatedCost();
 
-        // Event delegation para botões de remover ingrediente
+        // Event delegation para botões de remover e editar ingrediente
         const modal = document.getElementById('modal-produto');
         if (modal) {
             // Remover handler anterior se existir para evitar duplicação
@@ -1424,48 +1453,21 @@ class ProdutoManager {
             // Criar e registrar novo handler
             this.modalClickHandler = (e) => {
                 const removeBtn = e.target.closest('.btn-remover-ingrediente');
+                const editBtn = e.target.closest('.btn-editar-ingrediente');
+                
                 if (removeBtn) {
                     this.removeIngredientFromRecipe(removeBtn);
+                } else if (editBtn) {
+                    this.editarIngredienteReceita(editBtn);
                 }
             };
             modal.addEventListener('click', this.modalClickHandler);
         }
+
+        // Configurar modal de ingrediente da receita
+        this.setupModalIngredienteReceitaListeners();
     }
 
-    /**
-     * Atualiza informações da porção base do ingrediente selecionado
-     */
-    updateIngredientePorcaoInfo(selectElement) {
-        const infoPorcaoField = document.getElementById('info-porcao-ingrediente');
-        const infoPorcaoSpan = document.getElementById('info-porcao-ingrediente-span');
-        
-        if (!infoPorcaoField && !infoPorcaoSpan) return;
-
-        const selectedOption = selectElement.options[selectElement.selectedIndex];
-        if (selectedOption && selectedOption.value) {
-            const quantidade = selectedOption.dataset.porcaoQuantidade || '1';
-            const unidade = selectedOption.dataset.porcaoUnidade || 'un';
-            const porcaoTexto = `${quantidade} ${unidade}`;
-            
-            // Atualizar o campo de input se existir
-            if (infoPorcaoField) {
-                infoPorcaoField.value = porcaoTexto;
-            }
-            
-            // Atualizar o span se existir
-            if (infoPorcaoSpan) {
-                infoPorcaoSpan.textContent = porcaoTexto;
-            }
-        } else {
-            // Limpar os campos
-            if (infoPorcaoField) {
-                infoPorcaoField.value = '';
-            }
-            if (infoPorcaoSpan) {
-                infoPorcaoSpan.textContent = '100g'; // Valor padrão
-            }
-        }
-    }
 
     /**
      * Remove listeners do modal para evitar duplicação
@@ -1474,7 +1476,7 @@ class ProdutoManager {
         // Remover listeners específicos se necessário
         const btnCancelar = document.getElementById('cancelar-produto');
         const btnSalvar = document.getElementById('salvar-produto');
-        const btnAdicionarIngrediente = document.getElementById('btn-adicionar-ingrediente');
+        const btnAdicionarIngrediente = document.getElementById('btn-adicionar-ingrediente-receita');
         const modal = document.getElementById('modal-produto');
         
         if (btnCancelar) {
@@ -1490,6 +1492,268 @@ class ProdutoManager {
         if (modal && this.modalClickHandler) {
             modal.removeEventListener('click', this.modalClickHandler);
             this.modalClickHandler = null;
+        }
+    }
+
+    /**
+     * Configura listeners da modal de ingrediente da receita
+     */
+    setupModalIngredienteReceitaListeners() {
+        // Select de ingrediente - atualizar info da porção base
+        const selectIngredienteModal = document.getElementById('ingrediente-select-modal');
+        if (selectIngredienteModal) {
+            selectIngredienteModal.addEventListener('change', (e) => {
+                this.updateIngredientePorcaoInfoModal(e.target);
+                this.calcularCustoIngredienteModal();
+            });
+        }
+
+        // Input de quantidade - atualizar custo
+        const quantidadeInput = document.getElementById('quantidade-porcoes-ingrediente-modal');
+        if (quantidadeInput) {
+            quantidadeInput.addEventListener('input', () => {
+                this.calcularCustoIngredienteModal();
+            });
+        }
+
+        // Botão salvar
+        const btnSalvar = document.getElementById('salvar-ingrediente-receita');
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', () => {
+                this.salvarIngredienteReceita();
+            });
+        }
+
+        // Botões fechar modal
+        const modal = document.getElementById('modal-ingrediente-receita');
+        if (modal) {
+            const btnsCancelar = modal.querySelectorAll('[data-close-modal="modal-ingrediente-receita"]');
+            btnsCancelar.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this.fecharModalIngredienteReceita();
+                });
+            });
+
+            // Fechar ao clicar no overlay
+            const overlay = modal.querySelector('.div-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', () => {
+                    this.fecharModalIngredienteReceita();
+                });
+            }
+        }
+    }
+
+    /**
+     * Abre modal para adicionar ingrediente à receita
+     */
+    abrirModalIngredienteReceita(ingredienteId = null, quantidade = null) {
+        const modal = document.getElementById('modal-ingrediente-receita');
+        const titulo = document.getElementById('titulo-modal-ingrediente-receita');
+        const textoBotao = document.getElementById('texto-btn-salvar-ingrediente');
+        const selectIngrediente = document.getElementById('ingrediente-select-modal');
+        const quantidadeInput = document.getElementById('quantidade-porcoes-ingrediente-modal');
+        
+        if (!modal) {
+            console.error('Modal #modal-ingrediente-receita não encontrado');
+            return;
+        }
+        
+        if (!selectIngrediente) {
+            console.error('Select #ingrediente-select-modal não encontrado');
+            return;
+        }
+
+        // Definir modo (adicionar ou editar)
+        if (ingredienteId && quantidade) {
+            // Modo edição
+            titulo.textContent = 'Editar Ingrediente da Receita';
+            textoBotao.textContent = 'Salvar';
+            modal.dataset.mode = 'edit';
+            modal.dataset.ingredientId = ingredienteId;
+            
+            // Preencher campos
+            selectIngrediente.value = ingredienteId;
+            selectIngrediente.disabled = true; // Não permitir trocar o ingrediente em edição
+            quantidadeInput.value = quantidade;
+            
+            this.updateIngredientePorcaoInfoModal(selectIngrediente);
+            this.calcularCustoIngredienteModal();
+        } else {
+            // Modo adicionar
+            titulo.textContent = 'Adicionar Ingrediente à Receita';
+            textoBotao.textContent = 'Adicionar';
+            modal.dataset.mode = 'add';
+            delete modal.dataset.ingredientId;
+            
+            // Limpar campos
+            selectIngrediente.value = '';
+            selectIngrediente.disabled = false;
+            quantidadeInput.value = '';
+            document.getElementById('info-porcao-ingrediente-modal').value = '';
+            document.getElementById('custo-por-porcao-modal').textContent = 'R$ 0,00';
+            document.getElementById('custo-total-modal').textContent = 'R$ 0,00';
+        }
+
+        // Mostrar modal
+        modal.style.display = 'flex';
+        selectIngrediente.focus();
+    }
+
+    /**
+     * Fecha modal de ingrediente da receita
+     */
+    fecharModalIngredienteReceita() {
+        const modal = document.getElementById('modal-ingrediente-receita');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    /**
+     * Atualiza informações da porção base do ingrediente na modal
+     */
+    updateIngredientePorcaoInfoModal(selectElement) {
+        const infoPorcaoField = document.getElementById('info-porcao-ingrediente-modal');
+        if (!infoPorcaoField) return;
+
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const quantidade = selectedOption.dataset.porcaoQuantidade || '1';
+            const unidade = selectedOption.dataset.porcaoUnidade || 'un';
+            infoPorcaoField.value = `${quantidade} ${unidade}`;
+        } else {
+            infoPorcaoField.value = '';
+        }
+    }
+
+    /**
+     * Calcula custo do ingrediente em tempo real na modal
+     */
+    calcularCustoIngredienteModal() {
+        const selectIngrediente = document.getElementById('ingrediente-select-modal');
+        const quantidadeInput = document.getElementById('quantidade-porcoes-ingrediente-modal');
+        const custoPorPorcaoEl = document.getElementById('custo-por-porcao-modal');
+        const custoTotalEl = document.getElementById('custo-total-modal');
+
+        if (!selectIngrediente || !quantidadeInput) return;
+
+        const ingredienteId = selectIngrediente.value;
+        const quantidadePorcoes = this.dataManager.safeParseFloat(quantidadeInput.value);
+
+        if (!ingredienteId || !quantidadePorcoes || quantidadePorcoes <= 0) {
+            custoPorPorcaoEl.textContent = 'R$ 0,00';
+            custoTotalEl.textContent = 'R$ 0,00';
+            return;
+        }
+
+        // Buscar dados do ingrediente
+        const ingrediente = this.ingredientesDisponiveis.find(ing => ing.id == ingredienteId);
+        if (!ingrediente) return;
+
+        const precoUnitario = this.dataManager.safeParseFloat(ingrediente.price);
+        const quantidadePorcaoBase = this.dataManager.safeParseFloat(ingrediente.base_portion_quantity) || 1;
+        const unidadePorcaoBase = ingrediente.base_portion_unit || 'un';
+        const stockUnit = ingrediente.stock_unit || 'un';
+        
+        const precoPorUnidadeBase = this.convertPriceToRecipeUnit(precoUnitario, stockUnit, unidadePorcaoBase);
+        const custoPorPorcao = precoPorUnidadeBase * quantidadePorcaoBase;
+        const custoTotal = custoPorPorcao * quantidadePorcoes;
+
+        custoPorPorcaoEl.textContent = `R$ ${this.formatCurrency(custoPorPorcao)}`;
+        custoTotalEl.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
+    }
+
+    /**
+     * Salva ingrediente da receita (adicionar ou editar)
+     */
+    salvarIngredienteReceita() {
+        const modal = document.getElementById('modal-ingrediente-receita');
+        const selectIngrediente = document.getElementById('ingrediente-select-modal');
+        const quantidadeInput = document.getElementById('quantidade-porcoes-ingrediente-modal');
+
+        const ingredienteId = selectIngrediente.value;
+        const quantidadePorcoes = this.dataManager.safeParseFloat(quantidadeInput.value);
+        const mode = modal.dataset.mode;
+
+        // Validações
+        if (!ingredienteId) {
+            this.showErrorMessage('Selecione um ingrediente');
+            return;
+        }
+
+        if (!quantidadeInput.value || quantidadePorcoes <= 0) {
+            this.showErrorMessage('Digite um número de porções válido');
+            return;
+        }
+
+        // Buscar dados do ingrediente
+        const ingrediente = this.ingredientesDisponiveis.find(ing => ing.id == ingredienteId);
+        if (!ingrediente) {
+            this.showErrorMessage('Ingrediente não encontrado');
+            return;
+        }
+
+        if (mode === 'edit') {
+            // Modo edição - remover o antigo e adicionar o novo
+            const oldIngredientId = modal.dataset.ingredientId;
+            const oldElement = document.querySelector(`[data-ingrediente-id="${oldIngredientId}"]`);
+            if (oldElement) {
+                // Remover da área de extras também
+                if (this.extrasManager) {
+                    this.extrasManager.removerIngredienteReceita(parseInt(oldIngredientId));
+                }
+                oldElement.remove();
+            }
+        } else {
+            // Modo adicionar - verificar se já existe
+            const ingredienteJaAdicionado = document.querySelector(`[data-ingrediente-id="${ingredienteId}"]`);
+            if (ingredienteJaAdicionado) {
+                this.showErrorMessage('Este ingrediente já foi adicionado à receita');
+                return;
+            }
+        }
+
+        // Adicionar à lista
+        this.addIngredientToList(ingrediente, quantidadePorcoes, 'porções');
+
+        // Adicionar à área de extras automaticamente
+        if (this.extrasManager) {
+            const ingredienteParaExtra = {
+                ingredient_id: parseInt(ingredienteId),
+                name: ingrediente.name,
+                portions: quantidadePorcoes,
+                min_quantity: 0,
+                max_quantity: 0,
+                additional_price: this.dataManager.safeParseFloat(ingrediente.additional_price) || 0,
+                is_available: ingrediente.is_available !== false
+            };
+            
+            this.extrasManager.adicionarIngredienteReceita(ingredienteParaExtra);
+        }
+
+        // Atualizar custo estimado
+        this.updateEstimatedCost();
+
+        // Fechar modal
+        this.fecharModalIngredienteReceita();
+
+        // Mensagem de sucesso
+        this.showSuccessMessage(mode === 'edit' ? 'Ingrediente atualizado com sucesso!' : 'Ingrediente adicionado com sucesso!');
+    }
+
+    /**
+     * Edita um ingrediente da receita
+     */
+    editarIngredienteReceita(button) {
+        const ingredienteElement = button.closest('.ingrediente-item');
+        if (!ingredienteElement) return;
+
+        const ingredienteId = ingredienteElement.dataset.ingredienteId;
+        const quantidadeAtual = button.dataset.quantidade || button.getAttribute('data-quantidade');
+
+        if (ingredienteId && quantidadeAtual) {
+            this.abrirModalIngredienteReceita(ingredienteId, quantidadeAtual);
         }
     }
 
@@ -1676,21 +1940,47 @@ class ProdutoManager {
                 ingredientesContainer.innerHTML = '';
             }
             
-            // Adicionar cada ingrediente à lista
+            // Separar ingredientes da receita (portions > 0) e extras (portions = 0)
+            const receitaIngredientes = [];
+            const extrasIngredientes = [];
+            
             for (const ingrediente of ingredientes) {
+                const porcoes = this.dataManager.safeParseFloat(
+                    ingrediente.portions !== undefined ? ingrediente.portions : ingrediente.quantity
+                );
+                
+                if (porcoes > 0) {
+                    // Ingrediente da receita
+                    receitaIngredientes.push(ingrediente);
+                } else {
+                    // Ingrediente extra
+                    extrasIngredientes.push(ingrediente);
+                }
+            }
+            
+            // Adicionar ingredientes da receita à lista
+            for (const ingrediente of receitaIngredientes) {
                 // Buscar dados completos do ingrediente
                 const ingredienteCompleto = this.ingredientesDisponiveis.find(ing => ing.id == ingrediente.ingredient_id);
 
                 if (ingredienteCompleto) {
-                    // API pode retornar 'portions' (modelo novo) ou 'quantity' (legado)
                     const porcoes = this.dataManager.safeParseFloat(
                         ingrediente.portions !== undefined ? ingrediente.portions : ingrediente.quantity
                     );
-
-                    if (porcoes > 0) {
-                        this.addIngredientToList(ingredienteCompleto, porcoes, 'porções', true /* persisted */);
-                    }
+                    this.addIngredientToList(ingredienteCompleto, porcoes, 'porções', true /* persisted */);
                 }
+            }
+            
+            // Passar ingredientes da receita para o extrasManager (para exibir na área de extras)
+            if (this.extrasManager) {
+                
+                this.extrasManager.setIngredientesReceita(receitaIngredientes);
+            }
+            
+            // Passar extras para o extrasManager
+            if (this.extrasManager && extrasIngredientes.length > 0) {
+                
+                this.extrasManager.setExtrasFromAPI(extrasIngredientes);
             }
             
             // Atualizar custo estimado
@@ -2191,9 +2481,11 @@ class ProdutoManager {
         let custoTotal = 0;
 
         ingredientes.forEach((ingrediente) => {
-            const custoText = ingrediente.querySelector('.custo').textContent;
-            const custo = this.dataManager.safeParseFloat(custoText.replace('R$', '').replace(',', '.'));
-            custoTotal += custo;
+            const badgeCusto = ingrediente.querySelector('.badge-custo');
+            if (badgeCusto) {
+                const custo = this.dataManager.safeParseFloat(badgeCusto.dataset.custo);
+                custoTotal += custo;
+            }
         });
 
         return custoTotal;
@@ -2263,57 +2555,6 @@ class ProdutoManager {
         showToast(message, { type: 'error', title: 'Erro' });
     }
 
-    /**
-     * Adiciona ingrediente à receita do produto
-     */
-    addIngredientToRecipe() {
-        const ingredienteSelect = document.getElementById('ingrediente-select');
-        const quantidadePorcoesInput = document.getElementById('quantidade-porcoes-ingrediente');
-        const infoPorcaoField = document.getElementById('info-porcao-ingrediente');
-
-        if (!ingredienteSelect || !quantidadePorcoesInput || !infoPorcaoField) {
-            this.showErrorMessage('Erro: Campos de ingrediente não encontrados');
-            return;
-        }
-
-        const ingredienteId = ingredienteSelect.value;
-        const quantidadePorcoes = this.dataManager.safeParseFloat(quantidadePorcoesInput.value);
-
-        if (!ingredienteId) {
-            this.showErrorMessage('Selecione um ingrediente');
-            return;
-        }
-
-        if (!quantidadePorcoesInput.value || quantidadePorcoes <= 0) {
-            this.showErrorMessage('Digite um número de porções válido');
-            return;
-        }
-
-        // Verificar se o ingrediente já foi adicionado
-        const ingredienteJaAdicionado = document.querySelector(`[data-ingrediente-id="${ingredienteId}"]`);
-        if (ingredienteJaAdicionado) {
-            this.showErrorMessage('Este ingrediente já foi adicionado à receita');
-            return;
-        }
-
-        // Buscar dados do ingrediente
-        const ingrediente = this.ingredientesDisponiveis.find(ing => ing.id == ingredienteId);
-        if (!ingrediente) {
-            this.showErrorMessage('Ingrediente não encontrado');
-            return;
-        }
-
-        // Adicionar à lista de ingredientes (usando porções)
-        this.addIngredientToList(ingrediente, quantidadePorcoes, 'porções');
-
-        // Limpar formulário
-        ingredienteSelect.value = '';
-        quantidadePorcoesInput.value = '';
-        infoPorcaoField.value = '';
-
-        // Atualizar custo estimado
-        this.updateEstimatedCost();
-    }
 
     /**
      * Converte o preço unitário do ingrediente para a unidade da receita
@@ -2408,17 +2649,24 @@ class ProdutoManager {
         
 
         ingredienteElement.innerHTML = `
-            <div class="ingrediente-info">
-                <div class="ingrediente-info-content">
+            <div class="ingrediente-header">
                 <span class="nome">${this.escapeHtml(ingrediente.name)}</span>
-                <span class="quantidade">${quantidadePorcoes} porções (${quantidadePorcaoBase} ${unidadePorcaoBase} cada)</span>
-                
-                </div> 
-                <span class="custo">R$ ${this.formatCurrency(custoTotal)}</span>
+                <span class="badge-custo" data-custo="${custoTotal}">R$ ${this.formatCurrency(custoTotal)}</span>
             </div>
-            <button type="button" class="btn-remover-ingrediente">
-                <i class="fa-solid fa-trash"></i>
-            </button>
+            <div class="ingrediente-body">
+                <div class="ingrediente-info">
+                    <span class="info-label">Quantidade:</span>
+                    <span class="info-valor quantidade">${quantidadePorcoes} porções (${quantidadePorcaoBase} ${unidadePorcaoBase} cada)</span>
+                </div>
+                <div class="ingrediente-acoes">
+                    <button type="button" class="btn-editar-ingrediente" title="Editar ingrediente" data-quantidade="${quantidadePorcoes}">
+                        <i class="fa-solid fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn-remover-ingrediente" title="Remover ingrediente">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>
         `;
 
         container.appendChild(ingredienteElement);
@@ -2431,7 +2679,7 @@ class ProdutoManager {
         const ingredienteElement = button.closest('.ingrediente-item');
         if (!ingredienteElement) return;
 
-        const ingredienteId = ingredienteElement.dataset.ingredienteId;
+        const ingredienteId = parseInt(ingredienteElement.dataset.ingredienteId);
         const isPersisted = ingredienteElement.dataset.persisted === 'true';
 
         // Se estamos editando um produto existente, remover também no backend
@@ -2443,6 +2691,12 @@ class ProdutoManager {
 
                 // Remover da UI e atualizar custo
                 ingredienteElement.remove();
+                
+                // Remover também da área de extras
+                if (this.extrasManager) {
+                    this.extrasManager.removerIngredienteReceita(ingredienteId);
+                }
+                
                 this.updateEstimatedCost();
                 this.showSuccessMessage('Ingrediente removido do produto');
             } catch (error) {
@@ -2454,6 +2708,11 @@ class ProdutoManager {
         } else {
             // Caso seja um produto novo (ainda não salvo), apenas remove da UI
             ingredienteElement.remove();
+            
+            // Remover também da área de extras
+            if (this.extrasManager) {
+                this.extrasManager.removerIngredienteReceita(ingredienteId);
+            }
             this.updateEstimatedCost();
         }
     }
@@ -2472,10 +2731,9 @@ class ProdutoManager {
 
         // Usar for...of para melhor performance que forEach
         for (const ingrediente of ingredientes) {
-            const custoElement = ingrediente.querySelector('.custo');
-            if (custoElement) {
-                const custoText = custoElement.textContent;
-                const custo = this.dataManager.safeParseFloat(custoText.replace('R$', '').replace(',', '.'));
+            const badgeCusto = ingrediente.querySelector('.badge-custo');
+            if (badgeCusto) {
+                const custo = this.dataManager.safeParseFloat(badgeCusto.dataset.custo);
                 custoTotal += custo;
             }
         }
@@ -2490,21 +2748,24 @@ class ProdutoManager {
      * Carrega ingredientes no select
      */
     loadIngredientesInSelect() {
-        const select = document.getElementById('ingrediente-select');
-        if (!select) {
-            return;
+        // Carregar no select da modal de ingrediente da receita
+        const selectModal = document.getElementById('ingrediente-select-modal');
+        if (selectModal) {
+            selectModal.innerHTML = '<option value="">Selecione um ingrediente</option>';
+            
+            this.ingredientesDisponiveis.forEach(ingrediente => {
+                const option = document.createElement('option');
+                option.value = ingrediente.id;
+                option.textContent = `${ingrediente.name} (${ingrediente.base_portion_quantity || 1} ${ingrediente.base_portion_unit || 'un'})`;
+                option.dataset.porcaoQuantidade = ingrediente.base_portion_quantity || 1;
+                option.dataset.porcaoUnidade = ingrediente.base_portion_unit || 'un';
+                option.dataset.price = ingrediente.price || 0;
+                option.dataset.stockUnit = ingrediente.stock_unit || 'un';
+                selectModal.appendChild(option);
+            });
+        } else {
+            console.error('Select #ingrediente-select-modal não encontrado no DOM');
         }
-
-        select.innerHTML = '<option value="">Selecione um ingrediente</option>';
-        
-        this.ingredientesDisponiveis.forEach(ingrediente => {
-            const option = document.createElement('option');
-            option.value = ingrediente.id;
-            option.textContent = `${ingrediente.name} (${ingrediente.base_portion_quantity || 1} ${ingrediente.base_portion_unit || 'un'})`;
-            option.dataset.porcaoQuantidade = ingrediente.base_portion_quantity || 1;
-            option.dataset.porcaoUnidade = ingrediente.base_portion_unit || 'un';
-            select.appendChild(option);
-        });
     }
 
     /**
@@ -2546,36 +2807,80 @@ class ProdutoManager {
      */
     async saveProductWithIngredients(produtoData) {
         try {
-            // Primeiro, salvar o produto
-            let produtoId;
-            if (this.currentEditingId) {
-                await this.dataManager.updateProduto(this.currentEditingId, produtoData);
-                produtoId = this.currentEditingId;
-            } else {
-                // Para novo produto, precisamos obter o ID retornado pela API
-                const response = await this.dataManager.addProduto(produtoData);
-                produtoId = response.id;
-            }
-
-            // Adicionar ingredientes da receita
-            const ingredientes = document.querySelectorAll('.ingrediente-item');
+            // Criar um mapa para combinar receita + regras de extras
+            const ingredientesMap = new Map();
             
-            for (const ingrediente of ingredientes) {
-                const ingredienteId = ingrediente.dataset.ingredienteId;
-                const quantidadeText = ingrediente.querySelector('.quantidade').textContent;
+            // 1. Coletar ingredientes da receita (portions > 0)
+            const ingredientesDOM = document.querySelectorAll('.ingrediente-item');
+            
+            for (const ingrediente of ingredientesDOM) {
+                const ingredienteId = parseInt(ingrediente.dataset.ingredienteId);
+                const quantidadeElement = ingrediente.querySelector('.info-valor.quantidade');
+                
+                if (!quantidadeElement) continue;
+                
+                const quantidadeText = quantidadeElement.textContent;
                 
                 // Extrair número de porções do texto (ex: "2 porções (100g cada)")
                 const match = quantidadeText.match(/(\d+(?:\.\d+)?)\s+porções/);
                 const quantidadePorcoes = match ? this.dataManager.safeParseFloat(match[1]) : 0;
 
-                // Validar dados antes de enviar
-                if (!ingredienteId || !quantidadePorcoes) {
-                    continue; // Pular este ingrediente e continuar com os outros
+                // Validar dados antes de adicionar
+                if (!ingredienteId || !quantidadePorcoes || quantidadePorcoes <= 0) {
+                    continue;
                 }
                 
-                await this.dataManager.addIngredienteAoProduto(produtoId, ingredienteId, quantidadePorcoes);
+                // Adicionar ao mapa (inicialmente sem regras de min/max)
+                ingredientesMap.set(ingredienteId, {
+                    ingredient_id: ingredienteId,
+                    portions: quantidadePorcoes,
+                    min_quantity: 0,
+                    max_quantity: 0
+                });
             }
-
+            
+            // 2. Obter regras de min/max dos ingredientes da receita (definidas na área de extras)
+            if (this.extrasManager && this.extrasManager.ingredientesReceita) {
+                for (const receitaItem of this.extrasManager.ingredientesReceita) {
+                    const ingredienteId = receitaItem.ingredient_id;
+                    if (ingredientesMap.has(ingredienteId)) {
+                        // Atualizar com as regras de min/max
+                        ingredientesMap.get(ingredienteId).min_quantity = receitaItem.min_quantity || 0;
+                        ingredientesMap.get(ingredienteId).max_quantity = receitaItem.max_quantity || 0;
+                    }
+                }
+            }
+            
+            // 3. Adicionar extras puros (portions = 0)
+            if (this.extrasManager) {
+                const extrasIngredientes = this.extrasManager.getExtrasFormatadosParaAPI();
+                
+                for (const extra of extrasIngredientes) {
+                    // Só adicionar se não for ingrediente da receita
+                    if (!ingredientesMap.has(extra.ingredient_id)) {
+                        ingredientesMap.set(extra.ingredient_id, extra);
+                    }
+                }
+            }
+            
+            // 4. Converter mapa para array
+            const todosIngredientes = Array.from(ingredientesMap.values());
+            
+            // Adicionar ingredientes ao payload do produto
+            produtoData.ingredients = todosIngredientes;
+            
+            // Salvar o produto com todos os ingredientes de uma vez
+            let produtoId;
+            if (this.currentEditingId) {
+                // Atualização: usa updateProduto que agora aceita 'ingredients'
+                await this.dataManager.updateProduto(this.currentEditingId, produtoData);
+                produtoId = this.currentEditingId;
+            } else {
+                // Criação: usa addProduto que agora aceita 'ingredients'
+                const response = await this.dataManager.addProduto(produtoData);
+                produtoId = response.id;
+            }
+            
             return produtoId;
         } catch (error) {
             console.error('Erro ao salvar produto com ingredientes:', error);

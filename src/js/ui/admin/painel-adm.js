@@ -8,6 +8,7 @@ import { UsuarioManager } from './usuarios-gerenciamento.js';
 import { ProdutoManager } from './produtos-gerenciamento.js';
 import { InsumoManager } from './insumos-gerenciamento.js';
 import { CategoriaManager } from './categorias-gerenciamento.js';
+import { GruposInsumosManager } from './grupos-insumos-gerenciamento.js';
 
 import { showToast } from '../alerts.js';
 import { fetchMe } from '../../api/auth.js';
@@ -54,7 +55,8 @@ class AdminPanelManager {
             usuarios: null,
             produtos: null,
             insumos: null,
-            categorias: null
+            categorias: null,
+            gruposInsumos: null
         };
         this.isInitialized = false;
     }
@@ -518,6 +520,11 @@ class AdminPanelManager {
                 e.preventDefault();
                 await this.openCategoriasModal();
             }
+            
+            if (e.target.matches('#btn-grupos-adicionais')) {
+                e.preventDefault();
+                await this.openGruposInsumosModal();
+            }
         });
     }
 
@@ -537,6 +544,25 @@ class AdminPanelManager {
         } catch (error) {
             console.error('Erro ao abrir modal de categorias:', error);
             this.showErrorMessage('Erro ao abrir modal de categorias');
+        }
+    }
+
+    /**
+     * Abre modal de grupos de insumos extras
+     */
+    async openGruposInsumosModal() {
+        try {
+            // Inicializar gerenciador de grupos de insumos se não existir
+            if (!this.managers.gruposInsumos) {
+                this.managers.gruposInsumos = new GruposInsumosManager();
+            }
+            await this.managers.gruposInsumos.init();
+            
+            // Abrir modal de grupos de insumos
+            this.managers.gruposInsumos.abrirModalGrupos();
+        } catch (error) {
+            console.error('Erro ao abrir modal de grupos de insumos:', error);
+            this.showErrorMessage('Erro ao abrir modal de grupos de insumos');
         }
     }
 
@@ -862,7 +888,6 @@ class ProdutoFormManager {
         const btnProximo = document.getElementById('btn-proximo');
         const btnAnterior = document.getElementById('btn-anterior');
         const btnSalvar = document.getElementById('salvar-produto');
-        const btnAdicionarGrupo = document.getElementById('btn-adicionar-grupo');
 
         if (btnProximo) {
             btnProximo.addEventListener('click', () => this.nextPart());
@@ -876,36 +901,19 @@ class ProdutoFormManager {
             btnSalvar.addEventListener('click', () => this.saveProduct());
         }
 
-        if (btnAdicionarGrupo) {
-            btnAdicionarGrupo.addEventListener('click', () => this.openGroupsModal());
+        // Botão cancelar
+        const btnCancelar = document.getElementById('cancelar-produto');
+        if (btnCancelar) {
+            btnCancelar.addEventListener('click', () => this.closeModal());
         }
 
-        // Modal de grupos de extras
-        this.bindGroupsModalEvents();
+        // Botão fechar (X) - usa o sistema de modais automaticamente via data-close-modal
+        // Não precisa adicionar listener, pois já está configurado no modais.js
+
+        // NOTA: Os botões de extras (btn-adicionar-grupo e btn-adicionar-insumo-extra)
+        // são gerenciados pelo ProdutoExtrasManager no produtos-gerenciamento.js
     }
 
-    bindGroupsModalEvents() {
-        const modal = document.getElementById('modal-grupos-extras');
-        const btnConfirmar = document.getElementById('confirmar-grupos');
-        const btnFechar = modal?.querySelector('[data-close-modal="modal-grupos-extras"]');
-
-        if (btnConfirmar) {
-            btnConfirmar.addEventListener('click', () => this.confirmGroupsSelection());
-        }
-
-        if (btnFechar) {
-            btnFechar.addEventListener('click', () => this.closeGroupsModal());
-        }
-
-        // Seleção de grupos
-        const grupoItems = modal?.querySelectorAll('.grupo-item');
-        grupoItems?.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleGroupSelection(item);
-            });
-        });
-    }
 
     nextPart() {
         if (this.validateCurrentPart()) {
@@ -925,17 +933,28 @@ class ProdutoFormManager {
     showPart(partNumber) {
         const parteInformacoes = document.getElementById('parte-informacoes');
         const parteReceita = document.getElementById('parte-receita');
+        const modalContent = document.querySelector('.modal-content-produto');
 
         if (partNumber === 1) {
             parteInformacoes.style.display = 'block';
             parteInformacoes.setAttribute('aria-expanded', 'true');
             parteReceita.style.display = 'none';
             parteReceita.setAttribute('aria-expanded', 'false');
+            
+            // Mostrar imagem na primeira parte
+            if (modalContent) {
+                modalContent.classList.remove('hide-image');
+            }
         } else if (partNumber === 2) {
             parteInformacoes.style.display = 'none';
             parteInformacoes.setAttribute('aria-expanded', 'false');
             parteReceita.style.display = 'block';
             parteReceita.setAttribute('aria-expanded', 'true');
+            
+            // Esconder imagem na segunda parte
+            if (modalContent) {
+                modalContent.classList.add('hide-image');
+            }
         }
     }
 
@@ -1021,86 +1040,6 @@ class ProdutoFormManager {
         return [];
     }
 
-    openGroupsModal() {
-        const modal = document.getElementById('modal-grupos-extras');
-        if (modal) {
-            modal.style.display = 'flex';
-            this.loadAvailableGroups();
-        }
-    }
-
-    closeGroupsModal() {
-        const modal = document.getElementById('modal-grupos-extras');
-        if (modal) {
-            modal.style.display = 'none';
-        }
-    }
-
-    loadAvailableGroups() {
-        // Simular carregamento de grupos disponíveis
-        // Em implementação real, buscar da API
-        console.log('Carregando grupos disponíveis...');
-    }
-
-    toggleGroupSelection(item) {
-        const grupoId = item.getAttribute('data-grupo-id');
-        const isSelected = item.classList.contains('selecionado');
-
-        if (isSelected) {
-            item.classList.remove('selecionado');
-            this.selectedGroups = this.selectedGroups.filter(id => id !== grupoId);
-        } else {
-            item.classList.add('selecionado');
-            this.selectedGroups.push(grupoId);
-        }
-    }
-
-    confirmGroupsSelection() {
-        this.updateSelectedGroupsDisplay();
-        this.closeGroupsModal();
-        
-        showToast(`${this.selectedGroups.length} grupo(s) selecionado(s)`, { 
-            type: 'success', 
-            title: 'Grupos adicionados' 
-        });
-    }
-
-    updateSelectedGroupsDisplay() {
-        const gruposExtras = document.querySelector('.grupos-extras');
-        if (!gruposExtras) return;
-
-        if (this.selectedGroups.length === 0) {
-            gruposExtras.innerHTML = '<p class="empty-message">Nenhum grupo selecionado</p>';
-            gruposExtras.classList.add('empty');
-        } else {
-            gruposExtras.classList.remove('empty');
-            gruposExtras.innerHTML = this.selectedGroups.map(grupoId => {
-                const grupoName = this.getGroupName(grupoId);
-                return `
-                    <div class="grupo-selecionado" data-grupo-id="${grupoId}">
-                        <span class="grupo-nome">${grupoName}</span>
-                        <button type="button" class="btn-remover-grupo" onclick="produtoFormManager.removeGroup('${grupoId}')">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                    </div>
-                `;
-            }).join('');
-        }
-    }
-
-    getGroupName(grupoId) {
-        const groupNames = {
-            '1': 'Queijos',
-            '2': 'Molhos',
-            '3': 'Vegetais'
-        };
-        return groupNames[grupoId] || 'Grupo';
-    }
-
-    removeGroup(grupoId) {
-        this.selectedGroups = this.selectedGroups.filter(id => id !== grupoId);
-        this.updateSelectedGroupsDisplay();
-    }
 
     saveProduct() {
         if (this.validateCurrentPart()) {
@@ -1120,11 +1059,22 @@ class ProdutoFormManager {
     }
 
     closeModal() {
-        const modal = document.querySelector('#modal-produto');
-        if (modal) {
-            modal.style.display = 'none';
+        // Usar sistema centralizado de modais
+        if (typeof window.fecharModal === 'function') {
+            window.fecharModal('modal-produto');
+        } else {
+            console.error('Função fecharModal não encontrada');
         }
         this.resetForm();
+    }
+
+    openModal() {
+        // Usar sistema centralizado de modais
+        if (typeof window.abrirModal === 'function') {
+            window.abrirModal('modal-produto');
+        } else {
+            console.error('Função abrirModal não encontrada');
+        }
     }
 
     resetForm() {

@@ -467,10 +467,12 @@
 
                 <div class="info">
                     <div style="display: flex; flex-direction: column;">
-                        <p class="config">Itens das categorias do cardápio</p>
-                        <p class="descricao">Cadastre, edite, exclua e reorganize seus itens das categorias do cardápio
+                        <p class="config">Grupos de adicionais de produtos do cardápio</p>
+                        <p class="descricao">Cadastre, edite, exclua e organize grupos de adicionais de produtos do cardápio para facilitar a seleção de adicionais por parte do cliente
                         </p>
                     </div>
+
+                    <button id="btn-grupos-adicionais">Acessar</button>
                 </div>
             </div>
 
@@ -797,26 +799,23 @@
                         <h3>Informações básicas</h3>
 
                         <div class="div-input">
-                            <label for="nome-produto">Nome do item <span class="required" aria-label="obrigatório">*</span></label>
+                            <label for="nome-produto">Nome do item</label>
                             <input type="text" id="nome-produto" name="nome-produto" autocomplete="off" required aria-describedby="nome-produto-help">
-                            <small id="nome-produto-help" class="help-text">Digite o nome do produto</small>
                         </div>
 
                         <div class="div-input">
                             <label for="descricao-produto">Descrição</label>
                             <textarea id="descricao-produto" name="descricao-produto" rows="3" aria-describedby="descricao-produto-help"></textarea>
-                            <small id="descricao-produto-help" class="help-text">Descreva o produto</small>
-                        </div>
-
-                        <div class="div-input">
-                            <label for="preco-produto">Preço de Venda <span class="required" aria-label="obrigatório">*</span></label>
-                            <input type="text" id="preco-produto" name="preco-produto" autocomplete="off" required aria-describedby="preco-produto-help">
-                            <small id="preco-produto-help" class="help-text">Digite o preço em reais</small>
                         </div>
 
                         <div class="campos-linha">
                             <div class="div-input">
-                                <label for="categoria-produto">Categorias <span class="required" aria-label="obrigatório">*</span></label>
+                                <label for="tempo-preparo-produto">Tempo de Preparo (minutos)</label>
+                                <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto" min="1" max="999" autocomplete="off" aria-describedby="tempo-preparo-help">
+                            </div>
+
+                            <div class="div-input">
+                                <label for="categoria-produto">Categoria</label>
                                 <select id="categoria-produto" name="categoria-produto" required aria-describedby="categoria-produto-help">
                                     <option value="">Selecione uma categoria</option>
                                     <option value="burguer">Burguer</option>
@@ -824,74 +823,62 @@
                                     <option value="bebida">Bebida</option>
                                     <option value="sobremesa">Sobremesa</option>
                                 </select>
-                                <small id="categoria-produto-help" class="help-text">Escolha a categoria do produto</small>
-                            </div>
-
-                            <div class="div-input">
-                                <label for="tempo-preparo-produto">Tempo de Preparo (min)</label>
-                                <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto" min="1" max="999" autocomplete="off" aria-describedby="tempo-preparo-help">
-                                <small id="tempo-preparo-help" class="help-text">Tempo estimado em minutos</small>
                             </div>
                         </div>
+
+                            <div class="div-input">
+                                <label for="preco-produto">Preço de Venda</label>
+                                <input type="text" id="preco-produto" name="preco-produto" autocomplete="off" required aria-describedby="preco-produto-help">
+                            </div>
                     </fieldset>
                 </div>
 
+                <!-- Parte 2: Receita e Extras -->
                 <div class="parte-formulario" id="parte-receita" style="display: none;" role="tabpanel" aria-labelledby="tab-receita" aria-expanded="false">
-                    <fieldset class="secao-receita">
-                        <legend class="sr-only">Receita do produto</legend>
-                        <h3>Receita</h3>
-
-                        <div class="ingredientes-receita" role="list" aria-label="Lista de ingredientes da receita">
-                            <!-- Os ingredientes serão adicionados dinamicamente -->
-                        </div>
-
-                        <div class="adicionar-ingrediente-form">
-                            <div class="div-input">
-                                <label for="ingrediente-select">Ingrediente</label>
-                                <select id="ingrediente-select" name="ingrediente-select" autocomplete="off" aria-describedby="ingrediente-select-help">
-                                    <option value="">Selecione um ingrediente</option>
-                                </select>
-                                <small id="ingrediente-select-help" class="help-text">Escolha um ingrediente da lista</small>
-                            </div>
-
-                            <div class="campos-linha ingredientes-quantidade">
-                                <div class="div-input">
-                                    <label for="quantidade-porcoes-ingrediente">Número de porções</label>
-                                    <input type="number" id="quantidade-porcoes-ingrediente" name="quantidade-porcoes-ingrediente" min="0.1" step="0.1" autocomplete="off" aria-describedby="quantidade-porcoes-help">
-                                    <small id="quantidade-porcoes-help" class="help-text">Quantidade de porções necessárias</small>
-                                </div>
-
-                                <div class="div-input">
-                                    <label for="info-porcao-ingrediente">Porção</label>
-                                    <input type="text" id="info-porcao-ingrediente" name="info-porcao-ingrediente" autocomplete="off" readonly aria-describedby="info-porcao-help">
-                                    <small id="info-porcao-help" class="help-text">Informação da porção base</small>
+                    <div class="secoes-grid">
+                        <!-- Seção de Receita -->
+                        <fieldset class="secao-receita">
+                            <legend class="sr-only">Receita do produto</legend>
+                            
+                            <div class="header-secao-receita">
+                                <h3><i class="fa-solid fa-list-check"></i> Receita do Produto</h3>
+                                <div class="custo-receita">
+                                    <span class="label-custo">Custo Estimado:</span>
+                                    <span id="custo-estimado" class="valor-custo" aria-label="Custo estimado">R$ 0,00</span>
                                 </div>
                             </div>
-                            <button type="button" class="btn-adicionar-ingrediente" id="btn-adicionar-ingrediente" aria-label="Adicionar ingrediente à receita">
+
+                            <div class="ingredientes-receita" role="list" aria-label="Lista de ingredientes da receita">
+                                <!-- Os ingredientes serão adicionados dinamicamente -->
+                            </div>
+
+                            <button type="button" class="btn-adicionar-ingrediente-receita" id="btn-adicionar-ingrediente-receita" aria-label="Adicionar ingrediente à receita">
                                 <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                                <span>Adicionar ingrediente</span>
+                                <span>Adicionar Ingrediente</span>
                             </button>
-                        </div>
+                        </fieldset>
 
-                        <div class="custo-receita">
-                            <h4>Custo Estimado da Receita:</h4>
-                            <span id="custo-estimado" aria-label="Custo estimado">R$ 0,00</span>
-                        </div>
-                    </fieldset>
+                        <!-- Seção de Extras -->
+                        <fieldset class="secao-extras">
+                            <legend class="sr-only">Adicionais extras do produto</legend>
+                            <h3><i class="fa-solid fa-layer-group"></i> Insumos extras</h3>
+                            
+                            <div class="grupos-extras" id="lista-extras-produto" role="list" aria-label="Lista de insumos extras do produto">
+                                <p class="empty-message">Nenhum insumo extra adicionado</p>
+                            </div>
 
-                    <fieldset class="secao-extras">
-                        <legend class="sr-only">Adicionais extras do produto</legend>
-                        <h3>Adicionais Extras</h3>
-                        
-                        <div class="grupos-extras" role="list" aria-label="Lista de grupos de extras selecionados">
-                            <!-- Grupos de extras serão adicionados dinamicamente -->
-                        </div>
-
-                        <button type="button" class="btn-adicionar-grupo" id="btn-adicionar-grupo" aria-label="Abrir modal para selecionar grupos de extras">
-                            <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                            <span>Adicionar grupo de insumos extras</span>
-                        </button>
-                    </fieldset>
+                            <div class="campos-linha">
+                                <button type="button" class="btn-adicionar-insumo-extra" id="btn-adicionar-insumo-extra" aria-label="Adicionar insumos extras individuais">
+                                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                    <span>Adicionar Insumos Extras</span>
+                                </button>
+                                <button type="button" class="btn-adicionar-grupo" id="btn-adicionar-grupo" aria-label="Adicionar grupos de insumos extras">
+                                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                                    <span>Selecionar Grupos de Insumos</span>
+                                </button>
+                            </div>
+                        </fieldset>
+                    </div>
                 </div>
             </div>
 
@@ -910,6 +897,58 @@
                 <button type="button" class="btn-adicionar" id="salvar-produto" style="display: none;" aria-label="Salvar produto">
                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
                     <span id="texto-botao">Adicionar item</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar/Editar Ingrediente da Receita -->
+    <div id="modal-ingrediente-receita" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-ingrediente-receita">
+            <div class="header-modal">
+                <h2 id="titulo-modal-ingrediente-receita">Adicionar Ingrediente à Receita</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-ingrediente-receita"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input">
+                    <label for="ingrediente-select-modal">Ingrediente</label>
+                    <select id="ingrediente-select-modal" name="ingrediente-select-modal" autocomplete="off" required aria-describedby="ingrediente-select-help">
+                        <option value="">Selecione um ingrediente</option>
+                        <!-- Ingredientes serão carregados dinamicamente -->
+                    </select>
+                </div>
+
+                <div class="campos-linha">
+                    <div class="div-input">
+                        <label for="quantidade-porcoes-ingrediente-modal">Número de porções</label>
+                        <input type="number" id="quantidade-porcoes-ingrediente-modal" name="quantidade-porcoes-ingrediente-modal" min="0.1" step="0.1" autocomplete="off" required aria-describedby="quantidade-porcoes-help">
+                    </div>
+
+                    <div class="div-input">
+                        <label for="info-porcao-ingrediente-modal">Porção base</label>
+                        <input type="text" id="info-porcao-ingrediente-modal" name="info-porcao-ingrediente-modal" autocomplete="off" readonly aria-describedby="info-porcao-help">
+                    </div>
+                </div>
+
+                <div class="info-custo-ingrediente">
+                    <div class="info-row">
+                        <span class="label-info">Custo por porção:</span>
+                        <span id="custo-por-porcao-modal" class="valor-info">R$ 0,00</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label-info">Custo total:</span>
+                        <span id="custo-total-modal" class="valor-info destaque">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button type="button" class="btn-cancelar" data-close-modal="modal-ingrediente-receita">Cancelar</button>
+                <button type="button" class="btn-salvar" id="salvar-ingrediente-receita">
+                    <i class="fa-solid fa-check"></i>
+                    <span id="texto-btn-salvar-ingrediente">Adicionar</span>
                 </button>
             </div>
         </div>
@@ -1250,6 +1289,206 @@
             <div class="footer-modal">
                 <button class="btn-cancelar" id="cancelar-produtos">Cancelar</button>
                 <button class="btn-salvar" id="adicionar-produtos">Adicionar Selecionados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Grupos de Insumos Extras -->
+    <div id="modal-grupos-insumos" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-grupos-insumos">
+            <div class="header-modal">
+                <h2>Grupos de Insumos Extras</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="lista-grupos-insumos" id="lista-grupos-insumos">
+                    <!-- Grupos serão gerados dinamicamente -->
+                </div>
+
+                <button class="btn-adicionar-grupo-insumo" id="btn-adicionar-grupo-insumo">
+                    <i class="fa-solid fa-plus"></i>
+                    Adicionar Grupo
+                </button>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-grupos-insumos">Cancelar</button>
+                <button class="btn-salvar" id="salvar-grupos-insumos">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Insumos do Grupo -->
+    <div id="modal-insumos-grupo" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-insumos-grupo">
+            <div class="header-modal">
+                <h2 id="titulo-insumos-grupo">Insumos do Grupo</h2>
+                <button class="btn-voltar" id="voltar-grupos-insumos">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Voltar
+                </button>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="lista-insumos-grupo" id="lista-insumos-grupo">
+                    <!-- Insumos serão gerados dinamicamente -->
+                </div>
+
+                <button class="btn-adicionar-insumo-grupo" id="btn-adicionar-insumo-grupo">
+                    <i class="fa-solid fa-plus"></i>
+                    Adicionar Insumo
+                </button>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-insumos-grupo">Cancelar</button>
+                <button class="btn-salvar" id="salvar-insumos-grupo">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar/Editar Grupo de Insumos -->
+    <div id="modal-grupo-insumo-form" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-grupo-insumo-form">
+            <div class="header-modal">
+                <h2 id="titulo-grupo-insumo-form">Adicionar Grupo</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input">
+                    <label for="nome-grupo-insumo-input">Nome do grupo</label>
+                    <input type="text" id="nome-grupo-insumo-input" name="nome-grupo-insumo-input" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-grupo-insumo-form">Cancelar</button>
+                <button class="btn-salvar" id="salvar-grupo-insumo-form">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seleção de Insumos -->
+    <div id="modal-selecao-insumos" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-selecao-insumos">
+            <div class="header-modal">
+                <h2>Selecionar Insumos</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="filtros-insumos">
+                    <div class="div-input">
+                        <label for="busca-insumo-modal">Buscar insumo</label>
+                        <input type="text" id="busca-insumo-modal" name="busca-insumo-modal" autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="lista-insumos-selecao" id="lista-insumos-selecao">
+                    <!-- Insumos serão gerados dinamicamente -->
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-selecao-insumos">Cancelar</button>
+                <button class="btn-salvar" id="adicionar-insumos-selecionados">Adicionar Selecionados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar Insumos Extras ao Produto -->
+    <div id="modal-insumos-extras-produto" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-selecao-insumos">
+            <div class="header-modal">
+                <h2>Adicionar Insumos Extras</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="filtros-insumos">
+                    <div class="div-input">
+                        <label for="busca-insumo-extra-produto">Buscar insumo</label>
+                        <input type="text" id="busca-insumo-extra-produto" name="busca-insumo-extra-produto" autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="lista-insumos-selecao" id="lista-insumos-extras-produto">
+                    <!-- Insumos serão gerados dinamicamente -->
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-insumos-extras-produto">Cancelar</button>
+                <button class="btn-salvar" id="adicionar-insumos-extras-produto">Adicionar Selecionados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seleção de Grupos de Extras para Produto -->
+    <div id="modal-grupos-extras-produto" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-grupos-insumos">
+            <div class="header-modal">
+                <h2>Selecionar Grupos de Extras</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="config-padrao-grupo">
+                    <h4>Configuração Padrão</h4>
+                    <div class="campos-linha">
+                        <div class="div-input">
+                            <label for="grupo-min-padrao">Quantidade Mínima</label>
+                            <input type="number" id="grupo-min-padrao" min="0" value="0" autocomplete="off">
+                        </div>
+                        <div class="div-input">
+                            <label for="grupo-max-padrao">Quantidade Máxima</label>
+                            <input type="number" id="grupo-max-padrao" min="0" value="1" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lista-grupos-insumos" id="lista-grupos-extras-produto">
+                    <!-- Grupos serão gerados dinamicamente -->
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-grupos-extras-produto">Cancelar</button>
+                <button class="btn-salvar" id="adicionar-grupos-extras-produto">Adicionar Grupos</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configurar Regras do Extra -->
+    <div id="modal-config-extra" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-grupo-insumo-form">
+            <div class="header-modal">
+                <h2 id="titulo-config-extra">Configurar Regras do Extra</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <p id="nome-insumo-config-extra" style="font-weight: 600; margin-bottom: 15px;"></p>
+                
+                <div class="div-input">
+                    <label for="extra-min-quantity">Quantidade Mínima</label>
+                    <input type="number" id="extra-min-quantity" min="0" value="0" autocomplete="off">
+                    <small class="form-text">Quantidade mínima que o cliente deve escolher</small>
+                </div>
+
+                <div class="div-input">
+                    <label for="extra-max-quantity">Quantidade Máxima</label>
+                    <input type="number" id="extra-max-quantity" min="0" value="1" autocomplete="off">
+                    <small class="form-text">Quantidade máxima que o cliente pode escolher</small>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-config-extra">Cancelar</button>
+                <button class="btn-salvar" id="salvar-config-extra">Salvar</button>
             </div>
         </div>
     </div>

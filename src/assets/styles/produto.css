@@ -27,6 +27,7 @@
         }
 
         & img {
+            box-shadow: var(--box-shadow);
             height: 480px;
             width: 550px;
             background-repeat: no-repeat;
@@ -124,12 +125,12 @@
         width: 780px;
 
         & #nome-produto {
-            font-size: 60px;
+            font-size: 2.5rem;
             font-weight: normal;
         }
 
         & #descricao-produto {
-            font-size: 14px;
+            font-size: 1.2rem;
             color: var(--color-texto-light);
             padding-right: 60px;
         }
@@ -228,6 +229,7 @@
                 justify-content: center;
                 align-items: center;
                 margin: 0 auto;
+            position: relative;
 
                 &:hover {
                     background-color: rgb(55, 55, 55);
@@ -236,6 +238,23 @@
                 &:active {
                     background-color: rgb(147, 147, 147);
                 }
+
+            & .extras-badge {
+                position: absolute;
+                top: -6px;
+                left: -6px;
+                background: var(--color-primary);
+                color: var(--color-texto-black);
+                border-radius: 999px;
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: 700;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            }
             }
         }
 
@@ -243,7 +262,10 @@
             width: 100%;
 
             & .div-input {
-                position: relative;
+
+                & label {
+                    background-color: var(--color-background);
+                }
 
                 & .limite {
                     position: absolute;
@@ -257,5 +279,161 @@
             }
         }
 
+    }
+}
+
+/* Estilos para modal de extras */
+#modal-extras {
+    .modal-contet {
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+
+        & .header {
+            text-align: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e9ecef;
+
+            & i {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+            }
+
+            & h2 {
+                font-size: 24px;
+                margin: 0 0 10px 0;
+                color: var(--color-texto-black);
+            }
+
+            & p {
+                font-size: 14px;
+                color: var(--color-texto-light);
+                margin: 0;
+            }
+        }
+
+        & .modal-body {
+            overflow-y: auto;
+            max-height: 50vh;
+        }
+
+        & .rolagem-modal {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+
+            & .item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px;
+                border: 1px solid #e9ecef;
+                border-radius: 8px;
+                background-color: #f8f9fa;
+
+                & .item-adicional-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+
+                    & .nome-adicional {
+                        font-size: 1rem;
+                        font-weight: 500;
+                        color: var(--color-texto-black);
+                    }
+
+                    & .preco-adicional {
+                        font-size: 0.9rem;
+                        font-weight: 400;
+                        color: var(--color-texto-light);
+                    }
+                }
+
+                & .quantidade {
+                    background-color: #ECECEC;
+                    border-radius: 5px;
+                    padding: 5px 10px;
+                    gap: 20px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    min-width: 100px;
+
+                    & i {
+                        font-size: 10px;
+                        color: var(--color-secondary);
+                        cursor: pointer;
+
+                        &:hover {
+                            color: #be0000;
+                        }
+
+                        &.dessativo {
+                            color: #cccccc;
+                            cursor: not-allowed;
+                            pointer-events: none;
+                        }
+                    }
+
+                    & p {
+                        font-size: 14px;
+                        color: var(--color-texto-black);
+                        min-width: 25px;
+                        text-align: center;
+                    }
+                }
+            }
+        }
+
+        /* Footer da modal (código direto) */
+        & .footer-modal {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+
+            & .btn-cancelar,
+            & .btn-salvar {
+                padding: 10px 20px;
+                border-radius: 6px;
+                font-size: 0.95rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                border: none;
+            }
+
+            & .btn-cancelar {
+                background-color: #f3f4f6;
+                color: var(--color-texto-black);
+
+                &:hover {
+                    background-color: #e5e7eb;
+                }
+            }
+
+            & .btn-salvar {
+                background-color: var(--color-primary);
+                color: var(--color-texto-black);
+
+                &:hover {
+                    background-color: #ffd700;
+                    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+                }
+            }
+        }
+    }
+
+    & .sem-extras {
+        text-align: center;
+        padding: 30px;
+        color: var(--color-texto-light);
+        font-size: 14px;
     }
 }

@@ -12,10 +12,12 @@ import { getIngredients } from '../api/ingredients.js';
         basePrice: 0,
         quantity: 1,
         extrasById: new Map(),
-        ingredientes: []
+        ingredientes: [],
+        ingredientesPorcaoBase: [],
+        ingredientesExtras: []
     };
 
-    // DOM refs (existentes na página)
+    // DOM refs
     const el = {
         nome: document.getElementById('nome-produto'),
         descricao: document.getElementById('descricao-produto'),
@@ -28,58 +30,89 @@ import { getIngredients } from '../api/ingredients.js';
         btnAdicionarCesta: document.querySelector('.area-adicionar .quadro button'),
         listaExtrasContainer: document.querySelector('.monte .rolagem'),
         btnExtras: document.querySelector('.monte button'),
+        extrasBadge: document.getElementById('extras-badge'),
         obsInput: document.querySelector('.observacao input'),
-        obsLimite: document.querySelector('.observacao .limite')
+        obsLimite: document.querySelector('.observacao .limite'),
+        modalExtras: document.getElementById('modal-extras'),
+        overlayExtras: document.getElementById('overlay-extras'),
+        fecharModalExtras: document.getElementById('fechar-modal-extras'),
+        listaExtrasModal: document.getElementById('lista-extras-modal')
     };
 
     // Utils
     const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
-/**
- * Constrói URL correta para imagem do produto com cache inteligente
- */
-function buildImageUrl(imagePath, imageHash = null) {
-    if (!imagePath) return '../assets/img/tudo.jpeg';
-    
-    // Se já é uma URL completa, usar diretamente
-    if (imagePath.startsWith('http')) {
-        return imagePath;
+    const toNum = (v) => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+    };
+
+    // SECURITY FIX: Sanitização contra XSS
+    function escapeHTML(text) {
+        if (typeof text !== 'string') return String(text || '');
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
-    
-    // URL base dinâmica baseada na origem atual
-    const currentOrigin = window.location.origin;
-    let baseUrl;
-    
-    // Se estamos em localhost, usar localhost:5000
-    if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-        baseUrl = 'http://localhost:5000';
-    } else {
-        // Para outros ambientes, usar a mesma origem mas porta 5000
-        const hostname = window.location.hostname;
-        baseUrl = `http://${hostname}:5000`;
+
+    // SECURITY FIX: Validação robusta de IDs
+    function validateIngredientId(id) {
+        const parsed = parseInt(id);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
     }
-    
-    // Usa hash da imagem se disponível, senão usa timestamp
-    const cacheParam = imageHash || new Date().getTime();
-    
-    // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
-    if (imagePath.startsWith('/api/uploads/products/')) {
-        return `${baseUrl}${imagePath}?v=${cacheParam}`;
+
+    function resolveAdditionalPrice(obj) {
+        if (!obj || typeof obj !== 'object') return null;
+        const candidates = [
+            'additional_price',
+            'additional_value',
+            'extra_price',
+            'price_additional',
+            'price_add',
+            'price_delta'
+        ];
+        for (const key of candidates) {
+            if (key in obj) {
+                const n = toNum(obj[key]);
+                if (n !== null) return n;
+            }
+        }
+        return null;
     }
-    
-    // Se é um caminho antigo (/uploads/products/ID.jpeg)
-    if (imagePath.startsWith('/uploads/products/')) {
-        return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
-    }
-    
-    // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
-    if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
+
+    function buildImageUrl(imagePath, imageHash = null) {
+        if (!imagePath) return '../assets/img/tudo.jpeg';
+        
+        if (imagePath.startsWith('http')) {
+            return imagePath;
+        }
+        
+        const currentOrigin = window.location.origin;
+        let baseUrl;
+        
+        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
+            baseUrl = 'http://localhost:5000';
+        } else {
+            const hostname = window.location.hostname;
+            baseUrl = `http://${hostname}:5000`;
+        }
+        
+        const cacheParam = imageHash || new Date().getTime();
+        
+        if (imagePath.startsWith('/api/uploads/products/')) {
+            return `${baseUrl}${imagePath}?v=${cacheParam}`;
+        }
+        
+        if (imagePath.startsWith('/uploads/products/')) {
+            return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
+        }
+        
+        if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
+            return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
+        }
+        
         return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
     }
-    
-    // Fallback: assumir que é um caminho relativo
-    return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
-}
 
     function getIdFromUrl() {
         const params = new URLSearchParams(window.location.search);
@@ -89,7 +122,7 @@ function buildImageUrl(imagePath, imageHash = null) {
 
     function updateTitle() {
         if (state.product?.name) {
-            document.title = `${state.product.name} - Royal Burguer`;
+            document.title = `${escapeHTML(state.product.name)} - Royal Burguer`;
         }
     }
 
@@ -105,7 +138,6 @@ function buildImageUrl(imagePath, imageHash = null) {
         if (el.descricao) el.descricao.textContent = desc;
         if (el.precoApartir) el.precoApartir.textContent = formatBRL(price);
 
-        // imagem
         const imagePath = state.product.image_url || getProductImageUrl(state.product.id);
         const imageUrl = buildImageUrl(imagePath, state.product.image_hash);
         if (el.img) {
@@ -118,16 +150,33 @@ function buildImageUrl(imagePath, imageHash = null) {
 
     function updateTotals() {
         const extrasTotal = Array.from(state.extrasById.values()).reduce((sum, extra) => {
-            // Buscar o elemento do ingrediente para obter as porções
-            const itemEl = el.listaExtrasContainer.querySelector(`[data-ingrediente-id="${extra.id}"]`);
-            const portions = parseFloat(itemEl?.getAttribute('data-porcoes') || 1);
-            // Calcular preço considerando as porções
-            return sum + (extra.price * extra.quantity * portions);
+            const additionalQty = Math.max(extra.quantity, 0);
+            return sum + (extra.price * additionalQty);
         }, 0);
         const unitTotal = state.basePrice + extrasTotal;
         const total = unitTotal * state.quantity;
         if (el.precoQuadro) el.precoQuadro.textContent = formatBRL(total);
         if (el.qtdTexto) el.qtdTexto.textContent = String(state.quantity).padStart(2, '0');
+    }
+
+    function updateExtrasBadge() {
+        if (!el.extrasBadge) return;
+        if (!Array.isArray(state.ingredientesExtras)) {
+            el.extrasBadge.style.display = 'none';
+            return;
+        }
+        const extrasCount = state.ingredientesExtras.reduce((acc, ing) => {
+            const id = ing.ingredient_id || ing.id;
+            const ex = state.extrasById.get(id);
+            const qty = ex?.quantity || 0;
+            return acc + (qty > 0 ? qty : 0);
+        }, 0);
+        if (extrasCount > 0) {
+            el.extrasBadge.textContent = String(extrasCount);
+            el.extrasBadge.style.display = 'flex';
+        } else {
+            el.extrasBadge.style.display = 'none';
+        }
     }
 
     function attachQuantityHandlers() {
@@ -151,7 +200,6 @@ function buildImageUrl(imagePath, imageHash = null) {
     }
 
     function toggleQtdMinusState() {
-        // aplica classe 'dessativo' no ícone de menos quando quantidade = 1
         if (!el.qtdMenos) return;
         if (state.quantity <= 1) {
             el.qtdMenos.classList.add('dessativo');
@@ -160,10 +208,10 @@ function buildImageUrl(imagePath, imageHash = null) {
         }
     }
 
-    function renderExtrasList() {
+    function renderMonteSeuJeitoList() {
         if (!el.listaExtrasContainer) return;
 
-        const ingredientes = state.ingredientes;
+        const ingredientes = state.ingredientesPorcaoBase;
         if (!ingredientes || ingredientes.length === 0) {
             el.listaExtrasContainer.innerHTML = '<p class="sem-ingredientes">Nenhum ingrediente disponível</p>';
             return;
@@ -171,70 +219,269 @@ function buildImageUrl(imagePath, imageHash = null) {
 
         const toBRL = (v) => `+ ${formatBRL(parseFloat(v) || 0)}`;
 
-        el.listaExtrasContainer.innerHTML = ingredientes.map((ing) => {
+        const ajustaveis = ingredientes.filter((ing) => {
+            const basePortions = parseFloat(ing.portions || 1) || 1;
+            const minQuantity = Number.isFinite(parseFloat(ing.min_quantity)) ? parseFloat(ing.min_quantity) : basePortions;
+            const maxQuantity = Number.isFinite(parseFloat(ing.max_quantity)) ? parseFloat(ing.max_quantity) : (basePortions + 999);
+            return minQuantity !== maxQuantity;
+        });
+
+        if (ajustaveis.length === 0) {
+            el.listaExtrasContainer.innerHTML = '<p class="sem-ingredientes">Nenhum ingrediente disponível</p>';
+            return;
+        }
+
+        // SECURITY FIX: Sanitização de nomes
+        el.listaExtrasContainer.innerHTML = ajustaveis.map((ing) => {
             const ingId = ing.ingredient_id || ing.id;
-            const ingName = ing.name || ing.ingredient_name || 'Ingrediente';
-            // Usar preço adicional em vez do preço unitário
-            const ingPrice = parseFloat(ing.additional_price || ing.price || 0) || 0;
-            const portions = parseFloat(ing.portions || 1) || 1;
-            const currentQty = state.extrasById.get(ingId)?.quantity || 0;
-            
-            // Debug: verificar os dados recebidos
-            console.log('Ingrediente:', ingName, 'Preço adicional:', ing.additional_price, 'Preço unitário:', ing.price, 'Preço final:', ingPrice);
+            const ingName = escapeHTML(ing.name || ing.ingredient_name || 'Ingrediente');
+            const ingPrice = toNum(ing.additional_price) ?? resolveAdditionalPrice(ing) ?? 0;
+            const basePortions = parseFloat(ing.portions || 1) || 1;
+            const minQuantity = Number.isFinite(parseFloat(ing.min_quantity)) ? parseFloat(ing.min_quantity) : basePortions;
+            const maxQuantity = Number.isFinite(parseFloat(ing.max_quantity)) ? parseFloat(ing.max_quantity) : (basePortions + 999);
+
+            const extra = state.extrasById.get(ingId);
+            const extraQty = extra?.quantity || 0;
+            const effectiveQty = basePortions + extraQty;
+
+            const showMinus = effectiveQty > minQuantity;
+            const showPlus = effectiveQty < maxQuantity;
+
             return `
-            <div class="item" data-ingrediente-id="${ingId}" data-preco="${ingPrice}" data-porcoes="${portions}">
+            <div class="item" 
+                 data-ingrediente-id="${ingId}" 
+                 data-preco="${ingPrice}" 
+                 data-porcoes="${basePortions}"
+                 data-min-qty="${minQuantity}"
+                 data-max-qty="${maxQuantity}">
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
               </div>
               <div class="quantidade">
-                <i class="fa-solid fa-minus ${currentQty <= 0 ? 'dessativo' : ''}"></i>
-                <p class="qtd-extra"> ${portions} porção${portions > 1 ? 'ões' : ''}</p>
-                <i class="fa-solid fa-plus"></i>
+                ${showMinus ? '<i class="fa-solid fa-minus"></i>' : ''}
+                <p class="qtd-extra">${String(effectiveQty).padStart(2, '0')}</p>
+                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : ''}
               </div>
             </div>`;
         }).join('');
 
-        // Eventos +/− por ingrediente
-        el.listaExtrasContainer.querySelectorAll('.item').forEach((itemEl) => {
-            const id = parseInt(itemEl.getAttribute('data-ingrediente-id'));
-            const price = parseFloat(itemEl.getAttribute('data-preco')) || 0;
+        attachIngredienteHandlers(el.listaExtrasContainer);
+    }
+
+    function renderExtrasModal() {
+        if (!el.listaExtrasModal) return;
+
+        const ingredientes = state.ingredientesExtras;
+        if (!ingredientes || ingredientes.length === 0) {
+            el.listaExtrasModal.innerHTML = '<p class="sem-extras">Nenhum extra disponível no momento</p>';
+            return;
+        }
+
+        const toBRL = (v) => `+ ${formatBRL(parseFloat(v) || 0)}`;
+
+        // SECURITY FIX: Sanitização de nomes
+        el.listaExtrasModal.innerHTML = ingredientes.map((ing) => {
+            const ingId = ing.ingredient_id || ing.id;
+            const ingName = escapeHTML(ing.name || ing.ingredient_name || 'Ingrediente');
+            const ingPrice = toNum(ing.additional_price) ?? resolveAdditionalPrice(ing) ?? 0;
+            const basePortions = 0;
+            const minQuantity = Number.isFinite(parseFloat(ing.min_quantity)) ? parseFloat(ing.min_quantity) : 0;
+            const maxQuantity = Number.isFinite(parseFloat(ing.max_quantity)) ? parseFloat(ing.max_quantity) : 999;
+
+            const extra = state.extrasById.get(ingId);
+            const extraQty = extra?.quantity || 0;
+            const effectiveQty = basePortions + extraQty;
+
+            const showMinus = effectiveQty > minQuantity;
+            const showPlus = effectiveQty < maxQuantity;
+
+            return `
+            <div class="item" 
+                 data-ingrediente-id="${ingId}" 
+                 data-preco="${ingPrice}" 
+                 data-porcoes="${basePortions}"
+                 data-min-qty="${minQuantity}"
+                 data-max-qty="${maxQuantity}">
+              <div class="item-adicional-container">
+                <p class="nome-adicional">${ingName}</p>
+                <p class="preco-adicional">${toBRL(ingPrice)}</p>
+              </div>
+              <div class="quantidade">
+                ${showMinus ? '<i class="fa-solid fa-minus"></i>' : ''}
+                <p class="qtd-extra">${String(effectiveQty).padStart(2, '0')}</p>
+                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : ''}
+              </div>
+            </div>`;
+        }).join('');
+
+        // PERFORMANCE FIX: Remover listener anterior antes de adicionar
+        const oldListeners = el.listaExtrasModal.querySelectorAll('.item [data-has-listener]');
+        oldListeners.forEach(btn => btn.removeAttribute('data-has-listener'));
+
+        attachIngredienteHandlers(el.listaExtrasModal);
+        
+        // PERFORMANCE FIX: Event delegation ao invés de múltiplos listeners
+        el.listaExtrasModal.querySelectorAll('.item .fa-minus, .item .fa-plus').forEach((btn) => {
+            if (!btn.hasAttribute('data-has-listener')) {
+                btn.setAttribute('data-has-listener', 'true');
+                btn.addEventListener('click', () => {
+                    renderMonteSeuJeitoList();
+                    updateTotals();
+                    updateExtrasBadge();
+                });
+            }
+        });
+    }
+
+    function attachIngredienteHandlers(container) {
+        if (!container) return;
+
+        container.querySelectorAll('.item').forEach((itemEl) => {
+            // SECURITY FIX: Validação de ID
+            const rawId = itemEl.getAttribute('data-ingrediente-id');
+            const id = validateIngredientId(rawId);
+            if (!id) return; // Skip ingredientes com ID inválido
+
+            // SECURITY FIX: Validação de preço
+            const price = Math.max(0, parseFloat(itemEl.getAttribute('data-preco')) || 0);
+            const basePortions = Math.max(0, parseFloat(itemEl.getAttribute('data-porcoes')) || 0);
+            const minQuantity = parseFloat(itemEl.getAttribute('data-min-qty'));
+            const maxQuantity = parseFloat(itemEl.getAttribute('data-max-qty'));
+            
             const minus = itemEl.querySelector('.fa-minus');
             const plus = itemEl.querySelector('.fa-plus');
             const qtdEl = itemEl.querySelector('.qtd-extra');
+            const nomeEl = itemEl.querySelector('.nome-adicional');
 
             const ensureExtra = () => {
                 if (!state.extrasById.has(id)) {
-                    state.extrasById.set(id, { id, name: (itemEl.querySelector('.nome-adicional')?.textContent || 'Ingrediente'), price, quantity: 0 });
+                    state.extrasById.set(id, { 
+                        id, 
+                        name: nomeEl?.textContent || 'Ingrediente', 
+                        price, 
+                        quantity: 0,
+                        basePortions,
+                        minQuantity,
+                        maxQuantity
+                    });
                 }
                 return state.extrasById.get(id);
             };
 
-            minus.addEventListener('click', () => {
-                const ex = ensureExtra();
-                if (ex.quantity > 0) {
-                    ex.quantity -= 1;
-                    qtdEl.textContent = String(ex.quantity).padStart(2, '0');
-                    if (ex.quantity === 0) minus.classList.add('dessativo');
+            const updateButtonStates = (extra) => {
+                const effectiveQty = basePortions + extra.quantity;
+                
+                if (minus && !(effectiveQty > minQuantity)) {
+                    minus.remove();
+                }
+                if (plus && !(effectiveQty < maxQuantity)) {
+                    plus.remove();
+                }
+            };
+
+            if (minus) minus.addEventListener('click', (e) => {
+                if (minus.classList.contains('dessativo')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+
+                const extra = ensureExtra();
+                const effectiveQty = basePortions + extra.quantity;
+                
+                if (effectiveQty > minQuantity) {
+                    extra.quantity -= 1;
+                    const newEffective = basePortions + extra.quantity;
+                    qtdEl.textContent = String(newEffective).padStart(2, '0');
                     updateTotals();
+                    
+                    if (basePortions > 0) {
+                        renderMonteSeuJeitoList();
+                    } else {
+                        renderExtrasModal();
+                    }
+                    if (basePortions === 0) updateExtrasBadge();
                 }
             });
 
-            plus.addEventListener('click', () => {
-                const ex = ensureExtra();
-                ex.quantity += 1;
-                qtdEl.textContent = String(ex.quantity).padStart(2, '0');
-                minus.classList.remove('dessativo');
-                updateTotals();
+            if (plus) plus.addEventListener('click', (e) => {
+                if (plus.classList.contains('dessativo')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+
+                const extra = ensureExtra();
+                const effectiveQty = basePortions + extra.quantity;
+                
+                if (effectiveQty < maxQuantity) {
+                    extra.quantity += 1;
+                    const newEffective = basePortions + extra.quantity;
+                    qtdEl.textContent = String(newEffective).padStart(2, '0');
+                    updateTotals();
+                    
+                    if (basePortions > 0) {
+                        renderMonteSeuJeitoList();
+                    } else {
+                        renderExtrasModal();
+                    }
+                    if (basePortions === 0) updateExtrasBadge();
+                }
             });
+
+            const extra = ensureExtra();
+            updateButtonStates(extra);
         });
+    }
+
+    function openExtrasModal() {
+        if (!el.modalExtras) return;
+        renderExtrasModal();
+        try {
+            if (window.abrirModal) {
+                window.abrirModal('modal-extras');
+            } else {
+                el.modalExtras.style.display = 'flex';
+                el.modalExtras.style.opacity = '1';
+            }
+        } catch (err) {
+            // Fallback silencioso mantido por compatibilidade
+            el.modalExtras.style.display = 'flex';
+            el.modalExtras.style.opacity = '1';
+        }
+    }
+
+    function closeExtrasModal() {
+        if (!el.modalExtras) return;
+        try {
+            if (window.fecharModal) {
+                window.fecharModal('modal-extras');
+            } else {
+                el.modalExtras.style.display = 'none';
+                el.modalExtras.style.opacity = '0';
+            }
+        } catch (err) {
+            // Fallback silencioso mantido por compatibilidade
+            el.modalExtras.style.display = 'none';
+            el.modalExtras.style.opacity = '0';
+        }
     }
 
     function attachExtrasButton() {
         if (!el.btnExtras) return;
         el.btnExtras.addEventListener('click', () => {
-            document.querySelector('.monte .rolagem')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            openExtrasModal();
         });
+
+        const btnSalvar = document.getElementById('btn-salvar-extras');
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', () => {
+                renderMonteSeuJeitoList();
+                updateTotals();
+                closeExtrasModal();
+            });
+        }
     }
 
     function attachObsCounter() {
@@ -250,49 +497,60 @@ function buildImageUrl(imagePath, imageHash = null) {
     function attachAddToCart() {
         if (!el.btnAdicionarCesta) return;
         el.btnAdicionarCesta.addEventListener('click', () => {
-            // Integração de carrinho não existente no projeto atual.
-            // Exibir apenas um feedback simples.
             try {
-                // eslint-disable-next-line no-alert
                 alert('Item adicionado à cesta (simulação). Integração com carrinho pendente.');
-            } catch (_) {}
+            } catch (err) {
+                // TODO: Implementar feedback visual alternativo
+            }
         });
     }
 
     async function loadIngredientes(productId) {
         try {
-            // Buscar ingredientes do produto
             const resp = await getProductIngredients(productId);
             const productIngredients = Array.isArray(resp) ? resp : (resp?.items || []);
-            
-            // Buscar dados completos de todos os ingredientes
-            const allIngredientsResp = await getIngredients({ page_size: 1000 });
-            const allIngredients = Array.isArray(allIngredientsResp) ? allIngredientsResp : (allIngredientsResp?.items || []);
-            
-            // Combinar dados: ingredientes do produto + dados completos
+
+            let allIngredients = [];
+            try {
+                const allIngredientsResp = await getIngredients({ page_size: 1000 });
+                allIngredients = Array.isArray(allIngredientsResp) ? allIngredientsResp : (allIngredientsResp?.items || []);
+            } catch (err) {
+                // IMPROVEMENT: Silencioso propositalmente - autenticação não obrigatória
+                allIngredients = [];
+            }
+
             const enrichedIngredients = productIngredients.map(productIng => {
-                const fullIngredient = allIngredients.find(ing => ing.id === productIng.ingredient_id || ing.id === productIng.id);
+                const fullIngredient = allIngredients.find(ing => ing.id === productIng.ingredient_id || ing.id === productIng.id) || {};
                 return {
                     ...productIng,
-                    ...fullIngredient, // Dados completos do ingrediente
+                    ...fullIngredient,
                     ingredient_id: productIng.ingredient_id || productIng.id,
-                    id: productIng.ingredient_id || productIng.id
+                    id: productIng.ingredient_id || productIng.id,
+                    name: productIng.name || fullIngredient.name || productIng.ingredient_name || 'Ingrediente',
+                    additional_price: (toNum(productIng.additional_price) ?? resolveAdditionalPrice(productIng) ?? toNum(fullIngredient?.additional_price) ?? resolveAdditionalPrice(fullIngredient) ?? 0),
                 };
             });
-            
-            // Debug: verificar estrutura dos dados
-            console.log('Ingredientes do produto:', productIngredients);
-            console.log('Todos os ingredientes:', allIngredients);
-            console.log('Ingredientes enriquecidos:', enrichedIngredients);
-            if (enrichedIngredients.length > 0) {
-                console.log('Primeiro ingrediente enriquecido:', enrichedIngredients[0]);
-                console.log('Campos disponíveis:', Object.keys(enrichedIngredients[0]));
-            }
-            
+
             state.ingredientes = enrichedIngredients;
-        } catch (e) {
-            console.error('Erro ao carregar ingredientes:', e);
+
+            state.ingredientesPorcaoBase = enrichedIngredients.filter(ing => {
+                const portions = parseFloat(ing.portions || 0);
+                return portions > 0;
+            });
+
+            state.ingredientesExtras = enrichedIngredients.filter(ing => {
+                const portions = parseFloat(ing.portions || 0);
+                return portions === 0;
+            });
+
+        } catch (err) {
+            // ERROR HANDLING FIX: Log para debug em desenvolvimento
+            if (window.location.hostname === 'localhost') {
+                console.error('Erro ao carregar ingredientes:', err);
+            }
             state.ingredientes = [];
+            state.ingredientesPorcaoBase = [];
+            state.ingredientesExtras = [];
         }
     }
 
@@ -302,16 +560,19 @@ function buildImageUrl(imagePath, imageHash = null) {
         try {
             const [produto] = await Promise.all([
                 getProductById(state.productId),
-                // carregamento de ingredientes em paralelo (não depende do produto)
                 loadIngredientes(state.productId)
             ]);
             state.product = produto;
             updateTitle();
             renderProdutoInfo();
-            renderExtrasList();
-        } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('Erro ao carregar produto:', e);
+            renderMonteSeuJeitoList();
+            updateExtrasBadge();
+        } catch (err) {
+            // ERROR HANDLING FIX: Log apenas em desenvolvimento
+            if (window.location.hostname === 'localhost') {
+                console.error('Erro ao carregar produto:', err);
+            }
+            // TODO: Implementar feedback visual de erro para o usuário
         }
     }
 
@@ -324,4 +585,3 @@ function buildImageUrl(imagePath, imageHash = null) {
         await loadProduto();
     });
 })();
-

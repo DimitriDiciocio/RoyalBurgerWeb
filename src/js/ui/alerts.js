@@ -39,7 +39,7 @@ function ensureMessageModels() {
                         <div class="icon-msg-sucess-text"><p></p></div>
                     </div>
                     <div class="icon-msg-aviso" style="display:none">
-                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        <i class="fa-solid fa-damation-triangle"></i>
                         <div class="icon-msg-aviso-text"><p></p></div>
                     </div>
                     <div class="icon-msg-info" style="display:none">

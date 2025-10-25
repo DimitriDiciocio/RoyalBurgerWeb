@@ -83,7 +83,6 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
     }
 
     try {
-
         const response = await fetch(url, {
             method,
             headers: baseHeaders,

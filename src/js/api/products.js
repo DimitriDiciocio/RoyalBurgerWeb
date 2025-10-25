@@ -74,11 +74,15 @@ export const createProduct = async (productData) => {
         if (productData.preparation_time_minutes) formData.append('preparation_time_minutes', productData.preparation_time_minutes);
         if (productData.category_id) formData.append('category_id', productData.category_id);
         
+        // Adiciona ingredientes se fornecidos (como JSON string)
+        if (productData.ingredients && Array.isArray(productData.ingredients)) {
+            formData.append('ingredients', JSON.stringify(productData.ingredients));
+        }
+        
         // Adiciona imagem (o backend gerará o image_url automaticamente)
         if (productData.image) {
             formData.append('image', productData.image);
         }
-        
         
         return await apiRequest('/api/products/', {
             method: 'POST',
@@ -86,7 +90,6 @@ export const createProduct = async (productData) => {
             headers: {} // Remove Content-Type para FormData
         });
     } else {
-        
         return await apiRequest('/api/products/', {
             method: 'POST',
             body: JSON.stringify(productData)
@@ -102,14 +105,20 @@ export const createProduct = async (productData) => {
  * @returns {Promise<Object>} Resultado da atualização
  */
 export const updateProduct = async (productId, updateData) => {
-    
     // Sempre usa FormData para atualizações
     const formData = new FormData();
     
     // Adiciona campos de texto
     Object.keys(updateData).forEach(key => {
-        if (key !== 'image' && updateData[key] !== undefined) {
-            formData.append(key, updateData[key]);
+        if (key !== 'image' && updateData[key] !== undefined && updateData[key] !== null) {
+            // Para arrays/objects, converte para JSON string
+            if (typeof updateData[key] === 'object' && !Array.isArray(updateData[key])) {
+                formData.append(key, JSON.stringify(updateData[key]));
+            } else if (Array.isArray(updateData[key])) {
+                formData.append(key, JSON.stringify(updateData[key]));
+            } else {
+                formData.append(key, updateData[key]);
+            }
         }
     });
     
@@ -355,7 +364,14 @@ export const updateProductWithImage = async (productId, productData, imageFile =
         // Adiciona dados do produto
         Object.keys(productData).forEach(key => {
             if (productData[key] !== null && productData[key] !== undefined) {
-                formData.append(key, productData[key]);
+                // Para arrays/objects, converte para JSON string
+                if (typeof productData[key] === 'object' && !Array.isArray(productData[key])) {
+                    formData.append(key, JSON.stringify(productData[key]));
+                } else if (Array.isArray(productData[key])) {
+                    formData.append(key, JSON.stringify(productData[key]));
+                } else {
+                    formData.append(key, productData[key]);
+                }
             }
         });
         

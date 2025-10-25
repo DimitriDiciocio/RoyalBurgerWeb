@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="../assets/styles/global.css">
   <link rel="stylesheet" href="../assets/styles/footer.css">
   <link rel="stylesheet" href="../assets/styles/produto.css">
+  <link rel="stylesheet" href="../assets/styles/modais.css">
   <link rel="stylesheet" href="../assets/styles/mensagens.css">
   <!-- js sistema -->
   <script src="../js/utils.js" type="module" defer></script>
@@ -18,6 +19,7 @@
   <script src="../js/ui/header.js" type="module" defer></script>
   <script src="../js/ui/alerts.js" type="module" defer></script>
   <script src="../js/ui/log-cadas.js" type="module" defer></script>
+  <script src="../js/ui/modais.js" type="module"></script>
   <script src="../js/ui/produto.js" type="module" defer></script>
     <!-- js complementares -->
   <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
@@ -67,99 +69,12 @@
           <p>Monte do seu jeito!</p>
 
           <div class="rolagem">
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
+                      </div>
 
-              <div class="quantidade">
-                <i class="fa-solid fa-minus dessativo"></i>
-                <p id="quantidade">01</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-
-            <div class="item">
-              <div class="item-adicional-container">
-                <p class="nome-adicional">Item produtor</p>
-                <p class="preco-adicional">+ R$ 0.00</p>
-              </div>
-
-              <div class="quantidade">
-                <i class="fa-solid fa-minus"></i>
-                <p id="quantidade">02</p>
-                <i class="fa-solid fa-plus"></i>
-              </div>
-            </div>
-          </div>
-
-          <button>Adicionar extras</button>
+          <button data-open-modal="modal-extras">
+            Adicionar extras
+            <span class="extras-badge" id="extras-badge" style="display: none;">0</span>
+          </button>
 
         </div>
 
@@ -178,6 +93,28 @@
 
   <!-- importare footer -->
   <div id="footer-container"></div>
+
+  <!-- Modal de Extras -->
+  <div id="modal-extras" class="modal" style="display: none;">
+    <div class="div-overlay" id="overlay-extras" data-close-modal="modal-extras"></div>
+    <div class="modal-contet">
+      <div class="header">
+        <i class="fa-solid fa-xmark" id="fechar-modal-extras" data-close-modal="modal-extras"></i>
+        <h2>Adicionar Extras</h2>
+        <p>Personalize seu pedido com ingredientes extras</p>
+      </div>
+      
+      <div class="modal-body">
+        <div id="lista-extras-modal" class="rolagem-modal">
+          <!-- Será preenchido dinamicamente -->
+        </div>
+      </div>
+      <div class="footer-modal">
+        <button id="btn-cancelar-extras" class="btn-cancelar" data-close-modal="modal-extras">Cancelar</button>
+        <button id="btn-salvar-extras" class="btn-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

@@ -453,7 +453,8 @@ class CategoriaManager {
             </div>
             
             <div class="acoes-categoria">
-                <button id="btn-acessar-itens" class="btn-acao btn-itens gerenciar-itens" title="Gerenciar itens"> Acessar itens
+                <button id="btn-acessar-itens" class="btn-acao btn-itens gerenciar-itens" title="Gerenciar itens"> 
+                    Acessar produtos
                     <i class="fa-solid fa-list"></i>
                 </button>
                 <button id="btn-editar-categoria" class="btn-acao btn-editar editar-categoria" title="Editar categoria">
