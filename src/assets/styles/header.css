@@ -119,69 +119,51 @@ header {
       align-items: center;
       gap: 20px;
 
-      & .cesta {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid var(--color-primary);
-        border-radius: 15px;
-        padding: 10px 25px;
-        cursor: pointer;
-        user-select: none;
-
-        & i {
-          font-size: 14px;
-          color: var(--color-texto-black);
-          margin-right: 10px;
-        }
-
-        & .total {
-          font-size: 8px;
-          font-weight: bolder;
-          color: var(--color-texto-light);
-        }
-
-        & .valor {
-          display: flex;
-          align-items: center;
-
-          & #preco {
-            font-size: 8px;
-          }
-
-          & #itens {
-            font-size: 8px;
-            color: var(--color-texto-erased);
-          }
-        }
-      }
 
       & .pontos-royal {
         display: flex;
         align-items: center;
         user-select: none;
         cursor: pointer;
+        padding: 6px 12px;
+        border-radius: 20px;
+        background-color: rgba(255, 199, 0, 0.1);
+        border: 1px solid rgba(255, 199, 0, 0.3);
+        transition: all 0.3s ease;
 
         & i {
           color: var(--color-primary);
-          font-size: 14px;
-          margin-right: 5px;
+          font-size: 16px;
+          margin-right: 6px;
         }
 
         & p {
           color: var(--color-primary);
           font-size: 14px;
+          font-weight: 600;
         }
       }
 
-      & .pontos-royal:hover i,
-      & .pontos-royal:hover p {
-        color: #d8aa00;
+      & .pontos-royal:hover {
+        background-color: rgba(255, 199, 0, 0.2);
+        border-color: var(--color-primary);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(255, 199, 0, 0.3);
+
+        & i,
+        & p {
+          color: #d8aa00;
+        }
       }
 
-      & .pontos-royal:active i,
-      & .pontos-royal:active p {
-        color: #ffdb58;
+      & .pontos-royal:active {
+        transform: translateY(0);
+        background-color: rgba(255, 199, 0, 0.3);
+
+        & i,
+        & p {
+          color: #ffdb58;
+        }
       }
 
       & .endereco {
@@ -348,7 +330,7 @@ header.header-logged-out {
   display: none !important;
 }
 
-/* Customer: mostrar cesta, pontos, endereço e ícone do perfil */
+/* Customer: mostrar pontos, endereço e ícone do perfil */
 .header-profile-customer .user-element-customer {
   display: flex !important;
 }
@@ -514,7 +496,6 @@ header.header-logged-out {
   /* Mobile: esconder itens extras e manter apenas logo, hambúrguer e ícone da conta */
   /* Deixar a decisão do que aparece para o JS conforme estado (logado/deslogado) */
 
-  header #user-header #user .cesta,
   header #user-header #user .pontos-royal,
   header #user-header #user .endereco,
   header #user-header #user .sep {
@@ -537,9 +518,6 @@ header.header-logged-out {
     flex-wrap: wrap;
   }
 
-  header #user-header #user .cesta {
-    padding: 8px 14px;
-  }
 }
 
 @media (max-width: 480px) {

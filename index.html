@@ -12,12 +12,16 @@
   <link rel="stylesheet" href="src/assets/styles/global.css">
   <link rel="stylesheet" href="src/assets/styles/footer.css">
   <link rel="stylesheet" href="src/assets/styles/inicio.css">
+  <link rel="stylesheet" href="src/assets/styles/cesta.css">
+  <link rel="stylesheet" href="src/assets/styles/modais.css">
   <link rel="stylesheet" href="src/assets/styles/mensagens.css">
   <!-- js sistema -->
   <script src="src/js/utils.js" type="module" defer></script>
   <script src="src/js/ui/imports.js" type="module" defer></script>
   <script src="src/js/ui/header.js" type="module" defer></script>
   <script src="src/js/ui/alerts.js" type="module" defer></script>
+  <script src="src/js/ui/modais.js" type="module" defer></script>
+  <script src="src/js/ui/cesta.js" type="module" defer></script>
   <script src="src/js/ui/home.js" type="module" defer></script>
   <!-- js complementares -->
   <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
@@ -83,6 +87,86 @@
   </main>
   <!-- importare footer -->
   <div id="footer-container"></div>
+
+  <!-- Botão Flutuante da Cesta -->
+  <button id="btn-cesta-flutuante" class="btn-cesta-flutuante" style="display: none;" data-open-modal="modal-cesta">
+    <div class="cesta-badge" id="cesta-badge-count">0</div>
+    <i class="fa-solid fa-basket-shopping"></i>
+    <div class="cesta-info">
+      <span class="cesta-label">Ver Cesta</span>
+      <span class="cesta-valor" id="cesta-valor-flutuante">R$ 0,00</span>
+    </div>
+  </button>
+
+  <!-- Modal da Cesta -->
+  <div id="modal-cesta" class="modal-cesta" style="display: none;">
+    <div class="modal-cesta-content">
+      <div class="modal-cesta-header">
+        <button class="btn-close-modal" data-close-modal="modal-cesta" aria-label="Fechar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <h2>
+          <i class="fa-solid fa-crown" style="color: #ffc107; margin-right: 0.5rem; font-size: 1.2rem;"></i>
+          Cesta
+        </h2>
+        <button class="btn-limpar-cesta" id="btn-limpar-cesta">Limpar</button>
+      </div>
+
+      <div class="modal-cesta-body">
+        <!-- Cesta Vazia -->
+        <div id="cesta-vazia-modal" class="cesta-vazia-modal" style="display: none;">
+          <i class="fa-solid fa-basket-shopping"></i>
+          <p>Sua cesta está vazia</p>
+        </div>
+
+        <!-- Itens da Cesta -->
+        <div id="cesta-items-container" class="cesta-items-container">
+          <h3>Itens adicionados</h3>
+          <div id="lista-itens-modal" class="lista-itens-modal">
+            <!-- Itens serão renderizados aqui -->
+          </div>
+        </div>
+
+        <!-- Resumo de Valores -->
+        <div id="cesta-resumo-container" class="cesta-resumo-container">
+          <h3>Resumo de valores</h3>
+          <div class="resumo-valores">
+            <div class="resumo-linha">
+              <span>Subtotal</span>
+              <span id="modal-subtotal">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span>Taxa de entrega</span>
+              <span id="modal-taxa-entrega">R$ 5,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span>Taxa de serviço</span>
+              <span id="modal-taxa-servico">R$ 1,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span>Descontos</span>
+              <span id="modal-descontos">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha total-linha">
+              <div class="total-linha-container">
+                <span>Total</span>
+                <span id="modal-total">R$ 0,00</span>
+              </div>
+              <p class="pontos-info">Nessa compra, você ganhará <strong id="modal-pontos">0</strong> pontos Royal</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-cesta-footer">
+        <div class="footer-total">
+          <span>Total</span>
+          <span id="modal-footer-total">R$ 0,00</span>
+        </div>
+        <button class="btn-continuar" id="btn-continuar-modal">Continuar</button>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

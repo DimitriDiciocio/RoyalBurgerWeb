@@ -161,7 +161,7 @@
 .modelo-alert-modal{
     position: fixed;
     inset: 0;
-    z-index: 1000;
+    z-index: 10000;
 }
 .modelo-alert-modal .modal-o{
     position: absolute;

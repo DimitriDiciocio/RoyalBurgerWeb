@@ -52,7 +52,7 @@ main{
         }
     }
 
-    & .conteudo-1{
+    & .conteudo-principal{
         padding: 40px 10vh;
         min-height: 80vh;
         display: flex;
@@ -69,11 +69,11 @@ main{
             position: relative;
             gap: 10px;
             width: 18vw;
+            height: fit-content;
 
             & .txt1 {
                 font-size: 1.1rem;
                 font-weight: 600;
-
                 display: flex;
                 justify-content: center;
             }
@@ -83,7 +83,6 @@ main{
                 flex-direction: row;
                 justify-content: center;
                 align-items: center;
-
                 gap: 10px;
                 font-size: 1.7rem;
                 margin: 20px 0px;
@@ -123,115 +122,182 @@ main{
             }
         }
 
-        & .informa{
-            user-select: none;
+        & .secao-explicacao {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            width: 60vw;
 
-            & .titulo{
-                display: flex;
-                gap: 20px;
-                align-items: center;
-
-                & i{
-                    font-size: 0.8rem;
-                    color: var(--color-texto-erased);
-                }
-
-                & p{
-                    font-size: 1.2rem;
-                    color: var(--color-texto-black);
-                    font-weight: 600;
-                }
-            }
-
-            & .descricao{
-                border-left: 2px solid var(--color-texto-erased);
-                color: var(--color-texto-light);
-                padding-left: 20px;
-                margin-left: 6px;
-                width: 40vw;
-            }
-        }
-    }
-
-    & .conteudo-2{
-        padding: 40px 20vh;
-        min-height: 80vh;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-
-        & .vencimento{
-            font-size: 0.9rem;
-            font-weight: 300;
-            text-align: center;
-            color: #888888;
-
-            & span {
-                font-weight: 600;
-            }
-        }
-
-        & .quandro{
-            display: flex;
-            flex-direction: column;
-            box-shadow: var(--box-shadow);
-            border-radius: var(--border-radius);
-
-            & .faixa{
-                background-color: var(--color-primary);
-                width: 100%;
-                border-radius: 10px 10px 0px 0px;
-
-                & i{
-                    padding: 10px;
-                    color: var(--cor-div-primary);
-                }
-            }
-
-            & .texto{
+            & .informa{
+                user-select: none;
                 display: flex;
                 flex-direction: column;
-                padding: 10px 50px;
                 gap: 10px;
 
-                & .informa{
-                    font-size: 1rem;
-                    color: var(--color-texto-black);
-                    font-weight: 600;
+                & .titulo{
+                    display: flex;
+                    gap: 20px;
+                    align-items: center;
 
-                    & span{
-                        color: var(--color-primary);
+                    & i{
+                        font-size: 0.8rem;
+                        color: var(--color-texto-erased);
+                    }
+
+                    & p{
+                        font-size: 1.2rem;
+                        color: var(--color-texto-black);
+                        font-weight: 600;
                     }
                 }
 
                 & .descricao{
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    color: #888888;
-                    font-size: 0.8rem;
-
-                    & .escuro{
-                        font-weight: 600;
-                    }
-
-                    & .claro{
-                        font-weight: 400;
-                        display: flex;
-                        justify-content: end;
-                        width: 50%;
-                    }
+                    border-left: 2px solid var(--color-texto-erased);
+                    color: var(--color-texto-light);
+                    padding-left: 20px;
+                    margin-left: 6px;
+                    width: 100%;
                 }
             }
+        }
+
+        & .secao-historico {
+            display: flex;
+            flex-direction: column;
+            width: 60vw;
+            gap: 20px;
+
+            & .vencimento{
+                font-size: 0.9rem;
+                font-weight: 300;
+                text-align: center;
+                color: #888888;
+                margin-bottom: 10px;
+
+                & span {
+                    font-weight: 600;
+                    color: var(--color-primary);
+                }
+            }
+
+            & #historico-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 20px;
+                width: 100%;
+            }
+        }
+    }
+
+    /* Estilos para cards do histórico */
+    & .quandro{
+        width: 400px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--box-shadow);
+        border-radius: var(--border-radius);
+        background: var(--cor-div-primary);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        height: fit-content;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        & .faixa{
+            background-color: var(--color-primary);
+            width: 100%;
+            border-radius: 10px 10px 0px 0px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+
+            & i{
+                padding: 10px;
+                color: var(--cor-div-primary);
+                font-size: 1.2rem;
+            }
+        }
+
+        & .texto{
+            display: flex;
+            flex-direction: column;
+            padding: 20px 30px;
+            gap: 15px;
+
+            & .informa{
+                font-size: 1rem;
+                color: var(--color-texto-black);
+                font-weight: 600;
+                line-height: 1.4;
+
+                & span{
+                    color: var(--color-primary);
+                    font-weight: 700;
+                }
+            }
+
+            & .descricao{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                color: #888888;
+                font-size: 0.85rem;
+                flex-wrap: wrap;
+                gap: 10px;
+
+                & .escuro{
+                    font-weight: 600;
+                    color: var(--color-texto-black);
+                }
+
+                & .claro{
+                    font-weight: 400;
+                    display: flex;
+                    justify-content: end;
+                    width: 50%;
+                    color: var(--color-texto-erased);
+                }
+            }
+        }
+    }
+
+    /* Estilo para histórico vazio */
+    & .historico-vazio {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-texto-erased);
+
+        & i {
+            font-size: 3rem;
+            color: var(--color-primary);
+            margin-bottom: 20px;
+        }
+
+        & p {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        & .descricao {
+            font-size: 0.9rem;
+            color: var(--color-texto-light);
         }
     }
 }
 
 @media (max-width: 1440px) {
-
+    main {
+        & .conteudo-principal {
+            & .secao-historico {
+                & #historico-container {
+                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                    gap: 15px;
+                }
+            }
+        }
+    }
 }
 
 @media (max-width: 1280px) {
@@ -252,7 +318,7 @@ main{
             }
         }
 
-        & .conteudo-1{
+        & .conteudo-principal{
             padding: 30px 5vh;
             min-height: 0vh;
             display: flex;
@@ -267,7 +333,6 @@ main{
                 & .txt1 {
                     font-size: 1.1rem;
                     font-weight: 600;
-
                     display: flex;
                     justify-content: center;
                 }
@@ -277,7 +342,6 @@ main{
                     flex-direction: row;
                     justify-content: center;
                     align-items: center;
-
                     gap: 10px;
                     font-size: 1.7rem;
                     margin: 20px 0px;
@@ -296,29 +360,42 @@ main{
                 }
             }
 
-            & .informa{
-                margin-top: 20px;
-                gap: 10px;
+            & .secao-explicacao {
+                width: 50vw;
 
-                & .titulo{
-                    display: flex;
-                    gap: 20px;
-                    align-items: center;
+                & .informa{
+                    margin-top: 20px;
+                    gap: 10px;
 
-                    & i{
-                        font-size: 0.7rem;
+                    & .titulo{
+                        display: flex;
+                        gap: 20px;
+                        align-items: center;
+
+                        & i{
+                            font-size: 0.7rem;
+                        }
+
+                        & p{
+                            font-size: 1rem;
+                        }
                     }
 
-                    & p{
-                        font-size: 1rem;
+                    & .descricao{
+                        font-size: 0.9rem;
+                        padding-left: 20px;
+                        margin-left: 6px;
+                        width: 100%;
                     }
                 }
+            }
 
-                & .descricao{
-                    font-size: 0.9rem;
-                    padding-left: 20px;
-                    margin-left: 6px;
-                    width: 40vw;
+            & .secao-historico {
+                width: 50vw;
+
+                & #historico-container {
+                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    gap: 15px;
                 }
             }
         }
@@ -326,6 +403,19 @@ main{
 }
 
 @media (max-width: 1024px) {
+    main {
+        & .conteudo-principal {
+            & .secao-historico {
+                & #historico-container {
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 12px;
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 900px) {
     main{
         padding: 68px 0vh 68px 0vh;
 
@@ -343,7 +433,7 @@ main{
             }
         }
 
-        & .conteudo-1{
+        & .conteudo-principal{
             padding: 30px 5vh;
             min-height: 0vh;
             display: flex;
@@ -358,7 +448,6 @@ main{
                 & .txt1 {
                     font-size: 1.1rem;
                     font-weight: 600;
-
                     display: flex;
                     justify-content: center;
                 }
@@ -368,7 +457,6 @@ main{
                     flex-direction: row;
                     justify-content: center;
                     align-items: center;
-
                     gap: 10px;
                     font-size: 1.7rem;
                     margin: 20px 0px;
@@ -408,29 +496,42 @@ main{
                 }
             }
 
-            & .informa{
-                margin-top: 20px;
-                gap: 10px;
+            & .secao-explicacao {
+                width: 50vw;
 
-                & .titulo{
-                    display: flex;
-                    gap: 20px;
-                    align-items: center;
+                & .informa{
+                    margin-top: 20px;
+                    gap: 10px;
 
-                    & i{
-                        font-size: 0.7rem;
+                    & .titulo{
+                        display: flex;
+                        gap: 20px;
+                        align-items: center;
+
+                        & i{
+                            font-size: 0.7rem;
+                        }
+
+                        & p{
+                            font-size: 1rem;
+                        }
                     }
 
-                    & p{
-                        font-size: 1rem;
+                    & .descricao{
+                        font-size: 0.9rem;
+                        padding-left: 20px;
+                        margin-left: 6px;
+                        width: 100%;
                     }
                 }
+            }
 
-                & .descricao{
-                    font-size: 0.9rem;
-                    padding-left: 20px;
-                    margin-left: 6px;
-                    width: 40vw;
+            & .secao-historico {
+                width: 50vw;
+
+                & #historico-container {
+                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    gap: 15px;
                 }
             }
         }
@@ -453,15 +554,23 @@ main{
                 }
 
                 & .texto{
-                    padding: 10px 15px;
-                    gap: 10px;
+                    padding: 15px 20px;
+                    gap: 12px;
 
                     & .informa{
                         font-size: 0.9rem;
                     }
 
                     & .descricao{
-                        font-size: 0.7rem;
+                        font-size: 0.75rem;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 5px;
+
+                        & .claro {
+                            width: 100%;
+                            justify-content: flex-start;
+                        }
                     }
                 }
             }
@@ -487,7 +596,7 @@ main{
             }
         }
 
-        & .conteudo-1{
+        & .conteudo-principal{
             padding: 0px 5vh;
             min-height: 0vh;
             display: flex;
@@ -502,7 +611,6 @@ main{
                 & .txt1 {
                     font-size: 1.1rem;
                     font-weight: 600;
-
                     display: flex;
                     justify-content: center;
                 }
@@ -512,7 +620,6 @@ main{
                     flex-direction: row;
                     justify-content: center;
                     align-items: center;
-
                     gap: 10px;
                     font-size: 1.7rem;
                     margin: 20px 0px;
@@ -552,29 +659,42 @@ main{
                 }
             }
 
-            & .informa{
-                margin-top: 20px;
-                gap: 10px;
+            & .secao-explicacao {
+                width: 80vw;
 
-                & .titulo{
-                    display: flex;
-                    gap: 20px;
-                    align-items: center;
+                & .informa{
+                    margin-top: 20px;
+                    gap: 10px;
 
-                    & i{
-                        font-size: 0.7rem;
+                    & .titulo{
+                        display: flex;
+                        gap: 20px;
+                        align-items: center;
+
+                        & i{
+                            font-size: 0.7rem;
+                        }
+
+                        & p{
+                            font-size: 1rem;
+                        }
                     }
 
-                    & p{
-                        font-size: 1rem;
+                    & .descricao{
+                        font-size: 0.9rem;
+                        padding-left: 20px;
+                        margin-left: 6px;
+                        width: 100%;
                     }
                 }
+            }
 
-                & .descricao{
-                    font-size: 0.9rem;
-                    padding-left: 20px;
-                    margin-left: 6px;
-                    width: 80vw;
+            & .secao-historico {
+                width: 80vw;
+
+                & #historico-container {
+                    grid-template-columns: 1fr;
+                    gap: 15px;
                 }
             }
         }
@@ -605,7 +725,15 @@ main{
                     }
 
                     & .descricao{
-                        font-size: 0.7rem;
+                        font-size: 0.75rem;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 5px;
+
+                        & .claro {
+                            width: 100%;
+                            justify-content: flex-start;
+                        }
                     }
                 }
             }
@@ -748,7 +876,15 @@ main{
                     }
 
                     & .descricao{
-                        font-size: 0.7rem;
+                        font-size: 0.75rem;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 5px;
+
+                        & .claro {
+                            width: 100%;
+                            justify-content: flex-start;
+                        }
                     }
                 }
             }
@@ -891,7 +1027,15 @@ main{
                     }
 
                     & .descricao{
-                        font-size: 0.7rem;
+                        font-size: 0.75rem;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 5px;
+
+                        & .claro {
+                            width: 100%;
+                            justify-content: flex-start;
+                        }
                     }
                 }
             }

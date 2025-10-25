@@ -20,6 +20,7 @@
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/modais.js" type="module" defer></script>
+    <script src="../js/ui/clube-royal.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -40,76 +41,67 @@
             </div>
         </section>
         
-        <section class="conteudo-1" style="display: flex;">
+        <section class="conteudo-principal">
+            <!-- Quadro de pontos fixo -->
             <div class="quadro-pontos-royal">
                 <p class="txt1">Seus pontos</p>
 
                 <div class="pontos">
                     <i class="fa-solid fa-crown"></i>
-                    <p>100</p>
+                    <p id="pontos-atual">100</p>
                 </div>
 
-                <p class="txt2">Faltam <span>XX</span> dias para seus pontos expirarem</p>
+                <p class="txt2">Faltam <span id="dias-expiram">XX</span> dias para seus pontos expirarem</p>
 
-                <button>Histórico de pontos</button>
+                <button id="btn-alternar">Histórico de pontos</button>
             </div>
 
-            <div class="informa">
-                <div>
-                    <div class="titulo">
-                        <i class="fa-solid fa-circle"></i>
-                        <p>Acumule pontos!</p>
+            <!-- Seção de explicação -->
+            <div class="secao-explicacao" id="secao-explicacao">
+                <div class="informa">
+                    <div>
+                        <div class="titulo">
+                            <i class="fa-solid fa-circle"></i>
+                            <p>Acumule pontos em cada compra!</p>
+                        </div>
+
+                        <p class="descricao">A cada R$ 1,00 que você gasta, ganha 10 pontos Royal automaticamente. Quanto mais você compra, mais pontos acumula!</p>
                     </div>
 
-                    <p class="descricao">Ao finalizar uma compra no app, você receberá a quantia gasta em pontos.</p>
-                </div>
+                    <div>
+                        <div class="titulo">
+                            <i class="fa-solid fa-circle"></i>
+                            <p>Use seus pontos para descontos!</p>
+                        </div>
 
-                <div>
-                    <div class="titulo">
-                        <i class="fa-solid fa-circle"></i>
-                        <p>Compre com descontos!</p>
+                        <p class="descricao">Na finalização do pedido, você pode usar seus pontos para obter descontos reais. 100 pontos = R$ 1,00 de desconto!</p>
                     </div>
 
-                    <p class="descricao">Ao adicionar suas compras à cesta, é possível acionar os pontos e ganhar descontos.</p>
-                </div>
+                    <div>
+                        <div class="titulo">
+                            <i class="fa-solid fa-circle"></i>
+                            <p>Como funciona o sistema?</p>
+                        </div>
 
-                <div>
-                    <div class="titulo">
-                        <i class="fa-solid fa-circle"></i>
-                        <p>Como funciona a conversão?</p>
+                        <p class="descricao">É simples: você gasta dinheiro real e ganha pontos virtuais. Depois usa os pontos para ganhar dinheiro de volta em descontos!</p>
                     </div>
 
-                    <p class="descricao">A cada 1 real gasto no app, você receberá 10 pontos Royal e a cada 100 pontos acumlados, você terá 1 real de desconto.</p>
-                </div>
+                    <div>
+                        <div class="titulo">
+                            <i class="fa-solid fa-circle"></i>
+                            <p>Os pontos expiram?</p>
+                        </div>
 
-                <div>
-                    <div class="titulo">
-                        <i class="fa-solid fa-circle"></i>
-                        <p>Os pontos Royal expiram?</p>
+                        <p class="descricao">Sim, mas não se preocupe! Seus pontos só expiram se você ficar 60 dias sem fazer nenhuma compra. A cada nova compra, todos os pontos se renovam!</p>
                     </div>
-
-                    <p class="descricao">Os pontos Royal expiram após 1 mês da sua última compra. Após realizar uma compra, os pontos se renovam por mais 1 mês.</p>
                 </div>
             </div>
-        </section>
 
-        <section class="conteudo-2" style="display: none;">
-            <p class="vencimento">Seus pontos vencem daqui <span>42</span> dias</p>
-
-            <div class="quandro">
-                <div class="faixa">
-                    <i class="fa-solid fa-crown"></i>
-                </div>
-
-                <div class="texto">
-                    <p class="informa">
-                        Você comprou dois X-Tudão, um X-Bacon e uma Grapete por <span>R$ 108,00</span> e ganhou <span>1080 pontos</span>
-                    </p>
-                    <div class="descricao">
-                        <p class="escuro">R$ 20,00 gastos</p>
-                        <p class="escuro">200 pontos</p>
-                        <p class="claro">Valido até 26/10/2025</p>
-                    </div>
+            <!-- Seção de histórico -->
+            <div class="secao-historico" id="secao-historico" style="display: none;">
+                <p class="vencimento">Seus pontos vencem daqui <span id="vencimento-dias">42</span> dias</p>
+                <div id="historico-container">
+                    <!-- Histórico será renderizado aqui -->
                 </div>
             </div>
         </section>

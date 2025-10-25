@@ -5192,3 +5192,433 @@
     width: 100%;
   }
 }
+
+/* Modal pai - Lista de endereços */
+#modal-enderecos {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+
+  & .div-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+  }
+
+  & .modal-contet {
+    max-width: 500px;
+    width: 90%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    position: relative;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  &.show {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  & .header {
+    & .titulo {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--color-texto-black);
+    }
+
+    & .descricao {
+      font-size: 0.9rem;
+      color: var(--color-texto-erased);
+    }
+  }
+
+  & .footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-direction: row;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+
+    & button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &[data-close-modal] {
+        background-color: #f3f4f6;
+        color: var(--color-texto-black);
+
+        &:hover {
+          background-color: #e5e7eb;
+        }
+      }
+
+      &#btn-adicionar-endereco-modal {
+        background-color: var(--cor-div-secondary );
+        color: var(--color-texto-white);
+
+        &:hover {
+          background-color: #2e2e2e;
+        }
+      }
+    }
+  }
+}
+
+.lista-enderecos-modal {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  & .endereco-item {
+    background-color: var(--cor-div-primary);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    position: relative;
+    padding: 15px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+
+    &:hover {
+      border-color: var(--color-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    &.selecionado {
+      border-color: var(--color-primary);
+      background-color: #fff8e1;
+    }
+
+    &.endereco-padrao {
+      border-color: var(--color-primary);
+
+      & .endereco-info .titulo::after {
+        content: " (Padrão)";
+        color: var(--color-primary);
+        font-weight: 600;
+      }
+    }
+
+    & .endereco-info {
+      display: flex;
+      align-items: center;  
+      gap: 15px;
+
+      & i {
+        color: var(--color-texto-black);
+        font-size: 20px;
+      }
+
+      & .titulo {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+        margin-bottom: 0;
+        color: var(--color-texto-black);
+      }
+      & .descricao {
+        font-size: 14px;
+        font-weight: 400;
+        margin: 0;
+        
+        color: var(--color-texto-erased);
+      }
+      & .endereco-info-content {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      & .endereco-info-content .titulo {
+        color: var(--color-texto-black);
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      & .endereco-info-content .descricao {
+        color: var(--color-texto-erased);
+        font-size: 14px;
+        margin: 0;
+      }
+    }
+
+    & .endereco-actions {
+      display: flex;
+      align-items: center;
+
+      & button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        color: var(--color-primary);
+        transition: all 0.2s ease;
+        padding: 8px;
+        border-radius: 4px;
+
+        &:hover {
+          color: #f7d660;
+          background-color: rgba(255, 199, 0, 0.1);
+        }
+
+        &:active {
+          color: #d2a400;
+        }
+        &.btn-editar {
+          color: var(--color-texto-erased);
+
+          &:hover {
+            color: #d97706;
+            background-color: #fef3c7;
+          }
+        }
+
+
+        & i {
+          font-size: 16px;
+        }
+      }
+    }
+  }
+
+  & .endereco-vazio {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+    background-color: var(--cor-div-primary);
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    text-align: center;
+    gap: 15px;
+
+    & i {
+      font-size: 48px;
+      color: var(--color-texto-erased);
+      margin-bottom: 10px;
+    }
+
+    & h3 {
+      margin: 0;
+      color: var(--color-texto-black);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    & p {
+      margin: 0;
+      color: var(--color-texto-erased);
+      font-size: 14px;
+    }
+    
+    & .btn-adicionar-primeiro {
+      background-color: var(--color-primary);
+      color: var(--color-texto-black);
+      border: none;
+      font-weight: 600;
+      font-size: 16px;
+      border-radius: 8px;
+      padding: 12px 30px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 10px;
+
+      &:hover {
+        background-color: #f7d660;
+      }
+
+      &:active {
+        background-color: #d2a400;
+      }
+    }
+  }
+}
+
+/* Modal filha - Formulário de endereço */
+#modal-endereco-form {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1001;
+
+  & .div-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+  }
+
+  & .modal-contet {
+    max-width: 500px;
+    width: 90%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    position: relative;
+  }
+
+  &.show {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  & .header {
+    & .titulo {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--color-texto-black);
+    }
+
+    & .descricao {
+      font-size: 0.9rem;
+      color: var(--color-texto-erased);
+    }
+  }
+
+  & .footer {
+    display: flex;
+    gap: 10px;
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+
+    & button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+
+      &[data-close-modal] {
+        background-color: #f3f4f6;
+        color: var(--color-texto-black);
+
+        &:hover {
+          background-color: #e5e7eb;
+        }
+      }
+
+      &#btn-salvar-endereco-form {
+        background-color: var(--color-primary);
+        color: var(--color-texto-black);
+
+        &:hover {
+          background: #f7d660;
+        }
+      }
+
+      &#btn-excluir-endereco-form {
+        background-color: #ef4444;
+        color: white;
+
+        &:hover {
+          background-color: #dc2626;
+        }
+      }
+    }
+  }
+}
+
+/* Responsividade para modais de endereços */
+@media (max-width: 768px) {
+  #modal-enderecos .modal-contet,
+  #modal-endereco-form .modal-contet {
+    width: 95%;
+    margin: 20px auto;
+  }
+
+  #modal-enderecos .header,
+  #modal-endereco-form .header {
+    padding: 15px;
+  }
+
+  #modal-enderecos .header .titulo,
+  #modal-endereco-form .header .titulo {
+    font-size: 1.1rem;
+  }
+
+  #modal-enderecos .main,
+  #modal-endereco-form .main {
+    padding: 15px;
+  }
+
+  #modal-enderecos .footer,
+  #modal-endereco-form .footer {
+    padding: 15px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #modal-enderecos .footer button,
+  #modal-endereco-form .footer button {
+    width: 100%;
+  }
+
+  .lista-enderecos-modal {
+    max-height: 300px;
+
+    & .endereco-item {
+      padding: 15px 20px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 15px;
+
+      & .endereco-info {
+        gap: 15px;
+
+        & i {
+          font-size: 20px;
+        }
+      }
+
+      & .endereco-actions {
+        width: 100%;
+        justify-content: flex-end;
+        gap: 10px;
+
+        & button {
+          font-size: 14px;
+          padding: 6px;
+        }
+      }
+    }
+  }
+}

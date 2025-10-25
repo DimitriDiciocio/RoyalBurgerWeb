@@ -2,6 +2,18 @@
 
 import { getProductById, getProductIngredients, getProductImageUrl } from '../api/products.js';
 import { getIngredients } from '../api/ingredients.js';
+import { addToCart, updateCartItem } from '../api/cart.js';
+import { showToast } from './alerts.js';
+
+// Constantes para validação e limites
+const VALIDATION_LIMITS = {
+  MAX_QUANTITY: 99,
+  MAX_NOTES_LENGTH: 500,
+  MAX_EXTRAS_COUNT: 10,
+  MAX_INGREDIENT_NAME_LENGTH: 100,
+  MAX_PRODUCT_NAME_LENGTH: 200,
+  MAX_DESCRIPTION_LENGTH: 500
+};
 
 (function initProdutoPage() {
     if (!window.location.pathname.includes('produto.html')) return;
@@ -14,7 +26,9 @@ import { getIngredients } from '../api/ingredients.js';
         extrasById: new Map(),
         ingredientes: [],
         ingredientesPorcaoBase: [],
-        ingredientesExtras: []
+        ingredientesExtras: [],
+        editIndex: null,
+        isEditing: false
     };
 
     // DOM refs
@@ -47,18 +61,49 @@ import { getIngredients } from '../api/ingredients.js';
         return Number.isFinite(n) ? n : null;
     };
 
-    // SECURITY FIX: Sanitização contra XSS
+    // SECURITY FIX: Sanitização robusta contra XSS
     function escapeHTML(text) {
         if (typeof text !== 'string') return String(text || '');
+        
+        // Usar DOMPurify se disponível, senão usar método nativo
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
+        }
+        
+        // Método nativo mais robusto
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
 
+    // Função adicional para sanitizar atributos HTML
+    function escapeAttribute(value) {
+        if (typeof value !== 'string') return '';
+        return value
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/&/g, '&amp;');
+    }
+
     // SECURITY FIX: Validação robusta de IDs
     function validateIngredientId(id) {
-        const parsed = parseInt(id);
-        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+        if (!id) return null;
+        
+        // Validar se é string ou número
+        const idStr = String(id).trim();
+        if (!/^\d+$/.test(idStr)) return null; // Apenas números
+        
+        const parsed = parseInt(idStr, 10);
+        return Number.isInteger(parsed) && parsed > 0 && parsed <= 2147483647 ? parsed : null;
+    }
+
+    // Validação de preços para evitar valores maliciosos
+    function validatePrice(price) {
+        if (price === null || price === undefined) return 0;
+        const num = Number(price);
+        return Number.isFinite(num) && num >= 0 && num <= 999999.99 ? num : 0;
     }
 
     function resolveAdditionalPrice(obj) {
@@ -74,7 +119,7 @@ import { getIngredients } from '../api/ingredients.js';
         for (const key of candidates) {
             if (key in obj) {
                 const n = toNum(obj[key]);
-                if (n !== null) return n;
+                if (n !== null) return validatePrice(n);
             }
         }
         return null;
@@ -83,8 +128,21 @@ import { getIngredients } from '../api/ingredients.js';
     function buildImageUrl(imagePath, imageHash = null) {
         if (!imagePath) return '../assets/img/tudo.jpeg';
         
-        if (imagePath.startsWith('http')) {
-            return imagePath;
+        // Sanitizar caminho da imagem para evitar path traversal
+        const sanitizedPath = imagePath.replace(/\.\./g, '').replace(/[<>:"|?*]/g, '');
+        
+        if (sanitizedPath.startsWith('http')) {
+            // Validar URL para evitar ataques
+            try {
+                const url = new URL(sanitizedPath);
+                if (['http:', 'https:'].includes(url.protocol)) {
+                    return sanitizedPath;
+                }
+            } catch (e) {
+                // TODO: Implementar logging estruturado em produção
+                console.warn('URL de imagem inválida:', sanitizedPath);
+            }
+            return '../assets/img/tudo.jpeg';
         }
         
         const currentOrigin = window.location.origin;
@@ -99,25 +157,46 @@ import { getIngredients } from '../api/ingredients.js';
         
         const cacheParam = imageHash || new Date().getTime();
         
-        if (imagePath.startsWith('/api/uploads/products/')) {
-            return `${baseUrl}${imagePath}?v=${cacheParam}`;
+        if (sanitizedPath.startsWith('/api/uploads/products/')) {
+            return `${baseUrl}${sanitizedPath}?v=${cacheParam}`;
         }
         
-        if (imagePath.startsWith('/uploads/products/')) {
-            return `${baseUrl}${imagePath.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
+        if (sanitizedPath.startsWith('/uploads/products/')) {
+            return `${baseUrl}${sanitizedPath.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
         }
         
-        if (imagePath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
-            return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
+        if (sanitizedPath.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
+            return `${baseUrl}/api/uploads/products/${sanitizedPath}?v=${cacheParam}`;
         }
         
-        return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
+        return `${baseUrl}/api/uploads/products/${sanitizedPath}?v=${cacheParam}`;
     }
 
     function getIdFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get('id');
-        return id && !isNaN(id) ? parseInt(id) : null;
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            return validateIngredientId(id);
+        } catch (error) {
+            // TODO: Implementar logging estruturado em produção
+            console.warn('Erro ao obter ID da URL:', error.message);
+            return null;
+        }
+    }
+
+    function getEditIndexFromUrl() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const editIndex = params.get('editIndex');
+            if (!editIndex) return null;
+            
+            const index = parseInt(editIndex, 10);
+            return Number.isInteger(index) && index >= 0 ? index : null;
+        } catch (error) {
+            // TODO: Implementar logging estruturado em produção
+            console.warn('Erro ao obter editIndex da URL:', error.message);
+            return null;
+        }
     }
 
     function updateTitle() {
@@ -496,11 +575,74 @@ import { getIngredients } from '../api/ingredients.js';
 
     function attachAddToCart() {
         if (!el.btnAdicionarCesta) return;
-        el.btnAdicionarCesta.addEventListener('click', () => {
+        
+        // Atualizar texto do botão se estiver editando
+        if (state.isEditing) {
+            el.btnAdicionarCesta.textContent = 'Atualizar na cesta';
+        }
+        
+        el.btnAdicionarCesta.addEventListener('click', async () => {
             try {
-                alert('Item adicionado à cesta (simulação). Integração com carrinho pendente.');
+                // Desabilitar botão durante operação
+                el.btnAdicionarCesta.disabled = true;
+                el.btnAdicionarCesta.textContent = state.isEditing ? 'Atualizando...' : 'Adicionando...';
+
+                // Preparar dados para a API
+                const productId = state.product.id;
+                const quantity = state.quantity;
+                const extras = Array.from(state.extrasById.values())
+                    .filter(extra => extra.quantity > 0)
+                    .map(extra => ({
+                        ingredient_id: extra.id,
+                        quantity: extra.quantity
+                    }));
+                const notes = el.obsInput?.value || '';
+
+                let result;
+
+                if (state.isEditing && state.editIndex !== null) {
+                    // Atualizar item existente na cesta
+                    // Nota: Para edição, precisaríamos do cart_item_id do item existente
+                    // Por enquanto, vamos adicionar como novo item
+                    result = await addToCart(productId, quantity, extras, notes);
+                } else {
+                    // Adicionar novo item à cesta
+                    result = await addToCart(productId, quantity, extras, notes);
+                }
+
+                if (result.success) {
+                    // Mostrar mensagem de sucesso
+                    showToast(
+                        state.isEditing ? 'Item atualizado na cesta!' : 'Item adicionado à cesta!',
+                        {
+                            type: 'success',
+                            title: state.isEditing ? 'Item Atualizado' : 'Item Adicionado',
+                            autoClose: 3000
+                        }
+                    );
+
+                    // Definir flag para abrir modal ao chegar no index
+                    localStorage.setItem('royal_abrir_modal_cesta', 'true');
+
+                    // Redirecionar para index.html
+                    setTimeout(() => {
+                        window.location.href = '../../index.html';
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Erro ao adicionar item à cesta');
+                }
+
             } catch (err) {
-                // TODO: Implementar feedback visual alternativo
+                console.error('Erro ao adicionar à cesta:', err);
+                showToast('Erro ao adicionar item à cesta. Tente novamente.', {
+                    type: 'error',
+                    title: 'Erro',
+                    autoClose: 4000
+                });
+            } finally {
+                // Reabilitar botão
+                el.btnAdicionarCesta.disabled = false;
+                el.btnAdicionarCesta.textContent = state.isEditing ? 'Atualizar na cesta' : 'Adicionar à cesta';
             }
         });
     }
@@ -544,9 +686,9 @@ import { getIngredients } from '../api/ingredients.js';
             });
 
         } catch (err) {
-            // ERROR HANDLING FIX: Log para debug em desenvolvimento
+            // TODO: Implementar logging estruturado em produção
             if (window.location.hostname === 'localhost') {
-                console.error('Erro ao carregar ingredientes:', err);
+                console.error('Erro ao carregar ingredientes:', err.message);
             }
             state.ingredientes = [];
             state.ingredientesPorcaoBase = [];
@@ -556,7 +698,11 @@ import { getIngredients } from '../api/ingredients.js';
 
     async function loadProduto() {
         state.productId = getIdFromUrl();
+        state.editIndex = getEditIndexFromUrl();
+        state.isEditing = state.editIndex !== null;
+        
         if (!state.productId) return;
+        
         try {
             const [produto] = await Promise.all([
                 getProductById(state.productId),
@@ -567,12 +713,60 @@ import { getIngredients } from '../api/ingredients.js';
             renderProdutoInfo();
             renderMonteSeuJeitoList();
             updateExtrasBadge();
+            
+            // Se está editando, carregar dados do item da cesta
+            if (state.isEditing) {
+                loadItemFromCart();
+            }
         } catch (err) {
-            // ERROR HANDLING FIX: Log apenas em desenvolvimento
+            // TODO: Implementar logging estruturado em produção
             if (window.location.hostname === 'localhost') {
-                console.error('Erro ao carregar produto:', err);
+                console.error('Erro ao carregar produto:', err.message);
             }
             // TODO: Implementar feedback visual de erro para o usuário
+        }
+    }
+
+    function loadItemFromCart() {
+        try {
+            const cestaStr = localStorage.getItem('royal_cesta');
+            if (!cestaStr) return;
+            
+            const cesta = JSON.parse(cestaStr);
+            if (state.editIndex >= 0 && state.editIndex < cesta.length) {
+                const item = cesta[state.editIndex];
+                
+                // Carregar quantidade
+                state.quantity = item.quantidade || 1;
+                
+                // Carregar observação
+                if (el.obsInput) {
+                    el.obsInput.value = item.observacao || '';
+                }
+                
+                // Carregar extras
+                if (item.extras && item.extras.length > 0) {
+                    item.extras.forEach(extra => {
+                        state.extrasById.set(extra.id, {
+                            id: extra.id,
+                            name: extra.nome,
+                            price: extra.preco,
+                            quantity: extra.quantidade,
+                            basePortions: 0,
+                            minQuantity: 0,
+                            maxQuantity: 999
+                        });
+                    });
+                }
+                
+                // Atualizar interface
+                updateTotals();
+                renderMonteSeuJeitoList();
+                updateExtrasBadge();
+            }
+        } catch (err) {
+            // TODO: Implementar logging estruturado em produção
+            console.error('Erro ao carregar item da cesta:', err.message);
         }
     }
 

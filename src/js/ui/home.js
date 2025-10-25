@@ -3,16 +3,34 @@
  * Carrega produtos e categorias da API e exibe dinamicamente na home
  */
 
-// Cache para produtos e categorias
+// Cache para produtos e categorias com TTL
 let productsCache = null;
 let categoriesCache = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+let cacheTimestamp = 0;
+
+// Constantes para validação e limites
+const VALIDATION_LIMITS = {
+  MAX_PRODUCTS: 1000,
+  MAX_CATEGORIES: 100,
+  MAX_NAME_LENGTH: 200,
+  MAX_DESCRIPTION_LENGTH: 500
+};
 
 /**
  * Limpa o cache de produtos (útil quando produtos são atualizados)
  */
 function clearProductsCache() {
     productsCache = null;
-    console.log('Cache de produtos limpo');
+    categoriesCache = null;
+    cacheTimestamp = 0;
+}
+
+/**
+ * Verifica se o cache ainda é válido
+ */
+function isCacheValid() {
+    return productsCache && categoriesCache && (Date.now() - cacheTimestamp) < CACHE_TTL;
 }
 
 /**
@@ -20,30 +38,35 @@ function clearProductsCache() {
  */
 async function loadProducts() {
     try {
-        if (productsCache) {
+        // Verificar cache válido
+        if (isCacheValid()) {
             return productsCache;
         }
         
         const response = await getProducts({ 
-            page_size: 1000, 
+            page_size: VALIDATION_LIMITS.MAX_PRODUCTS, 
             include_inactive: false 
         });
         
         // Filtrar apenas produtos ativos (dupla verificação)
-        const allProducts = response.items || [];
+        const allProducts = response?.items || [];
         const activeProducts = allProducts.filter(product => {
             // Verificar se o produto está ativo (is_active deve ser true ou undefined/null)
             const isActive = product.is_active !== false && product.is_active !== 0 && product.is_active !== 'false';
             return isActive;
         });
         
-        console.log(`Produtos carregados: ${allProducts.length} total, ${activeProducts.length} ativos`);
-        
+        // Atualizar cache com timestamp
         productsCache = activeProducts;
+        cacheTimestamp = Date.now();
+        
         return productsCache;
     } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
-        return [];
+        // TODO: Implementar logging estruturado em produção
+        console.error('Erro ao carregar produtos:', error.message);
+        
+        // Retornar cache anterior se disponível, senão array vazio
+        return productsCache || [];
     }
 }
 
@@ -52,16 +75,25 @@ async function loadProducts() {
  */
 async function loadCategories() {
     try {
-        if (categoriesCache) {
+        // Verificar cache válido
+        if (isCacheValid()) {
             return categoriesCache;
         }
         
-        const response = await getCategories({ page_size: 100 });
-        categoriesCache = response.items || [];
+        const response = await getCategories({ page_size: VALIDATION_LIMITS.MAX_CATEGORIES });
+        const categories = response?.items || [];
+        
+        // Atualizar cache com timestamp
+        categoriesCache = categories;
+        cacheTimestamp = Date.now();
+        
         return categoriesCache;
     } catch (error) {
-        console.error('Erro ao carregar categorias:', error);
-        return [];
+        // TODO: Implementar logging estruturado em produção
+        console.error('Erro ao carregar categorias:', error.message);
+        
+        // Retornar cache anterior se disponível, senão array vazio
+        return categoriesCache || [];
     }
 }
 
@@ -140,19 +172,29 @@ function updateImageIfChanged(imgElement, newImagePath, newImageHash) {
  * Cria o HTML de um produto (mantendo formatação original)
  */
 function createProductHTML(product) {
+    // Validar dados do produto
+    if (!product || !product.id) {
+        return '';
+    }
+    
     const imageUrl = buildImageUrl(product.image_url, product.image_hash);
     const price = product.price ? `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
     const prepTime = product.preparation_time_minutes ? `${product.preparation_time_minutes} - ${product.preparation_time_minutes + 10} min` : '40 - 50 min';
     const deliveryFee = 'R$ 5,00';
     
+    // Sanitizar dados para evitar XSS
+    const safeName = escapeHTML((product.name || 'Produto').substring(0, VALIDATION_LIMITS.MAX_NAME_LENGTH));
+    const safeDescription = escapeHTML((product.description || 'Descrição rápida...').substring(0, VALIDATION_LIMITS.MAX_DESCRIPTION_LENGTH));
+    const safeId = String(product.id).replace(/[^0-9]/g, '');
+    
     return `
-        <a href="src/pages/produto.html?id=${product.id}">
+        <a href="src/pages/produto.html?id=${safeId}">
             <div id="ficha-produto">
-                <img src="${imageUrl}" alt="${product.name}" id="foto">
+                <img src="${imageUrl}" alt="${safeName}" id="foto">
                 <div class="informa">
                     <div>
-                        <p id="nome">${product.name}</p>
-                        <p id="descricao">${product.description || 'Descrição rápida...'}</p>
+                        <p id="nome">${safeName}</p>
+                        <p id="descricao">${safeDescription}</p>
                     </div>
                     <div>
                         <p id="preco">${price}</p>
@@ -162,6 +204,29 @@ function createProductHTML(product) {
             </div>
         </a>
     `;
+}
+
+/**
+ * Sanitiza texto para evitar XSS
+ * @param {any} text - Texto a ser sanitizado
+ * @returns {string} Texto sanitizado
+ */
+function escapeHTML(text) {
+    if (typeof text !== 'string') return String(text || '');
+    
+    // Usar DOMPurify se disponível, senão usar método básico
+    if (typeof DOMPurify !== 'undefined') {
+        return DOMPurify.sanitize(text);
+    }
+    
+    // Método básico de sanitização
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;');
 }
 
 
@@ -206,7 +271,8 @@ async function updateProductSections() {
         updateExistingProductImages(products);
         
     } catch (error) {
-        console.error('Erro ao atualizar seções de produtos:', error);
+        // TODO: Implementar logging estruturado em produção
+        console.error('Erro ao atualizar seções de produtos:', error.message);
     }
 }
 
@@ -375,12 +441,11 @@ function addCategoryListeners() {
  */
 async function refreshHome() {
     try {
-        console.log('🔄 Atualizando home...');
         clearProductsCache();
         await updateProductSections();
-        console.log('✅ Home atualizada com sucesso');
     } catch (error) {
-        console.error('❌ Erro ao atualizar home:', error);
+        // TODO: Implementar logging estruturado em produção
+        console.error('Erro ao atualizar home:', error.message);
     }
 }
 
@@ -391,16 +456,20 @@ async function initHome() {
     try {
         // Aguardar carregamento dos módulos de API
         if (typeof getProducts !== 'function' || typeof getCategories !== 'function') {
-            console.log('Aguardando carregamento dos módulos de API...');
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
         // Atualizar seções de produtos
         await updateProductSections();
         
-        console.log('✅ Home inicializada com sucesso');
+        // Carregar pontos no header
+        if (typeof window.carregarPontosHeader === 'function') {
+            window.carregarPontosHeader();
+        }
+        
     } catch (error) {
-        console.error('❌ Erro ao inicializar home:', error);
+        // TODO: Implementar logging estruturado em produção
+        console.error('Erro ao inicializar home:', error.message);
     }
 }
 

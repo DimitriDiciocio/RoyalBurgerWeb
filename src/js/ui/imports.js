@@ -1,4 +1,11 @@
-// src/js/ui/footer.js
+// src/js/ui/imports.js
+
+// Constantes para validação e limites
+const VALIDATION_LIMITS = {
+  MAX_RETRY_ATTEMPTS: 5,
+  RETRY_DELAY: 100,
+  MAX_PATH_LENGTH: 200
+};
 
 /**
  * Determina o caminho correto para o footer.html baseado na página atual
@@ -35,7 +42,8 @@ function getFooterPath() {
           return { success: true, data };
         }
       } catch (error) {
-        console.warn(`Tentativa de carregar footer de ${path} falhou:`, error);
+        // TODO: Implementar logging estruturado em produção
+        continue;
       }
     }
     
@@ -65,7 +73,8 @@ function getFooterPath() {
       // Corrigir caminhos após carregar o footer
       fixFooterPaths();
     } catch (error) {
-      console.error('Erro ao carregar o footer:', error);
+      // TODO: Implementar logging estruturado em produção
+      console.error('Erro ao carregar o footer:', error.message);
       // Fallback HTML básico
       document.getElementById("footer-container").innerHTML = `
         <footer>
@@ -127,7 +136,9 @@ function getFooterPath() {
       window.loadHeader();
     } else {
       // fallback leve: tenta novamente um pouco depois
-      setTimeout(() => { if (typeof window.loadHeader === 'function') window.loadHeader(); }, 100);
+      setTimeout(() => { 
+        if (typeof window.loadHeader === 'function') window.loadHeader(); 
+      }, VALIDATION_LIMITS.RETRY_DELAY);
     }
   });
 
@@ -346,8 +357,8 @@ function isLoginPage() {
             newHref = '../../index.html';
           } else if (href.includes('clube-royal.html')) {
             newHref = 'clube-royal.html';
-          } else if (href.includes('pedidos.html')) {
-            newHref = 'pedidos.html';
+          } else if (href.includes('hist-pedidos.html')) {
+            newHref = 'hist-pedidos.html';
           } else if (href.includes('painel-adm.html')) {
             newHref = 'painel-adm.html';
           }
@@ -356,8 +367,8 @@ function isLoginPage() {
             newHref = '../index.html';
           } else if (href.includes('clube-royal.html')) {
             newHref = 'pages/clube-royal.html';
-          } else if (href.includes('pedidos.html')) {
-            newHref = 'pages/pedidos.html';
+          } else if (href.includes('hist-pedidos.html')) {
+            newHref = 'pages/hist-pedidos.html';
           } else if (href.includes('painel-adm.html')) {
             newHref = 'pages/painel-adm.html';
           }
@@ -366,8 +377,8 @@ function isLoginPage() {
             newHref = 'index.html';
           } else if (href.includes('clube-royal.html')) {
             newHref = 'src/pages/clube-royal.html';
-          } else if (href.includes('pedidos.html')) {
-            newHref = 'src/pages/pedidos.html';
+          } else if (href.includes('hist-pedidos.html')) {
+            newHref = 'src/pages/hist-pedidos.html';
           } else if (href.includes('painel-adm.html')) {
             newHref = 'src/pages/painel-adm.html';
           }
@@ -504,6 +515,15 @@ function isLoginPage() {
       setTimeout(() => {
         fixPaths();
         configureHeader();
+        
+        // Carregar sistemas do header (pontos e endereço)
+        if (typeof window.carregarPontosHeader === 'function') {
+          window.carregarPontosHeader();
+        }
+        if (typeof window.carregarEnderecoHeader === 'function') {
+          window.carregarEnderecoHeader();
+        }
+        
         // Inicializa comportamento do modal hamburguer
         try {
           const headerEl = document.querySelector('header');
@@ -553,9 +573,10 @@ function isLoginPage() {
           }
         }
       } catch (_e) { }
-      }, 100);
+      }, VALIDATION_LIMITS.RETRY_DELAY);
     } catch (error) {
-      console.error('Erro ao carregar o header:', error);
+      // TODO: Implementar logging estruturado em produção
+      console.error('Erro ao carregar o header:', error.message);
       // Fallback: inserir header básico em caso de erro
       document.getElementById("header-container").innerHTML = `
         <header>
@@ -609,13 +630,17 @@ function isLoginPage() {
       const ingredientsModule = await import('../api/ingredients.js');
       Object.assign(window, ingredientsModule);
       
+      // Carregar módulo de endereços
+      const addressModule = await import('../api/address.js');
+      Object.assign(window, addressModule);
+      
       // Carregar módulo de modais
       const modaisModule = await import('./modais.js');
       Object.assign(window, modaisModule);
       
-      console.log('✅ Módulos de API carregados com sucesso');
     } catch (error) {
-      console.error('❌ Erro ao carregar módulos de API:', error);
+      // TODO: Implementar logging estruturado em produção
+      console.error('Erro ao carregar módulos de API:', error.message);
     }
   }
 

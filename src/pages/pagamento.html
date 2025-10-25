@@ -20,6 +20,7 @@
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/modais.js" type="module" defer></script>
+    <script src="../js/ui/pagamento.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -33,21 +34,35 @@
         <section class="esquerda" style="width: 50%;">
             <div class="endereco">
                 <div class="informa">
-                    <p class="titulo">Enderço</p>
+                    <p class="titulo">Endereço</p>
                     <p class="tempo">40 - 50 min</p>
                 </div>
 
-                <div class="quadro-endereco">
+                <div class="quadro-endereco" id="endereco-selecionado">
                     <div style="display: flex; align-items: center; gap: 20px">
                         <i class="fa-solid fa-location-dot"></i>
 
                         <div>
-                            <p class="titulo">R. Nome da Rua, 1000</p>
-                            <p class="descricao">Bairro - Complemento</p>
+                            <p class="titulo" id="endereco-rua">Carregando endereço...</p>
+                            <p class="descricao" id="endereco-bairro">Aguarde...</p>
                         </div>
                     </div>
 
-                    <i class="fa-solid fa-angle-down"></i>
+                    <i class="fa-solid fa-angle-down" id="btn-selecionar-endereco"></i>
+                </div>
+
+                <!-- Lista de endereços disponíveis -->
+                <div class="lista-enderecos" id="lista-enderecos" style="display: none;">
+                    <div class="endereco-item" data-endereco-id="novo">
+                        <div class="endereco-info">
+                            <i class="fa-solid fa-plus"></i>
+                            <div>
+                                <p class="titulo">Adicionar novo endereço</p>
+                                <p class="descricao">Cadastrar um novo endereço de entrega</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Endereços serão carregados dinamicamente -->
                 </div>
             </div>
 
@@ -69,17 +84,11 @@
                     </div>
 
                     <div class="quadro-forma">
-                        <p>Dinheiro</p>
+                        <div>
+                            <p>Dinheiro</p>
+                            <p class="troco-info" id="troco-info" style="display: none; font-size: 12px; color: #666; margin-top: 4px;"></p>
+                        </div>
                         <i class="fa-solid fa-money-bill"></i>
-                    </div>
-                </div>
-
-                <div class="cpf-nota">
-                    <p>Deseja CPF na nota?</p>
-
-                    <div class="div-input">
-                        <label for="cpf">CPF</label>
-                        <input type="number" name="cpf" required autocomplete="off">
                     </div>
                 </div>
 
@@ -91,20 +100,8 @@
             <div class="quadro-pedido">
                 <p>Itens adicionados</p>
 
-                <div class="itens">
-                    <div class="item">
-                        <img src="../assets/img/tudo.jpeg" alt="">
-
-                        <div>
-                            <p class="nome">Nome do produto</p>
-                            <p class="descricao">Descrição dos produtos</p>
-                            <p class="adicional">1 item adicional</p>
-                        </div>
-                    </div>
-
-                    <div class="total">
-                        <p>R$ 50,00</p>
-                    </div>
+                <div class="itens" id="itens-container">
+                    <!-- Itens serão carregados dinamicamente -->
                 </div>
 
                 <div class="resumo">
@@ -112,19 +109,15 @@
                     
                     <div class="valor">
                         <p>Subtotal</p>
-                        <p>R$ 100,00</p>
+                        <p id="subtotal-valor">R$ 0,00</p>
                     </div>
                     <div class="valor">
                         <p>Taxa de entrega</p>
-                        <p>R$ 5,00</p>
-                    </div>
-                    <div class="valor">
-                        <p>Taxa de serviço</p>
-                        <p>R$ 1,00</p>
+                        <p id="taxa-entrega-valor">R$ 5,00</p>
                     </div>
                     <div class="valor">
                         <p>Descontos</p>
-                        <p>R$ 00,00</p>
+                        <p id="descontos-valor">R$ 0,00</p>
                     </div>
 
                     <div class="pontos-royal">
@@ -143,17 +136,17 @@
                                 <span class="bolinha"></span>
                             </label>
 
-                            <p>-R$ 1,00</p>
+                            <p id="desconto-pontos-valor">-R$ 0,00</p>
                         </div>
                     </div>
 
                     <div class="total">
                         <div>
                             <p>Total</p>
-                            <p>Nessa compra, você ganhará <span>20</span> pontos Royal</p>
+                            <p>Nessa compra, você ganhará <span id="pontos-ganhos">0</span> pontos Royal</p>
                         </div>
 
-                        <p>R$ 56,00</p>
+                        <p id="total-valor">R$ 0,00</p>
                     </div>
                 </div>
             </div>
@@ -168,7 +161,7 @@
         <div class="div-overlay"></div>
         <div class="modal-content-metricas">
             <div class="header-modal">
-                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-metricas"></i>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-troco"></i>
                 <h2>Vai precisar de troco?</h2>
             </div>
 
@@ -185,7 +178,7 @@
             </div>
 
             <div class="footer-modal">
-                <button class="btn-fechar" id="fechar-metricas">Confirmar</button>
+                <button class="btn-fechar" id="btn-confirmar-troco" onclick="confirmarTroco()">Confirmar</button>
             </div>
         </div>
     </div>
@@ -195,6 +188,7 @@
         <div class="div-overlay"></div>
         <div class="modal-content-metricas">
             <div class="header-modal">
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-revisao"></i>
                 <h2>Revise o seu pedido</h2>
             </div>
 
@@ -232,9 +226,101 @@
             </div>
 
             <div class="footer-modal">
-                <button class="btn-fechar" id="fechar-metricas">Confirmar pedido</button>
+                <button class="btn-fechar" id="btn-confirmar-pedido" onclick="confirmarPedido()">Confirmar pedido</button>
 
-                <p>Alterar pedido</p>
+                <p id="btn-alterar-pedido" onclick="fecharModalRevisao()" style="cursor: pointer; color: #666; text-decoration: underline;">Alterar pedido</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal pai - Listagem de endereços -->
+    <div id="modal-enderecos" class="modal" style="display: none;" data-reset-on-close="true">
+        <div class="div-overlay"></div>
+        <div class="modal-contet">
+            <div class="header">
+                <i class="fa-solid fa-xmark" data-close-modal="modal-enderecos"></i>
+                <p class="titulo">Selecionar endereço</p>
+                <p class="descricao">Escolha um endereço de entrega ou adicione um novo</p>
+            </div>
+            
+            <div class="main">
+                <div id="lista-enderecos-modal" class="lista-enderecos-modal">
+                    <!-- Lista de endereços será carregada dinamicamente -->
+                </div>
+            </div>
+            
+            <div class="footer">
+                <button data-close-modal="modal-enderecos">Cancelar</button>
+                <button id="btn-adicionar-endereco-modal">Adicionar Endereço</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal filha - Adicionar/Editar endereço -->
+    <div id="modal-endereco-form" class="modal" style="display: none;" data-reset-on-close="true">
+        <div class="div-overlay"></div>
+        <div class="modal-contet">
+            <div class="header">
+                <i class="fa-solid fa-xmark" data-close-modal="modal-endereco-form"></i>
+                <p class="titulo" id="titulo-endereco-form">Adicionar endereço</p>
+                <p class="descricao">Campos com (*) são obrigatórios</p>
+            </div>
+
+            <div class="main">
+                <div class="div-input">
+                    <label for="cep-form">CEP*</label>
+                    <input type="text" id="cep-form" name="cep" required autocomplete="off">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </div>
+                <div class="sep-select">
+                    <div class="div-input">
+                        <label for="estado-form">Estado*</label>
+                        <select id="estado-form" name="estado" required>
+                            <option value="" disabled selected>Selecione o estado</option>
+                        </select>
+                    </div>
+                    <div class="div-input">
+                        <label for="cidade-form">Cidade*</label>
+                        <select id="cidade-form" name="cidade" required>
+                            <option value="" disabled selected>Selecione a cidade</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="div-input">
+                    <label for="rua-form">Rua*</label>
+                    <input type="text" id="rua-form" name="rua" required autocomplete="off">
+                </div>
+
+                <div class="div-input">
+                    <label for="bairro-form">Bairro*</label>
+                    <input type="text" id="bairro-form" name="bairro" required autocomplete="off">
+                </div>
+
+                <div class="div-input">
+                    <label for="numero-form">Número*</label>
+                    <input type="number" id="numero-form" name="numero" required autocomplete="off">
+                </div>
+
+                <div class="div-checa">
+                    <input type="checkbox" id="sem-numero-form">
+                    <label for="sem-numero-form">Endereço sem número</label>
+                </div>
+
+                <div class="div-input">
+                    <label for="complemento-form">Complemento</label>
+                    <input type="text" id="complemento-form" name="complemento" autocomplete="off">
+                </div>
+
+                <div class="div-checa">
+                    <input type="checkbox" id="sem-complemento-form">
+                    <label for="sem-complemento-form">Endereço sem complemento</label>
+                </div>
+
+            </div>
+
+            <div class="footer">
+                <button data-close-modal="modal-endereco-form">Cancelar</button>
+                <button id="btn-salvar-endereco-form">Salvar Endereço</button>
             </div>
         </div>
     </div>
