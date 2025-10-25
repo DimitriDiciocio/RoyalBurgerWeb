@@ -1109,13 +1109,18 @@ const VALIDATION_LIMITS = {
 
     // Validar CPF
     function validarCPF(cpf) {
+        if (!cpf || typeof cpf !== 'string') return false;
+        
+        // Remove caracteres não numéricos
         cpf = cpf.replace(/[^\d]/g, '');
+        
+        // Verifica se tem 11 dígitos
         if (cpf.length !== 11) return false;
         
-        // Verificar se todos os dígitos são iguais
+        // Verifica se todos os dígitos são iguais
         if (/^(\d)\1{10}$/.test(cpf)) return false;
         
-        // Validar dígitos verificadores
+        // Validação do primeiro dígito verificador
         let soma = 0;
         for (let i = 0; i < 9; i++) {
             soma += parseInt(cpf.charAt(i)) * (10 - i);
@@ -1124,6 +1129,7 @@ const VALIDATION_LIMITS = {
         if (resto === 10 || resto === 11) resto = 0;
         if (resto !== parseInt(cpf.charAt(9))) return false;
         
+        // Validação do segundo dígito verificador
         soma = 0;
         for (let i = 0; i < 10; i++) {
             soma += parseInt(cpf.charAt(i)) * (11 - i);
@@ -1395,41 +1401,73 @@ const VALIDATION_LIMITS = {
     }
 
     function confirmarPedido() {
-        if (!state.endereco) {
-            alert('Selecione um endereço de entrega.');
-            return;
-        }
-
-        if (state.cesta.length === 0) {
-            alert('Sua cesta está vazia!');
-            return;
-        }
-
-        // Validar CPF se preenchido
-        if (state.cpf && !validarCPF(state.cpf)) {
-            alert('CPF inválido!');
-            return;
-        }
-
-        // Preparar dados do pedido
-        const pedido = {
-            itens: state.cesta,
-            endereco: state.endereco,
-            formaPagamento: state.formaPagamento,
-            cpf: state.cpf,
-            usarPontos: state.usarPontos,
-            pontosUsados: state.usarPontos ? Math.min(state.pontosDisponiveis, Math.floor(state.subtotal * 100)) : 0,
-            subtotal: state.subtotal,
-            taxaEntrega: state.taxaEntrega,
-            descontos: state.descontos,
-            total: state.total,
-            valorTroco: state.valorTroco,
-            data: new Date().toISOString(),
-            status: 'confirmado'
-        };
-
-        // Salvar pedido no localStorage
         try {
+            // Validar endereço
+            if (!state.endereco) {
+                alert('Selecione um endereço de entrega.');
+                return;
+            }
+
+            // Validar cesta
+            if (!state.cesta || state.cesta.length === 0) {
+                alert('Sua cesta está vazia!');
+                return;
+            }
+
+            // Validar CPF se preenchido
+            if (state.cpf && state.cpf.trim() !== '' && !validarCPF(state.cpf)) {
+                alert('CPF inválido!');
+                return;
+            }
+
+            // Validar forma de pagamento
+            if (!state.formaPagamento) {
+                alert('Selecione uma forma de pagamento.');
+                return;
+            }
+
+            // Validar totais
+            if (state.total <= 0) {
+                alert('Valor total inválido. Verifique sua cesta.');
+                return;
+            }
+
+            // Preparar dados do pedido
+            const pedido = {
+                id: Date.now(), // ID único simples
+                itens: state.cesta.map(item => ({
+                    id: item.id,
+                    nome: item.nome,
+                    preco: item.preco,
+                    precoTotal: item.precoTotal,
+                    quantidade: item.quantidade,
+                    extras: item.extras || [],
+                    observacao: item.observacao || ''
+                })),
+                endereco: {
+                    id: state.endereco.id,
+                    street: state.endereco.street || state.endereco.rua,
+                    number: state.endereco.number || state.endereco.numero,
+                    neighborhood: state.endereco.neighborhood || state.endereco.district || state.endereco.bairro,
+                    city: state.endereco.city || state.endereco.cidade,
+                    state: state.endereco.state || state.endereco.estado,
+                    zip_code: state.endereco.zip_code || state.endereco.cep
+                },
+                formaPagamento: state.formaPagamento,
+                cpf: state.cpf || null,
+                usarPontos: state.usarPontos || false,
+                pontosUsados: state.usarPontos ? Math.min(state.pontosDisponiveis, Math.floor(state.subtotal * 100)) : 0,
+                subtotal: state.subtotal,
+                taxaEntrega: state.taxaEntrega,
+                descontos: state.descontos || 0,
+                total: state.total,
+                valorTroco: state.valorTroco || null,
+                data: new Date().toISOString(),
+                status: 'confirmado',
+                timestamp: Date.now()
+            };
+
+            // Salvar pedido no localStorage
             const pedidos = JSON.parse(localStorage.getItem('royal_pedidos') || '[]');
             pedidos.push(pedido);
             localStorage.setItem('royal_pedidos', JSON.stringify(pedidos));
@@ -1446,9 +1484,10 @@ const VALIDATION_LIMITS = {
             
             // Redirecionar para página de histórico
             window.location.href = 'hist-pedidos.html';
+            
         } catch (err) {
             // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao salvar pedido:', err.message);
+            console.error('Erro ao confirmar pedido:', err.message);
             alert('Erro ao processar pedido. Tente novamente.');
         }
     }

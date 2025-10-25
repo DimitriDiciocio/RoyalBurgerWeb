@@ -612,33 +612,51 @@ const VALIDATION_LIMITS = {
 
                 if (result.success) {
                     // Mostrar mensagem de sucesso
-                    showToast(
-                        state.isEditing ? 'Item atualizado na cesta!' : 'Item adicionado à cesta!',
-                        {
-                            type: 'success',
-                            title: state.isEditing ? 'Item Atualizado' : 'Item Adicionado',
-                            autoClose: 3000
-                        }
-                    );
+                    if (typeof showToast === 'function') {
+                        showToast(
+                            state.isEditing ? 'Item atualizado na cesta!' : 'Item adicionado à cesta!',
+                            {
+                                type: 'success',
+                                title: state.isEditing ? 'Item Atualizado' : 'Item Adicionado',
+                                autoClose: 3000
+                            }
+                        );
+                    } else {
+                        alert(state.isEditing ? 'Item atualizado na cesta!' : 'Item adicionado à cesta!');
+                    }
 
                     // Definir flag para abrir modal ao chegar no index
                     localStorage.setItem('royal_abrir_modal_cesta', 'true');
 
                     // Redirecionar para index.html
                     setTimeout(() => {
-                        window.location.href = '../../index.html';
+                        // Verificar se estamos em uma página de produto
+                        const currentPath = window.location.pathname;
+                        if (currentPath.includes('produto.html')) {
+                            // Se estamos em src/pages/produto.html, voltar para index
+                            window.location.href = '../../index.html';
+                        } else {
+                            // Fallback para outros casos
+                            window.location.href = '/index.html';
+                        }
                     }, 1000);
                 } else {
                     throw new Error(result.error || 'Erro ao adicionar item à cesta');
                 }
 
             } catch (err) {
-                console.error('Erro ao adicionar à cesta:', err);
-                showToast('Erro ao adicionar item à cesta. Tente novamente.', {
-                    type: 'error',
-                    title: 'Erro',
-                    autoClose: 4000
-                });
+                // TODO: Implementar logging estruturado em produção
+                console.error('Erro ao adicionar à cesta:', err.message);
+                
+                if (typeof showToast === 'function') {
+                    showToast('Erro ao adicionar item à cesta. Tente novamente.', {
+                        type: 'error',
+                        title: 'Erro',
+                        autoClose: 4000
+                    });
+                } else {
+                    alert('Erro ao adicionar item à cesta. Tente novamente.');
+                }
             } finally {
                 // Reabilitar botão
                 el.btnAdicionarCesta.disabled = false;
