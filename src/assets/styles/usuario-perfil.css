@@ -97,6 +97,7 @@ main{
                 font-size: 14px;
                 gap: 10px;
                 cursor: pointer;
+                white-space: nowrap;
 
                 &:hover {
                     color: var(--color-texto-light);
@@ -417,4 +418,692 @@ main{
 
 .espaco-branco{
     height: 120px;
+}
+
+@media (max-width: 1440px) {
+    
+}
+
+@media (max-width: 1280px) {
+    
+}
+
+@media (max-width: 1024px) {
+    main{
+        padding: 68px 0px 0px 0px;
+    }
+
+    .navegacao {
+        width: 250px;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+
+        & .quadro-navegacao {
+            background-color: var(--cor-div-primary);
+            padding: 50px 20px 0px 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            position: relative;
+
+            & .perfil {
+                background-color: var(--color-texto-black);
+                color: var(--color-texto-white);
+                border: 3.5px solid var(--cor-div-primary);
+                border-radius: 50px;
+                font-weight: bold;
+                font-size: 37px;
+                height: 80px;
+                width: 80px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                justify-self: center;
+                user-select: none;
+                position: absolute;
+                top: -10%;
+            }
+
+            & .nome {
+                justify-self: center;
+                font-size: 24px;
+                font-weight: 600;
+                text-align: center;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #D9D9D9;
+            }
+
+            & .navega {
+                display: flex;
+                flex-direction: column;
+                padding: 20px 5px;
+                gap: 20px;
+
+                & div, a {
+                    display: flex;
+                    align-items: center;
+                    color: var(--color-texto-erased);
+                    font-size: 14px;
+                    gap: 10px;
+                    cursor: pointer;
+                    white-space: nowrap;
+
+                    &:hover {
+                        color: var(--color-texto-light);
+                    }
+                }
+
+                & div.select {
+                    color: var(--color-texto-black);
+                }
+
+            }
+        }
+
+        & .quadro-pontos-royal {
+            background-color: var(--cor-div-primary);
+            padding: 10px 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            position: relative;
+            gap: 10px;
+
+            & .fa-circle-info {
+                color: var(--color-texto-erased);
+                font-size: 14px;
+                display: flex;
+                justify-content: end;
+            }
+
+            & .txt1 {
+                font-size: 14px;
+                font-weight: 600;
+
+                display: flex;
+                justify-content: center;
+            }
+
+            & .pontos {
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+
+                gap: 10px;
+                font-size: 20px;
+                color: var(--color-primary);
+            }
+
+            & .txt2 {
+                font-size: 14px;
+                font-weight: 200;
+                text-align: center;
+
+                & span {
+                    font-weight: 600;
+                }
+            }
+        }
+    }
+
+    #dados-user, #enderecos, #config {
+        width: 1000px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+
+        & .quadro-info {
+            & .tema {
+                & .edita {
+                    width: 45px;
+                    white-space: nowrap; 
+                    overflow: hidden;
+                }
+            }
+
+            & .info {
+                align-items: flex-start; 
+                flex-direction: column;  
+                padding: 20px 40px;
+            }
+
+            & .info-checa {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 40px;
+                border-top: 1px solid #D9D9D9;
+
+                & .titulo {
+                    color: var(--color-texto-black);
+                    font-size: 16px;
+                }
+
+                & .descricao {
+                    color: var(--color-texto-erased);
+                    font-size: 14px;
+                }
+
+                & .checa {
+                    position: relative;
+                    display: inline-block;
+                    width: 50px;
+                    height: 28px;
+
+                    input {
+                        opacity: 0;
+                        width: 0;
+                        height: 0;
+                    }
+
+                    .bolinha {
+                        position: absolute;
+                        cursor: pointer;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-color: #ccc;
+                        border-radius: 34px;
+                        transition: .4s;
+
+                        &::before {
+                            content: '';
+                            position: absolute;
+                            height: 22px;
+                            width: 22px;
+                            left: 3px;
+                            bottom: 3px;
+                            background-color: white;
+                            border-radius: 50%;
+                            transition: .4s;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        }
+                    }
+
+                    input:checked + .bolinha {
+                        background-color: var(--color-primary);
+                    }
+
+                    input:checked + .bolinha::before {
+                        transform: translateX(22px);
+                    }
+                }
+
+                & .edita {
+                    font-size: 16px;
+                    color: var(--color-primary);
+                    cursor: pointer;
+                }
+            }
+        }
+
+        & .quadro-endereco {
+            background-color: var(--cor-div-primary);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            position: relative;
+            padding: 15px 40px;
+
+            & i {
+                color: var(--color-texto-black);
+                font-size: 30px;
+            }
+
+            & .titulo {
+                color: var(--color-texto-black);
+                font-size: 16px;
+            }
+
+            & .descricao {
+                color: var(--color-texto-erased);
+                font-size: 14px;
+            }
+
+            & .edita {
+                font-size: 16px;
+                color: var(--color-primary);
+                cursor: pointer;
+
+                &:hover {
+                    color: #f7d660;
+                }
+
+                &:active {
+                    color: #d2a400;
+                }
+            }
+
+        }
+
+        & .adiciona-ende {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+
+            & button {
+                background-color: var(--color-primary);
+                color: var(--color-texto-black);
+                border: none;
+                font-weight: 600;
+                font-size: 16px;
+                border-radius: 8px;
+                padding: 5px 75px;
+                cursor: pointer;
+
+                &:hover {
+                    background-color: #f7d660;
+                }
+
+                &:active {
+                    background-color: #d2a400;
+                }
+            }
+        }
+
+        & .logout {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+
+            & button {
+                background-color: var(--color-secondary);
+                color: var(--color-texto-white);
+                border: none;
+                font-weight: 600;
+                font-size: 16px;
+                border-radius: 8px;
+                padding: 5px 75px;
+                cursor: pointer;
+
+                &:hover {
+                    background-color: #ff4545;
+                }
+
+                &:active {
+                    background-color: #cb0000;
+                }
+            }
+        }
+    }
+
+    .espaco-branco{
+        height: 120px;
+    }
+}
+
+@media (max-width: 768px) {
+    main{
+        padding: 240px 0px 0px 0px;
+    }
+
+    .banner {
+        display: none;
+    }
+
+    .absolute {
+        display: flex;
+        flex-direction: column;
+        gap: 50px;
+        justify-content: space-between;
+        top: 0px;
+        padding: 0px 3vh;
+    }
+
+    .navegacao {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        gap: 30px;
+
+        & .quadro-navegacao {
+            width: 60vw;
+            padding: 50px 20px 0px 20px;
+
+            & .navega {
+                display: flex;
+                flex-direction: column;
+                padding: 20px 18vw;
+                gap: 20px;
+            }
+
+        }
+
+        & .quadro-pontos-royal {
+            width: 60vw;
+        }
+    }
+
+    #dados-user, #enderecos, #config {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+
+        & .quadro-info {
+            & .tema {
+                padding: 15px 20px;
+
+                & .tirulo {
+                    font-size: 0.9rem;
+                }
+
+                & .edita {
+                    font-size: 0.9rem;
+                }
+            }
+
+            & .info {
+                align-items: flex-start; 
+                flex-direction: column;   
+                padding: 15px 20px;
+
+                & .label {
+                    font-size: 0.9rem;
+                }
+
+                & .cont {
+                    font-size: 0.9rem;
+                }
+
+                & i {
+                    font-size: 0.9rem;
+                }
+            }
+
+            & .info-checa {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+
+                & .titulo {
+                    font-size: 0.9rem;
+                }
+
+                & .descricao {
+                    font-size: 0.9rem;
+                }
+
+                & .checa {
+                    position: relative;
+                    display: inline-block;
+                    width: 120px;
+                    max-width: 50px;
+                    height: 28px;
+                }
+
+                & .edita {
+                    font-size: 0.9rem;
+                    width: 110px;
+                    white-space: nowrap; 
+                    overflow: hidden;
+                }
+            }
+        }
+
+        & .quadro-endereco {
+            background-color: var(--cor-div-primary);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            position: relative;
+            padding: 15px 40px;
+
+            & i {
+                color: var(--color-texto-black);
+                font-size: 30px;
+            }
+
+            & .titulo {
+                color: var(--color-texto-black);
+                font-size: 16px;
+            }
+
+            & .descricao {
+                color: var(--color-texto-erased);
+                font-size: 14px;
+            }
+
+            & .edita {
+                font-size: 16px;
+                color: var(--color-primary);
+                cursor: pointer;
+
+                &:hover {
+                    color: #f7d660;
+                }
+
+                &:active {
+                    color: #d2a400;
+                }
+            }
+
+        }
+
+        & .adiciona-ende {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+
+            & button {
+                font-size: 0.9rem;
+                padding: 5px 75px;
+            }
+        }
+
+        & .logout {
+            & button {
+                font-size: 0.9rem;
+            }
+
+            & p {
+                font-size: 0.9rem;
+            }
+        }
+    }
+
+    .espaco-branco{
+        height: 120px;
+    }
+}
+
+@media (max-width: 480px) {
+    main{
+        padding: 240px 0px 0px 0px;
+    }
+
+    .banner {
+        display: none;
+    }
+
+    .absolute {
+        display: flex;
+        flex-direction: column;
+        gap: 50px;
+        justify-content: space-between;
+        top: 0px;
+        padding: 0px 3vh;
+    }
+
+    .navegacao {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+
+        & .quadro-navegacao {
+            padding: 50px 20px 0px 20px;
+
+            & .navega {
+                display: flex;
+                flex-direction: column;
+                padding: 20px 18vw;
+                gap: 20px;
+            }
+        }
+    }
+
+    #dados-user, #enderecos, #config {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+
+        & .quadro-info {
+            & .tema {
+                padding: 15px 20px;
+
+                & .tirulo {
+                    font-size: 0.9rem;
+                }
+
+                & .edita {
+                    font-size: 0.9rem;
+                    width: 45px;
+                    white-space: nowrap; 
+                    overflow: hidden;
+                }
+            }
+
+            & .info {
+                align-items: flex-start; 
+                flex-direction: column;   
+                padding: 15px 20px;
+
+                & .label {
+                    font-size: 0.9rem;
+                }
+
+                & .cont {
+                    font-size: 0.9rem;
+                }
+
+                & i {
+                    font-size: 0.9rem;
+                }
+            }
+
+            & .info-checa {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+
+                & .titulo {
+                    font-size: 0.9rem;
+                }
+
+                & .descricao {
+                    font-size: 0.9rem;
+                }
+
+                & .checa {
+                    position: relative;
+                    display: inline-block;
+                    width: 120px;
+                    max-width: 50px;
+                    height: 28px;
+                }
+
+                & .edita {
+                    font-size: 0.9rem;
+                    width: 110px;
+                    white-space: nowrap; 
+                    overflow: hidden;
+                }
+            }
+        }
+
+        & .quadro-endereco {
+            background-color: var(--cor-div-primary);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            position: relative;
+            padding: 15px 40px;
+
+            & i {
+                color: var(--color-texto-black);
+                font-size: 30px;
+            }
+
+            & .titulo {
+                color: var(--color-texto-black);
+                font-size: 16px;
+            }
+
+            & .descricao {
+                color: var(--color-texto-erased);
+                font-size: 14px;
+            }
+
+            & .edita {
+                font-size: 16px;
+                color: var(--color-primary);
+                cursor: pointer;
+
+                &:hover {
+                    color: #f7d660;
+                }
+
+                &:active {
+                    color: #d2a400;
+                }
+            }
+
+        }
+
+        & .adiciona-ende {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+
+            & button {
+                font-size: 0.9rem;
+                padding: 5px 75px;
+            }
+        }
+
+        & .logout {
+            & button {
+                font-size: 0.9rem;
+            }
+
+            & p {
+                font-size: 0.9rem;
+            }
+        }
+    }
+
+    .espaco-branco{
+        height: 120px;
+    }
 }

@@ -30,6 +30,10 @@ main{
     justify-content: space-between;
 
     & .esquerda{
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+
         & .endereco{
             margin-bottom: 10px;
 
@@ -650,5 +654,24 @@ main{
             gap: 5px;
         }
     }
+}
 
+@media (max-width: 1440px) {
+    
+}
+
+@media (max-width: 1280px) {
+    
+}
+
+@media (max-width: 1024px) {
+    
+}
+
+@media (max-width: 768px) {
+    
+}
+
+@media (max-width: 480px) {
+    
 }
