@@ -79,11 +79,11 @@ function escapeHTML(text) {
 function isValidItem(item) {
     return item && 
            typeof item === 'object' && 
-           typeof item.id === 'number' && 
-           typeof item.nome === 'string' && 
-           typeof item.quantidade === 'number' &&
-           item.quantidade > 0 && 
-           item.quantidade <= VALIDATION_LIMITS.MAX_QUANTITY_PER_ITEM;
+           typeof item.product_id === 'number' && 
+           typeof item.product?.name === 'string' && 
+           typeof item.quantity === 'number' &&
+           item.quantity > 0 && 
+           item.quantity <= VALIDATION_LIMITS.MAX_QUANTITY_PER_ITEM;
 }
 
 /**
@@ -150,7 +150,7 @@ async function carregarCesta() {
         const result = await getCart();
         if (result.success) {
             // Converter dados da API para formato local
-            const apiItems = result.data.cart?.items || [];
+            const apiItems = result.data.items || [];
             
             // Validar dados antes de processar
             if (!isValidCartData(apiItems)) {
@@ -158,7 +158,7 @@ async function carregarCesta() {
             }
             
             state.itens = apiItems.map(item => ({
-                id: item.product.id,
+                id: item.product_id,
                 nome: item.product.name,
                 descricao: item.product.description,
                 imagem: item.product.image_url,

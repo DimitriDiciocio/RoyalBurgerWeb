@@ -2,7 +2,9 @@
 // Gerenciamento da página de pagamento
 
 import { getLoyaltyBalance, validatePointsRedemption, calculateDiscountFromPoints } from '../api/loyalty.js';
-import { AddressService } from '../api/address.js';
+import { getDefaultAddress, getAddresses, createAddress, updateAddress } from '../api/address.js';
+import { createOrder, calculateOrderTotal } from '../api/orders.js';
+import { getCart } from '../api/cart.js';
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -41,14 +43,15 @@ const VALIDATION_LIMITS = {
         pedidoConfirmado: false
     };
 
-    // Instância do serviço de endereços
-    const addressService = new AddressService();
+    // Instância do serviço de endereços não é mais necessária, usamos as funções diretamente
 
     // Refs DOM
     let el = {};
 
     // Inicializar elementos DOM
     function initElements() {
+        console.log('Inicializando elementos DOM...');
+        
         el = {
             // Endereço
             enderecoTitulo: document.querySelector('#endereco-rua'),
@@ -98,6 +101,24 @@ const VALIDATION_LIMITS = {
             btnFazerPedido: document.querySelector('.pagamento button')
         };
         
+        // Verificar elementos críticos
+        const elementosCriticos = [
+            'itensContainer',
+            'enderecoTitulo',
+            'enderecoDescricao',
+            'subtotal',
+            'taxaEntrega',
+            'descontos',
+            'total'
+        ];
+        
+        elementosCriticos.forEach(nome => {
+            if (!el[nome]) {
+                console.error(`Elemento crítico não encontrado: ${nome}`);
+            } else {
+                console.log(`Elemento encontrado: ${nome}`);
+            }
+        });
     }
 
     // Utils
@@ -155,17 +176,48 @@ const VALIDATION_LIMITS = {
         return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
     }
 
-    // Carregar dados da cesta
-    function carregarCesta() {
+    // Carregar dados da cesta via API
+    async function carregarCesta() {
         try {
-            const cestaStr = localStorage.getItem('royal_cesta');
-            if (cestaStr) {
-                state.cesta = JSON.parse(cestaStr);
+            console.log('Carregando cesta...');
+            const cartResult = await getCart();
+            console.log('Resultado da cesta:', cartResult);
+            
+            if (cartResult.success && cartResult.data.items) {
+                // Converter formato da API para formato local
+                state.cesta = cartResult.data.items.map(item => ({
+                    id: item.product_id,
+                    nome: item.product.name,
+                    descricao: item.product.description,
+                    preco: item.product.price,
+                    precoTotal: item.item_subtotal,
+                    quantidade: item.quantity,
+                    extras: item.extras || [],
+                    observacao: item.notes || '',
+                    imagem: item.product.image_url || 'tudo.jpeg'
+                }));
+                
+                console.log('Cesta processada:', state.cesta);
+                
+                // Atualizar totais da API
+                if (cartResult.data.summary) {
+                    state.subtotal = cartResult.data.summary.subtotal || 0;
+                    state.taxaEntrega = cartResult.data.summary.fees || 5.00;
+                    state.descontos = cartResult.data.summary.discounts || 0;
+                    state.total = cartResult.data.summary.total || 0;
+                }
+                
+                console.log('Totais atualizados:', {
+                    subtotal: state.subtotal,
+                    taxaEntrega: state.taxaEntrega,
+                    descontos: state.descontos,
+                    total: state.total
+                });
             } else {
+                console.log('Cesta vazia ou erro:', cartResult);
                 state.cesta = [];
             }
         } catch (err) {
-            // TODO: Implementar logging estruturado em produção
             console.error('Erro ao carregar cesta:', err.message);
             state.cesta = [];
         }
@@ -187,16 +239,31 @@ const VALIDATION_LIMITS = {
     // Carregar endereços do usuário
     async function carregarEnderecos() {
         try {
-            const enderecos = await addressService.getAddresses();
-            state.enderecos = enderecos || [];
+            console.log('Carregando endereços...');
             
-            // Selecionar o primeiro endereço disponível
-            if (state.enderecos.length > 0) {
-                state.enderecoSelecionado = state.enderecos[0];
-                state.endereco = state.enderecos[0];
+            // Primeiro tenta buscar o endereço padrão
+            const enderecoPadrao = await getDefaultAddress();
+            
+            if (enderecoPadrao) {
+                console.log('Endereço padrão encontrado:', enderecoPadrao);
+                state.enderecoSelecionado = enderecoPadrao;
+                state.endereco = enderecoPadrao;
+                state.enderecos = [enderecoPadrao];
+            } else {
+                // Se não houver endereço padrão, busca todos os endereços
+                console.log('Nenhum endereço padrão, buscando todos os endereços...');
+                const enderecos = await getAddresses();
+                state.enderecos = enderecos || [];
+                
+                if (state.enderecos.length > 0) {
+                    state.enderecoSelecionado = state.enderecos[0];
+                    state.endereco = state.enderecos[0];
+                    console.log('Endereço selecionado:', state.endereco);
+                } else {
+                    console.log('Nenhum endereço encontrado');
+                }
             }
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
             console.error('Erro ao carregar endereços:', error.message);
             state.enderecos = [];
         }
@@ -265,7 +332,18 @@ const VALIDATION_LIMITS = {
 
     // Renderizar itens da cesta
     function renderItens() {
-        if (!el.itensContainer) return;
+        console.log('Renderizando itens...', state.cesta);
+        
+        if (!el.itensContainer) {
+            console.error('Container de itens não encontrado');
+            return;
+        }
+
+        if (state.cesta.length === 0) {
+            console.log('Cesta vazia, não há itens para renderizar');
+            el.itensContainer.innerHTML = '<p>Nenhum item na cesta</p>';
+            return;
+        }
 
         const itensHtml = state.cesta.map(item => {
             const imageUrl = buildImageUrl(item.imagem, item.imageHash);
@@ -316,6 +394,7 @@ const VALIDATION_LIMITS = {
             `;
         }).join('');
 
+        console.log('HTML dos itens gerado:', itensHtml);
         el.itensContainer.innerHTML = itensHtml;
     }
 
@@ -342,6 +421,8 @@ const VALIDATION_LIMITS = {
 
     // Renderizar endereço
     function renderEndereco() {
+        console.log('Renderizando endereço...', state.endereco);
+        
         if (state.endereco) {
             // Construir endereço completo baseado na estrutura da API
             let enderecoCompleto = '';
@@ -372,6 +453,8 @@ const VALIDATION_LIMITS = {
                 enderecoDescricao = 'Localização não informada';
             }
             
+            console.log('Endereço processado:', { enderecoCompleto, enderecoDescricao });
+            
             if (el.enderecoTitulo) {
                 el.enderecoTitulo.textContent = enderecoCompleto;
             }
@@ -379,6 +462,7 @@ const VALIDATION_LIMITS = {
                 el.enderecoDescricao.textContent = enderecoDescricao;
             }
         } else {
+            console.log('Nenhum endereço selecionado');
             // Fallback quando não há endereço
             if (el.enderecoTitulo) el.enderecoTitulo.textContent = 'Nenhum endereço selecionado';
             if (el.enderecoDescricao) el.enderecoDescricao.textContent = 'Clique para selecionar um endereço';
@@ -1266,13 +1350,17 @@ const VALIDATION_LIMITS = {
 
     // Inicializar
     async function init() {
+        console.log('Inicializando página de pagamento...');
+        
         initElements();
         
-        carregarCesta();
+        console.log('Carregando dados...');
+        await carregarCesta();
         carregarUsuario();
         await carregarEnderecos();
         await carregarPontos();
         
+        console.log('Renderizando interface...');
         renderItens();
         renderResumo();
         renderEndereco();
@@ -1289,6 +1377,8 @@ const VALIDATION_LIMITS = {
             const descontoMaximo = Math.min(calculateDiscountFromPoints(state.pontosDisponiveis), state.subtotal);
             el.descontoPontos.textContent = `-${formatBRL(descontoMaximo)}`;
         }
+        
+        console.log('Página de pagamento inicializada com sucesso');
     }
 
     // Função legada para seleção de endereço
@@ -1432,62 +1522,50 @@ const VALIDATION_LIMITS = {
                 return;
             }
 
-            // Preparar dados do pedido
-            const pedido = {
-                id: Date.now(), // ID único simples
-                itens: state.cesta.map(item => ({
-                    id: item.id,
-                    nome: item.nome,
-                    preco: item.preco,
-                    precoTotal: item.precoTotal,
-                    quantidade: item.quantidade,
-                    extras: item.extras || [],
-                    observacao: item.observacao || ''
-                })),
-                endereco: {
-                    id: state.endereco.id,
-                    street: state.endereco.street || state.endereco.rua,
-                    number: state.endereco.number || state.endereco.numero,
-                    neighborhood: state.endereco.neighborhood || state.endereco.district || state.endereco.bairro,
-                    city: state.endereco.city || state.endereco.cidade,
-                    state: state.endereco.state || state.endereco.estado,
-                    zip_code: state.endereco.zip_code || state.endereco.cep
-                },
-                formaPagamento: state.formaPagamento,
-                cpf: state.cpf || null,
-                usarPontos: state.usarPontos || false,
-                pontosUsados: state.usarPontos ? Math.min(state.pontosDisponiveis, Math.floor(state.subtotal * 100)) : 0,
-                subtotal: state.subtotal,
-                taxaEntrega: state.taxaEntrega,
-                descontos: state.descontos || 0,
-                total: state.total,
-                valorTroco: state.valorTroco || null,
-                data: new Date().toISOString(),
-                status: 'confirmado',
-                timestamp: Date.now()
+            // Preparar dados do pedido para API
+            const orderData = {
+                address_id: state.endereco.id,
+                payment_method: state.formaPagamento,
+                notes: state.cesta.map(item => 
+                    item.observacao ? `${item.nome}: ${item.observacao}` : ''
+                ).filter(note => note).join('; ') || '',
+                cpf_on_invoice: state.cpf || null,
+                points_to_redeem: state.usarPontos ? state.pontosParaUsar : 0,
+                use_cart: true // Usar carrinho da API
             };
 
-            // Salvar pedido no localStorage
-            const pedidos = JSON.parse(localStorage.getItem('royal_pedidos') || '[]');
-            pedidos.push(pedido);
-            localStorage.setItem('royal_pedidos', JSON.stringify(pedidos));
-            
-            // Limpar cesta
-            localStorage.removeItem('royal_cesta');
-            localStorage.removeItem('royal_abrir_modal_cesta');
-            
-            state.pedidoConfirmado = true;
-            fecharModalRevisao();
-            
-            // Mostrar sucesso
-            alert('Pedido confirmado com sucesso! Em breve você receberá um SMS com os detalhes da entrega.');
-            
-            // Redirecionar para página de histórico
-            window.location.href = 'hist-pedidos.html';
+            // Se dinheiro, adicionar troco
+            if (state.formaPagamento === 'dinheiro' && state.valorTroco) {
+                orderData.change_for_amount = state.valorTroco;
+            }
+
+            // Criar pedido via API
+            criarPedidoAPI(orderData);
             
         } catch (err) {
-            // TODO: Implementar logging estruturado em produção
             console.error('Erro ao confirmar pedido:', err.message);
+            alert('Erro ao processar pedido. Tente novamente.');
+        }
+    }
+
+    async function criarPedidoAPI(orderData) {
+        try {
+            const result = await createOrder(orderData);
+            
+            if (result.success) {
+                state.pedidoConfirmado = true;
+                fecharModalRevisao();
+                
+                // Mostrar sucesso
+                alert('Pedido confirmado com sucesso! Em breve você receberá um SMS com os detalhes da entrega.');
+                
+                // Redirecionar para página de histórico
+                window.location.href = 'hist-pedidos.html';
+            } else {
+                alert(`Erro ao criar pedido: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Erro ao criar pedido:', error.message);
             alert('Erro ao processar pedido. Tente novamente.');
         }
     }

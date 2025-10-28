@@ -1,6 +1,10 @@
 // src/js/ui/header.js
 // Gerenciamento completo do header - pontos, endereço e autenticação
 
+// Importar APIs
+import { getLoyaltyBalance } from '../api/loyalty.js';
+import { getDefaultAddress, getAddresses, setDefaultAddress } from '../api/address.js';
+
 // Chaves usadas na aplicação
 const RB_STORAGE_KEYS = {
   token: 'rb.token',
@@ -353,11 +357,21 @@ async function carregarPontos() {
   }
 
   try {
-    // Usar dados simulados por enquanto
-    pontosAtuais = 100; // Pontos simulados
-    atualizarExibicaoPontos();
+    console.log('Carregando pontos do usuário ID:', usuario.id);
+    
+    // Buscar pontos na API
+    const balance = await getLoyaltyBalance(usuario.id);
+    
+    if (balance && typeof balance.balance === 'number') {
+      pontosAtuais = balance.balance;
+      console.log('Pontos carregados:', pontosAtuais);
+      atualizarExibicaoPontos();
+    } else {
+      console.log('Nenhum ponto encontrado');
+      pontosAtuais = 0;
+      atualizarExibicaoPontos();
+    }
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
     console.error('Erro ao carregar pontos:', error.message);
     ocultarPontos();
   }
@@ -437,19 +451,19 @@ async function carregarEndereco() {
       return;
     }
     
+    console.log('Carregando endereço padrão do usuário ID:', usuario.id);
+    
     // Buscar endereço padrão
-    let endereco = null;
-    if (typeof window.addressService !== 'undefined') {
-      endereco = await window.addressService.getDefaultAddress();
-    }
+    const endereco = await getDefaultAddress();
     
     if (endereco) {
+      console.log('Endereço encontrado:', endereco);
       exibirEndereco(endereco);
     } else {
+      console.log('Nenhum endereço padrão encontrado');
       exibirSemEndereco();
     }
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
     console.error('Erro ao carregar endereço:', error.message);
     exibirSemEndereco();
   }
@@ -484,6 +498,16 @@ function exibirEndereco(endereco) {
   // Resetar estilos
   enderecoElement.style.color = '';
   enderecoElement.style.fontStyle = '';
+  
+  // Adicionar evento de clique para alterar endereço principal
+  const enderecoContainer = enderecoElement.parentElement;
+  if (enderecoContainer) {
+    enderecoContainer.setAttribute('data-address-id', endereco.id);
+    enderecoContainer.style.cursor = 'pointer';
+    enderecoContainer.onclick = async () => {
+      await mostrarModalAlterarEndereco(endereco.id);
+    };
+  }
 }
 
 /**
@@ -502,7 +526,129 @@ function exibirSemEndereco() {
   // Adicionar estilo para indicar que não há endereço
   enderecoElement.style.color = '#999';
   enderecoElement.style.fontStyle = 'italic';
+  
+  // Adicionar evento de clique para cadastrar endereço
+  const enderecoContainer = enderecoElement.parentElement;
+  if (enderecoContainer) {
+    enderecoContainer.style.cursor = 'pointer';
+    enderecoContainer.onclick = () => {
+      window.location.href = '../pages/usuario-perfil.html#enderecos';
+    };
+  }
 }
+
+/**
+ * Mostrar modal para alterar endereço principal
+ */
+async function mostrarModalAlterarEndereco(currentAddressId) {
+  try {
+    console.log('Carregando endereços para alteração...');
+    
+    // Buscar todos os endereços do usuário
+    const enderecos = await getAddresses();
+    
+    if (enderecos.length <= 1) {
+      alert('Você não tem endereços adicionais para alternar.');
+      return;
+    }
+    
+    // Criar modal dinamicamente
+    const modalHtml = `
+      <div id="modal-alterar-endereco" class="modal" style="display: block;">
+        <div class="div-overlay" onclick="fecharModalEndereco()"></div>
+        <div class="modal-content-metricas">
+          <div class="header-modal">
+            <i class="fa-solid fa-xmark fechar-modal" onclick="fecharModalEndereco()"></i>
+            <h2>Alterar Endereço Principal</h2>
+          </div>
+          
+          <div class="conteudo-modal">
+            <p>Selecione um endereço para definir como principal:</p>
+            <div id="lista-enderecos-alteracao">
+              ${enderecos.map(endereco => `
+                <div class="endereco-item" data-address-id="${endereco.id}" style="padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 5px; cursor: pointer; ${endereco.id === currentAddressId ? 'background-color: #f0f0f0;' : ''}">
+                  <strong>${endereco.street}, ${endereco.number || 'S/N'}</strong>
+                  ${endereco.complement ? `<br><small>${endereco.complement}</small>` : ''}
+                  <br>
+                  <small>${endereco.neighborhood} - ${endereco.city}/${endereco.state}</small>
+                  <br>
+                  <small>CEP: ${formatarCEP(endereco.zip_code)}</small>
+                  ${endereco.id === currentAddressId ? '<br><span style="color: green; font-weight: bold;">✓ Endereço Atual</span>' : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Remover modal anterior se existir
+    const existingModal = document.getElementById('modal-alterar-endereco');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Adicionar modal ao DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Adicionar eventos de clique nos itens
+    document.querySelectorAll('#lista-enderecos-alteracao .endereco-item').forEach(item => {
+      item.addEventListener('click', async () => {
+        const addressId = item.getAttribute('data-address-id');
+        if (addressId && addressId !== String(currentAddressId)) {
+          await alterarEnderecoPrincipal(addressId);
+        }
+      });
+    });
+    
+  } catch (error) {
+    console.error('Erro ao mostrar modal de alteração de endereço:', error.message);
+    alert('Erro ao carregar endereços. Tente novamente.');
+  }
+}
+
+/**
+ * Alterar endereço principal
+ */
+async function alterarEnderecoPrincipal(addressId) {
+  try {
+    console.log('Alterando endereço principal para ID:', addressId);
+    
+    await setDefaultAddress(Number(addressId));
+    
+    console.log('Endereço principal alterado com sucesso');
+    
+    // Fechar modal
+    fecharModalEndereco();
+    
+    // Recarregar endereço no header
+    await carregarEndereco();
+    
+    // Mostrar mensagem de sucesso
+    if (typeof showToast === 'function') {
+      showToast('Endereço principal alterado com sucesso!', 'success');
+    } else {
+      alert('Endereço principal alterado com sucesso!');
+    }
+    
+  } catch (error) {
+    console.error('Erro ao alterar endereço principal:', error.message);
+    alert('Erro ao alterar endereço principal. Tente novamente.');
+  }
+}
+
+/**
+ * Fechar modal de endereço
+ */
+function fecharModalEndereco() {
+  const modal = document.getElementById('modal-alterar-endereco');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Expor função globalmente
+window.fecharModalEndereco = fecharModalEndereco;
 
 /**
  * Ocultar endereço
