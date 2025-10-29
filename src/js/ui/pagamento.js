@@ -127,19 +127,15 @@ const VALIDATION_LIMITS = {
     function escapeHTML(text) {
         if (typeof text !== 'string') return String(text || '');
         
-        // Usar DOMPurify se disponível, senão usar método básico
+        // Usar DOMPurify se disponível para sanitização robusta
         if (typeof DOMPurify !== 'undefined') {
-            return DOMPurify.sanitize(text);
+            return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
         }
         
-        // Método básico de sanitização
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#x27;')
-            .replace(/\//g, '&#x2F;');
+        // Fallback: usar DOM nativo (mais seguro que regex)
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function buildImageUrl(imagePath, imageHash = null) {
@@ -269,11 +265,7 @@ const VALIDATION_LIMITS = {
         }
     }
 
-    // Carregar endereço do usuário (compatibilidade)
-    function carregarEndereco() {
-        // Esta função é mantida para compatibilidade
-        // O carregamento real é feito em carregarEnderecos()
-    }
+    // REMOVED: Função vazia mantida por compatibilidade - não é mais necessária
 
     // Carregar pontos Royal do usuário via API
     async function carregarPontos() {
@@ -738,6 +730,7 @@ const VALIDATION_LIMITS = {
 
 
     function selecionarEndereco(enderecoId) {
+        // Verifica se é requisição para adicionar novo endereço
         if (enderecoId === 'novo') {
             abrirModalAdicionarEndereco();
             return;
@@ -1381,16 +1374,7 @@ const VALIDATION_LIMITS = {
         console.log('Página de pagamento inicializada com sucesso');
     }
 
-    // Função legada para seleção de endereço
-    function selecionarEndereco(enderecoId) {
-        const endereco = state.enderecos.find(addr => addr.id === enderecoId);
-        if (endereco) {
-            state.enderecoSelecionado = endereco;
-            state.endereco = endereco;
-            renderEndereco();
-            renderListaEnderecos();
-        }
-    }
+    // REMOVED: Função duplicada - usar implementação principal na linha 740
 
     // ====== MODAIS DE TROCO E REVISÃO ======
     

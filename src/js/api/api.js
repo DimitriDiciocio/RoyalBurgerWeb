@@ -106,7 +106,7 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
             
             if (response.status === 0 || response.status >= 500) {
                 // Servidor não está respondendo ou erro interno
-                errorMessage = 'Servidor temporariamente indisponível. Verifique sua conexão e tente novamente.';
+                errorMessage = (data && (data.error || data.message)) || 'Servidor temporariamente indisponível. Verifique sua conexão e tente novamente.';
             } else if (response.status === 404) {
                 // Verificar se é erro de login (credenciais inválidas) ou endpoint não encontrado
                 const isLoginEndpoint = path.includes('/login') || path.includes('/users/login');

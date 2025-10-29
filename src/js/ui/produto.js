@@ -2,7 +2,7 @@
 
 import { getProductById, getProductIngredients, getProductImageUrl } from '../api/products.js';
 import { getIngredients } from '../api/ingredients.js';
-import { addToCart, updateCartItem } from '../api/cart.js';
+import { addToCart, updateCartItem, getCart } from '../api/cart.js';
 import { showToast } from './alerts.js';
 
 // Constantes para validação e limites
@@ -28,7 +28,8 @@ const VALIDATION_LIMITS = {
         ingredientesPorcaoBase: [],
         ingredientesExtras: [],
         editIndex: null,
-        isEditing: false
+        isEditing: false,
+        cartItemId: null
     };
 
     // DOM refs
@@ -60,6 +61,20 @@ const VALIDATION_LIMITS = {
         const n = parseFloat(v);
         return Number.isFinite(n) ? n : null;
     };
+
+    // Trata mensagens de erro vindas do backend de forma amigável
+    function getFriendlyAddToCartError(rawMessage) {
+        const msg = (rawMessage || '').toString();
+        if (!msg) return 'Não foi possível adicionar o item à cesta. Tente novamente.';
+        // Erros conhecidos
+        if (msg.includes('Estoque insuficiente')) return msg; // já vem explicativo do backend
+        if (msg.includes('da receita base')) return 'Você tentou adicionar um ingrediente da receita base como extra. Ajuste apenas os extras.';
+        if (msg.toLowerCase().includes('unauthorized') || msg.includes('Sessão expirada')) return 'Sua sessão expirou. Faça login e tente novamente.';
+        if (msg.includes('Serviço não encontrado')) return 'Serviço indisponível. Verifique se o servidor está em execução.';
+        // Fallback: exibir a mensagem do backend se não for genérica
+        if (!/^erro\s?\d+/i.test(msg)) return msg;
+        return 'Não foi possível adicionar o item à cesta. Tente novamente.';
+    }
 
     // SECURITY FIX: Sanitização robusta contra XSS
     function escapeHTML(text) {
@@ -199,6 +214,18 @@ const VALIDATION_LIMITS = {
         }
     }
 
+    function getCartItemIdFromUrl() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const raw = params.get('cartItemId');
+            if (!raw) return null;
+            const id = parseInt(raw, 10);
+            return Number.isInteger(id) && id > 0 ? id : null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
     function updateTitle() {
         if (state.product?.name) {
             document.title = `${escapeHTML(state.product.name)} - Royal Burguer`;
@@ -228,12 +255,27 @@ const VALIDATION_LIMITS = {
     }
 
     function updateTotals() {
+        // Calcular total de extras e modificações de base
+        // EXTRAS (basePortions = 0): cobrar pela quantidade total
+        // BASE_MODIFICATIONS (basePortions > 0): cobrar apenas pelo delta positivo
         const extrasTotal = Array.from(state.extrasById.values()).reduce((sum, extra) => {
-            const additionalQty = Math.max(extra.quantity, 0);
-            return sum + (extra.price * additionalQty);
+            if (extra.basePortions > 0) {
+                // Modificação de receita base: cobrar apenas se delta > 0
+                const delta = extra.quantity || 0;
+                if (delta > 0) {
+                    return sum + (extra.price * delta);
+                }
+                return sum;
+            } else {
+                // Extra adicional: cobrar pela quantidade total
+                const qty = Math.max(extra.quantity, 0);
+                return sum + (extra.price * qty);
+            }
         }, 0);
+        
         const unitTotal = state.basePrice + extrasTotal;
         const total = unitTotal * state.quantity;
+        
         if (el.precoQuadro) el.precoQuadro.textContent = formatBRL(total);
         if (el.qtdTexto) el.qtdTexto.textContent = String(state.quantity).padStart(2, '0');
     }
@@ -589,25 +631,47 @@ const VALIDATION_LIMITS = {
 
                 // Preparar dados para a API
                 const productId = state.product.id;
-                const quantity = state.quantity;
+                const quantity = Math.max(1, parseInt(state.quantity, 10) || 1);
+                
+                // EXTRAS: ingredientes fora da receita base (basePortions === 0) com quantity > 0
                 const extras = Array.from(state.extrasById.values())
-                    .filter(extra => extra.quantity > 0)
-                    .map(extra => ({
-                        ingredient_id: extra.id,
-                        quantity: extra.quantity
-                    }));
+                    .filter(extra => (extra?.basePortions ?? 0) === 0)
+                    .filter(extra => Number.isFinite(extra.quantity) && extra.quantity > 0)
+                    .map(extra => {
+                        const id = parseInt(extra.id, 10);
+                        const qty = parseInt(extra.quantity, 10);
+                        return {
+                            ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                            quantity: Number.isInteger(qty) && qty > 0 ? Math.min(qty, 999) : null
+                        };
+                    })
+                    .filter(e => e.ingredient_id !== null && e.quantity !== null)
+                    .slice(0, 10); // respeitar limite máximo de extras
+                
+                // BASE_MODIFICATIONS: ingredientes da receita base (basePortions > 0) com delta != 0
+                const base_modifications = Array.from(state.extrasById.values())
+                    .filter(extra => (extra?.basePortions ?? 0) > 0)
+                    .filter(extra => Number.isFinite(extra.quantity) && extra.quantity !== 0)
+                    .map(extra => {
+                        const id = parseInt(extra.id, 10);
+                        const delta = parseInt(extra.quantity, 10);
+                        return {
+                            ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                            delta: Number.isInteger(delta) && delta !== 0 ? delta : null
+                        };
+                    })
+                    .filter(bm => bm.ingredient_id !== null && bm.delta !== null);
+                
                 const notes = el.obsInput?.value || '';
 
                 let result;
 
-                if (state.isEditing && state.editIndex !== null) {
-                    // Atualizar item existente na cesta
-                    // Nota: Para edição, precisaríamos do cart_item_id do item existente
-                    // Por enquanto, vamos adicionar como novo item
-                    result = await addToCart(productId, quantity, extras, notes);
+                if (state.isEditing && state.cartItemId) {
+                    // Atualizar item existente na cesta por cart item id
+                    result = await updateCartItem(state.cartItemId, { quantity, extras, notes, base_modifications });
                 } else {
                     // Adicionar novo item à cesta
-                    result = await addToCart(productId, quantity, extras, notes);
+                    result = await addToCart(productId, quantity, extras, notes, base_modifications);
                 }
 
                 if (result.success) {
@@ -648,14 +712,19 @@ const VALIDATION_LIMITS = {
                 // TODO: Implementar logging estruturado em produção
                 console.error('Erro ao adicionar à cesta:', err.message);
                 
+                const friendly = getFriendlyAddToCartError(err?.message);
                 if (typeof showToast === 'function') {
-                    showToast('Erro ao adicionar item à cesta. Tente novamente.', {
+                    showToast(friendly, {
                         type: 'error',
-                        title: 'Erro',
-                        autoClose: 4000
+                        title: 'Não foi possível adicionar',
+                        autoClose: 5000
                     });
                 } else {
-                    alert('Erro ao adicionar item à cesta. Tente novamente.');
+                    alert(friendly);
+                }
+                // Em caso de estoque insuficiente, opcionalmente abrir a modal de extras
+                if (err?.message && err.message.includes('Estoque insuficiente')) {
+                    openExtrasModal();
                 }
             } finally {
                 // Reabilitar botão
@@ -717,7 +786,8 @@ const VALIDATION_LIMITS = {
     async function loadProduto() {
         state.productId = getIdFromUrl();
         state.editIndex = getEditIndexFromUrl();
-        state.isEditing = state.editIndex !== null;
+        state.cartItemId = getCartItemIdFromUrl();
+        state.isEditing = (state.editIndex !== null) || (state.cartItemId !== null);
         
         if (!state.productId) return;
         
@@ -729,13 +799,19 @@ const VALIDATION_LIMITS = {
             state.product = produto;
             updateTitle();
             renderProdutoInfo();
+            
+            // Se está editando, carregar dados do item da cesta ANTES de renderizar ingredientes
+            if (state.isEditing) {
+                if (state.cartItemId) {
+                    await loadItemFromApiByCartId(state.cartItemId);
+                } else {
+                    loadItemFromCart();
+                }
+            }
+            
+            // Renderizar ingredientes após carregar dados do carrinho (se estiver editando)
             renderMonteSeuJeitoList();
             updateExtrasBadge();
-            
-            // Se está editando, carregar dados do item da cesta
-            if (state.isEditing) {
-                loadItemFromCart();
-            }
         } catch (err) {
             // TODO: Implementar logging estruturado em produção
             if (window.location.hostname === 'localhost') {
@@ -785,6 +861,92 @@ const VALIDATION_LIMITS = {
         } catch (err) {
             // TODO: Implementar logging estruturado em produção
             console.error('Erro ao carregar item da cesta:', err.message);
+        }
+    }
+
+    async function loadItemFromApiByCartId(cartItemId) {
+        try {
+            const cartResp = await getCart();
+            const items = cartResp?.data?.items || cartResp?.data?.cart?.items || [];
+            const found = items.find(it => it?.id === cartItemId);
+            if (!found) return;
+
+            // quantidade
+            state.quantity = Math.max(1, parseInt(found.quantity, 10) || 1);
+
+            // observação
+            if (el.obsInput) {
+                el.obsInput.value = found.notes || '';
+            }
+
+            // Usar os ingredientes que já foram carregados em state.ingredientes
+            const ingredientsMap = new Map();
+            const ingredientPriceMap = new Map();
+            
+            (state.ingredientes || []).forEach(ing => {
+                const ingId = ing.ingredient_id || ing.id;
+                ingredientsMap.set(ingId, parseFloat(ing.portions || 0));
+                
+                const price = toNum(ing.additional_price) ?? resolveAdditionalPrice(ing) ?? 0;
+                ingredientPriceMap.set(ingId, price);
+            });
+
+            // extras (ingredientes adicionais, basePortions = 0)
+            (found.extras || []).forEach(extra => {
+                const id = extra.ingredient_id || extra.id;
+                const qty = parseInt(extra.quantity, 10) || 0;
+                const price = toNum(extra.ingredient_price) ?? 0;
+                state.extrasById.set(id, {
+                    id,
+                    name: extra.ingredient_name || 'Ingrediente',
+                    price: validatePrice(price),
+                    quantity: qty,
+                    basePortions: 0,
+                    minQuantity: 0,
+                    maxQuantity: 999
+                });
+            });
+
+            // base_modifications (modificações da receita base, basePortions > 0)
+            (found.base_modifications || []).forEach(bm => {
+                const id = bm.ingredient_id || bm.id;
+                const delta = parseInt(bm.delta, 10) || 0;
+                const basePortions = ingredientsMap.get(id) || 1;
+                const price = ingredientPriceMap.get(id) || 0;
+                
+                // Buscar minQuantity e maxQuantity do ingrediente original
+                const fullIng = state.ingredientes.find(i => (i.ingredient_id || i.id) === id);
+                const minQuantity = fullIng && Number.isFinite(parseFloat(fullIng.min_quantity)) 
+                    ? parseFloat(fullIng.min_quantity) 
+                    : basePortions;
+                const maxQuantity = fullIng && Number.isFinite(parseFloat(fullIng.max_quantity)) 
+                    ? parseFloat(fullIng.max_quantity) 
+                    : (basePortions + 999);
+                
+                state.extrasById.set(id, {
+                    id,
+                    name: bm.ingredient_name || fullIng?.name || 'Ingrediente',
+                    price: validatePrice(price),
+                    quantity: delta, // Mantém o delta para exibir corretamente na UI
+                    basePortions: basePortions,
+                    minQuantity: minQuantity,
+                    maxQuantity: maxQuantity
+                });
+            });
+
+            // Atualizar a UI da quantidade do produto
+            if (el.qtdTexto) {
+                el.qtdTexto.textContent = String(state.quantity).padStart(2, '0');
+            }
+            
+            // Atualizar estado dos botões de quantidade
+            toggleQtdMinusState();
+            
+            // Atualizar totais (renderização será feita no loadProduto)
+            updateTotals();
+        } catch (err) {
+            // TODO: Implementar logging estruturado em produção
+            console.error('Erro ao carregar item do carrinho:', err);
         }
     }
 

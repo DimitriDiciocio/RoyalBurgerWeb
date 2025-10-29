@@ -360,6 +360,59 @@
     line-height: 1;
 }
 
+/* Estilos para modificações da receita base */
+.item-base-mods-list {
+    padding: 0;
+}
+
+.item-base-mods-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.item-base-mods-list li {
+    font-size: 0.85rem;
+    color: #757575;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.base-mod-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+}
+
+.base-mod-icon.mod-add {
+    color: #4caf50;
+    background-color: rgba(76, 175, 80, 0.1);
+}
+
+.base-mod-icon.mod-remove {
+    color: #f44336;
+    background-color: rgba(244, 67, 54, 0.1);
+}
+
+.base-mod-quantity {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #424242;
+}
+
+.base-mod-name {
+    flex: 1;
+}
+
 /* Observação */
 .item-observacao {
     font-size: 0.85rem;

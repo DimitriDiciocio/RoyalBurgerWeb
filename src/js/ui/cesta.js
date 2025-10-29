@@ -15,7 +15,6 @@ const VALIDATION_LIMITS = {
 const state = {
     itens: [],
     taxaEntrega: 5.00,
-    taxaServico: 1.00,
     descontos: 0.00,
     subtotal: 0,
     total: 0
@@ -30,7 +29,6 @@ const el = {
     listaItens: null,
     subtotal: null,
     taxaEntrega: null,
-    taxaServico: null,
     descontos: null,
     total: null,
     footerTotal: null,
@@ -56,19 +54,15 @@ const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', cur
 function escapeHTML(text) {
     if (typeof text !== 'string') return String(text || '');
     
-    // Usar DOMPurify se disponível, senão usar método básico
+    // Usar DOMPurify se disponível para sanitização robusta
     if (typeof DOMPurify !== 'undefined') {
-        return DOMPurify.sanitize(text);
+        return DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
     }
     
-    // Método básico de sanitização
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\//g, '&#x2F;');
+    // Fallback: usar DOM nativo (mais seguro que regex)
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 /**
@@ -148,43 +142,88 @@ function buildImageUrl(imagePath, imageHash = null) {
 async function carregarCesta() {
     try {
         const result = await getCart();
+        
         if (result.success) {
             // Converter dados da API para formato local
-            const apiItems = result.data.items || [];
+            // CORREÇÃO: API retorna diferentes estruturas para usuário logado vs convidado
+            // Usuário logado: result.data.items
+            // Convidado: result.data.cart.items
+            let apiItems = [];
+            
+            if (result.data.items) {
+                // Usuário autenticado
+                apiItems = result.data.items;
+            } else if (result.data.cart?.items) {
+                // Convidado: cart tem items dentro
+                apiItems = result.data.cart.items;
+            } else if (result.data.cart && Array.isArray(result.data.cart)) {
+                // Convidado: cart é o array direto
+                apiItems = result.data.cart;
+            } else {
+                apiItems = [];
+            }
             
             // Validar dados antes de processar
             if (!isValidCartData(apiItems)) {
                 throw new Error('Dados do carrinho inválidos');
             }
             
-            state.itens = apiItems.map(item => ({
-                id: item.product_id,
-                nome: item.product.name,
-                descricao: item.product.description,
-                imagem: item.product.image_url,
-                imageHash: item.product.image_hash,
-                precoBase: item.product.price,
-                quantidade: item.quantity,
-                extras: (item.extras || []).map(extra => ({
-                    id: extra.ingredient_id,
-                    nome: extra.ingredient_name,
-                    preco: extra.ingredient_price,
-                    quantidade: extra.quantity
-                })),
-                observacao: item.notes || '',
-                precoUnitario: item.item_subtotal / item.quantity,
-                precoTotal: item.item_subtotal,
-                cartItemId: item.id, // ID do item no carrinho da API
-                timestamp: Date.now()
-            }));
+            state.itens = apiItems.map(item => {
+                const produto = item.product || {};
+                
+                // Mapear EXTRAS (ingredientes adicionais fora da receita)
+                const rawExtras = item.extras || item.additional_items || item.additional_ingredients || item.ingredients_extras || [];
+                const extrasMapeados = (Array.isArray(rawExtras) ? rawExtras : []).map(extra => {
+                    const id = extra.ingredient_id ?? extra.id;
+                    const nome = extra.ingredient_name ?? extra.name ?? extra.title ?? 'Ingrediente';
+                    const preco = parseFloat(extra.ingredient_price ?? extra.price ?? extra.additional_price ?? 0) || 0;
+                    const quantidade = parseInt(extra.quantity ?? extra.qty ?? 0, 10) || 0;
+                    return { id, nome, preco, quantidade };
+                });
+
+                // Mapear BASE_MODIFICATIONS (modificações da receita base)
+                const rawBaseMods = item.base_modifications || [];
+                const baseModsMapeados = (Array.isArray(rawBaseMods) ? rawBaseMods : []).map(bm => {
+                    const id = bm.ingredient_id ?? bm.id;
+                    const nome = bm.ingredient_name ?? bm.name ?? 'Ingrediente';
+                    const delta = parseInt(bm.delta ?? 0, 10) || 0;
+                    return { id, nome, delta };
+                });
+
+                const quantidade = parseInt(item.quantity, 10) || 1;
+                const precoBaseNum = parseFloat(produto.price) || 0;
+                const extrasTotal = parseFloat(item.extras_total ?? 0) || 0;
+                const baseModsTotal = parseFloat(item.base_mods_total ?? 0) || 0;
+
+                const itemSubtotal = item.item_subtotal ?? item.subtotal ?? null;
+                const precoUnitario = (itemSubtotal && quantidade > 0)
+                    ? (parseFloat(itemSubtotal) / quantidade)
+                    : (precoBaseNum + extrasTotal + baseModsTotal);
+                const precoTotal = itemSubtotal ? parseFloat(itemSubtotal) : (precoUnitario * quantidade);
+
+                return {
+                    id: item.product_id,
+                    nome: produto.name,
+                    descricao: produto.description,
+                    imagem: produto.image_url,
+                    imageHash: produto.image_hash,
+                    precoBase: precoBaseNum,
+                    quantidade: quantidade,
+                    extras: extrasMapeados,
+                    base_modifications: baseModsMapeados,
+                    observacao: item.notes || '',
+                    precoUnitario: precoUnitario,
+                    precoTotal: precoTotal,
+                    cartItemId: item.id,
+                    timestamp: Date.now()
+                };
+            });
         } else {
-            // TODO: Implementar logging estruturado em produção
             console.error('Erro ao carregar cesta:', result.error);
             state.itens = [];
         }
     } catch (err) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao carregar cesta:', err.message);
+        console.error('Exceção ao carregar cesta:', err.message, err.stack);
         state.itens = [];
     }
     
@@ -238,9 +277,7 @@ async function verificarBackupCesta() {
             }
         }
     } catch (err) {
-        // TODO: Implementar logging estruturado em produção
         console.error('Erro ao restaurar backup da cesta:', err.message);
-        // Limpar backup corrompido
         localStorage.removeItem('royal_cesta_backup');
     }
     return false;
@@ -256,7 +293,6 @@ function salvarCesta() {
         
         localStorage.setItem('royal_cesta', JSON.stringify(state.itens));
     } catch (err) {
-        // TODO: Implementar logging estruturado em produção
         console.error('Erro ao salvar cesta:', err.message);
     }
 }
@@ -266,7 +302,11 @@ function calcularTotais() {
     state.subtotal = state.itens.reduce((sum, item) => {
         return sum + (item.precoTotal || 0);
     }, 0);
-    state.total = state.subtotal + state.taxaEntrega + state.taxaServico - state.descontos;
+    
+    // Taxa de entrega só é aplicada se houver itens na cesta
+    const taxaEntrega = state.itens.length > 0 ? state.taxaEntrega : 0;
+    
+    state.total = state.subtotal + taxaEntrega - state.descontos;
 }
 
 // Calcular pontos Royal (10 pontos a cada R$ 1,00 gasto)
@@ -278,7 +318,7 @@ function calcularPontos() {
 function renderItem(item, index) {
     const imageUrl = buildImageUrl(item.imagem, item.imageHash);
     
-    // Renderizar lista de extras/modificações
+    // Renderizar lista de EXTRAS (ingredientes adicionais)
     let extrasHtml = '';
     if (item.extras && item.extras.length > 0) {
         const extrasItems = item.extras.map(extra => {
@@ -287,8 +327,38 @@ function renderItem(item, index) {
         extrasHtml = `
             <div class="item-extras-separator"></div>
             <div class="item-extras-list">
+                <strong>Extras:</strong>
                 <ul>
                     ${extrasItems}
+                </ul>
+            </div>
+        `;
+    }
+
+    // Renderizar lista de BASE_MODIFICATIONS (modificações da receita base)
+    let baseModsHtml = '';
+    if (item.base_modifications && item.base_modifications.length > 0) {
+        const baseModsItems = item.base_modifications.map(bm => {
+            const isPositive = bm.delta > 0;
+            const icon = isPositive ? '+' : '-';
+            const colorClass = isPositive ? 'mod-add' : 'mod-remove';
+            const deltaValue = Math.abs(bm.delta);
+            return `
+                <li>
+                    <span class="base-mod-icon ${colorClass}">
+                        <i class="fa-solid fa-circle-${isPositive ? 'plus' : 'minus'}"></i>
+                    </span>
+                    <span class="base-mod-quantity">${deltaValue}</span>
+                    <span class="base-mod-name">${escapeHTML(bm.nome)}</span>
+                </li>
+            `;
+        }).join('');
+        baseModsHtml = `
+            <div class="item-extras-separator"></div>
+            <div class="item-base-mods-list">
+                <strong>Modificações:</strong>
+                <ul>
+                    ${baseModsItems}
                 </ul>
             </div>
         `;
@@ -317,6 +387,7 @@ function renderItem(item, index) {
                 </button>
             </div>
             ${extrasHtml}
+            ${baseModsHtml}
             ${obsHtml}
             <div class="item-extras-separator"></div>
             <div class="item-footer">
@@ -359,6 +430,10 @@ function renderCesta() {
         if (el.itemsContainer) el.itemsContainer.style.display = 'none';
         if (el.resumoContainer) el.resumoContainer.style.display = 'none';
         if (el.btnLimpar) el.btnLimpar.style.display = 'none';
+        
+        // Atualizar footer-total mesmo quando vazio
+        if (el.footerTotal) el.footerTotal.textContent = formatBRL(state.total);
+        
         atualizarHeaderCesta();
         atualizarBotaoFlutuante();
         atualizarPontosHeader();
@@ -377,7 +452,6 @@ function renderCesta() {
     // Atualizar valores
     if (el.subtotal) el.subtotal.textContent = formatBRL(state.subtotal);
     if (el.taxaEntrega) el.taxaEntrega.textContent = formatBRL(state.taxaEntrega);
-    if (el.taxaServico) el.taxaServico.textContent = formatBRL(state.taxaServico);
     if (el.descontos) el.descontos.textContent = formatBRL(state.descontos);
     if (el.total) el.total.textContent = formatBRL(state.total);
     if (el.footerTotal) el.footerTotal.textContent = formatBRL(state.total);
@@ -447,9 +521,8 @@ async function alterarQuantidade(index, delta) {
     try {
         const result = await updateCartItem(item.cartItemId, { quantity: novaQtd });
         if (result.success) {
-            item.quantidade = novaQtd;
-            item.precoTotal = item.precoUnitario * item.quantidade;
-            renderCesta();
+            // Recarregar cesta da API para garantir sincronização
+            await carregarCesta();
         } else {
             showToast('Erro ao atualizar quantidade. Tente novamente.', {
                 type: 'error',
@@ -458,7 +531,6 @@ async function alterarQuantidade(index, delta) {
             });
         }
     } catch (err) {
-        // TODO: Implementar logging estruturado em produção
         console.error('Erro ao alterar quantidade:', err.message);
         showToast('Erro ao atualizar quantidade. Tente novamente.', {
             type: 'error',
@@ -477,8 +549,8 @@ async function removerItem(index) {
     try {
         const result = await removeCartItem(item.cartItemId);
         if (result.success) {
-            state.itens.splice(index, 1);
-            renderCesta();
+            // Recarregar cesta da API para garantir sincronização
+            await carregarCesta();
         } else {
             showToast('Erro ao remover item. Tente novamente.', {
                 type: 'error',
@@ -487,7 +559,6 @@ async function removerItem(index) {
             });
         }
     } catch (err) {
-        // TODO: Implementar logging estruturado em produção
         console.error('Erro ao remover item:', err.message);
         showToast('Erro ao remover item. Tente novamente.', {
             type: 'error',
@@ -514,8 +585,8 @@ async function limparCesta() {
     try {
         const result = await clearCart();
         if (result.success) {
-            state.itens = [];
-            renderCesta();
+            // Recarregar cesta da API para garantir sincronização
+            await carregarCesta();
             showToast('Cesta limpa com sucesso!', {
                 type: 'success',
                 title: 'Cesta Limpa',
@@ -529,7 +600,6 @@ async function limparCesta() {
             });
         }
     } catch (err) {
-        // TODO: Implementar logging estruturado em produção
         console.error('Erro ao limpar cesta:', err.message);
         showToast('Erro ao limpar cesta. Tente novamente.', {
             type: 'error',
@@ -545,7 +615,8 @@ function editarItem(index) {
 
     const item = state.itens[index];
     // Redirecionar para página do produto com índice de edição
-    window.location.href = `src/pages/produto.html?id=${item.id}&editIndex=${index}`;
+    const cartItemId = item.cartItemId || item.id;
+    window.location.href = `src/pages/produto.html?id=${item.id}&editIndex=${index}&cartItemId=${cartItemId}`;
 }
 
 // Anexar eventos aos itens
@@ -591,7 +662,6 @@ function initElements() {
     el.listaItens = document.getElementById('lista-itens-modal');
     el.subtotal = document.getElementById('modal-subtotal');
     el.taxaEntrega = document.getElementById('modal-taxa-entrega');
-    el.taxaServico = document.getElementById('modal-taxa-servico');
     el.descontos = document.getElementById('modal-descontos');
     el.total = document.getElementById('modal-total');
     el.footerTotal = document.getElementById('modal-footer-total');
@@ -676,7 +746,8 @@ function attachGlobalHandlers() {
                 if (mutation.attributeName === 'style') {
                     const display = window.getComputedStyle(el.modal).display;
                     if (display !== 'none') {
-                        // Apenas renderizar, não recarregar da API
+                        // Renderizar com dados já carregados
+                        // (o carregamento é feito nos handlers de click)
                         renderCesta();
                     }
                 }
@@ -705,6 +776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Verificar se deve abrir a modal automaticamente (após adicionar produto)
     const abrirModal = localStorage.getItem('royal_abrir_modal_cesta');
+    
     if (abrirModal === 'true') {
         // Remover flag
         localStorage.removeItem('royal_abrir_modal_cesta');
@@ -716,8 +788,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             autoClose: 3000
         });
         
-        // Abrir modal após um pequeno delay para garantir que tudo está carregado
-        setTimeout(() => {
+        // Recarregar cesta antes de abrir a modal para pegar item recém-adicionado
+        setTimeout(async () => {
+            await carregarCesta();
             if (window.abrirModal && el.modal) {
                 window.abrirModal('modal-cesta');
             }

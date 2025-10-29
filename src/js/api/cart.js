@@ -72,10 +72,21 @@ function getCartIdFromStorage() {
         if (!cartData) return null;
         
         const parsed = JSON.parse(cartData);
-        return parsed?.cartId || null;
+        const cartId = parsed?.cartId;
+        
+        // Validar e normalizar cart ID
+        if (cartId == null) return null; // Captura null e undefined
+        
+        const cartIdStr = String(cartId).trim();
+        
+        // Validar se é uma string válida (não vazia e não literal 'undefined'/'null')
+        if (!cartIdStr || cartIdStr === 'undefined' || cartIdStr === 'null') {
+            return null;
+        }
+        
+        return cartIdStr;
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.warn('Erro ao parsear dados do carrinho:', error.message);
+        console.error('Erro ao parsear dados do carrinho:', error.message);
         return null;
     }
 }
@@ -87,7 +98,15 @@ function getCartIdFromStorage() {
  */
 function saveCartToStorage(cartId, items = []) {
     try {
-        if (!cartId || typeof cartId !== 'string') {
+        // Validar cart ID
+        if (cartId == null) {
+            throw new Error('Cart ID inválido (vazio)');
+        }
+        
+        // Normalizar para string
+        const cartIdStr = String(cartId).trim();
+        
+        if (!cartIdStr || cartIdStr === 'undefined' || cartIdStr === 'null') {
             throw new Error('Cart ID inválido');
         }
         
@@ -95,13 +114,14 @@ function saveCartToStorage(cartId, items = []) {
             throw new Error('Items deve ser um array');
         }
         
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({
-            cartId,
+        const dataToSave = {
+            cartId: cartIdStr,
             items,
             timestamp: Date.now()
-        }));
+        };
+        
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(dataToSave));
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
         console.error('Erro ao salvar carrinho no localStorage:', error.message);
     }
 }
@@ -121,7 +141,7 @@ function clearCartFromStorage() {
  * @param {string} notes - Observações
  * @returns {Promise<Object>} Resultado da operação
  */
-export async function addToCart(productId, quantity = 1, extras = [], notes = '') {
+export async function addToCart(productId, quantity = 1, extras = [], notes = '', base_modifications = []) {
     try {
         // Validar parâmetros de entrada
         if (!isValidProductId(productId)) {
@@ -142,13 +162,46 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
         
         const isAuth = isAuthenticated();
         const cartId = getCartIdFromStorage();
-        
+
+        // Normalizar extras para garantir formato aceito pelo backend
+        const normalizedExtras = Array.isArray(extras)
+            ? extras
+                .map((e) => {
+                    const id = parseInt(e?.ingredient_id ?? e?.id, 10);
+                    const qty = parseInt(e?.quantity, 10);
+                    return {
+                        ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                        quantity: Number.isInteger(qty) && qty > 0 ? Math.min(qty, VALIDATION_LIMITS.MAX_QUANTITY) : null
+                    };
+                })
+                .filter((e) => e.ingredient_id !== null && e.quantity !== null)
+            : [];
+
+        // Normalizar base_modifications para garantir formato aceito pelo backend
+        const normalizedBaseMods = Array.isArray(base_modifications)
+            ? base_modifications
+                .map((bm) => {
+                    const id = parseInt(bm?.ingredient_id, 10);
+                    const delta = parseInt(bm?.delta, 10);
+                    return {
+                        ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                        delta: Number.isInteger(delta) && delta !== 0 ? delta : null
+                    };
+                })
+                .filter((bm) => bm.ingredient_id !== null && bm.delta !== null)
+            : [];
+
         const payload = {
             product_id: Number(productId),
             quantity: Number(quantity),
-            extras: Array.isArray(extras) ? extras : [],
-            notes: String(notes || '')
+            extras: normalizedExtras,
+            notes: String(notes || '').slice(0, VALIDATION_LIMITS.MAX_NOTES_LENGTH)
         };
+
+        // Adicionar base_modifications apenas se não estiver vazio
+        if (normalizedBaseMods.length > 0) {
+            payload.base_modifications = normalizedBaseMods;
+        }
 
         // Se não logado, inclui cart_id no payload (se existir)
         if (!isAuth && cartId) {
@@ -204,7 +257,7 @@ export async function getCart() {
             const cartId = getCartIdFromStorage();
             
             // Se é um ID de fallback antigo, limpar e retornar carrinho vazio
-            if (cartId && cartId.startsWith('fallback_')) {
+            if (cartId && typeof cartId === 'string' && cartId.startsWith('fallback_')) {
                 clearCartFromStorage();
                 return {
                     success: true,
@@ -419,19 +472,45 @@ export async function syncCart() {
 }
 
 /**
- * Limpa carrinho do usuário logado
+ * Limpa carrinho (usuário logado ou convidado)
  * @returns {Promise<Object>} Resultado da operação
  */
 export async function clearCart() {
     try {
-        const data = await apiRequest('/api/cart/me/clear', {
-            method: 'DELETE'
-        });
+        const isAuth = isAuthenticated();
+        const cartId = getCartIdFromStorage();
 
-        return {
-            success: true,
-            message: data.message
-        };
+        if (isAuth) {
+            // Usuário autenticado: usar rota /me/clear
+            const data = await apiRequest('/api/cart/me/clear', {
+                method: 'DELETE'
+            });
+
+            return {
+                success: true,
+                message: data.message
+            };
+        } else {
+            // Convidado: limpar localStorage e itens do carrinho via API
+            if (cartId) {
+                // Buscar todos os itens do carrinho
+                const cartData = await getCart();
+                const items = cartData?.data?.items || cartData?.data?.cart?.items || [];
+                
+                // Remover cada item individualmente
+                for (const item of items) {
+                    await removeCartItem(item.id);
+                }
+            }
+            
+            // Limpar localStorage
+            clearCartFromStorage();
+
+            return {
+                success: true,
+                message: 'Carrinho limpo com sucesso'
+            };
+        }
     } catch (error) {
         // TODO: Implementar logging estruturado em produção
         console.error('Erro ao limpar carrinho:', error.message);
