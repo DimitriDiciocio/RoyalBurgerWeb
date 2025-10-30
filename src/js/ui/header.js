@@ -20,6 +20,9 @@ const VALIDATION_LIMITS = {
 };
 
 // Função para verificar se o usuário está logado
+// NOTA DE SEGURANÇA: Esta validação é apenas estrutural (formato JWT).
+// A validação de assinatura e expiração é feita no backend.
+// Não confie apenas nesta validação para decisões de segurança críticas.
 function isUserLoggedIn() {
   try {
     // Verifica tokens possíveis (compatibilidade): rb.token e authToken
@@ -31,7 +34,7 @@ function isUserLoggedIn() {
     // Verificar se não é apenas espaços ou caracteres inválidos
     if (token.trim() === '') return false;
     
-    // Validação básica de JWT (3 partes separadas por ponto)
+    // Validação básica de JWT (3 partes: header.payload.signature)
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) return false;
     
@@ -39,7 +42,8 @@ function isUserLoggedIn() {
     return tokenParts.every(part => part.length > 0);
   } catch (error) {
     // Log apenas em desenvolvimento
-    if (process.env.NODE_ENV === 'development') {
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
       console.warn('Erro ao verificar login:', error);
     }
     return false;
@@ -63,7 +67,8 @@ function getStoredUser() {
     return sanitizeUserData(user);
   } catch (error) {
     // Log apenas em desenvolvimento
-    if (process.env.NODE_ENV === 'development') {
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
       console.warn('Erro ao obter usuário:', error);
     }
     return null;
@@ -357,23 +362,26 @@ async function carregarPontos() {
   }
 
   try {
-    console.log('Carregando pontos do usuário ID:', usuario.id);
-    
     // Buscar pontos na API
     const balance = await getLoyaltyBalance(usuario.id);
     
-    if (balance && typeof balance.balance === 'number') {
-      pontosAtuais = balance.balance;
-      console.log('Pontos carregados:', pontosAtuais);
+    // A API retorna current_balance, não balance
+    if (balance && typeof balance.current_balance === 'number') {
+      pontosAtuais = balance.current_balance;
       atualizarExibicaoPontos();
     } else {
-      console.log('Nenhum ponto encontrado');
       pontosAtuais = 0;
       atualizarExibicaoPontos();
     }
   } catch (error) {
-    console.error('Erro ao carregar pontos:', error.message);
-    ocultarPontos();
+    // Log apenas em desenvolvimento
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.error('Erro ao carregar pontos:', error.message);
+    }
+    // Mesmo com erro, mostrar 0 pontos em vez de ocultar
+    pontosAtuais = 0;
+    atualizarExibicaoPontos();
   }
 }
 
@@ -381,16 +389,19 @@ async function carregarPontos() {
  * Atualizar exibição dos pontos
  */
 function atualizarExibicaoPontos() {
-  const pontosElement = document.querySelector('.pontos-royal p');
-  if (!pontosElement) return;
-
-  if (pontosAtuais > 0) {
-    pontosElement.textContent = `${pontosAtuais} pts`;
-    pontosElement.parentElement.style.display = 'flex';
-    pontosElement.parentElement.style.visibility = 'visible';
-    pontosElement.parentElement.style.opacity = '1';
-  } else {
-    ocultarPontos();
+  const pontosCountElement = document.querySelector('#pontos-count');
+  const pontosContainer = document.querySelector('.pontos-royal');
+  
+  if (!pontosCountElement) return;
+  
+  // Atualizar o valor dos pontos
+  pontosCountElement.textContent = pontosAtuais;
+  
+  // Garantir que o container está visível
+  if (pontosContainer) {
+    pontosContainer.style.display = 'flex';
+    pontosContainer.style.visibility = 'visible';
+    pontosContainer.style.opacity = '1';
   }
 }
 
@@ -398,9 +409,9 @@ function atualizarExibicaoPontos() {
  * Ocultar exibição dos pontos
  */
 function ocultarPontos() {
-  const pontosElement = document.querySelector('.pontos-royal p');
-  if (pontosElement && pontosElement.parentElement) {
-    pontosElement.parentElement.style.display = 'none';
+  const pontosContainer = document.querySelector('.pontos-royal');
+  if (pontosContainer) {
+    pontosContainer.style.display = 'none';
   }
 }
 
@@ -410,12 +421,19 @@ function ocultarPontos() {
 function tentarInitPontos() {
   tentativasPontos++;
   
-  const pontosElement = document.querySelector('.pontos-royal p');
-  if (!pontosElement) {
+  const pontosCountElement = document.querySelector('#pontos-count');
+  const pontosContainer = document.querySelector('.pontos-royal');
+  
+  if (!pontosCountElement) {
     if (tentativasPontos < VALIDATION_LIMITS.MAX_RETRY_ATTEMPTS) {
       setTimeout(tentarInitPontos, VALIDATION_LIMITS.RETRY_DELAY);
     }
     return;
+  }
+  
+  // Garantir que o container está visível
+  if (pontosContainer) {
+    pontosContainer.style.display = 'flex';
   }
   
   carregarPontos();
@@ -428,6 +446,15 @@ function initPontos() {
   const userHeader = document.querySelector('#user-header');
   if (userHeader && userHeader.style.display !== 'none') {
     tentarInitPontos();
+    
+    // Adicionar evento de clique para ir para o Clube Royal
+    const pontosElement = document.querySelector('.pontos-royal');
+    if (pontosElement) {
+      pontosElement.addEventListener('click', () => {
+        window.location.href = 'clube-royal.html';
+      });
+      pontosElement.style.cursor = 'pointer';
+    }
   } else {
     setTimeout(initPontos, 1000);
   }
@@ -451,20 +478,20 @@ async function carregarEndereco() {
       return;
     }
     
-    console.log('Carregando endereço padrão do usuário ID:', usuario.id);
-    
     // Buscar endereço padrão
     const endereco = await getDefaultAddress();
     
     if (endereco) {
-      console.log('Endereço encontrado:', endereco);
       exibirEndereco(endereco);
     } else {
-      console.log('Nenhum endereço padrão encontrado');
       exibirSemEndereco();
     }
   } catch (error) {
-    console.error('Erro ao carregar endereço:', error.message);
+    // Log apenas em desenvolvimento
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.error('Erro ao carregar endereço:', error.message);
+    }
     exibirSemEndereco();
   }
 }
@@ -542,8 +569,6 @@ function exibirSemEndereco() {
  */
 async function mostrarModalAlterarEndereco(currentAddressId) {
   try {
-    console.log('Carregando endereços para alteração...');
-    
     // Buscar todos os endereços do usuário
     const enderecos = await getAddresses();
     
@@ -552,30 +577,53 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
       return;
     }
     
-    // Criar modal dinamicamente
+    // Função auxiliar para sanitizar dados do endereço
+    function sanitizeAddressData(address) {
+      return {
+        street: sanitizeString(address.street || ''),
+        number: sanitizeString(address.number || 'S/N'),
+        complement: address.complement ? sanitizeString(address.complement) : '',
+        neighborhood: sanitizeString(address.neighborhood || ''),
+        city: sanitizeString(address.city || ''),
+        state: sanitizeString(address.state || ''),
+        zip_code: sanitizeString(formatarCEP(address.zip_code || ''))
+      };
+    }
+    
+    // Criar modal dinamicamente com sanitização
+    const enderecosSanitizados = enderecos.map(endereco => {
+      const sanitized = sanitizeAddressData(endereco);
+      const addressId = Number(endereco.id) || 0;
+      const isCurrent = addressId === Number(currentAddressId);
+      
+      return `
+        <div class="endereco-item" data-address-id="${addressId}" 
+             style="padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 5px; cursor: pointer; ${isCurrent ? 'background-color: #f0f0f0;' : ''}"
+             data-action="select-address">
+          <strong>${sanitized.street}, ${sanitized.number}</strong>
+          ${sanitized.complement ? `<br><small>${sanitized.complement}</small>` : ''}
+          <br>
+          <small>${sanitized.neighborhood} - ${sanitized.city}/${sanitized.state}</small>
+          <br>
+          <small>CEP: ${sanitized.zip_code}</small>
+          ${isCurrent ? '<br><span style="color: green; font-weight: bold;">✓ Endereço Atual</span>' : ''}
+        </div>
+      `;
+    }).join('');
+    
     const modalHtml = `
       <div id="modal-alterar-endereco" class="modal" style="display: block;">
-        <div class="div-overlay" onclick="fecharModalEndereco()"></div>
+        <div class="div-overlay" data-action="close-modal"></div>
         <div class="modal-content-metricas">
           <div class="header-modal">
-            <i class="fa-solid fa-xmark fechar-modal" onclick="fecharModalEndereco()"></i>
+            <i class="fa-solid fa-xmark fechar-modal" data-action="close-modal"></i>
             <h2>Alterar Endereço Principal</h2>
           </div>
           
           <div class="conteudo-modal">
             <p>Selecione um endereço para definir como principal:</p>
             <div id="lista-enderecos-alteracao">
-              ${enderecos.map(endereco => `
-                <div class="endereco-item" data-address-id="${endereco.id}" style="padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 5px; cursor: pointer; ${endereco.id === currentAddressId ? 'background-color: #f0f0f0;' : ''}">
-                  <strong>${endereco.street}, ${endereco.number || 'S/N'}</strong>
-                  ${endereco.complement ? `<br><small>${endereco.complement}</small>` : ''}
-                  <br>
-                  <small>${endereco.neighborhood} - ${endereco.city}/${endereco.state}</small>
-                  <br>
-                  <small>CEP: ${formatarCEP(endereco.zip_code)}</small>
-                  ${endereco.id === currentAddressId ? '<br><span style="color: green; font-weight: bold;">✓ Endereço Atual</span>' : ''}
-                </div>
-              `).join('')}
+              ${enderecosSanitizados}
             </div>
           </div>
         </div>
@@ -591,18 +639,32 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     // Adicionar modal ao DOM
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Adicionar eventos de clique nos itens
-    document.querySelectorAll('#lista-enderecos-alteracao .endereco-item').forEach(item => {
-      item.addEventListener('click', async () => {
-        const addressId = item.getAttribute('data-address-id');
-        if (addressId && addressId !== String(currentAddressId)) {
-          await alterarEnderecoPrincipal(addressId);
+    // Adicionar eventos de clique usando delegation (substitui onclick inline)
+    document.getElementById('modal-alterar-endereco')?.addEventListener('click', async (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      
+      const action = target.dataset.action;
+      
+      if (action === 'close-modal') {
+        fecharModalEndereco();
+      } else if (action === 'select-address') {
+        const addressItem = e.target.closest('.endereco-item');
+        if (addressItem) {
+          const addressId = parseInt(String(addressItem.dataset.addressId || ''), 10);
+          if (!isNaN(addressId) && addressId > 0 && addressId !== Number(currentAddressId)) {
+            await alterarEnderecoPrincipal(addressId);
+          }
         }
-      });
+      }
     });
     
   } catch (error) {
-    console.error('Erro ao mostrar modal de alteração de endereço:', error.message);
+    // Log apenas em desenvolvimento - erro já é exibido ao usuário
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.error('Erro ao mostrar modal de alteração de endereço:', error.message);
+    }
     alert('Erro ao carregar endereços. Tente novamente.');
   }
 }
@@ -612,11 +674,7 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
  */
 async function alterarEnderecoPrincipal(addressId) {
   try {
-    console.log('Alterando endereço principal para ID:', addressId);
-    
     await setDefaultAddress(Number(addressId));
-    
-    console.log('Endereço principal alterado com sucesso');
     
     // Fechar modal
     fecharModalEndereco();
@@ -626,13 +684,17 @@ async function alterarEnderecoPrincipal(addressId) {
     
     // Mostrar mensagem de sucesso
     if (typeof showToast === 'function') {
-      showToast('Endereço principal alterado com sucesso!', 'success');
+      showToast('Endereço principal alterado com sucesso!', { type: 'success' });
     } else {
       alert('Endereço principal alterado com sucesso!');
     }
     
   } catch (error) {
-    console.error('Erro ao alterar endereço principal:', error.message);
+    // Log apenas em desenvolvimento - erro já é exibido ao usuário
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.error('Erro ao alterar endereço principal:', error.message);
+    }
     alert('Erro ao alterar endereço principal. Tente novamente.');
   }
 }

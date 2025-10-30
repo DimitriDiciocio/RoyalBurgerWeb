@@ -4,6 +4,16 @@
  */
 
 import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from '../api/orders.js';
+import { getIngredients } from '../api/ingredients.js';
+import { showError, showSuccess } from './alerts.js';
+
+// Função de sanitização para prevenir XSS
+function escapeHTML(text) {
+    if (typeof text !== 'string') return String(text || '');
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 (function initOrderHistory() {
     if (!window.location.pathname.includes('hist-pedidos.html')) return;
@@ -12,6 +22,7 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
         orders: [],
         filteredOrders: [],
         currentOrder: null,
+        ingredientsCache: null, // Cache de ingredientes para buscar preços
         filters: {
             status: ''
         },
@@ -38,11 +49,40 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
             ordersContainer: document.getElementById('orders-container'),
             pagination: document.getElementById('pagination'),
 
-            // Modal
-            modalOrderDetails: document.getElementById('modal-order-details'),
-            orderDetailsContent: document.getElementById('order-details-content'),
-            btnCancelOrder: document.getElementById('btn-cancel-order')
+            // Modal não é mais necessária - redireciona para info-pedido.html
         };
+    }
+
+    // Carregar cache de ingredientes para buscar preços
+    async function loadIngredientsCache() {
+        if (state.ingredientsCache) return state.ingredientsCache;
+        
+        try {
+            const response = await getIngredients({ page_size: 1000 });
+            const ingredients = response.items || [];
+            state.ingredientsCache = {};
+            
+            // Criar um mapa ID -> ingrediente para busca rápida
+            ingredients.forEach(ing => {
+                state.ingredientsCache[ing.id] = {
+                    price: parseFloat(ing.price) || 0,
+                    additional_price: parseFloat(ing.additional_price) || 0
+                };
+            });
+            
+            // Log apenas em desenvolvimento
+            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                console.log('Cache de ingredientes carregado:', Object.keys(state.ingredientsCache).length, 'ingredientes');
+            }
+            return state.ingredientsCache;
+        } catch (err) {
+            // Log apenas em desenvolvimento
+            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                console.warn('Erro ao carregar ingredientes para cache:', err);
+            }
+            state.ingredientsCache = {};
+            return state.ingredientsCache;
+        }
     }
 
     // Carregar pedidos do usuário
@@ -51,20 +91,71 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
         state.error = null;
 
         try {
-            console.log('Carregando pedidos...');
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            
+            if (isDev) {
+                console.log('Carregando pedidos...');
+            }
+            
+            // Carregar cache de ingredientes primeiro
+            await loadIngredientsCache();
+            
             const result = await getMyOrders();
-            console.log('Resultado da API:', result);
+            
+            if (isDev) {
+                console.log('Resultado da API:', result);
+            }
             
             if (result.success) {
-                state.orders = result.data || [];
-                console.log('Pedidos carregados:', state.orders);
+                const ordersList = result.data || [];
+                
+                if (isDev) {
+                    console.log('Pedidos carregados:', ordersList);
+                    console.log(`Buscando detalhes de ${ordersList.length} pedido(s)...`);
+                }
+                
+                // Buscar detalhes completos de cada pedido para obter itens e totais
+                // Usar Promise.allSettled para evitar falha completa se um pedido falhar
+                const ordersWithDetails = await Promise.allSettled(
+                    ordersList.map(async (order) => {
+                        const orderId = order.order_id || order.id;
+                        try {
+                            const detailsResult = await getOrderDetails(orderId);
+                            
+                            if (detailsResult.success && detailsResult.data) {
+                                // Combinar dados básicos com detalhes completos
+                                return {
+                                    ...order,
+                                    ...detailsResult.data,
+                                    order_id: orderId
+                                };
+                            }
+                            return order;
+                        } catch (err) {
+                            if (isDev) {
+                                console.error(`Erro ao buscar detalhes do pedido ${orderId}:`, err);
+                            }
+                            return order;
+                        }
+                    })
+                ).then(results => 
+                    results.map(result => result.status === 'fulfilled' ? result.value : null)
+                           .filter(order => order !== null)
+                );
+                
+                state.orders = ordersWithDetails;
                 applyFilters();
             } else {
                 state.error = result.error;
-                showError('Erro ao carregar pedidos: ' + result.error);
+                showError('Erro ao carregar pedidos: ' + (result.error || 'Erro desconhecido'));
             }
         } catch (error) {
-            console.error('Erro ao carregar pedidos:', error);
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário via showError
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao carregar pedidos:', error);
+            }
             state.error = error.message;
             showError('Erro ao carregar pedidos: ' + error.message);
         } finally {
@@ -133,6 +224,57 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
         el.pagination.innerHTML = html;
     }
 
+    // Formatar data para exibição
+    function formatDate(dateString) {
+        if (!dateString) return 'Data não disponível';
+        
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            
+            return date.toLocaleDateString('pt-BR', {
+                weekday: 'short',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return dateString;
+        }
+    }
+
+    // Formatar valor monetário
+    function formatCurrency(value) {
+        const numValue = parseFloat(value || 0);
+        return numValue.toFixed(2).replace('.', ',');
+    }
+
+    // Formatar telefone para exibição
+    function formatarTelefone(telefone) {
+        if (!telefone || telefone === '(00)0000-000' || telefone === 'Não informado') {
+            return telefone || '(00)0000-000';
+        }
+        
+        if (typeof telefone !== 'string' && typeof telefone !== 'number') {
+            return String(telefone);
+        }
+        
+        const telefoneLimpo = String(telefone).replace(/\D/g, '');
+        
+        if (telefoneLimpo.length === 11) {
+            // Celular: (XX) XXXXX-XXXX
+            return telefoneLimpo.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else if (telefoneLimpo.length === 10) {
+            // Fixo: (XX) XXXX-XXXX
+            return telefoneLimpo.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+        }
+        
+        // Se não tiver tamanho válido, retorna o original
+        return telefone;
+    }
+
     // Renderizar lista de pedidos
     function renderOrders() {
         if (!el.ordersContainer) return;
@@ -143,209 +285,229 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
 
         if (ordersToShow.length === 0) {
             el.ordersContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-clipboard-list"></i>
+                <div class="empty-state" style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
                     <h3>Nenhum pedido encontrado</h3>
                     <p>Você ainda não fez nenhum pedido ou não há pedidos que correspondam aos filtros selecionados.</p>
-                    <a href="index.html" class="btn-primary">Fazer primeiro pedido</a>
+                    <a href="../../index.html" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: #ff6b35; color: white; text-decoration: none; border-radius: 8px;">Fazer primeiro pedido</a>
                 </div>
             `;
             return;
         }
 
-        const ordersHtml = ordersToShow.map(order => {
-            const statusClass = getStatusColor(order.status);
-            const statusText = formatOrderStatus(order.status);
-            const createdAt = new Date(order.created_at).toLocaleString('pt-BR');
-            const canCancel = order.status === 'pending';
-            
-            // Debug: log dos dados do pedido
-            console.log('Order data:', {
-                id: order.order_id,
-                total_amount: order.total_amount,
-                total: order.total,
-                status: order.status,
-                created_at: order.created_at
-            });
+        // Buscar dados do usuário para exibir nome e telefone
+        const usuario = window.getStoredUser ? window.getStoredUser() : null;
+        const nomeUsuario = usuario?.full_name || usuario?.name || 'Nome Completo';
+        const telefoneBruto = usuario?.phone || usuario?.telefone || '(00)0000-000';
+        const telefoneUsuario = formatarTelefone(telefoneBruto);
 
-            return `
-                <div class="quadro-pedido" data-order-id="${order.order_id}">
+        const ordersHtml = ordersToShow.map(order => {
+            // Extrair ID do pedido (pode ser order_id ou id)
+            const orderId = order.order_id || order.id;
+            // Obter código de confirmação (sanitizado)
+            const confirmationCode = escapeHTML(order.confirmation_code || 'N/A');
+            // Mapear texto do status - usando "Recebido" em vez de "Pendente"
+            let statusText = formatOrderStatus(order.status);
+            if (order.status === 'pending') {
+                statusText = 'Recebido';
+            }
+            // Sanitizar texto do status
+            statusText = escapeHTML(statusText);
+            const createdAt = formatDate(order.created_at);
+            
+            // Formatar endereço (sanitizado)
+            const address = escapeHTML(order.address || 'Endereço não informado');
+            
+            // Formatar total
+            const total = order.total_amount || order.total || 0;
+            const totalFormatted = formatCurrency(total);
+            
+            // Obter itens do pedido
+            const items = order.items || [];
+            // Remover cálculo não utilizado para limpeza de código
+            
+            // Determinar classe CSS do status para o HTML
+            let statusCssClass = '';
+            switch(order.status) {
+                case 'preparing':
+                    statusCssClass = 'preparo';
+                    break;
+                case 'on_the_way':
+                    statusCssClass = 'entrega';
+                    break;
+                case 'completed':
+                case 'delivered':
+                    statusCssClass = 'concluido';
+                    break;
+                case 'pending':
+                    statusCssClass = 'recebido';
+                    break;
+                case 'cancelled':
+                    statusCssClass = 'cancelado';
+                    break;
+                default:
+                    statusCssClass = 'recebido';
+                    break;
+            }
+            
+            // Log removido de produção - dados sensíveis
+
+            return `<div class="quadro-pedido" data-order-id="${escapeHTML(String(orderId))}">
                     <div class="header">
                         <div class="div1">
                             <div class="principal">
-                                <p class="n-pedido">#${order.order_id}</p>
-                                <p class="status-pedido ${statusClass}">${statusText}</p>
+                                <p class="n-pedido">${confirmationCode}</p>
+                                <p class="status-pedido ${statusCssClass}">${statusText}</p>
                             </div>
                             <div class="prazo">
                                 <i class="fa-solid fa-clock"></i>
-                                <p>40 - 50min</p>
+                                <p>35 - 50min</p>
                             </div>
                         </div>
+
                         <p class="tempo-pedido">${createdAt}</p>
                     </div>
 
                     <div class="main">
                         <div class="div-1">
                             <div class="div-2">
-                                <p>Pedido</p>
+                                <p>${escapeHTML(nomeUsuario)}</p>
+
                                 <div class="fone">
-                                    <i class="fa-solid fa-receipt"></i>
-                                    <p>Código: ${order.confirmation_code || 'N/A'}</p>
+                                    <i class="fa-solid fa-phone"></i>
+                                    <p>${escapeHTML(telefoneUsuario)}</p>
                                 </div>
                             </div>
+
                             <div class="endereco">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <p>${order.address || 'Endereço não informado'}</p>
+                                <p>${address}</p>
                             </div>
                         </div>
 
                         <div class="pedidos">
-                            <div class="pedido">
-                                <div>
-                                    <p class="qtd">1</p>
-                                    <p class="nome">Pedido completo</p>
+                            ${items.length > 0 ? items.map(item => {
+                                // Sanitizar nome do produto
+                                const itemName = escapeHTML(item.product_name || item.product?.name || 'Produto');
+                                const itemQuantity = parseInt(item.quantity || 1, 10);
+                                
+                                // Calcular preço total incluindo extras e modificações
+                                let itemTotal = 0;
+                                
+                                // Priorizar item_subtotal se disponível
+                                if (item.item_subtotal !== undefined && item.item_subtotal !== null) {
+                                    itemTotal = parseFloat(item.item_subtotal) || 0;
+                                } else if (item.subtotal !== undefined && item.subtotal !== null) {
+                                    itemTotal = parseFloat(item.subtotal) || 0;
+                                } else {
+                                    // Calcular manualmente: unit_price do produto + unit_price de cada extra
+                                    const basePrice = parseFloat(item.unit_price || item.product?.price || 0);
+                                    
+                                    // Somar unit_price de cada EXTRA vinculado ao produto e pedido
+                                    let extrasTotal = 0;
+                                    if (Array.isArray(item.extras) && item.extras.length > 0) {
+                                        extrasTotal = item.extras.reduce((sum, extra) => {
+                                            // Usar unit_price do extra (valor unitário do ingrediente extra)
+                                            const unitPrice = parseFloat(
+                                                extra.unit_price || 
+                                                extra.ingredient_unit_price || 
+                                                extra.ingredient_price || 
+                                                extra.price || 
+                                                extra.additional_price || 
+                                                0
+                                            );
+                                            return sum + unitPrice;
+                                        }, 0);
+                                    }
+                                    
+                                    // Somar unit_price de cada BASE_MODIFICATION vinculado ao produto e pedido
+                                    // BASE_MODIFICATIONS: cobrar apenas pelo delta positivo (quantidade extra além da receita base)
+                                    let baseModsTotal = 0;
+                                    if (Array.isArray(item.base_modifications) && item.base_modifications.length > 0) {
+                                        baseModsTotal = item.base_modifications.reduce((sum, mod) => {
+                                            const delta = parseInt(String(mod.delta || 0), 10);
+                                            if (delta > 0) {
+                                                // Buscar preço do ingrediente pelo ingredient_id usando cache
+                                                const ingredientId = mod.ingredient_id || mod.id;
+                                                let unitPrice = 0;
+                                                
+                                                if (ingredientId && state.ingredientsCache) {
+                                                    const ingredient = state.ingredientsCache[ingredientId];
+                                                    if (ingredient) {
+                                                        // Usar additional_price se disponível, senão usar price
+                                                        unitPrice = ingredient.additional_price || ingredient.price || 0;
+                                                    }
+                                                }
+                                                
+                                                // Fallback: tentar campos diretos no mod se o cache não tiver o ingrediente
+                                                if (unitPrice === 0) {
+                                                    unitPrice = parseFloat(
+                                                        mod.unit_price || 
+                                                        mod.ingredient_unit_price || 
+                                                        mod.ingredient_price || 
+                                                        mod.price || 
+                                                        0
+                                                    );
+                                                }
+                                                
+                                                // Multiplicar pelo delta (quantidade extra)
+                                                return sum + (unitPrice * delta);
+                                            }
+                                            return sum;
+                                        }, 0);
+                                    }
+                                    
+                                    // Preço unitário total = unit_price do produto + unit_price de cada extra + unit_price * delta de cada modificação
+                                    const unitTotal = basePrice + extrasTotal + baseModsTotal;
+                                    
+                                    // Total = preço unitário total * quantidade do item
+                                    itemTotal = unitTotal * itemQuantity;
+                                }
+                                
+                                return `
+                                    <div class="pedido">
+                                        <div>
+                                            <p class="qtd">${itemQuantity}</p>
+                                            <p class="nome">${itemName}</p>
+                                        </div>
+
+                                        <p class="preco">R$ ${formatCurrency(itemTotal)}</p>
+                                    </div>
+                                `;
+                            }).join('') : `
+                                <div class="pedido">
+                                    <div>
+                                        <p class="qtd">-</p>
+                                        <p class="nome">Carregando itens...</p>
+                                    </div>
+
+                                    <p class="preco">-</p>
                                 </div>
-                                <p class="preco">Ver detalhes</p>
-                            </div>
+                            `}
                         </div>
                     </div>
 
                     <div class="footer">
-                        <button class="btn-view-details" data-order-id="${order.order_id}">Ver mais</button>
+                        <button class="btn-view-details" data-order-id="${orderId}">Ver mais</button>
                         <div>
                             <p>Total</p>
-                            <p>R$ ${(order.total_amount || order.total || 0).toFixed(2).replace('.', ',')}</p>
+                            <p>R$ ${totalFormatted}</p>
                         </div>
                     </div>
-                </div>
-            `;
+            </div>`;
         }).join('');
 
         el.ordersContainer.innerHTML = ordersHtml;
     }
 
-    // Carregar detalhes do pedido
-    async function loadOrderDetails(orderId) {
-        try {
-            const result = await getOrderDetails(orderId);
-            if (result.success) {
-                state.currentOrder = result.data;
-                renderOrderDetails();
-                openModal('modal-order-details');
-            } else {
-                showError('Erro ao carregar detalhes: ' + result.error);
-            }
-        } catch (error) {
-            showError('Erro ao carregar detalhes: ' + error.message);
-        }
+    // Carregar detalhes do pedido - Redireciona para página de detalhes
+    function loadOrderDetails(orderId) {
+        // Redirecionar para página de detalhes do pedido
+        window.location.href = `info-pedido.html?id=${orderId}`;
     }
 
-    // Renderizar detalhes do pedido
-    function renderOrderDetails() {
-        if (!el.orderDetailsContent || !state.currentOrder) return;
-
-        const order = state.currentOrder;
-        const createdAt = new Date(order.created_at).toLocaleString('pt-BR');
-        const statusClass = getStatusColor(order.status);
-        const statusText = formatOrderStatus(order.status);
-        const canCancel = order.status === 'pending';
-
-        let itemsHtml = '';
-        if (order.items && order.items.length > 0) {
-            itemsHtml = order.items.map(item => {
-                let extrasHtml = '';
-                if (item.extras && item.extras.length > 0) {
-                    extrasHtml = `
-                        <div class="item-extras">
-                            <strong>Extras:</strong>
-                            ${item.extras.map(extra => `${extra.name} (${extra.quantity}x)`).join(', ')}
-                        </div>
-                    `;
-                }
-
-                return `
-                    <div class="order-item">
-                        <div class="item-info">
-                            <h4>${item.product_name}</h4>
-                            <p class="item-description">${item.product_description || ''}</p>
-                            ${extrasHtml}
-                        </div>
-                        <div class="item-quantity">
-                            <span>Qtd: ${item.quantity}</span>
-                        </div>
-                        <div class="item-price">
-                            <span>R$ ${(item.unit_price * item.quantity).toFixed(2).replace('.', ',')}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        el.orderDetailsContent.innerHTML = `
-            <div class="order-details-header">
-                <div class="order-info">
-                    <h3>Pedido #${order.id}</h3>
-                    <p class="order-time">Criado em: ${createdAt}</p>
-                    <p class="order-code">Código: ${order.confirmation_code || 'N/A'}</p>
-                </div>
-                <div class="order-status">
-                    <span class="status-badge ${statusClass}">${statusText}</span>
-                </div>
-            </div>
-
-            <div class="order-details-content">
-                <div class="details-section">
-                    <h4>Informações do Pedido</h4>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>Método de Pagamento:</label>
-                            <span>${order.payment_method || 'N/A'}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Total:</label>
-                            <span>R$ ${(order.total_amount || 0).toFixed(2).replace('.', ',')}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Observações:</label>
-                            <span>${order.notes || 'Nenhuma'}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="details-section">
-                    <h4>Itens do Pedido</h4>
-                    <div class="items-list">
-                        ${itemsHtml || '<p>Nenhum item encontrado</p>'}
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Mostrar/esconder botão de cancelar
-        if (el.btnCancelOrder) {
-            el.btnCancelOrder.style.display = canCancel ? 'block' : 'none';
-        }
-    }
-
-    // Cancelar pedido
-    async function cancelOrderAction(orderId) {
-        if (!confirm('Tem certeza que deseja cancelar este pedido?')) {
-            return;
-        }
-
-        try {
-            const result = await cancelOrder(orderId);
-            if (result.success) {
-                showSuccess('Pedido cancelado com sucesso!');
-                closeModal('modal-order-details');
-                await loadOrders(); // Recarregar lista
-            } else {
-                showError('Erro ao cancelar pedido: ' + result.error);
-            }
-        } catch (error) {
-            showError('Erro ao cancelar pedido: ' + error.message);
-        }
-    }
+    // Nota: Detalhes do pedido são visualizados na página info-pedido.html
+    // Esta função redireciona para lá ao invés de renderizar em modal
 
     // Anexar eventos
     function attachEvents() {
@@ -369,8 +531,11 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
             el.pagination.addEventListener('click', (e) => {
                 const btn = e.target.closest('.pagination-btn');
                 if (btn && btn.dataset.page) {
-                    state.pagination.currentPage = parseInt(btn.dataset.page);
-                    renderOrders();
+                    const pageNum = parseInt(String(btn.dataset.page), 10);
+                    if (!isNaN(pageNum) && pageNum > 0) {
+                        state.pagination.currentPage = pageNum;
+                        renderOrders();
+                    }
                 }
             });
         }
@@ -384,56 +549,23 @@ import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatus
 
                 const orderId = btn.dataset.orderId;
                 if (!orderId) return;
+                
+                // Validar que orderId é um número válido
+                const orderIdNum = parseInt(String(orderId), 10);
+                if (isNaN(orderIdNum) || orderIdNum <= 0) {
+                    showError('ID do pedido inválido');
+                    return;
+                }
 
                 if (btn.classList.contains('btn-view-details')) {
-                    loadOrderDetails(orderId);
-                }
-            });
-        }
-
-        // Botão cancelar pedido
-        if (el.btnCancelOrder) {
-            el.btnCancelOrder.addEventListener('click', () => {
-                if (state.currentOrder?.id) {
-                    cancelOrderAction(state.currentOrder.id);
+                    loadOrderDetails(orderIdNum);
                 }
             });
         }
     }
 
-    // Utilitários de modal
-    function openModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.style.display = 'flex';
-            modal.classList.add('show');
-        }
-    }
-
-    function closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.style.display = 'none';
-            modal.classList.remove('show');
-        }
-    }
-
-    // Utilitários de notificação
-    function showSuccess(message) {
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, { type: 'success' });
-        } else {
-            alert(message);
-        }
-    }
-
-    function showError(message) {
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, { type: 'error' });
-        } else {
-            alert(message);
-        }
-    }
+    // Utilitários de notificação (usando sistema global de alerts)
+    // As funções showError e showSuccess são importadas de alerts.js
 
     // Verificar se usuário está logado
     function checkUserLogin() {

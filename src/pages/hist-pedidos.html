@@ -13,13 +13,14 @@
     <link rel="stylesheet" href="../assets/styles/footer.css">
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
     <link rel="stylesheet" href="../assets/styles/modais.css">
-    <link rel="stylesheet" href="../assets/styles/hist-pedidos.css">
+    <link rel="stylesheet" href="../assets/styles/hist-pedidos.css">    
     <!-- js sistema -->
     <script src="../js/utils.js" type="module" defer></script>
     <script src="../js/ui/header.js" type="module" defer></script>
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/modais.js" type="module" defer></script>
+    <script src="../js/ui/order-history.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -31,7 +32,7 @@
 
     <main>
         <section>
-            <div>
+            <div class="btn-voltar" onclick="window.history.back();" style="cursor: pointer;">
                 <i class="fa-solid fa-angle-left"></i>
                 <p>Voltar</p>
             </div>
@@ -39,168 +40,11 @@
             <p>Histórico de pedidos</p>
         </section>
 
-        <section class="pedidos">
-            <div class="quadro-pedido">
-                    <div class="header">
-                        <div class="div1">
-                            <div class="principal">
-                                <p class="n-pedido">#123</p>
-                                <p class="status-pedido entrega">Em entrega</p>
-                            </div>
-                            <div class="prazo">
-                                <i class="fa-solid fa-clock"></i>
-                                <p>35 - 50min</p>
-                            </div>
-                        </div>
-
-                        <p class="tempo-pedido">Ter, 09/09/2021 - 19:21</p>
-                    </div>
-
-                    <div class="main">
-                        <div class="div-1">
-                            <div class="div-2">
-                                <p>Nome Completo</p>
-
-                                <div class="fone">
-                                    <i class="fa-solid fa-phone"></i>
-                                    <p>(00)0000-000</p>
-                                </div>
-                            </div>
-
-                            <div class="endereco">
-                                <i class="fa-solid fa-location-dot"></i>
-                                <p>R. Nome da Rua, 1000</p>
-                            </div>
-                        </div>
-
-                        <div class="pedidos">
-                            <div class="pedido">
-                                <div>
-                                    <p class="qtd">1</p>
-                                    <p class="nome">X-Tudão</p>
-                                </div>
-
-                                <p class="preco">R$ 50,00</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        <button>Ver mais</button>
-                        <div>
-                            <p>Total</p>
-                            <p>R$76,00</p>
-                        </div>
-                    </div>
-            </div>
-
-            <div class="quadro-pedido">
-                    <div class="header">
-                        <div class="div1">
-                            <div class="principal">
-                                <p class="n-pedido">#123</p>
-                                <p class="status-pedido preparo">Em preparo</p>
-                            </div>
-                            <div class="prazo">
-                                <i class="fa-solid fa-clock"></i>
-                                <p>35 - 50min</p>
-                            </div>
-                        </div>
-
-                        <p class="tempo-pedido">Ter, 09/09/2021 - 19:21</p>
-                    </div>
-
-                    <div class="main">
-                        <div class="div-1">
-                            <div class="div-2">
-                                <p>Nome Completo</p>
-
-                                <div class="fone">
-                                    <i class="fa-solid fa-phone"></i>
-                                    <p>(00)0000-000</p>
-                                </div>
-                            </div>
-
-                            <div class="endereco">
-                                <i class="fa-solid fa-location-dot"></i>
-                                <p>R. Nome da Rua, 1000</p>
-                            </div>
-                        </div>
-
-                        <div class="pedidos">
-                            <div class="pedido">
-                                <div>
-                                    <p class="qtd">1</p>
-                                    <p class="nome">X-Tudão</p>
-                                </div>
-
-                                <p class="preco">R$ 50,00</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        <button>Ver mais</button>
-                        <div>
-                            <p>Total</p>
-                            <p>R$76,00</p>
-                        </div>
-                    </div>
-            </div>
-
-            <div class="quadro-pedido">
-                    <div class="header">
-                        <div class="div1">
-                            <div class="principal">
-                                <p class="n-pedido">#123</p>
-                                <p class="status-pedido concluido">Concluído</p>
-                            </div>
-                            <div class="prazo">
-                                <i class="fa-solid fa-clock"></i>
-                                <p>35 - 50min</p>
-                            </div>
-                        </div>
-
-                        <p class="tempo-pedido">Ter, 09/09/2021 - 19:21</p>
-                    </div>
-
-                    <div class="main">
-                        <div class="div-1">
-                            <div class="div-2">
-                                <p>Nome Completo</p>
-
-                                <div class="fone">
-                                    <i class="fa-solid fa-phone"></i>
-                                    <p>(00)0000-000</p>
-                                </div>
-                            </div>
-
-                            <div class="endereco">
-                                <i class="fa-solid fa-location-dot"></i>
-                                <p>R. Nome da Rua, 1000</p>
-                            </div>
-                        </div>
-
-                        <div class="pedidos">
-                            <div class="pedido">
-                                <div>
-                                    <p class="qtd">1</p>
-                                    <p class="nome">X-Tudão</p>
-                                </div>
-
-                                <p class="preco">R$ 50,00</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        <button>Ver mais</button>
-                        <div>
-                            <p>Total</p>
-                            <p>R$76,00</p>
-                        </div>
-                    </div>
-            </div>
+        <section class="pedidos" id="orders-container">
+            <!-- Os pedidos serão carregados dinamicamente aqui -->
+            
+            <!-- Paginação (opcional) -->
+            <div id="pagination" style="margin-top: 20px; text-align: center; width: 100%;"></div>
         </section>
 
     </main>

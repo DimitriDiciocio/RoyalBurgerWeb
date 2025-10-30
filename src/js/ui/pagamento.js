@@ -1,10 +1,18 @@
 // src/js/ui/pagamento.js
 // Gerenciamento da página de pagamento
+// 
+// NOTA DE MANUTENÇÃO: Este arquivo está muito grande (1700+ linhas).
+// TODO: Refatorar em módulos menores:
+//   - payment-address.js (gestão de endereços)
+//   - payment-cart.js (exibição de itens)
+//   - payment-loyalty.js (gestão de pontos)
+//   - payment-checkout.js (finalização de pedido)
 
 import { getLoyaltyBalance, validatePointsRedemption, calculateDiscountFromPoints } from '../api/loyalty.js';
 import { getDefaultAddress, getAddresses, createAddress, updateAddress } from '../api/address.js';
 import { createOrder, calculateOrderTotal } from '../api/orders.js';
 import { getCart } from '../api/cart.js';
+import { showError, showSuccess, showToast, showConfirm } from './alerts.js';
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -50,8 +58,6 @@ const VALIDATION_LIMITS = {
 
     // Inicializar elementos DOM
     function initElements() {
-        console.log('Inicializando elementos DOM...');
-        
         el = {
             // Endereço
             enderecoTitulo: document.querySelector('#endereco-rua'),
@@ -114,9 +120,11 @@ const VALIDATION_LIMITS = {
         
         elementosCriticos.forEach(nome => {
             if (!el[nome]) {
-                console.error(`Elemento crítico não encontrado: ${nome}`);
-            } else {
-                console.log(`Elemento encontrado: ${nome}`);
+                // Log apenas em desenvolvimento - elementos faltando indicam problema de HTML
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.error(`Elemento crítico não encontrado: ${nome}`);
+                }
             }
         });
     }
@@ -175,25 +183,44 @@ const VALIDATION_LIMITS = {
     // Carregar dados da cesta via API
     async function carregarCesta() {
         try {
-            console.log('Carregando cesta...');
             const cartResult = await getCart();
-            console.log('Resultado da cesta:', cartResult);
             
             if (cartResult.success && cartResult.data.items) {
                 // Converter formato da API para formato local
-                state.cesta = cartResult.data.items.map(item => ({
-                    id: item.product_id,
-                    nome: item.product.name,
-                    descricao: item.product.description,
-                    preco: item.product.price,
-                    precoTotal: item.item_subtotal,
-                    quantidade: item.quantity,
-                    extras: item.extras || [],
-                    observacao: item.notes || '',
-                    imagem: item.product.image_url || 'tudo.jpeg'
-                }));
-                
-                console.log('Cesta processada:', state.cesta);
+                state.cesta = cartResult.data.items.map(item => {
+                    // Mapear EXTRAS (ingredientes adicionais fora da receita)
+                    const rawExtras = item.extras || item.additional_items || item.additional_ingredients || item.ingredients_extras || [];
+                    const extrasMapeados = (Array.isArray(rawExtras) ? rawExtras : []).map(extra => {
+                        const id = extra.ingredient_id ?? extra.id;
+                        const nome = extra.ingredient_name ?? extra.name ?? extra.title ?? 'Ingrediente';
+                        const preco = parseFloat(extra.ingredient_price ?? extra.price ?? extra.additional_price ?? 0) || 0;
+                        const quantidade = parseInt(extra.quantity ?? extra.qty ?? 0, 10) || 0;
+                        return { id, nome, preco, quantidade };
+                    });
+
+                    // Mapear BASE_MODIFICATIONS (modificações da receita base)
+                    const rawBaseMods = item.base_modifications || [];
+                    const baseModsMapeados = (Array.isArray(rawBaseMods) ? rawBaseMods : []).map(bm => {
+                        const id = bm.ingredient_id ?? bm.id;
+                        const nome = bm.ingredient_name ?? bm.name ?? 'Ingrediente';
+                        const delta = parseInt(bm.delta ?? 0, 10) || 0;
+                        return { id, nome, delta };
+                    });
+
+                    return {
+                        id: item.product_id,
+                        nome: item.product.name,
+                        descricao: item.product.description,
+                        preco: item.product.price,
+                        precoTotal: item.item_subtotal,
+                        quantidade: item.quantity,
+                        extras: extrasMapeados,
+                        base_modifications: baseModsMapeados,
+                        observacao: item.notes || '',
+                        imagem: item.product.image_url || 'tudo.jpeg',
+                        imageHash: item.product.image_hash
+                    };
+                });
                 
                 // Atualizar totais da API
                 if (cartResult.data.summary) {
@@ -202,19 +229,15 @@ const VALIDATION_LIMITS = {
                     state.descontos = cartResult.data.summary.discounts || 0;
                     state.total = cartResult.data.summary.total || 0;
                 }
-                
-                console.log('Totais atualizados:', {
-                    subtotal: state.subtotal,
-                    taxaEntrega: state.taxaEntrega,
-                    descontos: state.descontos,
-                    total: state.total
-                });
             } else {
-                console.log('Cesta vazia ou erro:', cartResult);
                 state.cesta = [];
             }
         } catch (err) {
-            console.error('Erro ao carregar cesta:', err.message);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao carregar cesta:', err.message);
+            }
             state.cesta = [];
         }
     }
@@ -226,8 +249,11 @@ const VALIDATION_LIMITS = {
                 state.usuario = window.getStoredUser();
             }
         } catch (err) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao carregar usuário:', err.message);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao carregar usuário:', err.message);
+            }
             state.usuario = null;
         }
     }
@@ -235,32 +261,30 @@ const VALIDATION_LIMITS = {
     // Carregar endereços do usuário
     async function carregarEnderecos() {
         try {
-            console.log('Carregando endereços...');
+            // Buscar TODOS os endereços do usuário
+            const enderecos = await getAddresses();
+            state.enderecos = enderecos || [];
             
-            // Primeiro tenta buscar o endereço padrão
-            const enderecoPadrao = await getDefaultAddress();
-            
-            if (enderecoPadrao) {
-                console.log('Endereço padrão encontrado:', enderecoPadrao);
-                state.enderecoSelecionado = enderecoPadrao;
-                state.endereco = enderecoPadrao;
-                state.enderecos = [enderecoPadrao];
-            } else {
-                // Se não houver endereço padrão, busca todos os endereços
-                console.log('Nenhum endereço padrão, buscando todos os endereços...');
-                const enderecos = await getAddresses();
-                state.enderecos = enderecos || [];
+            if (state.enderecos.length > 0) {
+                // Procurar o endereço padrão na lista
+                const enderecoPadrao = state.enderecos.find(end => end.is_default === true);
                 
-                if (state.enderecos.length > 0) {
+                if (enderecoPadrao) {
+                    // Se houver endereço padrão, selecionar ele
+                    state.enderecoSelecionado = enderecoPadrao;
+                    state.endereco = enderecoPadrao;
+                } else {
+                    // Se não houver padrão, selecionar o primeiro da lista
                     state.enderecoSelecionado = state.enderecos[0];
                     state.endereco = state.enderecos[0];
-                    console.log('Endereço selecionado:', state.endereco);
-                } else {
-                    console.log('Nenhum endereço encontrado');
                 }
             }
         } catch (error) {
-            console.error('Erro ao carregar endereços:', error.message);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao carregar endereços:', error.message);
+            }
             state.enderecos = [];
         }
     }
@@ -270,8 +294,11 @@ const VALIDATION_LIMITS = {
     // Carregar pontos Royal do usuário via API
     async function carregarPontos() {
         if (!state.usuario || !state.usuario.id) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Usuário não encontrado');
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Usuário não encontrado');
+            }
             return;
         }
 
@@ -282,8 +309,11 @@ const VALIDATION_LIMITS = {
             const balanceData = await getLoyaltyBalance(state.usuario.id);
             state.pontosDisponiveis = balanceData.current_balance || 0;
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao carregar pontos:', error.message);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao carregar pontos:', error.message);
+            }
             state.error = error.message;
             state.pontosDisponiveis = 0;
         } finally {
@@ -304,8 +334,11 @@ const VALIDATION_LIMITS = {
             );
             
             if (!validacao.valid) {
-                // TODO: Implementar logging estruturado em produção
-                console.warn('Validação de pontos falhou:', validacao.error);
+                // Log apenas em desenvolvimento
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.warn('Validação de pontos falhou:', validacao.error);
+                }
                 state.pontosParaUsar = validacao.maxPoints;
             }
         }
@@ -324,15 +357,16 @@ const VALIDATION_LIMITS = {
 
     // Renderizar itens da cesta
     function renderItens() {
-        console.log('Renderizando itens...', state.cesta);
-        
         if (!el.itensContainer) {
-            console.error('Container de itens não encontrado');
+            // Log apenas em desenvolvimento - problema de estrutura HTML
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Container de itens não encontrado');
+            }
             return;
         }
 
         if (state.cesta.length === 0) {
-            console.log('Cesta vazia, não há itens para renderizar');
             el.itensContainer.innerHTML = '<p>Nenhum item na cesta</p>';
             return;
         }
@@ -340,7 +374,7 @@ const VALIDATION_LIMITS = {
         const itensHtml = state.cesta.map(item => {
             const imageUrl = buildImageUrl(item.imagem, item.imageHash);
             
-            // Renderizar lista de extras/modificações
+            // Renderizar lista de EXTRAS (ingredientes adicionais)
             let extrasHtml = '';
             if (item.extras && item.extras.length > 0) {
                 const extrasItems = item.extras.map(extra => {
@@ -349,8 +383,38 @@ const VALIDATION_LIMITS = {
                 extrasHtml = `
                     <div class="item-extras-separator"></div>
                     <div class="item-extras-list">
+                        <strong>Extras:</strong>
                         <ul>
                             ${extrasItems}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Renderizar lista de BASE_MODIFICATIONS (modificações da receita base)
+            let baseModsHtml = '';
+            if (item.base_modifications && item.base_modifications.length > 0) {
+                const baseModsItems = item.base_modifications.map(bm => {
+                    const isPositive = bm.delta > 0;
+                    const icon = isPositive ? 'plus' : 'minus';
+                    const colorClass = isPositive ? 'mod-add' : 'mod-remove';
+                    const deltaValue = Math.abs(bm.delta);
+                    return `
+                        <li>
+                            <span class="base-mod-icon ${colorClass}">
+                                <i class="fa-solid fa-circle-${icon}"></i>
+                            </span>
+                            <span class="base-mod-quantity">${deltaValue}</span>
+                            <span class="base-mod-name">${escapeHTML(bm.nome)}</span>
+                        </li>
+                    `;
+                }).join('');
+                baseModsHtml = `
+                    <div class="item-extras-separator"></div>
+                    <div class="item-base-mods-list">
+                        <strong>Modificações:</strong>
+                        <ul>
+                            ${baseModsItems}
                         </ul>
                     </div>
                 `;
@@ -376,6 +440,7 @@ const VALIDATION_LIMITS = {
                         </div>
                     </div>
                     ${extrasHtml}
+                    ${baseModsHtml}
                     ${obsHtml}
                     <div class="item-extras-separator"></div>
                     <div class="item-footer">
@@ -386,7 +451,6 @@ const VALIDATION_LIMITS = {
             `;
         }).join('');
 
-        console.log('HTML dos itens gerado:', itensHtml);
         el.itensContainer.innerHTML = itensHtml;
     }
 
@@ -413,8 +477,6 @@ const VALIDATION_LIMITS = {
 
     // Renderizar endereço
     function renderEndereco() {
-        console.log('Renderizando endereço...', state.endereco);
-        
         if (state.endereco) {
             // Construir endereço completo baseado na estrutura da API
             let enderecoCompleto = '';
@@ -445,8 +507,6 @@ const VALIDATION_LIMITS = {
                 enderecoDescricao = 'Localização não informada';
             }
             
-            console.log('Endereço processado:', { enderecoCompleto, enderecoDescricao });
-            
             if (el.enderecoTitulo) {
                 el.enderecoTitulo.textContent = enderecoCompleto;
             }
@@ -454,7 +514,6 @@ const VALIDATION_LIMITS = {
                 el.enderecoDescricao.textContent = enderecoDescricao;
             }
         } else {
-            console.log('Nenhum endereço selecionado');
             // Fallback quando não há endereço
             if (el.enderecoTitulo) el.enderecoTitulo.textContent = 'Nenhum endereço selecionado';
             if (el.enderecoDescricao) el.enderecoDescricao.textContent = 'Clique para selecionar um endereço';
@@ -514,11 +573,13 @@ const VALIDATION_LIMITS = {
                 const cidade = endereco.city || endereco.cidade;
                 const estado = endereco.state || endereco.estado;
                 
-                const enderecoCompleto = rua && numero ? `${rua}, ${numero}` : rua || 'Endereço não informado';
-                const enderecoDescricao = bairro && cidade ? `${bairro} - ${cidade}` : bairro || cidade || 'Localização não informada';
+                // Sanitizar dados do endereço antes de inserir no HTML
+                const enderecoCompleto = escapeHTML(rua && numero ? `${rua}, ${numero}` : rua || 'Endereço não informado');
+                const enderecoDescricao = escapeHTML(bairro && cidade ? `${bairro} - ${cidade}` : bairro || cidade || 'Localização não informada');
+                const enderecoId = Number(endereco.id) || 0;
                 
                 html += `
-                    <div class="endereco-item ${isSelecionado ? 'selecionado' : ''}" data-endereco-id="${endereco.id}" onclick="selecionarEndereco(${endereco.id})">
+                    <div class="endereco-item ${isSelecionado ? 'selecionado' : ''}" data-endereco-id="${enderecoId}">
                         <div class="endereco-info">
                             <i class="fa-solid fa-location-dot"></i>
                             <div class="endereco-info-content">
@@ -527,7 +588,7 @@ const VALIDATION_LIMITS = {
                             </div>
                         </div>
                         <div class="endereco-actions">
-                            <button class="btn-editar" data-endereco-id="${endereco.id}" title="Editar endereço" onclick="event.stopPropagation(); abrirModalEnderecoForm('edit', ${endereco.id})">
+                            <button class="btn-editar" data-endereco-id="${enderecoId}" data-action="edit" title="Editar endereço">
                                 <i class="fa-solid fa-edit"></i>
                             </button>
                         </div>
@@ -550,7 +611,7 @@ const VALIDATION_LIMITS = {
                     <i class="fa-solid fa-map-location-dot"></i>
                     <h3>Nenhum endereço cadastrado</h3>
                     <p>Adicione um endereço para receber seus pedidos</p>
-                    <button class="btn-adicionar-primeiro" onclick="abrirModalEnderecoForm('add')">
+                    <button class="btn-adicionar-primeiro" data-action="add-address">
                         Adicionar primeiro endereço
                     </button>
                 </div>
@@ -560,19 +621,26 @@ const VALIDATION_LIMITS = {
 
         el.listaEnderecosModal.innerHTML = state.enderecos.map(endereco => {
             const isSelecionado = state.enderecoSelecionado && state.enderecoSelecionado.id === endereco.id;
+            const enderecoId = Number(endereco.id) || 0;
+            // Sanitizar dados do endereço
+            const street = escapeHTML(endereco.street || 'Endereço não informado');
+            const number = escapeHTML(endereco.number || 'S/N');
+            const neighborhood = escapeHTML(endereco.neighborhood || endereco.district || endereco.bairro || 'Bairro não informado');
+            const city = escapeHTML(endereco.city || 'Cidade não informada');
+            
             return `
             <div class="endereco-item ${isSelecionado ? 'selecionado' : ''}" 
-                 data-endereco-id="${endereco.id}" 
-                 onclick="selecionarEnderecoModal(${endereco.id})">
+                 data-endereco-id="${enderecoId}"
+                 data-action="select">
                 <div class="endereco-info">
                     <i class="fa-solid fa-location-dot"></i>
                     <div class="endereco-info-content">
-                        <p class="titulo">${endereco.street || 'Endereço não informado'}, ${endereco.number || 'S/N'}</p>
-                        <p class="descricao">${endereco.neighborhood || endereco.district || endereco.bairro || 'Bairro não informado'} - ${endereco.city || 'Cidade não informada'}</p>
+                        <p class="titulo">${street}, ${number}</p>
+                        <p class="descricao">${neighborhood} - ${city}</p>
                     </div>
                 </div>
                 <div class="endereco-actions">
-                    <button class="btn-editar" data-endereco-id="${endereco.id}" title="Editar endereço" onclick="event.stopPropagation(); abrirModalEnderecoForm('edit', ${endereco.id})">
+                    <button class="btn-editar" data-endereco-id="${enderecoId}" data-action="edit" title="Editar endereço">
                         <i class="fa-solid fa-pen"></i>
                     </button>
                 </div>
@@ -601,14 +669,14 @@ const VALIDATION_LIMITS = {
         try {
             if (state.modoEdicao && state.enderecoEditando) {
                 // Modo edição
-                await addressService.updateAddress(state.enderecoEditando.id, dadosEndereco);
+                const enderecoAtualizado = await updateAddress(state.enderecoEditando.id, dadosEndereco);
                 const index = state.enderecos.findIndex(addr => addr.id === state.enderecoEditando.id);
                 if (index !== -1) {
-                    state.enderecos[index] = { ...state.enderecos[index], ...dadosEndereco };
+                    state.enderecos[index] = enderecoAtualizado;
                 }
             } else {
                 // Modo adição
-                const novoEndereco = await addressService.createAddress(dadosEndereco);
+                const novoEndereco = await createAddress(dadosEndereco);
                 state.enderecos.push(novoEndereco);
                 
                 // Se for o primeiro endereço, selecionar
@@ -622,68 +690,132 @@ const VALIDATION_LIMITS = {
             renderListaEnderecosModal();
             fecharModalEnderecoForm();
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao salvar endereço:', error.message);
-            alert('Erro ao salvar endereço. Tente novamente.');
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao salvar endereço:', error.message);
+            }
+            showError('Erro ao salvar endereço. Tente novamente.');
         }
     }
 
 
+    // Função auxiliar para normalizar valores opcionais (padrão de usuario-perfil.js)
+    function normalizarOpcional(v) {
+        if (v === undefined) return undefined;
+        const s = String(v || '').trim();
+        return s === '' ? null : s;
+    }
+
+    // Configurar comportamento dos checkboxes (padrão de usuario-perfil.js)
+    // NOTA: Usa cloneNode para prevenir memory leaks de event listeners duplicados
+    function configurarCheckboxesEndereco() {
+        const checaSemNumero = document.getElementById('sem-numero-form');
+        const checaSemComplemento = document.getElementById('sem-complemento-form');
+        const numeroInput = document.getElementById('numero-form');
+        const complementoInput = document.getElementById('complemento-form');
+
+        if (checaSemNumero && numeroInput) {
+            // Remover listeners anteriores através de cloneNode
+            const novoCheckbox = checaSemNumero.cloneNode(true);
+            checaSemNumero.parentNode.replaceChild(novoCheckbox, checaSemNumero);
+            
+            novoCheckbox.addEventListener('change', () => {
+                if (novoCheckbox.checked) {
+                    numeroInput.value = '';
+                    numeroInput.disabled = true;
+                } else {
+                    numeroInput.disabled = false;
+                }
+            });
+        }
+
+        if (checaSemComplemento && complementoInput) {
+            // Remover listeners anteriores através de cloneNode
+            const novoCheckbox = checaSemComplemento.cloneNode(true);
+            checaSemComplemento.parentNode.replaceChild(novoCheckbox, checaSemComplemento);
+            
+            novoCheckbox.addEventListener('change', () => {
+                if (novoCheckbox.checked) {
+                    complementoInput.value = '';
+                }
+            });
+        }
+    }
+
     function coletarDadosFormulario() {
-        const cep = document.getElementById('cep-form').value?.trim();
-        const estado = document.getElementById('estado-form').value?.trim();
-        const cidade = document.getElementById('cidade-form').value?.trim();
-        const rua = document.getElementById('rua-form').value?.trim();
-        const bairro = document.getElementById('bairro-form').value?.trim();
-        const numero = document.getElementById('numero-form').value?.trim();
-        const complemento = document.getElementById('complemento-form').value?.trim();
+        // Coletar valores dos campos
+        const zip = document.getElementById('cep-form')?.value;
+        const uf = document.getElementById('estado-form')?.value;
+        const cidade = document.getElementById('cidade-form')?.value;
+        const rua = document.getElementById('rua-form')?.value;
+        const bairro = document.getElementById('bairro-form')?.value;
+        const numero = document.getElementById('numero-form')?.value;
+        const complemento = document.getElementById('complemento-form')?.value;
+        
+        // Verificar checkboxes
+        const semNumeroMarcado = document.getElementById('sem-numero-form')?.checked || false;
+        const semComplementoMarcado = document.getElementById('sem-complemento-form')?.checked || false;
 
-        // Validações específicas
-        if (!cep) {
-            alert('CEP é obrigatório.');
-            return null;
-        }
-        if (cep.replace(/\D/g, '').length !== 8) {
-            alert('CEP deve ter 8 dígitos.');
-            return null;
-        }
-        if (!estado) {
-            alert('Estado é obrigatório.');
-            return null;
-        }
-        if (!cidade) {
-            alert('Cidade é obrigatória.');
-            return null;
-        }
-        if (!rua) {
-            alert('Rua é obrigatória.');
-            return null;
-        }
-        if (!bairro) {
-            alert('Bairro é obrigatório.');
-            return null;
-        }
-        if (!numero) {
-            alert('Número é obrigatório.');
+        // Normalizar e validar CEP
+        const cepLimpo = String(zip || '').replace(/\D/g, '').trim();
+        if (!cepLimpo || cepLimpo.length !== 8) {
+            showError('CEP é obrigatório e deve ter 8 dígitos.');
             return null;
         }
 
-        return {
-            zip_code: cep.replace(/\D/g, ''),
-            state: estado,
-            city: cidade,
-            street: rua,
-            neighborhood: bairro,
-            number: numero,
-            complement: complemento || null,
+        // Validar campos obrigatórios
+        const estadoTrim = String(uf || '').trim();
+        if (!estadoTrim) {
+            showError('Estado é obrigatório.');
+            return null;
+        }
+
+        const cidadeTrim = String(cidade || '').trim();
+        if (!cidadeTrim) {
+            showError('Cidade é obrigatória.');
+            return null;
+        }
+
+        const ruaTrim = String(rua || '').trim();
+        if (!ruaTrim) {
+            showError('Rua é obrigatória.');
+            return null;
+        }
+
+        const bairroTrim = String(bairro || '').trim();
+        if (!bairroTrim) {
+            showError('Bairro é obrigatório.');
+            return null;
+        }
+
+        const numeroTrim = String(numero || '').trim();
+        if (!semNumeroMarcado && !numeroTrim) {
+            showError('Número é obrigatório.');
+            return null;
+        }
+
+        // Montar payload seguindo o padrão de usuario-perfil.js
+        const payload = {
+            zip_code: cepLimpo,
+            state: estadoTrim,
+            city: cidadeTrim,
+            street: ruaTrim,
+            neighborhood: bairroTrim,
+            // Se marcado sem número, enviar 'S/N', senão o número preenchido
+            number: semNumeroMarcado ? 'S/N' : numeroTrim,
+            // Se marcado sem complemento, enviar null, senão normalizar o valor
+            complement: semComplementoMarcado ? null : normalizarOpcional(complemento),
             is_default: false
         };
+
+        return payload;
     }
 
     // Gerenciar endereços
     async function adicionarEndereco(dadosEndereco) {
         try {
-            const novoEndereco = await addressService.createAddress(dadosEndereco);
+            const novoEndereco = await createAddress(dadosEndereco);
             state.enderecos.push(novoEndereco);
             
             // Se for o primeiro endereço, selecionar
@@ -696,15 +828,18 @@ const VALIDATION_LIMITS = {
             renderListaEnderecos();
             return novoEndereco;
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao adicionar endereço:', error.message);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao adicionar endereço:', error.message);
+            }
             throw error;
         }
     }
 
     async function editarEndereco(enderecoId, dadosEndereco) {
         try {
-            const enderecoAtualizado = await addressService.updateAddress(enderecoId, dadosEndereco);
+            const enderecoAtualizado = await updateAddress(enderecoId, dadosEndereco);
             
             // Atualizar na lista
             const index = state.enderecos.findIndex(addr => addr.id === enderecoId);
@@ -722,8 +857,11 @@ const VALIDATION_LIMITS = {
             renderListaEnderecos();
             return enderecoAtualizado;
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao editar endereço:', error.message);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao editar endereço:', error.message);
+            }
             throw error;
         }
     }
@@ -816,13 +954,19 @@ const VALIDATION_LIMITS = {
             btnSalvar.textContent = 'Atualizar Endereço';
             preencherFormularioEndereco(enderecoId);
         }
+        
+        // Configurar checkboxes após abrir a modal
+        configurarCheckboxesEndereco();
     }
 
     function limparFormularioEndereco() {
         const campos = ['cep-form', 'estado-form', 'cidade-form', 'rua-form', 'bairro-form', 'numero-form', 'complemento-form'];
         campos.forEach(id => {
             const campo = document.getElementById(id);
-            if (campo) campo.value = '';
+            if (campo) {
+                campo.value = '';
+                campo.disabled = false; // Reabilitar campos
+            }
         });
         
         const checkboxes = ['sem-numero-form', 'sem-complemento-form'];
@@ -877,7 +1021,8 @@ const VALIDATION_LIMITS = {
         fecharListaEnderecos();
         const endereco = state.enderecos.find(addr => addr.id === enderecoId);
         if (endereco) {
-            // Armazenar ID do endereço em edição
+            // NOTA: Variável global usada para compatibilidade com sistema legado de modals
+            // TODO: Refatorar para usar state.enderecoEditando ao remover sistema legado
             window.enderecoIdEmEdicao = enderecoId;
             preencherFormularioEdicao(endereco);
             
@@ -1019,19 +1164,51 @@ const VALIDATION_LIMITS = {
             }
         });
 
-        // Eventos da lista de endereços (delegation)
+        // Eventos da lista de endereços (delegation) - substitui onclick inline
         if (el.listaEnderecos) {
             el.listaEnderecos.addEventListener('click', (e) => {
                 const enderecoItem = e.target.closest('.endereco-item');
                 if (!enderecoItem) return;
 
                 const enderecoId = enderecoItem.dataset.enderecoId;
+                const action = e.target.closest('[data-action]')?.dataset.action || 
+                               enderecoItem.dataset.action;
                 
-                if (e.target.closest('.btn-editar')) {
+                if (e.target.closest('.btn-editar') || action === 'edit') {
                     e.stopPropagation();
-                    abrirModalEditarEndereco(enderecoId);
-                } else {
+                    const id = parseInt(String(enderecoId || enderecoItem.dataset.enderecoId), 10);
+                    if (!isNaN(id) && id > 0) {
+                        abrirModalEditarEndereco(id);
+                    }
+                } else if (action === 'select') {
                     selecionarEndereco(enderecoId);
+                }
+            });
+        }
+        
+        // Eventos da modal de endereços (delegation)
+        if (el.listaEnderecosModal) {
+            el.listaEnderecosModal.addEventListener('click', (e) => {
+                const target = e.target.closest('[data-action]');
+                if (!target) return;
+                
+                const action = target.dataset.action;
+                const enderecoId = target.dataset.enderecoId;
+                
+                if (action === 'add-address') {
+                    e.stopPropagation();
+                    abrirModalEnderecoForm('add');
+                } else if (action === 'edit' && enderecoId) {
+                    e.stopPropagation();
+                    const id = parseInt(String(enderecoId), 10);
+                    if (!isNaN(id) && id > 0) {
+                        abrirModalEnderecoForm('edit', id);
+                    }
+                } else if (action === 'select' && enderecoId) {
+                    const id = parseInt(String(enderecoId), 10);
+                    if (!isNaN(id) && id > 0) {
+                        selecionarEnderecoModal(id);
+                    }
                 }
             });
         }
@@ -1056,7 +1233,7 @@ const VALIDATION_LIMITS = {
     // Funções para gerenciar formulários de endereço
     async function salvarNovoEndereco() {
         try {
-            const dadosEndereco = coletarDadosFormulario('add-pag');
+            const dadosEndereco = coletarDadosFormularioLegacy('add-pag');
             await adicionarEndereco(dadosEndereco);
             
             // Usar o sistema de modais existente
@@ -1071,11 +1248,14 @@ const VALIDATION_LIMITS = {
                 }
             }
             
-            alert('Endereço adicionado com sucesso!');
+            showSuccess('Endereço adicionado com sucesso!');
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao salvar endereço:', error.message);
-            alert('Erro ao salvar endereço. Tente novamente.');
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao salvar endereço:', error.message);
+            }
+            showError('Erro ao salvar endereço. Tente novamente.');
         }
     }
 
@@ -1083,11 +1263,11 @@ const VALIDATION_LIMITS = {
         try {
             const enderecoId = obterEnderecoIdEmEdicao();
             if (!enderecoId) {
-                alert('Erro: ID do endereço não encontrado.');
+                showError('Erro: ID do endereço não encontrado.');
                 return;
             }
 
-            const dadosEndereco = coletarDadosFormulario('edit-pag');
+            const dadosEndereco = coletarDadosFormularioLegacy('edit-pag');
             await editarEndereco(enderecoId, dadosEndereco);
             
             // Usar o sistema de modais existente
@@ -1102,31 +1282,80 @@ const VALIDATION_LIMITS = {
                 }
             }
             
-            alert('Endereço atualizado com sucesso!');
+            showSuccess('Endereço atualizado com sucesso!');
         } catch (error) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao atualizar endereço:', error.message);
-            alert('Erro ao atualizar endereço. Tente novamente.');
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao atualizar endereço:', error.message);
+            }
+            showError('Erro ao atualizar endereço. Tente novamente.');
         }
     }
 
 
-    function coletarDadosFormulario(sufixo) {
-        const dados = {
-            cep: document.getElementById(`cep-${sufixo}`)?.value || '',
-            estado: document.getElementById(`estado-${sufixo}`)?.value || '',
-            cidade: document.getElementById(`cidade-${sufixo}`)?.value || '',
-            rua: document.getElementById(`rua-${sufixo}`)?.value || '',
-            bairro: document.getElementById(`bairro-${sufixo}`)?.value || '',
-            numero: document.getElementById(`numero-${sufixo}`)?.value || '',
-            complemento: document.getElementById(`complemento-${sufixo}`)?.value || null,
+    // FUNÇÃO LEGADA - NÃO UTILIZADA (mantida para compatibilidade futura)
+    function coletarDadosFormularioLegacy(sufixo) {
+        // Coletar valores dos campos (versão com sufixo)
+        const zip = document.getElementById(`cep-${sufixo}`)?.value;
+        const uf = document.getElementById(`estado-${sufixo}`)?.value;
+        const cidade = document.getElementById(`cidade-${sufixo}`)?.value;
+        const rua = document.getElementById(`rua-${sufixo}`)?.value;
+        const bairro = document.getElementById(`bairro-${sufixo}`)?.value;
+        const numero = document.getElementById(`numero-${sufixo}`)?.value;
+        const complemento = document.getElementById(`complemento-${sufixo}`)?.value;
+
+        // Normalizar e validar CEP
+        const cepLimpo = String(zip || '').replace(/\D/g, '').trim();
+        if (!cepLimpo || cepLimpo.length !== 8) {
+            showError('CEP é obrigatório e deve ter 8 dígitos.');
+            return null;
+        }
+
+        // Validar campos obrigatórios
+        const estadoTrim = String(uf || '').trim();
+        if (!estadoTrim) {
+            showError('Estado é obrigatório.');
+            return null;
+        }
+
+        const cidadeTrim = String(cidade || '').trim();
+        if (!cidadeTrim) {
+            showError('Cidade é obrigatória.');
+            return null;
+        }
+
+        const ruaTrim = String(rua || '').trim();
+        if (!ruaTrim) {
+            showError('Rua é obrigatória.');
+            return null;
+        }
+
+        const bairroTrim = String(bairro || '').trim();
+        if (!bairroTrim) {
+            showError('Bairro é obrigatório.');
+            return null;
+        }
+
+        const numeroTrim = String(numero || '').trim();
+        if (!numeroTrim) {
+            showError('Número é obrigatório.');
+            return null;
+        }
+
+        // Retornar no formato da API (em inglês)
+        const payload = {
+            zip_code: cepLimpo,
+            state: estadoTrim,
+            city: cidadeTrim,
+            street: ruaTrim,
+            neighborhood: bairroTrim,
+            number: numeroTrim,
+            complement: normalizarOpcional(complemento),
             is_default: false
         };
 
-        // Normalizar campos vazios para null
-        if (!dados.complemento) dados.complemento = null;
-        
-        return dados;
+        return payload;
     }
 
     function obterEnderecoIdEmEdicao() {
@@ -1138,13 +1367,13 @@ const VALIDATION_LIMITS = {
     // Fazer pedido
     function fazerPedido() {
         if (state.cesta.length === 0) {
-            alert('Sua cesta está vazia!');
+            showError('Sua cesta está vazia!');
             return;
         }
 
         // Validar CPF se preenchido
         if (state.cpf && !validarCPF(state.cpf)) {
-            alert('CPF inválido!');
+            showError('CPF inválido!');
             return;
         }
 
@@ -1173,18 +1402,22 @@ const VALIDATION_LIMITS = {
             localStorage.removeItem('royal_cesta');
             
             // Mostrar sucesso
-            alert('Pedido realizado com sucesso!');
+            showSuccess('Pedido realizado com sucesso!');
             
             // Redirecionar para página de sucesso ou histórico
             window.location.href = 'hist-pedidos.html';
         } catch (err) {
-            // TODO: Implementar logging estruturado em produção
-            console.error('Erro ao salvar pedido:', err.message);
-            alert('Erro ao processar pedido. Tente novamente.');
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao salvar pedido:', err.message);
+            }
+            showError('Erro ao processar pedido. Tente novamente.');
         }
     }
 
-    // Validar CPF
+    // Validar CPF - Algoritmo oficial da Receita Federal
+    // Valida dígitos verificadores e rejeita CPFs com todos dígitos iguais
     function validarCPF(cpf) {
         if (!cpf || typeof cpf !== 'string') return false;
         
@@ -1194,7 +1427,7 @@ const VALIDATION_LIMITS = {
         // Verifica se tem 11 dígitos
         if (cpf.length !== 11) return false;
         
-        // Verifica se todos os dígitos são iguais
+        // Verifica se todos os dígitos são iguais (ex: 111.111.111-11)
         if (/^(\d)\1{10}$/.test(cpf)) return false;
         
         // Validação do primeiro dígito verificador
@@ -1343,17 +1576,13 @@ const VALIDATION_LIMITS = {
 
     // Inicializar
     async function init() {
-        console.log('Inicializando página de pagamento...');
-        
         initElements();
         
-        console.log('Carregando dados...');
         await carregarCesta();
         carregarUsuario();
         await carregarEnderecos();
         await carregarPontos();
         
-        console.log('Renderizando interface...');
         renderItens();
         renderResumo();
         renderEndereco();
@@ -1370,8 +1599,6 @@ const VALIDATION_LIMITS = {
             const descontoMaximo = Math.min(calculateDiscountFromPoints(state.pontosDisponiveis), state.subtotal);
             el.descontoPontos.textContent = `-${formatBRL(descontoMaximo)}`;
         }
-        
-        console.log('Página de pagamento inicializada com sucesso');
     }
 
     // REMOVED: Função duplicada - usar implementação principal na linha 740
@@ -1433,7 +1660,7 @@ const VALIDATION_LIMITS = {
     function confirmarTroco() {
         const valor = el.valorTroco?.value?.trim();
         if (!valor || isNaN(valor) || parseFloat(valor) <= 0) {
-            alert('Digite um valor válido para o troco.');
+            showError('Digite um valor válido para o troco.');
             return;
         }
 
@@ -1441,7 +1668,7 @@ const VALIDATION_LIMITS = {
         const valorTotal = state.total;
         
         if (valorPago < valorTotal) {
-            alert(`O valor pago (R$ ${valorPago.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${valorTotal.toFixed(2).replace('.', ',')}).`);
+            showError(`O valor pago (R$ ${valorPago.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${valorTotal.toFixed(2).replace('.', ',')}).`);
             return;
         }
 
@@ -1477,58 +1704,107 @@ const VALIDATION_LIMITS = {
     function confirmarPedido() {
         try {
             // Validar endereço
-            if (!state.endereco) {
-                alert('Selecione um endereço de entrega.');
+            if (!state.endereco || !state.endereco.id) {
+                showError('Selecione um endereço de entrega.');
                 return;
             }
 
-            // Validar cesta
+            // Validar cesta (pode estar vazia se já foi processada, mas verificamos se o carrinho tem itens)
             if (!state.cesta || state.cesta.length === 0) {
-                alert('Sua cesta está vazia!');
+                showError('Sua cesta está vazia!');
                 return;
             }
 
             // Validar CPF se preenchido
             if (state.cpf && state.cpf.trim() !== '' && !validarCPF(state.cpf)) {
-                alert('CPF inválido!');
+                showError('CPF inválido!');
                 return;
             }
 
             // Validar forma de pagamento
             if (!state.formaPagamento) {
-                alert('Selecione uma forma de pagamento.');
+                showError('Selecione uma forma de pagamento.');
                 return;
             }
 
             // Validar totais
             if (state.total <= 0) {
-                alert('Valor total inválido. Verifique sua cesta.');
+                showError('Valor total inválido. Verifique sua cesta.');
                 return;
             }
 
+            // Calcular pontos para resgate (garantir que está sincronizado)
+            let pontosParaResgate = 0;
+            if (state.usarPontos && state.pontosDisponiveis > 0 && state.pontosParaUsar > 0) {
+                // Validar novamente antes de enviar
+                const validacao = validatePointsRedemption(
+                    state.pontosDisponiveis,
+                    state.pontosParaUsar,
+                    state.subtotal
+                );
+                
+                if (validacao.valid) {
+                    pontosParaResgate = state.pontosParaUsar;
+                } else {
+                    // Se inválido, usar máximo permitido
+                    pontosParaResgate = validacao.maxPoints || 0;
+                    if (pontosParaResgate > 0) {
+                        state.pontosParaUsar = pontosParaResgate;
+                        calcularTotais();
+                        renderResumo();
+                    }
+                }
+            }
+
+            // Mapear método de pagamento para valores esperados pelo backend
+            const paymentMethodMap = {
+                'pix': 'pix',
+                'cartao': 'credit_card', // Cartão mapeado para credit_card
+                'dinheiro': 'money'
+            };
+            const backendPaymentMethod = paymentMethodMap[state.formaPagamento] || state.formaPagamento;
+
             // Preparar dados do pedido para API
+            // IMPORTANTE: Quando use_cart=true, NÃO enviamos items manualmente
+            // O backend buscará os items diretamente do carrinho do usuário
             const orderData = {
-                address_id: state.endereco.id,
-                payment_method: state.formaPagamento,
+                address_id: Number(state.endereco.id),
+                payment_method: backendPaymentMethod,
                 notes: state.cesta.map(item => 
                     item.observacao ? `${item.nome}: ${item.observacao}` : ''
                 ).filter(note => note).join('; ') || '',
-                cpf_on_invoice: state.cpf || null,
-                points_to_redeem: state.usarPontos ? state.pontosParaUsar : 0,
-                use_cart: true // Usar carrinho da API
+                cpf_on_invoice: (state.cpf && state.cpf.trim() !== '') ? state.cpf.trim() : null,
+                points_to_redeem: pontosParaResgate,
+                use_cart: true // CRÍTICO: Indica ao backend para usar o carrinho atual
             };
 
             // Se dinheiro, adicionar troco
             if (state.formaPagamento === 'dinheiro' && state.valorTroco) {
-                orderData.change_for_amount = state.valorTroco;
+                orderData.change_for_amount = Number(state.valorTroco);
+            }
+
+            // Desabilitar botão para evitar duplicação
+            if (el.btnConfirmarPedido) {
+                el.btnConfirmarPedido.disabled = true;
+                el.btnConfirmarPedido.textContent = 'Processando...';
             }
 
             // Criar pedido via API
             criarPedidoAPI(orderData);
             
         } catch (err) {
-            console.error('Erro ao confirmar pedido:', err.message);
-            alert('Erro ao processar pedido. Tente novamente.');
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao confirmar pedido:', err.message);
+            }
+            showError('Erro ao processar pedido. Tente novamente.');
+            
+            // Reabilitar botão em caso de erro
+            if (el.btnConfirmarPedido) {
+                el.btnConfirmarPedido.disabled = false;
+                el.btnConfirmarPedido.textContent = 'Confirmar pedido';
+            }
         }
     }
 
@@ -1536,21 +1812,68 @@ const VALIDATION_LIMITS = {
         try {
             const result = await createOrder(orderData);
             
-            if (result.success) {
+            if (result.success && result.data) {
                 state.pedidoConfirmado = true;
                 fecharModalRevisao();
                 
-                // Mostrar sucesso
-                alert('Pedido confirmado com sucesso! Em breve você receberá um SMS com os detalhes da entrega.');
+                // Mostrar sucesso com informações do pedido
+                const orderId = result.data.id || result.data.order_id;
+                const confirmationCode = result.data.confirmation_code;
+                let mensagem = 'Pedido confirmado com sucesso!';
                 
-                // Redirecionar para página de histórico
-                window.location.href = 'hist-pedidos.html';
+                if (confirmationCode) {
+                    mensagem += ` Código de confirmação: ${confirmationCode}`;
+                }
+                
+                showSuccess(mensagem);
+                
+                // Limpar cesta local se houver (a API já limpa o carrinho)
+                if (typeof window.atualizarCesta === 'function') {
+                    await window.atualizarCesta();
+                }
+                
+                // Redirecionar para página de histórico após breve delay
+                setTimeout(() => {
+                    window.location.href = 'hist-pedidos.html';
+                }, 2000);
             } else {
-                alert(`Erro ao criar pedido: ${result.error}`);
+                // Tratar erros específicos da API
+                let errorMessage = result.error || 'Erro ao criar pedido';
+                
+                // Mapear erros conhecidos para mensagens amigáveis
+                if (errorMessage.includes('STORE_CLOSED')) {
+                    errorMessage = 'A loja está fechada no momento. Tente novamente durante o horário de funcionamento.';
+                } else if (errorMessage.includes('EMPTY_CART')) {
+                    errorMessage = 'Seu carrinho está vazio. Adicione itens antes de finalizar o pedido.';
+                } else if (errorMessage.includes('INVALID_ADDRESS')) {
+                    errorMessage = 'Endereço inválido. Selecione um endereço válido.';
+                } else if (errorMessage.includes('INVALID_CPF')) {
+                    errorMessage = 'CPF inválido. Verifique o CPF informado.';
+                } else if (errorMessage.includes('INVALID_DISCOUNT')) {
+                    errorMessage = 'Valor do desconto inválido. Verifique os pontos selecionados.';
+                }
+                
+                showError(errorMessage);
+                
+                // Reabilitar botão
+                if (el.btnConfirmarPedido) {
+                    el.btnConfirmarPedido.disabled = false;
+                    el.btnConfirmarPedido.textContent = 'Confirmar pedido';
+                }
             }
         } catch (error) {
-            console.error('Erro ao criar pedido:', error.message);
-            alert('Erro ao processar pedido. Tente novamente.');
+            // Log apenas em desenvolvimento - erro já é exibido ao usuário
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao criar pedido:', error.message);
+            }
+            showError('Erro ao processar pedido. Tente novamente.');
+            
+            // Reabilitar botão
+            if (el.btnConfirmarPedido) {
+                el.btnConfirmarPedido.disabled = false;
+                el.btnConfirmarPedido.textContent = 'Confirmar pedido';
+            }
         }
     }
 
@@ -1617,7 +1940,7 @@ const VALIDATION_LIMITS = {
 
     // Verificar se usuário está logado
     if (typeof window.isUserLoggedIn === 'function' && !window.isUserLoggedIn()) {
-        alert('Você precisa estar logado para acessar esta página.');
+        showError('Você precisa estar logado para acessar esta página.');
         window.location.href = 'login.html';
         return;
     }

@@ -12,7 +12,7 @@
     position: fixed;
     top: 24px;
     right: 0px;
-    z-index: 1010;
+    z-index: 1010000;
     box-shadow: 0 10px 30px rgba(235, 87, 87, 0.15);
 }
 .modelo-erro-modal i{

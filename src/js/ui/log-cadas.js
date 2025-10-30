@@ -3,6 +3,7 @@ import { inicializarGerenciamentoInputs } from '../utils.js';
 import { showToast, toastFromApiError, toastFromApiSuccess } from './alerts.js';
 import { loginWithEmailAndPassword, verify2FACode } from '../api/auth.js';
 import { registerCustomer } from '../api/user.js';
+import { claimGuestCart, getCartIdFromStorage } from '../api/cart.js';
 
 // Função para redirecionar para verificação 2FA
 function redirecionarPara2FA(userId, email) {
@@ -574,6 +575,25 @@ document.addEventListener('DOMContentLoaded', function () {
                             const fallbackUser = userResp || { email };
                             window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
                         } catch (_e) { }
+                        
+                        // Reivindicar carrinho de convidado se existir
+                        const guestCartId = getCartIdFromStorage();
+                        if (guestCartId) {
+                            try {
+                                const claimResult = await claimGuestCart();
+                                
+                                if (claimResult.success) {
+                                    showToast('Seu carrinho foi restaurado!', { 
+                                        type: 'info', 
+                                        title: 'Carrinho Restaurado',
+                                        autoClose: 2000 
+                                    });
+                                }
+                            } catch (claimErr) {
+                                // Não bloqueia o fluxo de login se falhar
+                                // NOTA: Erro silencioso intencional para não impactar UX
+                            }
+                        }
                         
                         setTimeout(() => {
                             window.location.href = '../../index.html';

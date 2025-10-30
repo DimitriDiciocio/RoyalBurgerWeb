@@ -1,7 +1,7 @@
 // src/js/ui/cesta.js
 // Gerenciamento da Modal da Cesta
 
-import { showConfirm, showToast } from './alerts.js';
+import { showConfirm, showError, showToast } from './alerts.js';
 import { getCart, updateCartItem, removeCartItem, clearCart, claimGuestCart } from '../api/cart.js';
 
 // Constantes para validação e limites
@@ -190,7 +190,7 @@ async function carregarCesta() {
                     return { id, nome, delta };
                 });
 
-                const quantidade = parseInt(item.quantity, 10) || 1;
+                const quantidade = parseInt(String(item.quantity || 1), 10);
                 const precoBaseNum = parseFloat(produto.price) || 0;
                 const extrasTotal = parseFloat(item.extras_total ?? 0) || 0;
                 const baseModsTotal = parseFloat(item.base_mods_total ?? 0) || 0;
@@ -219,11 +219,19 @@ async function carregarCesta() {
                 };
             });
         } else {
-            console.error('Erro ao carregar cesta:', result.error);
+            // Log apenas em desenvolvimento
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.error('Erro ao carregar cesta:', result.error);
+            }
             state.itens = [];
         }
     } catch (err) {
-        console.error('Exceção ao carregar cesta:', err.message, err.stack);
+        // Log apenas em desenvolvimento
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.error('Exceção ao carregar cesta:', err.message, err.stack);
+        }
         state.itens = [];
     }
     
@@ -231,53 +239,48 @@ async function carregarCesta() {
     renderCesta();
 }
 
-// Verificar se há backup da cesta para restaurar após login
+// Verificar se há backup da cesta para restaurar após login (FALLBACK ONLY)
+// 
+// NOTA IMPORTANTE: A reivindicação principal do carrinho é feita no login
+// (log-cadas.js e verificar-email.js via claimGuestCart).
+// Esta função serve apenas como fallback para limpar dados órfãos caso
+// algo dê errado no fluxo principal.
+// 
+// FLUXO NORMAL:
+// 1. Usuário faz pedido sem login → cart_id salvo em localStorage
+// 2. Usuário faz login → claimGuestCart() vincula cart ao user_id
+// 3. Esta função apenas limpa o backup local
 async function verificarBackupCesta() {
     try {
         const backupStr = localStorage.getItem('royal_cesta_backup');
         if (!backupStr) return false;
         
-        const backupItens = JSON.parse(backupStr);
-        
         // Validar dados do backup
-        if (!isValidCartData(backupItens)) {
+        let backupItens;
+        try {
+            backupItens = JSON.parse(backupStr);
+        } catch (parseErr) {
+            // Dados corrompidos, limpar
             localStorage.removeItem('royal_cesta_backup');
             return false;
         }
         
+        if (!isValidCartData(backupItens)) {
+            // Dados inválidos, limpar
+            localStorage.removeItem('royal_cesta_backup');
+            return false;
+        }
+        
+        // Se há itens no backup, limpar (já deve ter sido reivindicado no login)
         if (backupItens.length > 0) {
-            // Tentar reivindicar carrinho de convidado
-            const result = await claimGuestCart();
-            if (result.success) {
-                // Recarregar cesta da API
-                await carregarCesta();
-                // Remover backup
-                localStorage.removeItem('royal_cesta_backup');
-                
-                // Mostrar mensagem de sucesso
-                showToast('Sua cesta foi restaurada! Agora você pode finalizar seu pedido.', {
-                    type: 'info',
-                    title: 'Cesta Restaurada',
-                    autoClose: 4000
-                });
-                
-                return true;
-            } else {
-                // Se falhou, restaurar do backup local
-                state.itens = backupItens;
-                localStorage.removeItem('royal_cesta_backup');
-                
-                showToast('Cesta restaurada do backup local.', {
-                    type: 'info',
-                    title: 'Cesta Restaurada',
-                    autoClose: 3000
-                });
-                
-                return true;
-            }
+            localStorage.removeItem('royal_cesta_backup');
+            
+            // Recarregar cesta da API para garantir sincronização
+            await carregarCesta();
+            return true;
         }
     } catch (err) {
-        console.error('Erro ao restaurar backup da cesta:', err.message);
+        // Em caso de erro, limpar backup para evitar loops
         localStorage.removeItem('royal_cesta_backup');
     }
     return false;
@@ -293,7 +296,11 @@ function salvarCesta() {
         
         localStorage.setItem('royal_cesta', JSON.stringify(state.itens));
     } catch (err) {
-        console.error('Erro ao salvar cesta:', err.message);
+        // Log apenas em desenvolvimento - erro de localStorage geralmente não é crítico
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.error('Erro ao salvar cesta:', err.message);
+        }
     }
 }
 
@@ -531,7 +538,11 @@ async function alterarQuantidade(index, delta) {
             });
         }
     } catch (err) {
-        console.error('Erro ao alterar quantidade:', err.message);
+        // Log apenas em desenvolvimento - erro já é exibido ao usuário
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.error('Erro ao alterar quantidade:', err.message);
+        }
         showToast('Erro ao atualizar quantidade. Tente novamente.', {
             type: 'error',
             title: 'Erro',
@@ -559,7 +570,11 @@ async function removerItem(index) {
             });
         }
     } catch (err) {
-        console.error('Erro ao remover item:', err.message);
+        // Log apenas em desenvolvimento - erro já é exibido ao usuário
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.error('Erro ao remover item:', err.message);
+        }
         showToast('Erro ao remover item. Tente novamente.', {
             type: 'error',
             title: 'Erro',
@@ -600,7 +615,11 @@ async function limparCesta() {
             });
         }
     } catch (err) {
-        console.error('Erro ao limpar cesta:', err.message);
+        // Log apenas em desenvolvimento - erro já é exibido ao usuário
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.error('Erro ao limpar cesta:', err.message);
+        }
         showToast('Erro ao limpar cesta. Tente novamente.', {
             type: 'error',
             title: 'Erro',
@@ -688,7 +707,7 @@ function attachGlobalHandlers() {
     if (el.btnContinuar) {
         el.btnContinuar.addEventListener('click', () => {
             if (state.itens.length === 0) {
-                alert('Sua cesta está vazia!');
+                showError('Sua cesta está vazia!');
                 return;
             }
             

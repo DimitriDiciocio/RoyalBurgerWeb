@@ -84,6 +84,8 @@ main{
                             justify-content: center;
                             border-radius: 5px;
                             width: 80px;
+                            padding: 4px 8px;
+                            min-height: 20px;
                         }
 
                         & .entrega{
@@ -97,6 +99,12 @@ main{
                         & .concluido{
                             background-color: #57D015;
                         }
+
+                        & .recebido{
+                            background-color: #CCCCCC;
+                            color: #101010;
+                        }
+
                     }
 
                     & .prazo{

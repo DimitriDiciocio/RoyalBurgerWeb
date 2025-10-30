@@ -328,6 +328,13 @@
     padding: 0;
 }
 
+.item-extras-list strong {
+    font-size: 0.85rem;
+    color: #1a1a1a;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
 .item-extras-list ul {
     list-style: none;
     padding: 0;
@@ -363,6 +370,13 @@
 /* Estilos para modificações da receita base */
 .item-base-mods-list {
     padding: 0;
+}
+
+.item-base-mods-list strong {
+    font-size: 0.85rem;
+    color: #1a1a1a;
+    display: block;
+    margin-bottom: 0.5rem;
 }
 
 .item-base-mods-list ul {

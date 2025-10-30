@@ -3,6 +3,7 @@ import { createEmailVerification } from './code-verification.js';
 import { verifyEmailCode, resendVerificationCode, requestEmailVerification, verifyPasswordChangeCode, requestPasswordChangeCode, requestPasswordReset, verifyResetCode } from '../api/user.js';
 import { verify2FACode } from '../api/auth.js';
 import { showToast } from './alerts.js';
+import { claimGuestCart, getCartIdFromStorage } from '../api/cart.js';
 
 document.addEventListener('DOMContentLoaded', async function () {
     // Verificar se há email na query string
@@ -140,6 +141,25 @@ document.addEventListener('DOMContentLoaded', async function () {
                         window.applyLoggedHeader && window.applyLoggedHeader(fallbackUser);
                     } catch (_e) { }
                     
+                    // Reivindicar carrinho de convidado se existir
+                    const guestCartId = getCartIdFromStorage();
+                    if (guestCartId) {
+                        try {
+                            const claimResult = await claimGuestCart();
+                            
+                            if (claimResult.success) {
+                                showToast('Seu carrinho foi restaurado!', { 
+                                    type: 'info', 
+                                    title: 'Carrinho Restaurado',
+                                    autoClose: 2000 
+                                });
+                            }
+                        } catch (claimErr) {
+                            // Não bloqueia o fluxo de login se falhar
+                            // NOTA: Erro silencioso intencional para não impactar UX
+                        }
+                    }
+                    
                     // Redirecionar para página inicial
                     setTimeout(() => {
                         window.location.href = '../../index.html';
@@ -268,21 +288,16 @@ document.addEventListener('DOMContentLoaded', async function () {
         
         // Só adicionar event listener se o elemento existir
         if (btnAlterarEmail) {
-            console.log('Botão alterar email encontrado, adicionando event listener');
             // Abrir modal usando função global
             btnAlterarEmail.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Clicou no botão alterar email');
-                console.log('Função abrirModal existe?', typeof window.abrirModal);
                 
                 // Verificar se a função existe antes de usar
                 if (typeof window.abrirModal === 'function') {
                     window.abrirModal('modal-alterar-email');
-                    console.log('Modal deve estar aberta agora');
                     setTimeout(() => inputNovoEmail.focus(), 100);
                 } else {
-                    console.error('Função abrirModal não encontrada!');
                     // Fallback: mostrar modal manualmente
                     const modal = document.getElementById('modal-alterar-email');
                     if (modal) {
@@ -292,8 +307,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                 }
                 return false;
             });
-        } else {
-            console.log('Botão alterar email NÃO encontrado');
         }
     }, 100);
 
@@ -348,11 +361,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         btnConfirmarAlterar.textContent = 'Alterando...';
         
         try {
-            
-            console.log('Email atual do localStorage:', currentEmail);
-            console.log('Email da URL:', email);
-            console.log('Novo email:', novoEmail);
-            
             // Para verificação de email, vamos simplesmente redirecionar com o novo email
             // em vez de tentar alterar no banco (que ainda não existe)
             
@@ -360,7 +368,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (userData) {
                 const updatedUserData = { ...userData, email: novoEmail };
                 localStorage.setItem('rb.user', JSON.stringify(updatedUserData));
-                console.log('Email atualizado no localStorage:', novoEmail);
             }
             
             showToast('Redirecionando para verificação do novo email...', { 

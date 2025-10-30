@@ -27,7 +27,34 @@ main{
     padding-bottom: 120px;
 
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 30px;
+
+    & .pagamento-header {
+        margin-bottom: 20px;
+
+        & .voltar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--color-texto-black);
+            font-size: 1rem;
+
+            &:hover {
+                color: rgb(55, 55, 55);
+            }
+
+            &:active {
+                color: rgb(147, 147, 147);
+            }
+        }
+    }
+
+    & .pagamento-container {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+    }
 
     & .esquerda{
         display: flex;
@@ -294,6 +321,13 @@ main{
                     & .item-extras-list {
                         padding: 0;
 
+                        & strong {
+                            font-size: 0.85rem;
+                            color: #1a1a1a;
+                            display: block;
+                            margin-bottom: 0.5rem;
+                        }
+
                         & ul {
                             list-style: none;
                             padding: 0;
@@ -322,6 +356,66 @@ main{
                                     justify-content: center;
                                     flex-shrink: 0;
                                     line-height: 1;
+                                }
+                            }
+                        }
+                    }
+
+                    & .item-base-mods-list {
+                        padding: 0;
+
+                        & strong {
+                            font-size: 0.85rem;
+                            color: #1a1a1a;
+                            display: block;
+                            margin-bottom: 0.5rem;
+                        }
+
+                        & ul {
+                            list-style: none;
+                            padding: 0;
+                            margin: 0;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 0.5rem;
+
+                            & li {
+                                font-size: 0.85rem;
+                                color: #757575;
+                                display: flex;
+                                align-items: center;
+                                gap: 0.5rem;
+
+                                & .base-mod-icon {
+                                    width: 20px;
+                                    height: 20px;
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    flex-shrink: 0;
+                                    font-size: 0.75rem;
+
+                                    &.mod-add {
+                                        color: #4caf50;
+                                        background-color: rgba(76, 175, 80, 0.1);
+                                    }
+
+                                    &.mod-remove {
+                                        color: #f44336;
+                                        background-color: rgba(244, 67, 54, 0.1);
+                                    }
+                                }
+
+                                & .base-mod-quantity {
+                                    font-weight: 600;
+                                    font-size: 0.85rem;
+                                    color: #424242;
+                                }
+
+                                & .base-mod-name {
+                                    flex: 1;
+                                    color: #757575;
                                 }
                             }
                         }

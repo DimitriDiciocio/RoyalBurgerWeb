@@ -123,6 +123,7 @@ header {
       & .pontos-royal {
         display: flex;
         align-items: center;
+        gap: 8px;
         user-select: none;
         cursor: pointer;
         padding: 6px 12px;
@@ -134,13 +135,22 @@ header {
         & i {
           color: var(--color-primary);
           font-size: 16px;
-          margin-right: 6px;
         }
 
-        & p {
-          color: var(--color-primary);
-          font-size: 14px;
-          font-weight: 600;
+        & .pontos-info {
+          display: flex;
+          flex-direction: column;
+
+          & .pontos-valor {
+            color: var(--color-primary);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1;
+
+            & span {
+              font-weight: 700;
+            }
+          }
         }
       }
 
@@ -150,8 +160,11 @@ header {
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(255, 199, 0, 0.3);
 
-        & i,
-        & p {
+        & i {
+          color: #d8aa00;
+        }
+
+        & .pontos-info .pontos-valor {
           color: #d8aa00;
         }
       }
@@ -160,8 +173,11 @@ header {
         transform: translateY(0);
         background-color: rgba(255, 199, 0, 0.3);
 
-        & i,
-        & p {
+        & i {
+          color: #ffdb58;
+        }
+
+        & .pontos-info .pontos-valor {
           color: #ffdb58;
         }
       }
@@ -493,10 +509,20 @@ header.header-logged-out {
     display: none !important;
   }
 
-  /* Mobile: esconder itens extras e manter apenas logo, hambúrguer e ícone da conta */
-  /* Deixar a decisão do que aparece para o JS conforme estado (logado/deslogado) */
+  /* Mobile: ajustar tamanho dos pontos e esconder apenas endereço */
+  header #user-header #user .pontos-royal {
+    padding: 4px 8px;
+    gap: 6px;
+    
+    & i {
+      font-size: 13px;
+    }
+    
+    & .pontos-info .pontos-valor {
+      font-size: 11px;
+    }
+  }
 
-  header #user-header #user .pontos-royal,
   header #user-header #user .endereco,
   header #user-header #user .sep {
     display: none !important;
