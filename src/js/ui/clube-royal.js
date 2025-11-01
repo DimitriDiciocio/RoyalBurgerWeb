@@ -2,6 +2,10 @@
 // Gerenciamento da página do Clube Royal
 
 import { getLoyaltyBalance, getLoyaltyHistory } from '../api/loyalty.js';
+import * as settingsHelper from '../utils/settings-helper.js';
+
+// Importar sistema de alertas customizado
+import { showError } from './alerts.js';
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -247,7 +251,12 @@ const VALIDATION_LIMITS = {
             const limitedHistory = historyData.slice(0, VALIDATION_LIMITS.MAX_HISTORY_ITEMS);
             
             // Transformar dados da API para o formato esperado
-            state.historico = limitedHistory.map(item => {
+            // Buscar taxa de conversão de ganho dinamicamente
+            const loyaltySettings = await settingsHelper.getLoyaltySettings();
+            const gainRate = loyaltySettings.gain_rate || 0.10; // R$ 0,10 = 1 ponto (fallback)
+            const redemptionRate = loyaltySettings.redemption_rate || 0.01; // R$ 0,01 por ponto (fallback)
+            
+            state.historico = limitedHistory.map((item) => {
                 // Validar item do histórico
                 if (!item || typeof item !== 'object') {
                     return null;
@@ -264,8 +273,18 @@ const VALIDATION_LIMITS = {
                 }
                 
                 // Para pontos de boas-vindas, não mostrar valor de gasto
-                // Para transações relacionadas a pedidos, converter pontos para reais
-                const valor = isBoasVindas ? 0 : (isOrderRelated ? Math.abs(pontos) / 10 : 0);
+                // Para transações relacionadas a pedidos, converter pontos para reais usando taxa configurável
+                // gainRate = quanto precisa gastar para ganhar 1 ponto
+                // Exemplo: gainRate = 0.10 significa R$ 0,10 = 1 ponto
+                // Para calcular valor gasto: pontos * gainRate
+                // Exemplo: 100 pontos * 0.10 = R$ 10,00 gastos
+                let valor = 0;
+                if (!isBoasVindas && isOrderRelated && isGanho) {
+                    valor = Math.abs(pontos) * gainRate;
+                } else if (!isGanho && isOrderRelated) {
+                    // Para uso de pontos, calcular desconto usando taxa de resgate
+                    valor = Math.abs(pontos) * redemptionRate;
+                }
                 
                 // Melhorar descrições para serem mais amigáveis
                 let descricao = item.reason || '';
@@ -445,10 +464,64 @@ const VALIDATION_LIMITS = {
         }
     }
 
+    // Atualizar explicações com valores dinâmicos da API
+    async function atualizarExplicacoes() {
+        try {
+            const loyaltySettings = await settingsHelper.getLoyaltySettings();
+            const gainRate = loyaltySettings.gain_rate || 0.10; // R$ 0,10 = 1 ponto (fallback)
+            const redemptionRate = loyaltySettings.redemption_rate || 0.01; // R$ 0,01 por ponto (fallback)
+            const expirationDays = loyaltySettings.expiration_days || 60; // 60 dias (fallback)
+            
+            // Calcular quantos pontos por R$ 1,00
+            const pontosPorReal = gainRate > 0 ? Math.round(1 / gainRate) : 10;
+            const realFormatado = gainRate.toLocaleString('pt-BR', { 
+                style: 'currency', 
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            
+            // Calcular quantos pontos = R$ 1,00 de desconto
+            const pontosParaUmReal = redemptionRate > 0 ? Math.round(1 / redemptionRate) : 100;
+            const descontoUmReal = (pontosParaUmReal * redemptionRate).toLocaleString('pt-BR', { 
+                style: 'currency', 
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            
+            // Atualizar primeira explicação (acumule pontos)
+            const descricao1 = document.querySelector('#secao-explicacao .informa > div:nth-child(1) .descricao');
+            if (descricao1) {
+                descricao1.textContent = `A cada ${realFormatado} que você gasta, ganha ${pontosPorReal} pontos Royal automaticamente. Quanto mais você compra, mais pontos acumula!`;
+            }
+            
+            // Atualizar segunda explicação (use pontos para descontos)
+            const descricao2 = document.querySelector('#secao-explicacao .informa > div:nth-child(2) .descricao');
+            if (descricao2) {
+                descricao2.textContent = `Na finalização do pedido, você pode usar seus pontos para obter descontos reais. ${pontosParaUmReal} pontos = ${descontoUmReal} de desconto!`;
+            }
+            
+            // Atualizar quarta explicação (pontos expiram)
+            const descricao4 = document.querySelector('#secao-explicacao .informa > div:nth-child(4) .descricao');
+            if (descricao4) {
+                const diasTexto = expirationDays === 1 ? 'dia' : 'dias';
+                descricao4.textContent = `Sim, mas não se preocupe! Seus pontos só expiram se você ficar ${expirationDays} ${diasTexto} sem fazer nenhuma compra. A cada nova compra, todos os pontos se renovam!`;
+            }
+        } catch (error) {
+            // Log apenas em desenvolvimento
+            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                console.warn('Erro ao atualizar explicações:', error.message);
+            }
+            // Manter valores padrão do HTML em caso de erro
+        }
+    }
+
     // Inicializar
     async function init() {
         carregarUsuario();
         await carregarPontos();
+        await atualizarExplicacoes(); // Atualizar explicações com valores dinâmicos
         await carregarHistorico();
         renderHistorico();
         attachEvents();
@@ -456,9 +529,11 @@ const VALIDATION_LIMITS = {
 
     // Verificar se usuário está logado
     if (typeof window.isUserLoggedIn === 'function' && !window.isUserLoggedIn()) {
-        // TODO: Implementar sistema de notificações mais robusto
-        alert('Você precisa estar logado para acessar esta página.');
-        window.location.href = 'login.html';
+        showError('Você precisa estar logado para acessar esta página.');
+        // Pequeno delay para permitir exibição do alerta antes do redirecionamento
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 500);
         return;
     }
 

@@ -3,11 +3,21 @@
  * Carrega produtos e categorias da API e exibe dinamicamente na home
  */
 
+// Importar helper de configurações públicas
+// Importação estática garante que o módulo esteja disponível quando necessário
+import * as settingsHelper from '../utils/settings-helper.js';
+
 // Cache para produtos e categorias com TTL
 let productsCache = null;
 let categoriesCache = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 let cacheTimestamp = 0;
+
+// Cache para configurações de entrega
+let deliveryFeeCache = 'R$ 5,00'; // Valor padrão (fallback)
+
+// Cache para prazos de entrega (evita múltiplas chamadas à API)
+let estimatedTimesCache = null;
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -97,6 +107,88 @@ async function loadCategories() {
     }
 }
 
+/**
+ * Carrega taxa de entrega das configurações públicas
+ */
+async function loadDeliveryFee() {
+    try {
+        // Tentar carregar do helper se disponível
+        if (settingsHelper && typeof settingsHelper.formatDeliveryFee === 'function') {
+            const formatted = await settingsHelper.formatDeliveryFee();
+            deliveryFeeCache = formatted;
+        }
+    } catch (error) {
+        // Manter fallback padrão
+        console.warn('Usando taxa de entrega padrão:', error.message);
+    }
+}
+
+/**
+ * Carrega prazos de entrega estimados das configurações públicas
+ */
+async function loadEstimatedTimes() {
+    try {
+        if (settingsHelper && typeof settingsHelper.getEstimatedDeliveryTimes === 'function') {
+            estimatedTimesCache = await settingsHelper.getEstimatedDeliveryTimes();
+        }
+        
+        // Se não conseguiu carregar, usar valores padrão
+        if (!estimatedTimesCache) {
+            estimatedTimesCache = {
+                initiation_minutes: 5,
+                preparation_minutes: 20,
+                dispatch_minutes: 5,
+                delivery_minutes: 15
+            };
+        }
+    } catch (error) {
+        // Fallback para valores padrão
+        estimatedTimesCache = {
+            initiation_minutes: 5,
+            preparation_minutes: 20,
+            dispatch_minutes: 5,
+            delivery_minutes: 15
+        };
+    }
+}
+
+/**
+ * Calcula tempo estimado de entrega baseado nos prazos do sistema
+ * Conforme o guia completo: considera todos os prazos para delivery (padrão na home)
+ * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
+ * @returns {Object} Objeto com minTime e maxTime em minutos
+ */
+function calculateEstimatedDeliveryTime(orderType = 'delivery') {
+    if (!estimatedTimesCache) {
+        // Fallback se não carregou os tempos
+        const fallbackTotal = orderType === 'delivery' ? 45 : 30; // Delivery: 5+20+5+15, Pickup: 5+20+5+0
+        return {
+            minTime: fallbackTotal,
+            maxTime: fallbackTotal + 15
+        };
+    }
+    
+    // Extrair prazos do cache (com fallbacks)
+    const initiation = estimatedTimesCache.initiation_minutes || 5;
+    const preparation = estimatedTimesCache.preparation_minutes || 20;
+    const dispatch = estimatedTimesCache.dispatch_minutes || 5;
+    const delivery = orderType === 'delivery' ? (estimatedTimesCache.delivery_minutes || 15) : 0;
+    
+    // Calcular tempo total conforme fluxo do pedido
+    // Para pedido novo (pending): inclui todos os prazos
+    // Delivery: iniciação + preparo + envio + entrega
+    // Pickup: iniciação + preparo + envio (sem entrega)
+    const totalMinutes = initiation + preparation + dispatch + delivery;
+    
+    // Tempo mínimo = soma dos prazos
+    const minTime = totalMinutes;
+    
+    // Tempo máximo = soma dos prazos + 15 minutos (margem de segurança)
+    const maxTime = totalMinutes + 15;
+    
+    return { minTime, maxTime };
+}
+
 
 // Cache local para evitar recarregamento desnecessário de imagens
 const imageCache = new Map();
@@ -179,8 +271,17 @@ function createProductHTML(product) {
     
     const imageUrl = buildImageUrl(product.image_url, product.image_hash);
     const price = product.price ? `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
-    const prepTime = product.preparation_time_minutes ? `${product.preparation_time_minutes} - ${product.preparation_time_minutes + 10} min` : '40 - 50 min';
-    const deliveryFee = 'R$ 5,00';
+    
+    // Calcular tempo estimado baseado nos prazos do sistema
+    // Para cards de produtos na home, usamos 'delivery' como padrão (cenário mais completo)
+    // Fórmula: Pending (iniciação + preparo + envio + entrega) = tempo mínimo
+    //          Tempo máximo = tempo mínimo + 15 minutos (margem de segurança)
+    // Delivery: iniciação(5) + preparo(20) + envio(5) + entrega(15) = 45 min mínimo
+    const timeEstimate = calculateEstimatedDeliveryTime('delivery');
+    const deliveryTime = `${timeEstimate.minTime} - ${timeEstimate.maxTime} min`;
+    
+    // Usar taxa de entrega dinâmica (cacheada ao carregar página)
+    const deliveryFee = deliveryFeeCache;
     
     // Sanitizar dados para evitar XSS
     const safeName = escapeHTML((product.name || 'Produto').substring(0, VALIDATION_LIMITS.MAX_NAME_LENGTH));
@@ -198,7 +299,7 @@ function createProductHTML(product) {
                     </div>
                     <div>
                         <p id="preco">${price}</p>
-                        <p id="tempo">${prepTime} • ${deliveryFee}</p>
+                        <p id="tempo">${deliveryTime} • ${deliveryFee}</p>
                     </div>
                 </div>
             </div>
@@ -458,6 +559,12 @@ async function initHome() {
         if (typeof getProducts !== 'function' || typeof getCategories !== 'function') {
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        
+        // Carregar taxa de entrega das configurações públicas
+        await loadDeliveryFee();
+        
+        // Carregar prazos de entrega estimados das configurações públicas
+        await loadEstimatedTimes();
         
         // Atualizar seções de produtos
         await updateProductSections();

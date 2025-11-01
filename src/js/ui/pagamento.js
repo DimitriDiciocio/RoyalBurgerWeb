@@ -14,6 +14,10 @@ import { createOrder, calculateOrderTotal } from '../api/orders.js';
 import { getCart } from '../api/cart.js';
 import { showError, showSuccess, showToast, showConfirm } from './alerts.js';
 
+// Importar helper de configurações
+// Importação estática garante que o módulo esteja disponível quando necessário
+import * as settingsHelper from '../utils/settings-helper.js';
+
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
   MAX_QUANTITY: 99,
@@ -27,6 +31,9 @@ const VALIDATION_LIMITS = {
 (function initPagamentoPage() {
     if (!window.location.pathname.includes('pagamento.html')) return;
 
+    // Cache para prazos de entrega (evita múltiplas chamadas à API)
+    let estimatedTimesCache = null;
+    
     const state = {
         cesta: [],
         usuario: null,
@@ -39,7 +46,7 @@ const VALIDATION_LIMITS = {
         pontosDisponiveis: 0,
         pontosParaUsar: 0,
         subtotal: 0,
-        taxaEntrega: 5.00,
+        taxaEntrega: 5.00, // Fallback padrão (será carregado dinamicamente)
         descontos: 0,
         total: 0,
         loading: false,
@@ -325,12 +332,25 @@ const VALIDATION_LIMITS = {
     function calcularTotais() {
         state.subtotal = state.cesta.reduce((sum, item) => sum + item.precoTotal, 0);
         
+        // Verificar se é pickup para calcular total com entrega (se delivery)
+        const isPickup = state.endereco && (
+            state.endereco.type === 'pickup' || 
+            state.endereco.order_type === 'pickup' ||
+            state.endereco.delivery_type === 'pickup' || 
+            state.enderecoSelecionado === 'pickup'
+        );
+        
+        // Total antes do desconto (subtotal + taxa de entrega, se delivery)
+        const totalAntesDesconto = state.subtotal + (isPickup ? 0 : state.taxaEntrega);
+        
         // Validar resgate de pontos se estiver usando
+        // IMPORTANTE: O desconto pode ser aplicado sobre subtotal + entrega (se delivery)
+        // conforme o backend: total_with_delivery = subtotal + delivery_fee
         if (state.usarPontos && state.pontosParaUsar > 0) {
             const validacao = validatePointsRedemption(
                 state.pontosDisponiveis, 
                 state.pontosParaUsar, 
-                state.subtotal
+                totalAntesDesconto // Usar total com entrega para validação
             );
             
             if (!validacao.valid) {
@@ -343,14 +363,39 @@ const VALIDATION_LIMITS = {
             }
         }
         
-        // Calcular desconto por pontos (10 pontos = R$ 1,00)
+        // Calcular desconto por pontos
+        // 
+        // REGRA: O desconto NÃO pode ser maior que o valor total do pedido (subtotal + entrega)
+        // Isso evita que o pedido fique com valor negativo ou que o cliente receba dinheiro de volta
+        // 
+        // Exemplo 1 - Desconto normal:
+        //   Subtotal: R$ 50,00
+        //   Taxa entrega: R$ 5,50
+        //   Total antes desconto: R$ 55,50
+        //   Pontos resgatados: 1000 pontos = R$ 10,00 de desconto
+        //   Desconto aplicado: R$ 10,00 (menor que R$ 55,50)
+        //   Total final: R$ 55,50 - R$ 10,00 = R$ 45,50 ✅
+        //
+        // Exemplo 2 - Desconto maior que o total (limitado):
+        //   Subtotal: R$ 10,00
+        //   Taxa entrega: R$ 5,50
+        //   Total antes desconto: R$ 15,50
+        //   Pontos resgatados: 5000 pontos = R$ 50,00 de desconto
+        //   Desconto aplicado: R$ 15,50 (limitado ao total, não R$ 50,00)
+        //   Total final: R$ 15,50 - R$ 15,50 = R$ 0,00 ✅
+        //   (Cliente não recebe crédito de R$ 34,50 que sobraria)
+        //
         const descontoPontos = state.usarPontos ? calculateDiscountFromPoints(state.pontosParaUsar) : 0;
-        state.descontos = Math.min(descontoPontos, state.subtotal);
+        state.descontos = Math.min(descontoPontos, totalAntesDesconto);
         
-        state.total = state.subtotal + state.taxaEntrega - state.descontos;
+        state.total = totalAntesDesconto - state.descontos;
         
         // Atualizar exibição do troco se dinheiro estiver selecionado
+        // Se o total ficou 0 devido aos pontos, limpar o troco
         if (state.formaPagamento === 'dinheiro') {
+            if (state.total <= 0 && state.usarPontos) {
+                state.valorTroco = null;
+            }
             atualizarExibicaoTroco();
         }
     }
@@ -455,7 +500,7 @@ const VALIDATION_LIMITS = {
     }
 
     // Renderizar resumo de valores
-    function renderResumo() {
+    async function renderResumo() {
         calcularTotais();
 
         if (el.subtotal) el.subtotal.textContent = formatBRL(state.subtotal);
@@ -463,21 +508,193 @@ const VALIDATION_LIMITS = {
         if (el.descontos) el.descontos.textContent = formatBRL(state.descontos);
         if (el.total) el.total.textContent = formatBRL(state.total);
         
-        // Pontos (10 pontos a cada R$ 1,00 gasto)
-        const pontosGanhos = Math.floor(state.total * 10);
+        // Pontos usando configuração dinâmica
+        // IMPORTANTE: Pontos são calculados sobre o SUBTOTAL (produtos), NÃO sobre o total (com entrega)
+        // Conforme padrão de programas de fidelidade: pontos não incluem taxas de entrega
+        let pontosGanhos = 0;
+        
+        // Calcular base para pontos: subtotal (produtos apenas, sem taxa de entrega)
+        // Se houver desconto, considerar apenas o desconto proporcional ao subtotal
+        let basePontos = state.subtotal;
+        if (state.descontos > 0) {
+            // Se houver desconto aplicado, calcular desconto proporcional ao subtotal
+            // desconto_no_subtotal = desconto * (subtotal / total_antes_desconto)
+            const isPickup = state.endereco && (
+                state.endereco.type === 'pickup' || 
+                state.endereco.order_type === 'pickup' ||
+                state.endereco.delivery_type === 'pickup' || 
+                state.enderecoSelecionado === 'pickup'
+            );
+            const totalAntesDesconto = state.subtotal + (isPickup ? 0 : state.taxaEntrega);
+            if (totalAntesDesconto > 0) {
+                const descontoProporcionalSubtotal = state.descontos * (state.subtotal / totalAntesDesconto);
+                basePontos = Math.max(0, state.subtotal - descontoProporcionalSubtotal);
+            }
+        }
+        
+        if (settingsHelper && typeof settingsHelper.calculatePointsEarned === 'function') {
+            try {
+                pontosGanhos = await settingsHelper.calculatePointsEarned(basePontos);
+            } catch (error) {
+                // Fallback: 10 pontos por real
+                pontosGanhos = Math.floor(basePontos * 10);
+            }
+        } else {
+            // Fallback: 10 pontos por real
+            pontosGanhos = Math.floor(basePontos * 10);
+        }
+        
         if (el.pontosGanhos) el.pontosGanhos.textContent = pontosGanhos;
         if (el.pontosDisponiveis) el.pontosDisponiveis.textContent = state.pontosDisponiveis;
         
         // Desconto por pontos (sempre mostrar o valor máximo disponível)
+        // IMPORTANTE: O desconto pode ser aplicado sobre subtotal + entrega (se delivery)
         if (el.descontoPontos) {
-            const descontoMaximo = Math.min(calculateDiscountFromPoints(state.pontosDisponiveis), state.subtotal);
+            // Verificar se é pickup para calcular desconto máximo
+            const isPickup = state.endereco && (
+                state.endereco.type === 'pickup' || 
+                state.endereco.order_type === 'pickup' ||
+                state.endereco.delivery_type === 'pickup' || 
+                state.enderecoSelecionado === 'pickup'
+            );
+            const totalAntesDesconto = state.subtotal + (isPickup ? 0 : state.taxaEntrega);
+            const descontoMaximo = Math.min(calculateDiscountFromPoints(state.pontosDisponiveis), totalAntesDesconto);
             el.descontoPontos.textContent = `-${formatBRL(descontoMaximo)}`;
         }
     }
 
+    /**
+     * Carrega prazos de entrega estimados das configurações públicas
+     */
+    async function loadEstimatedTimes() {
+        try {
+            if (settingsHelper && typeof settingsHelper.getEstimatedDeliveryTimes === 'function') {
+                estimatedTimesCache = await settingsHelper.getEstimatedDeliveryTimes();
+            }
+            
+            // Se não conseguiu carregar, usar valores padrão
+            if (!estimatedTimesCache) {
+                estimatedTimesCache = {
+                    initiation_minutes: 5,
+                    preparation_minutes: 20,
+                    dispatch_minutes: 5,
+                    delivery_minutes: 15
+                };
+            }
+        } catch (error) {
+            // Fallback para valores padrão
+            estimatedTimesCache = {
+                initiation_minutes: 5,
+                preparation_minutes: 20,
+                dispatch_minutes: 5,
+                delivery_minutes: 15
+            };
+        }
+    }
+    
+    /**
+     * Calcula tempo estimado de entrega baseado nos prazos do sistema
+     * Conforme o guia completo: considera todos os prazos para delivery ou pickup
+     * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
+     * @returns {Object} Objeto com minTime e maxTime em minutos
+     */
+    function calculateEstimatedDeliveryTime(orderType = 'delivery') {
+        if (!estimatedTimesCache) {
+            // Fallback se não carregou os tempos
+            const fallbackTotal = orderType === 'delivery' ? 45 : 30; // Delivery: 5+20+5+15, Pickup: 5+20+5+0
+            return {
+                minTime: fallbackTotal,
+                maxTime: fallbackTotal + 15
+            };
+        }
+        
+        // Extrair prazos do cache (com fallbacks)
+        const initiation = estimatedTimesCache.initiation_minutes || 5;
+        const preparation = estimatedTimesCache.preparation_minutes || 20;
+        const dispatch = estimatedTimesCache.dispatch_minutes || 5;
+        const delivery = orderType === 'delivery' ? (estimatedTimesCache.delivery_minutes || 15) : 0;
+        
+        // Calcular tempo total conforme fluxo do pedido
+        // Para pedido novo (pending): inclui todos os prazos
+        // Delivery: iniciação + preparo + envio + entrega
+        // Pickup: iniciação + preparo + envio (sem entrega)
+        const totalMinutes = initiation + preparation + dispatch + delivery;
+        
+        // Tempo mínimo = soma dos prazos
+        const minTime = totalMinutes;
+        
+        // Tempo máximo = soma dos prazos + 15 minutos (margem de segurança)
+        const maxTime = totalMinutes + 15;
+        
+        return { minTime, maxTime };
+    }
+    
+    /**
+     * Atualiza a exibição do tempo estimado na página
+     */
+    function atualizarExibicaoTempo() {
+        // Verificar se é pickup ou delivery
+        // Se não houver endereço selecionado, usar 'delivery' como padrão
+        const isPickup = state.endereco && (
+            state.endereco.type === 'pickup' || 
+            state.endereco.order_type === 'pickup' ||
+            state.endereco.delivery_type === 'pickup' || 
+            state.enderecoSelecionado === 'pickup'
+        );
+        
+        const orderType = isPickup ? 'pickup' : 'delivery';
+        const timeEstimate = calculateEstimatedDeliveryTime(orderType);
+        const tempoTexto = `${timeEstimate.minTime} - ${timeEstimate.maxTime} min`;
+        
+        // Atualizar elemento de tempo na seção de endereço
+        const tempoElement = document.querySelector('.endereco .informa .tempo');
+        if (tempoElement) {
+            tempoElement.textContent = tempoTexto;
+        }
+        
+        // Atualizar tempo na modal de revisão
+        // Buscar o elemento que contém "Hoje, 40 - 50 min" (segundo <p> dentro do primeiro div)
+        const modalRevisao = document.querySelector('#modal-revisao .conteudo-modal');
+        if (modalRevisao) {
+            // Buscar o primeiro div que contém o ícone de moto e o texto de entrega
+            const entregaDiv = modalRevisao.querySelector('div:first-child');
+            if (entregaDiv) {
+                const entregaTexts = entregaDiv.querySelectorAll('div p');
+                // O segundo <p> geralmente contém o tempo
+                if (entregaTexts.length >= 2) {
+                    const tempoParagraph = entregaTexts[1];
+                    if (tempoParagraph) {
+                        // Manter o formato "Hoje, X - Y min" se já tiver "Hoje"
+                        const currentText = tempoParagraph.textContent.trim();
+                        if (currentText.includes('Hoje')) {
+                            tempoParagraph.textContent = `Hoje, ${tempoTexto}`;
+                        } else {
+                            tempoParagraph.textContent = tempoTexto;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // Renderizar endereço
     function renderEndereco() {
-        if (state.endereco) {
+        // Verificar se é retirada no local (pickup)
+        const isPickup = state.endereco && (
+            state.endereco.type === 'pickup' || 
+            state.endereco.order_type === 'pickup' ||
+            state.endereco.delivery_type === 'pickup' || 
+            state.enderecoSelecionado === 'pickup'
+        );
+        
+        if (isPickup) {
+            if (el.enderecoTitulo) {
+                el.enderecoTitulo.textContent = 'Retirar no Local';
+            }
+            if (el.enderecoDescricao) {
+                el.enderecoDescricao.textContent = 'Balcão - Retirada na loja';
+            }
+        } else if (state.endereco) {
             // Construir endereço completo baseado na estrutura da API
             let enderecoCompleto = '';
             let enderecoDescricao = '';
@@ -518,6 +735,9 @@ const VALIDATION_LIMITS = {
             if (el.enderecoTitulo) el.enderecoTitulo.textContent = 'Nenhum endereço selecionado';
             if (el.enderecoDescricao) el.enderecoDescricao.textContent = 'Clique para selecionar um endereço';
         }
+        
+        // Atualizar tempo estimado após renderizar endereço
+        atualizarExibicaoTempo();
     }
 
     // Renderizar lista de endereços
@@ -604,9 +824,33 @@ const VALIDATION_LIMITS = {
     function renderListaEnderecosModal() {
         if (!el.listaEnderecosModal) return;
 
+        // Verificar se pickup está selecionado
+        const isPickupSelected = state.enderecoSelecionado === 'pickup' || 
+                                 (state.endereco && (
+                                     state.endereco.type === 'pickup' || 
+                                     state.endereco.order_type === 'pickup' ||
+                                     state.endereco.delivery_type === 'pickup'
+                                 ));
 
+        // Opção de retirar no local (sempre visível)
+        let html = `
+            <div class="endereco-item endereco-pickup ${isPickupSelected ? 'selecionado' : ''}" 
+                 data-endereco-id="pickup" 
+                 data-action="select-pickup">
+                <div class="endereco-info">
+                    <i class="fa-solid fa-store"></i>
+                    <div class="endereco-info-content">
+                        <p class="titulo">Retirar no Local</p>
+                        <p class="descricao">Balcão - Retirada na loja</p>
+                    </div>
+                </div>
+                ${isPickupSelected ? '<div class="endereco-check"><i class="fa-solid fa-car-side"></i></div>' : ''}
+            </div>
+        `;
+
+        // Renderizar endereços cadastrados
         if (state.enderecos.length === 0) {
-            el.listaEnderecosModal.innerHTML = `
+            html += `
                 <div class="endereco-vazio">
                     <i class="fa-solid fa-map-location-dot"></i>
                     <h3>Nenhum endereço cadastrado</h3>
@@ -616,47 +860,61 @@ const VALIDATION_LIMITS = {
                     </button>
                 </div>
             `;
-            return;
-        }
-
-        el.listaEnderecosModal.innerHTML = state.enderecos.map(endereco => {
-            const isSelecionado = state.enderecoSelecionado && state.enderecoSelecionado.id === endereco.id;
-            const enderecoId = Number(endereco.id) || 0;
-            // Sanitizar dados do endereço
-            const street = escapeHTML(endereco.street || 'Endereço não informado');
-            const number = escapeHTML(endereco.number || 'S/N');
-            const neighborhood = escapeHTML(endereco.neighborhood || endereco.district || endereco.bairro || 'Bairro não informado');
-            const city = escapeHTML(endereco.city || 'Cidade não informada');
-            
-            return `
-            <div class="endereco-item ${isSelecionado ? 'selecionado' : ''}" 
-                 data-endereco-id="${enderecoId}"
-                 data-action="select">
-                <div class="endereco-info">
-                    <i class="fa-solid fa-location-dot"></i>
-                    <div class="endereco-info-content">
-                        <p class="titulo">${street}, ${number}</p>
-                        <p class="descricao">${neighborhood} - ${city}</p>
+        } else {
+            html += state.enderecos.map(endereco => {
+                const isSelecionado = state.enderecoSelecionado && 
+                                     state.enderecoSelecionado !== 'pickup' &&
+                                     state.enderecoSelecionado.id === endereco.id;
+                const enderecoId = Number(endereco.id) || 0;
+                // Sanitizar dados do endereço
+                const street = escapeHTML(endereco.street || 'Endereço não informado');
+                const number = escapeHTML(endereco.number || 'S/N');
+                const neighborhood = escapeHTML(endereco.neighborhood || endereco.district || endereco.bairro || 'Bairro não informado');
+                const city = escapeHTML(endereco.city || 'Cidade não informada');
+                
+                return `
+                <div class="endereco-item ${isSelecionado ? 'selecionado' : ''}" 
+                     data-endereco-id="${enderecoId}"
+                     data-action="select">
+                    <div class="endereco-info">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <div class="endereco-info-content">
+                            <p class="titulo">${street}, ${number}</p>
+                            <p class="descricao">${neighborhood} - ${city}</p>
+                        </div>
+                    </div>
+                    <div class="endereco-actions">
+                        ${isSelecionado ? '<div class="endereco-check"><i class="fa-solid fa-car-side"></i></div>' : ''}
+                        <button class="btn-editar" data-endereco-id="${enderecoId}" data-action="edit" title="Editar endereço">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
                     </div>
                 </div>
-                <div class="endereco-actions">
-                    <button class="btn-editar" data-endereco-id="${enderecoId}" data-action="edit" title="Editar endereço">
-                        <i class="fa-solid fa-pen"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        }).join('');
+            `;
+            }).join('');
+        }
+
+        el.listaEnderecosModal.innerHTML = html;
     }
 
     function selecionarEnderecoModal(enderecoId) {
-        const endereco = state.enderecos.find(addr => addr.id === enderecoId);
-        if (endereco) {
-            state.enderecoSelecionado = endereco;
-            state.endereco = endereco;
+        if (enderecoId === 'pickup') {
+            // Selecionar retirada no local
+            state.enderecoSelecionado = 'pickup';
+            state.endereco = { type: 'pickup', order_type: 'pickup' }; // Usar order_type para compatibilidade com backend
             renderEndereco();
             renderListaEnderecosModal(); // Re-renderizar para mostrar seleção
             fecharModalEnderecos();
+        } else {
+            // Selecionar endereço de entrega
+            const endereco = state.enderecos.find(addr => addr.id === enderecoId);
+            if (endereco) {
+                state.enderecoSelecionado = endereco;
+                state.endereco = { ...endereco, order_type: 'delivery' }; // Adicionar order_type para delivery
+                renderEndereco();
+                renderListaEnderecosModal(); // Re-renderizar para mostrar seleção
+                fecharModalEnderecos();
+            }
         }
     }
 
@@ -1087,8 +1345,15 @@ const VALIDATION_LIMITS = {
                         atualizarExibicaoTroco(); // Atualizar exibição
                     } else if (texto.includes('dinheiro')) {
                         state.formaPagamento = 'dinheiro';
-                        // Abrir modal de troco quando selecionar dinheiro
-                        abrirModalTroco();
+                        // Só abrir modal de troco se o total for maior que 0
+                        // Se total = 0 e há desconto por pontos, não precisa de troco
+                        if (state.total > 0) {
+                            abrirModalTroco();
+                        } else {
+                            // Se total é 0, limpar troco e não abrir modal
+                            state.valorTroco = null;
+                            atualizarExibicaoTroco();
+                        }
                     }
                 });
             });
@@ -1209,6 +1474,8 @@ const VALIDATION_LIMITS = {
                     if (!isNaN(id) && id > 0) {
                         selecionarEnderecoModal(id);
                     }
+                } else if (action === 'select-pickup') {
+                    selecionarEnderecoModal('pickup');
                 }
             });
         }
@@ -1578,6 +1845,21 @@ const VALIDATION_LIMITS = {
     async function init() {
         initElements();
         
+        // Carregar taxa de entrega das configurações públicas
+        if (settingsHelper && typeof settingsHelper.getDeliveryFee === 'function') {
+            try {
+                state.taxaEntrega = await settingsHelper.getDeliveryFee();
+            } catch (error) {
+                console.warn('Usando taxa de entrega padrão:', error.message);
+            }
+        }
+        
+        // Carregar prazos de entrega estimados das configurações públicas
+        await loadEstimatedTimes();
+        
+        // Atualizar tempo estimado inicial (mesmo sem endereço, mostra tempo para delivery)
+        atualizarExibicaoTempo();
+        
         await carregarCesta();
         carregarUsuario();
         await carregarEnderecos();
@@ -1585,7 +1867,7 @@ const VALIDATION_LIMITS = {
         
         renderItens();
         renderResumo();
-        renderEndereco();
+        renderEndereco(); // Esta função também atualiza o tempo
         renderListaEnderecos();
         
         // Configurar busca de CEP
@@ -1595,8 +1877,17 @@ const VALIDATION_LIMITS = {
         attachEvents();
         
         // Garantir que o valor de desconto seja exibido na inicialização
+        // IMPORTANTE: O desconto pode ser aplicado sobre subtotal + entrega (se delivery)
         if (el.descontoPontos) {
-            const descontoMaximo = Math.min(calculateDiscountFromPoints(state.pontosDisponiveis), state.subtotal);
+            // Verificar se é pickup para calcular desconto máximo
+            const isPickup = state.endereco && (
+                state.endereco.type === 'pickup' || 
+                state.endereco.order_type === 'pickup' ||
+                state.endereco.delivery_type === 'pickup' || 
+                state.enderecoSelecionado === 'pickup'
+            );
+            const totalAntesDesconto = state.subtotal + (isPickup ? 0 : state.taxaEntrega);
+            const descontoMaximo = Math.min(calculateDiscountFromPoints(state.pontosDisponiveis), totalAntesDesconto);
             el.descontoPontos.textContent = `-${formatBRL(descontoMaximo)}`;
         }
     }
@@ -1659,13 +1950,24 @@ const VALIDATION_LIMITS = {
 
     function confirmarTroco() {
         const valor = el.valorTroco?.value?.trim();
-        if (!valor || isNaN(valor) || parseFloat(valor) <= 0) {
+        const valorPago = parseFloat(valor);
+        const valorTotal = state.total;
+        const isFullyPaidWithPoints = valorTotal <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+        
+        // Se o pedido está completamente pago com pontos, não precisa de troco
+        if (isFullyPaidWithPoints) {
+            state.valorTroco = null;
+            fecharModalTroco();
+            atualizarExibicaoTroco();
+            atualizarExibicaoPagamento();
+            return;
+        }
+        
+        // Validação normal para pedidos com valor
+        if (!valor || isNaN(valorPago) || valorPago <= 0) {
             showError('Digite um valor válido para o troco.');
             return;
         }
-
-        const valorPago = parseFloat(valor);
-        const valorTotal = state.total;
         
         if (valorPago < valorTotal) {
             showError(`O valor pago (R$ ${valorPago.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${valorTotal.toFixed(2).replace('.', ',')}).`);
@@ -1685,6 +1987,14 @@ const VALIDATION_LIMITS = {
     function atualizarExibicaoTroco() {
         if (!el.trocoInfo) return;
         
+        const isFullyPaidWithPoints = state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+        
+        // Se está pago com pontos, não mostrar troco
+        if (isFullyPaidWithPoints) {
+            el.trocoInfo.style.display = 'none';
+            return;
+        }
+        
         if (state.formaPagamento === 'dinheiro' && state.valorTroco) {
             const valorTotal = state.total;
             const troco = state.valorTroco - valorTotal;
@@ -1703,9 +2013,17 @@ const VALIDATION_LIMITS = {
 
     function confirmarPedido() {
         try {
-            // Validar endereço
-            if (!state.endereco || !state.endereco.id) {
-                showError('Selecione um endereço de entrega.');
+            // Verificar se é pickup
+            const isPickupOrder = state.endereco && (
+                state.endereco.type === 'pickup' || 
+                state.endereco.order_type === 'pickup' ||
+                state.endereco.delivery_type === 'pickup' || 
+                state.enderecoSelecionado === 'pickup'
+            );
+            
+            // Validar endereço (aceita pickup ou endereço com id)
+            if (!state.endereco || (!isPickupOrder && !state.endereco.id)) {
+                showError('Selecione um endereço de entrega ou retirada no local.');
                 return;
             }
 
@@ -1721,26 +2039,35 @@ const VALIDATION_LIMITS = {
                 return;
             }
 
-            // Validar forma de pagamento
-            if (!state.formaPagamento) {
+            // Verificar se o pedido está completamente pago com pontos
+            const isFullyPaidWithPoints = state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+            
+            // Validar forma de pagamento apenas se houver valor a pagar
+            if (!isFullyPaidWithPoints && !state.formaPagamento) {
                 showError('Selecione uma forma de pagamento.');
                 return;
             }
 
-            // Validar totais
-            if (state.total <= 0) {
+            // Validar totais apenas se não estiver completamente pago com pontos
+            // Se está pago com pontos (total = 0), permitir finalizar
+            if (!isFullyPaidWithPoints && state.total <= 0) {
                 showError('Valor total inválido. Verifique sua cesta.');
                 return;
             }
 
             // Calcular pontos para resgate (garantir que está sincronizado)
+            // IMPORTANTE: O desconto pode ser aplicado sobre subtotal + entrega (se delivery)
+            // conforme o backend calcula: total_with_delivery = subtotal + delivery_fee
             let pontosParaResgate = 0;
             if (state.usarPontos && state.pontosDisponiveis > 0 && state.pontosParaUsar > 0) {
-                // Validar novamente antes de enviar
+                // Calcular total antes do desconto (subtotal + taxa de entrega, se delivery)
+                const totalAntesDesconto = state.subtotal + (isPickupOrder ? 0 : state.taxaEntrega);
+                
+                // Validar novamente antes de enviar usando total com entrega
                 const validacao = validatePointsRedemption(
                     state.pontosDisponiveis,
                     state.pontosParaUsar,
-                    state.subtotal
+                    totalAntesDesconto // Usar total com entrega para validação
                 );
                 
                 if (validacao.valid) {
@@ -1757,30 +2084,66 @@ const VALIDATION_LIMITS = {
             }
 
             // Mapear método de pagamento para valores esperados pelo backend
-            const paymentMethodMap = {
-                'pix': 'pix',
-                'cartao': 'credit_card', // Cartão mapeado para credit_card
-                'dinheiro': 'money'
-            };
-            const backendPaymentMethod = paymentMethodMap[state.formaPagamento] || state.formaPagamento;
+            // Se o pedido está completamente pago com pontos, usar um método especial ou null
+            let backendPaymentMethod = null;
+            if (!isFullyPaidWithPoints) {
+                const paymentMethodMap = {
+                    'pix': 'pix',
+                    'cartao': 'credit_card', // Cartão mapeado para credit_card
+                    'dinheiro': 'money'
+                };
+                backendPaymentMethod = paymentMethodMap[state.formaPagamento] || state.formaPagamento;
+                
+                // Validar que o método de pagamento foi mapeado corretamente
+                if (!backendPaymentMethod || backendPaymentMethod.trim() === '') {
+                    showError('Método de pagamento inválido. Por favor, selecione novamente.');
+                    return;
+                }
+            } else {
+                // Pedido pago integralmente com pontos - usar pix como fallback (ou o backend pode aceitar null)
+                backendPaymentMethod = 'pix'; // Valor padrão, mas o pagamento será via pontos
+            }
 
             // Preparar dados do pedido para API
             // IMPORTANTE: Quando use_cart=true, NÃO enviamos items manualmente
             // O backend buscará os items diretamente do carrinho do usuário
             const orderData = {
-                address_id: Number(state.endereco.id),
                 payment_method: backendPaymentMethod,
                 notes: state.cesta.map(item => 
                     item.observacao ? `${item.nome}: ${item.observacao}` : ''
                 ).filter(note => note).join('; ') || '',
                 cpf_on_invoice: (state.cpf && state.cpf.trim() !== '') ? state.cpf.trim() : null,
                 points_to_redeem: pontosParaResgate,
-                use_cart: true // CRÍTICO: Indica ao backend para usar o carrinho atual
+                use_cart: true, // CRÍTICO: Indica ao backend para usar o carrinho atual
+                order_type: isPickupOrder ? 'pickup' : 'delivery' // Especificar tipo de pedido (pickup ou delivery)
             };
+            
+            // Se for delivery, incluir address_id (para pickup, não incluir)
+            if (!isPickupOrder) {
+                const addressId = Number(state.endereco.id);
+                if (!isNaN(addressId) && addressId > 0) {
+                    orderData.address_id = addressId;
+                } else {
+                    showError('Endereço inválido. Por favor, selecione um endereço válido.');
+                    return;
+                }
+            }
+            // Para pickup, address_id não é incluído no objeto
 
-            // Se dinheiro, adicionar troco
-            if (state.formaPagamento === 'dinheiro' && state.valorTroco) {
-                orderData.change_for_amount = Number(state.valorTroco);
+            // Se dinheiro e há valor a pagar, adicionar troco
+            // Se total = 0, não adicionar troco (não há pagamento em dinheiro)
+            if (!isFullyPaidWithPoints && state.formaPagamento === 'dinheiro' && state.valorTroco) {
+                const trocoValue = Number(state.valorTroco);
+                // Só adicionar troco se houver valor total positivo e valor de troco válido
+                if (!isNaN(trocoValue) && trocoValue > 0 && state.total > 0) {
+                    orderData.change_for_amount = trocoValue;
+                }
+            }
+            
+            // Debug: Log dos dados sendo enviados (remover em produção)
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.log('Dados do pedido sendo enviados:', JSON.stringify(orderData, null, 2));
             }
 
             // Desabilitar botão para evitar duplicação
@@ -1819,13 +2182,64 @@ const VALIDATION_LIMITS = {
                 // Mostrar sucesso com informações do pedido
                 const orderId = result.data.id || result.data.order_id;
                 const confirmationCode = result.data.confirmation_code;
+                
+                // NOTA: Os pontos serão creditados automaticamente quando o pedido for concluído (status='completed')
+                // O backend credita pontos em update_order_status quando o status muda para 'completed'
+                
+                // Calcular e informar pontos que serão ganhos (baseado no subtotal)
+                // Importante: pontos são calculados sobre subtotal (sem taxa de entrega)
+                let pontosPrevistos = 0;
+                const baseParaPontos = state.subtotal; // Subtotal já considera desconto proporcional se houver
+                
+                try {
+                    // Usar settingsHelper importado estaticamente
+                    if (settingsHelper && typeof settingsHelper.calculatePointsEarned === 'function') {
+                        pontosPrevistos = await settingsHelper.calculatePointsEarned(baseParaPontos);
+                    } else {
+                        // Fallback: 10 pontos por real (R$ 0,10 = 1 ponto)
+                        pontosPrevistos = Math.floor(baseParaPontos * 10);
+                    }
+                } catch (error) {
+                    // Fallback em caso de erro
+                    pontosPrevistos = Math.floor(baseParaPontos * 10);
+                }
+                
+                // Log para debug (apenas em desenvolvimento)
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.log('Pedido criado com sucesso:', {
+                        orderId: orderId,
+                        confirmationCode: confirmationCode,
+                        pontosPrevistos: pontosPrevistos,
+                        subtotal: state.subtotal,
+                        total: state.total,
+                        orderType: orderData.order_type
+                    });
+                }
+                
                 let mensagem = 'Pedido confirmado com sucesso!';
                 
                 if (confirmationCode) {
-                    mensagem += ` Código de confirmação: ${confirmationCode}`;
+                    mensagem += ` Código: ${confirmationCode}`;
+                }
+                
+                // Informar pontos que serão creditados quando o pedido for concluído
+                if (pontosPrevistos > 0) {
+                    mensagem += ` Você ganhará ${pontosPrevistos} pontos Royal quando o pedido for concluído!`;
                 }
                 
                 showSuccess(mensagem);
+                
+                // Recarregar pontos do usuário (pode ter pontos de outros pedidos)
+                // Os pontos deste pedido serão creditados quando o status mudar para 'completed'
+                try {
+                    await carregarPontos();
+                } catch (error) {
+                    // Log apenas em desenvolvimento
+                    if (isDev) {
+                        console.warn('Erro ao recarregar pontos após pedido:', error.message);
+                    }
+                }
                 
                 // Limpar cesta local se houver (a API já limpa o carrinho)
                 if (typeof window.atualizarCesta === 'function') {
@@ -1878,6 +2292,48 @@ const VALIDATION_LIMITS = {
     }
 
     function atualizarExibicaoPagamento() {
+        // Atualizar endereço na modal de revisão
+        const isPickup = state.endereco && (
+            state.endereco.type === 'pickup' || 
+            state.endereco.order_type === 'pickup' ||
+            state.endereco.delivery_type === 'pickup' || 
+            state.enderecoSelecionado === 'pickup'
+        );
+        const enderecoDiv = document.querySelector('#modal-revisao .conteudo-modal > div:nth-child(2)');
+        if (enderecoDiv) {
+            const enderecoIcon = enderecoDiv.querySelector('i');
+            const enderecoTexts = enderecoDiv.querySelectorAll('div p');
+            
+            // Atualizar ícone - usar loja para pickup, location para entrega
+            if (enderecoIcon) {
+                if (isPickup) {
+                    enderecoIcon.className = 'fa-solid fa-store';
+                } else {
+                    enderecoIcon.className = 'fa-solid fa-location-dot';
+                }
+            }
+            
+            // Atualizar textos do endereço
+            if (enderecoTexts.length >= 2) {
+                if (isPickup) {
+                    enderecoTexts[0].textContent = 'Retirar no Local';
+                    enderecoTexts[1].textContent = 'Balcão - Retirada na loja';
+                } else {
+                    // Manter endereço normal ou atualizar se necessário
+                    const rua = state.endereco?.street || state.endereco?.rua || 'Endereço não informado';
+                    const numero = state.endereco?.number || state.endereco?.numero || '';
+                    const bairro = state.endereco?.neighborhood || state.endereco?.district || state.endereco?.bairro || '';
+                    const cidade = state.endereco?.city || state.endereco?.cidade || '';
+                    
+                    enderecoTexts[0].textContent = numero ? `${rua}, ${numero}` : rua;
+                    enderecoTexts[1].textContent = cidade ? `${bairro} - ${cidade}` : bairro || 'Localização não informada';
+                }
+            }
+        }
+        
+        // Atualizar tempo estimado na modal de revisão
+        atualizarExibicaoTempo();
+        
         // Atualizar ícones de pagamento na modal de revisão
         const pixIcon = document.querySelector('#modal-revisao .fa-pix');
         const cartaoIcon = document.querySelector('#modal-revisao .fa-credit-card');
@@ -1907,11 +2363,25 @@ const VALIDATION_LIMITS = {
             if (pagamentoTexts[0]) pagamentoTexts[0].style.display = 'block'; // "Pagamento na entrega"
             if (pagamentoTexts[2]) pagamentoTexts[2].style.display = 'block'; // "Cartão"
         } else if (state.formaPagamento === 'dinheiro') {
+            // Verificar se o pedido está completamente pago com pontos
+            const isFullyPaidWithPoints = state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+            
+            // Forçar limpeza do troco se o pedido está pago com pontos
+            if (isFullyPaidWithPoints && state.valorTroco !== null) {
+                state.valorTroco = null;
+            }
+            
             if (dinheiroIcon) dinheiroIcon.style.display = 'flex';
             if (pagamentoTexts[0]) pagamentoTexts[0].style.display = 'block'; // "Pagamento na entrega"
             
-            // Atualizar texto do dinheiro com troco se necessário
-            if (state.valorTroco) {
+            // Se está pago com pontos, mostrar apenas "Pago com pontos" ou "Dinheiro" sem troco
+            if (isFullyPaidWithPoints) {
+                if (pagamentoTexts[3]) {
+                    pagamentoTexts[3].textContent = 'Dinheiro - Pago com pontos';
+                    pagamentoTexts[3].style.display = 'block';
+                }
+            } else if (state.valorTroco) {
+                // Atualizar texto do dinheiro com troco se necessário
                 if (pagamentoTexts[3]) {
                     const troco = state.valorTroco - state.total;
                     if (troco > 0) {

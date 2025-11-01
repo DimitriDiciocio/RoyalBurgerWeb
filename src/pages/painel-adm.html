@@ -20,6 +20,8 @@
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/admin/painel-adm.js" type="module" defer></script>
+    <script src="../js/ui/admin/order-management.js" type="module" defer></script>
+    <script src="../js/ui/admin/configuracoes-gerenciamento.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -92,6 +94,107 @@
                     <p class="titulo-secao">Pedidos</p>
                     <p class="descricao-secao">Gerencie todos os pedidos em tempo real</p>
                 </div>
+            </div>
+
+            <!-- Cards de Métricas -->
+            <div class="relata">
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Pedidos ativos</p>
+                        <i class="fa-solid fa-basket-shopping"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-active-orders">00</p>
+                        <div class="status-labels">
+                            <span class="status-badge novo" id="metric-novos">0 Novos</span>
+                            <span class="status-badge preparo" id="metric-em-preparo">0 Em preparo</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Prontos/Entrega</p>
+                        <i class="fa-solid fa-dollar-sign"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-prontos-entrega">00</p>
+                        <div class="status-labels">
+                            <span class="status-badge pronto" id="metric-pronto">0 Pronto</span>
+                            <span class="status-badge entrega" id="metric-entrega">0 Entrega</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Concluídos</p>
+                        <i class="fa-solid fa-dollar-sign"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-concluidos">00</p>
+                        <p class="descricao" id="metric-cancelados">0 Cancelados</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Tempo Médio de Ciclo</p>
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-tempo-medio">12 min</p>
+                        <p class="descricao" id="metric-atrasos">0 Atrasos hoje</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros e Busca -->
+            <div class="filtros-pedidos">
+                <div class="div-input busca-pedidos">
+                    <label for="busca-pedido">Buscar por ID, cliente ou itens</label>
+                    <input type="text" id="busca-pedido" name="busca-pedido" autocomplete="off">
+                </div>
+
+                <div class="div-input">
+                    <label for="filtro-status-pedido">Status</label>
+                    <select id="filtro-status-pedido" name="filtro-status-pedido">
+                        <option value="">Todos</option>
+                        <option value="pending">Novo</option>
+                        <option value="preparing">Em preparo</option>
+                        <option value="ready">Pronto</option>
+                        <option value="on_the_way">Em entrega</option>
+                        <option value="delivered">Entregue</option>
+                        <option value="paid">Pago</option>
+                        <option value="completed">Concluído</option>
+                        <option value="cancelled">Cancelado</option>
+                    </select>
+                </div>
+
+                <div class="div-input">
+                    <label for="filtro-canais-pedido">Canais</label>
+                    <select id="filtro-canais-pedido" name="filtro-canais-pedido">
+                        <option value="">Todos</option>
+                        <option value="delivery">Delivery</option>
+                        <option value="pickup">Balcão</option>
+                        <option value="dine_in">Mesa</option>
+                    </select>
+                </div>
+
+                <div class="div-input">
+                    <label for="filtro-data-pedido">Data</label>
+                    <select id="filtro-data-pedido" name="filtro-data-pedido">
+                        <option value="today">Hoje</option>
+                        <option value="week">Esta semana</option>
+                        <option value="month">Este mês</option>
+                        <option value="all">Todos</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Container de Pedidos -->
+            <div class="pedidos-container" id="orders-list">
+                <!-- Os pedidos serão carregados dinamicamente aqui -->
             </div>
         </section>
 
@@ -191,7 +294,7 @@
             </div>
 
             <div class="produtos">
-                
+
                 <button class="adicionar">
                     <i class="fa-solid fa-plus"></i>
                     <p>Novo Item</p>
@@ -433,21 +536,23 @@
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Meta de Receita Mensal</p>
-                        <p class="descricao">Defina uma meta mensal de receita esperada</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Meta de Receita Mensal</p>
+                            <p class="descricao">Defina uma meta mensal de receita esperada</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Meta de Pedidos Mensais</p>
-                        <p class="descricao">Defina uma meta mensal de pedidos esperados</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Meta de Pedidos Mensais</p>
+                            <p class="descricao">Defina uma meta mensal de pedidos esperados</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
             </div>
 
@@ -457,22 +562,23 @@
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Categorias do cardápio</p>
-                        <p class="descricao">Cadastre, edite, exclua e reorganize seu cardápio</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Categorias do cardápio</p>
+                            <p class="descricao">Cadastre, edite, exclua e reorganize seu cardápio</p>
+                        </div>
                     </div>
-
-                    <button id="btn-categorias">Acessar</button>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Grupos de adicionais de produtos do cardápio</p>
-                        <p class="descricao">Cadastre, edite, exclua e organize grupos de adicionais de produtos do cardápio para facilitar a seleção de adicionais por parte do cliente
-                        </p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Grupos de adicionais de produtos do cardápio</p>
+                            <p class="descricao">Cadastre, edite, exclua e organize grupos de adicionais de produtos do
+                                cardápio para facilitar a seleção de adicionais por parte do cliente
+                            </p>
+                        </div>
                     </div>
-
-                    <button id="btn-grupos-adicionais">Acessar</button>
                 </div>
             </div>
 
@@ -482,51 +588,47 @@
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Prazo de iniciação de pedido</p>
-                        <p class="descricao">O tempo necessário para que um pedido novo comece a ser preparado</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Prazo de iniciação de pedido</p>
+                            <p class="descricao">O tempo necessário para que um pedido novo comece a ser preparado</p>
+                        </div>
                     </div>
 
-                    <div class="tempo">
-                        <p>5 min</p>
-                        <i class="fa-solid fa-pen-to-square"></i>
-                    </div>
+                    <div class="tempo"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Prazo de preparo de pedido</p>
-                        <p class="descricao">O tempo necessário para que um pedido em preparo seja finalizado</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Prazo de preparo de pedido</p>
+                            <p class="descricao">O tempo necessário para que um pedido em preparo seja finalizado</p>
+                        </div>
                     </div>
 
-                    <div class="tempo">
-                        <p>15 min</p>
-                        <i class="fa-solid fa-pen-to-square"></i>
-                    </div>
+                    <div class="tempo"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Prazo de envio de pedido</p>
-                        <p class="descricao">O tempo necessário para que um pedido em finalizado seja entregue</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Prazo de entrega de pedido</p>
+                            <p class="descricao">O tempo necessário para que um pedido novo chegue até a pessoa</p>
+                        </div>
                     </div>
 
-                    <div class="tempo">
-                        <p>15 min</p>
-                        <i class="fa-solid fa-pen-to-square"></i>
-                    </div>
+                    <div class="tempo"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Prazo de entrega de pedido</p>
-                        <p class="descricao">O tempo necessário para que um pedido novo chegue até a pessoa</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Prazo de envio de pedido</p>
+                            <p class="descricao">O tempo necessário para que um pedido em finalizado seja entregue</p>
+                        </div>
                     </div>
 
-                    <div class="tempo">
-                        <p>35 min</p>
-                        <i class="fa-solid fa-pen-to-square"></i>
-                    </div>
+                    <div class="tempo"></div>
                 </div>
             </div>
 
@@ -536,27 +638,36 @@
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
+                    <div class="info-content">
                         <p class="config">Taxa de entrega</p>
+                        <p class="descricao">Taxa de entrega do pedido</p>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Taxa de conversão do clube</p>
+                    <div class="info-content">
+                        <p class="config">Taxa de conversão de ganho do clube</p>
+                        <p class="descricao">Quanto o cliente precisa gastar para ganhar 1 ponto.</p>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
+                    <div class="info-content">
+                        <p class="config">Taxa de conversão de resgate do clube</p>
+                        <p class="descricao">Quanto cada ponto vale de desconto.</p>
+                    </div>
+                    <div class="valor"></div>
+                </div>
+
+                <div class="info">
+                    <div class="info-content">
                         <p class="config">Taxa de expiração de pontos do clube</p>
+                        <p class="descricao">Período em dias após o qual os pontos acumulados expiram se o cliente não
+                            realizar nenhuma compra.</p>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
             </div>
 
@@ -566,58 +677,73 @@
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Nome Fantasia</p>
-                        <p class="descricao">Nome comercial pelo qual a hamburgueria será conhecida pelos clientes</p>
+                    <div class="info-content">
+                        <div class="info-content-item">
+                            <p class="config">Nome Fantasia</p>
+                            <p class="descricao">Nome comercial pelo qual a hamburgueria será conhecida pelos clientes</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Razão Social</p>
-                        <p class="descricao">Nome jurídico registrado da empresa conforme consta no CNPJ</p>
+                    <div class="info-content">
+                        <div class="info-content-item">
+                            <p class="config">Razão Social</p>
+                            <p class="descricao">Nome jurídico registrado da empresa conforme consta no CNPJ</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">CNPJ</p>
-                        <p class="descricao">Número de cadastro nacional da pessoa jurídica para identificação fiscal
-                        </p>
+                    <div class="info-content">
+                        <div class="info-content-item">
+                            <p class="config">CNPJ</p>
+                            <p class="descricao">Número de cadastro nacional da pessoa jurídica para identificação fiscal
+                            </p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Endereço</p>
-                        <p class="descricao">Endereço completo da matriz ou filial da hamburgueria</p>
+                    <div class="info-content">
+                        <div class="info-content-item">
+                            <p class="config">Endereço</p>
+                            <p class="descricao">Endereço completo da matriz ou filial da hamburgueria</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">Telefone</p>
-                        <p class="descricao">Telefone principal de contato da empresa para clientes e fornecedores</p>
+                    <div class="info-content">
+                        <div class="info-content-item"> 
+                            <p class="config">Telefone</p>
+                            <p class="descricao">Telefone principal de contato da empresa para clientes e fornecedores</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
                 </div>
 
                 <div class="info">
-                    <div style="display: flex; flex-direction: column;">
-                        <p class="config">E-mail</p>
-                        <p class="descricao">E-mail oficial da empresa para comunicações e suporte</p>
+                    <div class="info-content">
+                        <div class="info-content-item">
+                            <p class="config">E-mail</p>
+                            <p class="descricao">E-mail oficial da empresa para comunicações e suporte</p>
+                        </div>
                     </div>
-
-                    <button>Definir</button>
+                    <div class="valor"></div>
+                </div>
+                <div class="info">
+                    <div class="info-content">
+                        <div class="info-content-item">
+                            <p class="config">Horário de funcionamento</p>
+                            <p class="descricao">Horário de funcionamento da empresa</p>
+                        </div>
+                    </div>
+                    <div class="valor"></div>
                 </div>
             </div>
         </section>
@@ -704,14 +830,15 @@
 
                 <div class="div-input">
                     <label for="preco-adicional-ingrediente">Preço Adicional</label>
-                    <input type="text" id="preco-adicional-ingrediente" name="preco-adicional-ingrediente" 
+                    <input type="text" id="preco-adicional-ingrediente" name="preco-adicional-ingrediente"
                         autocomplete="off">
                 </div>
 
                 <div class="campos-linha">
                     <div class="div-input">
                         <label for="quantidade-porcao-ingrediente">Quantidade da Porção Base</label>
-                        <input type="number" id="quantidade-porcao-ingrediente" name="quantidade-porcao-ingrediente" min="0.1" step="0.1" autocomplete="off">
+                        <input type="number" id="quantidade-porcao-ingrediente" name="quantidade-porcao-ingrediente"
+                            min="0.1" step="0.1" autocomplete="off">
                     </div>
                     <div class="div-input">
                         <label for="unidade-porcao-ingrediente">Unidade da Porção Base</label>
@@ -724,12 +851,11 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="campos-linha">
                     <div class="div-input">
                         <label for="custo-ingrediente">Custo Unitário</label>
-                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" 
-                            autocomplete="off">
+                        <input type="text" id="custo-ingrediente" name="custo-ingrediente" autocomplete="off">
                     </div>
                     <div class="div-input">
                         <label for="unidade-ingrediente">Unidade</label>
@@ -746,14 +872,14 @@
                 <div class="campos-linha">
                     <div class="div-input">
                         <label for="estoque-minimo-ingrediente">Estoque Mínimo</label>
-                        <input type="number" id="estoque-minimo-ingrediente" name="estoque-minimo-ingrediente" min="0" step="0.1"
-                            autocomplete="off">
+                        <input type="number" id="estoque-minimo-ingrediente" name="estoque-minimo-ingrediente" min="0"
+                            step="0.1" autocomplete="off">
                     </div>
 
                     <div class="div-input">
                         <label for="estoque-maximo-ingrediente">Estoque Máximo</label>
-                        <input type="number" id="estoque-maximo-ingrediente" name="estoque-maximo-ingrediente" min="0" step="0.1"
-                            autocomplete="off">
+                        <input type="number" id="estoque-maximo-ingrediente" name="estoque-maximo-ingrediente" min="0"
+                            step="0.1" autocomplete="off">
                     </div>
                 </div>
             </div>
@@ -793,30 +919,35 @@
 
             <div class="conteudo-modal">
                 <!-- Parte 1: Informações Básicas -->
-                <div class="parte-formulario" id="parte-informacoes" role="tabpanel" aria-labelledby="tab-informacoes" aria-expanded="true">
+                <div class="parte-formulario" id="parte-informacoes" role="tabpanel" aria-labelledby="tab-informacoes"
+                    aria-expanded="true">
                     <fieldset class="secao-informacoes">
                         <legend class="sr-only">Informações básicas do produto</legend>
                         <h3>Informações básicas</h3>
 
                         <div class="div-input">
                             <label for="nome-produto">Nome do item</label>
-                            <input type="text" id="nome-produto" name="nome-produto" autocomplete="off" required aria-describedby="nome-produto-help">
+                            <input type="text" id="nome-produto" name="nome-produto" autocomplete="off" required
+                                aria-describedby="nome-produto-help">
                         </div>
 
                         <div class="div-input">
                             <label for="descricao-produto">Descrição</label>
-                            <textarea id="descricao-produto" name="descricao-produto" rows="3" aria-describedby="descricao-produto-help"></textarea>
+                            <textarea id="descricao-produto" name="descricao-produto" rows="3"
+                                aria-describedby="descricao-produto-help"></textarea>
                         </div>
 
                         <div class="campos-linha">
                             <div class="div-input">
                                 <label for="tempo-preparo-produto">Tempo de Preparo (minutos)</label>
-                                <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto" min="1" max="999" autocomplete="off" aria-describedby="tempo-preparo-help">
+                                <input type="number" id="tempo-preparo-produto" name="tempo-preparo-produto" min="1"
+                                    max="999" autocomplete="off" aria-describedby="tempo-preparo-help">
                             </div>
 
                             <div class="div-input">
                                 <label for="categoria-produto">Categoria</label>
-                                <select id="categoria-produto" name="categoria-produto" required aria-describedby="categoria-produto-help">
+                                <select id="categoria-produto" name="categoria-produto" required
+                                    aria-describedby="categoria-produto-help">
                                     <option value="">Selecione uma categoria</option>
                                     <option value="burguer">Burguer</option>
                                     <option value="sanduiche">Sanduíche</option>
@@ -826,25 +957,28 @@
                             </div>
                         </div>
 
-                            <div class="div-input">
-                                <label for="preco-produto">Preço de Venda</label>
-                                <input type="text" id="preco-produto" name="preco-produto" autocomplete="off" required aria-describedby="preco-produto-help">
-                            </div>
+                        <div class="div-input">
+                            <label for="preco-produto">Preço de Venda</label>
+                            <input type="text" id="preco-produto" name="preco-produto" autocomplete="off" required
+                                aria-describedby="preco-produto-help">
+                        </div>
                     </fieldset>
                 </div>
 
                 <!-- Parte 2: Receita e Extras -->
-                <div class="parte-formulario" id="parte-receita" style="display: none;" role="tabpanel" aria-labelledby="tab-receita" aria-expanded="false">
+                <div class="parte-formulario" id="parte-receita" style="display: none;" role="tabpanel"
+                    aria-labelledby="tab-receita" aria-expanded="false">
                     <div class="secoes-grid">
                         <!-- Seção de Receita -->
                         <fieldset class="secao-receita">
                             <legend class="sr-only">Receita do produto</legend>
-                            
+
                             <div class="header-secao-receita">
                                 <h3><i class="fa-solid fa-list-check"></i> Receita do Produto</h3>
                                 <div class="custo-receita">
                                     <span class="label-custo">Custo Estimado:</span>
-                                    <span id="custo-estimado" class="valor-custo" aria-label="Custo estimado">R$ 0,00</span>
+                                    <span id="custo-estimado" class="valor-custo" aria-label="Custo estimado">R$
+                                        0,00</span>
                                 </div>
                             </div>
 
@@ -852,7 +986,8 @@
                                 <!-- Os ingredientes serão adicionados dinamicamente -->
                             </div>
 
-                            <button type="button" class="btn-adicionar-ingrediente-receita" id="btn-adicionar-ingrediente-receita" aria-label="Adicionar ingrediente à receita">
+                            <button type="button" class="btn-adicionar-ingrediente-receita"
+                                id="btn-adicionar-ingrediente-receita" aria-label="Adicionar ingrediente à receita">
                                 <i class="fa-solid fa-plus" aria-hidden="true"></i>
                                 <span>Adicionar Ingrediente</span>
                             </button>
@@ -862,17 +997,20 @@
                         <fieldset class="secao-extras">
                             <legend class="sr-only">Adicionais extras do produto</legend>
                             <h3><i class="fa-solid fa-layer-group"></i> Insumos extras</h3>
-                            
-                            <div class="grupos-extras" id="lista-extras-produto" role="list" aria-label="Lista de insumos extras do produto">
+
+                            <div class="grupos-extras" id="lista-extras-produto" role="list"
+                                aria-label="Lista de insumos extras do produto">
                                 <p class="empty-message">Nenhum insumo extra adicionado</p>
                             </div>
 
                             <div class="campos-linha">
-                                <button type="button" class="btn-adicionar-insumo-extra" id="btn-adicionar-insumo-extra" aria-label="Adicionar insumos extras individuais">
+                                <button type="button" class="btn-adicionar-insumo-extra" id="btn-adicionar-insumo-extra"
+                                    aria-label="Adicionar insumos extras individuais">
                                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
                                     <span>Adicionar Insumos Extras</span>
                                 </button>
-                                <button type="button" class="btn-adicionar-grupo" id="btn-adicionar-grupo" aria-label="Adicionar grupos de insumos extras">
+                                <button type="button" class="btn-adicionar-grupo" id="btn-adicionar-grupo"
+                                    aria-label="Adicionar grupos de insumos extras">
                                     <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
                                     <span>Selecionar Grupos de Insumos</span>
                                 </button>
@@ -883,18 +1021,22 @@
             </div>
 
             <div class="footer-modal">
-                <button type="button" class="btn-cancelar" id="cancelar-produto" aria-label="Cancelar criação do produto">Cancelar</button>
+                <button type="button" class="btn-cancelar" id="cancelar-produto"
+                    aria-label="Cancelar criação do produto">Cancelar</button>
                 <div class="navegacao-formulario" role="navigation" aria-label="Navegação do formulário">
-                    <button type="button" class="btn-anterior" id="btn-anterior" style="display: none;" aria-label="Voltar para a parte anterior do formulário">
+                    <button type="button" class="btn-anterior" id="btn-anterior" style="display: none;"
+                        aria-label="Voltar para a parte anterior do formulário">
                         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                         <span>Anterior</span>
                     </button>
-                    <button type="button" class="btn-proximo" id="btn-proximo" aria-label="Avançar para a próxima parte do formulário">
+                    <button type="button" class="btn-proximo" id="btn-proximo"
+                        aria-label="Avançar para a próxima parte do formulário">
                         <span>Próximo</span>
                         <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                     </button>
                 </div>
-                <button type="button" class="btn-adicionar" id="salvar-produto" style="display: none;" aria-label="Salvar produto">
+                <button type="button" class="btn-adicionar" id="salvar-produto" style="display: none;"
+                    aria-label="Salvar produto">
                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
                     <span id="texto-botao">Adicionar item</span>
                 </button>
@@ -914,7 +1056,8 @@
             <div class="conteudo-modal">
                 <div class="div-input">
                     <label for="ingrediente-select-modal">Ingrediente</label>
-                    <select id="ingrediente-select-modal" name="ingrediente-select-modal" autocomplete="off" required aria-describedby="ingrediente-select-help">
+                    <select id="ingrediente-select-modal" name="ingrediente-select-modal" autocomplete="off" required
+                        aria-describedby="ingrediente-select-help">
                         <option value="">Selecione um ingrediente</option>
                         <!-- Ingredientes serão carregados dinamicamente -->
                     </select>
@@ -923,12 +1066,15 @@
                 <div class="campos-linha">
                     <div class="div-input">
                         <label for="quantidade-porcoes-ingrediente-modal">Número de porções</label>
-                        <input type="number" id="quantidade-porcoes-ingrediente-modal" name="quantidade-porcoes-ingrediente-modal" min="0.1" step="0.1" autocomplete="off" required aria-describedby="quantidade-porcoes-help">
+                        <input type="number" id="quantidade-porcoes-ingrediente-modal"
+                            name="quantidade-porcoes-ingrediente-modal" min="0.1" step="0.1" autocomplete="off" required
+                            aria-describedby="quantidade-porcoes-help">
                     </div>
 
                     <div class="div-input">
                         <label for="info-porcao-ingrediente-modal">Porção base</label>
-                        <input type="text" id="info-porcao-ingrediente-modal" name="info-porcao-ingrediente-modal" autocomplete="off" readonly aria-describedby="info-porcao-help">
+                        <input type="text" id="info-porcao-ingrediente-modal" name="info-porcao-ingrediente-modal"
+                            autocomplete="off" readonly aria-describedby="info-porcao-help">
                     </div>
                 </div>
 
@@ -945,7 +1091,8 @@
             </div>
 
             <div class="footer-modal">
-                <button type="button" class="btn-cancelar" data-close-modal="modal-ingrediente-receita">Cancelar</button>
+                <button type="button" class="btn-cancelar"
+                    data-close-modal="modal-ingrediente-receita">Cancelar</button>
                 <button type="button" class="btn-salvar" id="salvar-ingrediente-receita">
                     <i class="fa-solid fa-check"></i>
                     <span id="texto-btn-salvar-ingrediente">Adicionar</span>
@@ -1411,7 +1558,8 @@
                 <div class="filtros-insumos">
                     <div class="div-input">
                         <label for="busca-insumo-extra-produto">Buscar insumo</label>
-                        <input type="text" id="busca-insumo-extra-produto" name="busca-insumo-extra-produto" autocomplete="off">
+                        <input type="text" id="busca-insumo-extra-produto" name="busca-insumo-extra-produto"
+                            autocomplete="off">
                     </div>
                 </div>
 
@@ -1472,7 +1620,7 @@
 
             <div class="conteudo-modal">
                 <p id="nome-insumo-config-extra" style="font-weight: 600; margin-bottom: 15px;"></p>
-                
+
                 <div class="div-input">
                     <label for="extra-min-quantity">Quantidade Mínima</label>
                     <input type="number" id="extra-min-quantity" min="0" value="0" autocomplete="off">
@@ -1489,6 +1637,103 @@
             <div class="footer-modal">
                 <button class="btn-cancelar" id="cancelar-config-extra">Cancelar</button>
                 <button class="btn-salvar" id="salvar-config-extra">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal genérica para configurações -->
+    <div id="modal-configuracao" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-configuracao">
+            <div class="header-modal">
+                <h2 id="titulo-modal-configuracao">Configurar</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-configuracao"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="info-configuracao">
+                    <p class="config-label" id="config-label-modal"></p>
+                    <p class="config-descricao" id="config-descricao-modal"></p>
+                </div>
+
+                <!-- Input único (padrão) -->
+                <div class="div-input" id="div-input-unico">
+                    <label for="input-configuracao" id="label-input-configuracao">Valor</label>
+                    <input type="text" id="input-configuracao" name="input-configuracao" autocomplete="off"
+                        placeholder="">
+                </div>
+
+                <!-- Inputs duplos (para taxas de conversão) -->
+                <div id="div-inputs-duplos" style="display: none;">
+                    <div class="div-input">
+                        <label for="input-configuracao-ganho" id="label-input-ganho">Taxa de ganho (R$ por
+                            ponto)</label>
+                        <input type="text" id="input-configuracao-ganho" name="input-configuracao-ganho"
+                            autocomplete="off" placeholder="Ex: 0,10">
+                        <small class="form-text"
+                            style="color: var(--color-texto-erased); font-size: 12px; margin-top: 5px;">Valor necessário
+                            para ganhar 1 ponto</small>
+                    </div>
+                    <div class="div-input" style="margin-top: 15px;">
+                        <label for="input-configuracao-resgate" id="label-input-resgate">Taxa de resgate (R$ por
+                            ponto)</label>
+                        <input type="text" id="input-configuracao-resgate" name="input-configuracao-resgate"
+                            autocomplete="off" placeholder="Ex: 0,01">
+                        <small class="form-text"
+                            style="color: var(--color-texto-erased); font-size: 12px; margin-top: 5px;">Valor de
+                            desconto que 1 ponto representa</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button type="button" class="btn-cancelar" data-close-modal="modal-configuracao">Cancelar</button>
+                <button type="button" class="btn-salvar" id="btn-salvar-configuracao">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Salvar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Horários de Funcionamento -->
+    <div id="modal-horarios-funcionamento" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-horarios">
+            <div class="header-modal">
+                <h2>Horários de Funcionamento</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-horarios-funcionamento"></i>
+            </div>
+
+            <div class="conteudo-modal-horarios">
+                <div class="info-configuracao">
+                    <p class="config-label">Configure os horários de funcionamento para cada dia da semana</p>
+                    <p class="config-descricao">Você pode definir horários de abertura e fechamento, além de marcar se a loja está aberta ou fechada em cada dia.</p>
+                </div>
+
+                <div class="horarios-table-container">
+                    <table class="horarios-table">
+                        <thead>
+                            <tr>
+                                <th>Dia</th>
+                                <th>Aberto</th>
+                                <th>Horário de Abertura</th>
+                                <th>Horário de Fechamento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="horarios-table-body">
+                            <!-- Será preenchido dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button type="button" class="btn-cancelar" data-close-modal="modal-horarios-funcionamento">Cancelar</button>
+                <button type="button" class="btn-salvar" id="btn-salvar-horarios">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Salvar</span>
+                </button>
             </div>
         </div>
     </div>

@@ -4,6 +4,10 @@
 import { showConfirm, showError, showToast } from './alerts.js';
 import { getCart, updateCartItem, removeCartItem, clearCart, claimGuestCart } from '../api/cart.js';
 
+// Importar helper de configurações
+// Importação estática garante que o módulo esteja disponível quando necessário
+import * as settingsHelper from '../utils/settings-helper.js';
+
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
     MAX_ITEMS: 50,
@@ -14,7 +18,7 @@ const VALIDATION_LIMITS = {
 
 const state = {
     itens: [],
-    taxaEntrega: 5.00,
+    taxaEntrega: 5.00, // Fallback padrão (será carregado dinamicamente)
     descontos: 0.00,
     subtotal: 0,
     total: 0
@@ -316,9 +320,40 @@ function calcularTotais() {
     state.total = state.subtotal + taxaEntrega - state.descontos;
 }
 
-// Calcular pontos Royal (10 pontos a cada R$ 1,00 gasto)
-function calcularPontos() {
-    return Math.floor(state.total * 10);
+// Calcular pontos Royal usando configuração dinâmica
+// IMPORTANTE: Pontos são calculados sobre o SUBTOTAL (produtos), NÃO sobre o total (com entrega)
+// Conforme padrão de programas de fidelidade: pontos não incluem taxas de entrega
+async function calcularPontos() {
+    let pontos = 0;
+    
+    // Calcular base para pontos: subtotal (produtos apenas, sem taxa de entrega)
+    // Se houver desconto, considerar apenas o desconto proporcional ao subtotal
+    let basePontos = state.subtotal;
+    if (state.descontos > 0 && state.total > 0) {
+        // Se houver desconto aplicado, calcular desconto proporcional ao subtotal
+        // desconto_no_subtotal = desconto * (subtotal / total_antes_desconto)
+        const totalAntesDesconto = state.subtotal + state.taxaEntrega;
+        if (totalAntesDesconto > 0) {
+            const descontoProporcionalSubtotal = state.descontos * (state.subtotal / totalAntesDesconto);
+            basePontos = Math.max(0, state.subtotal - descontoProporcionalSubtotal);
+        }
+    }
+    
+    // Tentar calcular usando helper de configurações
+    if (settingsHelper && typeof settingsHelper.calculatePointsEarned === 'function') {
+        try {
+            pontos = await settingsHelper.calculatePointsEarned(basePontos);
+        } catch (error) {
+            console.warn('Usando cálculo padrão de pontos:', error.message);
+            // Fallback: 10 pontos por real (R$ 0,10 = 1 ponto)
+            pontos = Math.floor(basePontos * 10);
+        }
+    } else {
+        // Fallback: 10 pontos por real (R$ 0,10 = 1 ponto)
+        pontos = Math.floor(basePontos * 10);
+    }
+    
+    return pontos;
 }
 
 // Renderizar item individual
@@ -426,7 +461,7 @@ function renderItem(item, index) {
 }
 
 // Renderizar cesta completa
-function renderCesta() {
+async function renderCesta() {
     if (!el.listaItens) return;
 
     calcularTotais();
@@ -462,7 +497,10 @@ function renderCesta() {
     if (el.descontos) el.descontos.textContent = formatBRL(state.descontos);
     if (el.total) el.total.textContent = formatBRL(state.total);
     if (el.footerTotal) el.footerTotal.textContent = formatBRL(state.total);
-    if (el.pontos) el.pontos.textContent = calcularPontos();
+    
+    // Calcular pontos (agora é async)
+    const pontos = await calcularPontos();
+    if (el.pontos) el.pontos.textContent = pontos;
 
     atualizarHeaderCesta();
     atualizarBotaoFlutuante();
@@ -786,6 +824,16 @@ window.atualizarCesta = async function() {
 // Inicializar
 document.addEventListener('DOMContentLoaded', async () => {
     initElements();
+    
+    // Carregar taxa de entrega das configurações públicas
+    if (settingsHelper && typeof settingsHelper.getDeliveryFee === 'function') {
+        try {
+            state.taxaEntrega = await settingsHelper.getDeliveryFee();
+        } catch (error) {
+            console.warn('Usando taxa de entrega padrão:', error.message);
+        }
+    }
+    
     await carregarCesta();
     
     // Verificar se há backup da cesta para restaurar após login

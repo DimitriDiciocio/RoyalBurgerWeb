@@ -44,8 +44,18 @@ export async function createOrder(orderData) {
             throw new Error('Dados do pedido são obrigatórios');
         }
 
-        if (!isValidOrderId(orderData.address_id)) {
-            throw new Error('ID do endereço inválido');
+        // Validar address_id: se order_type for 'pickup', não deve estar presente
+        // Caso contrário, deve ser um ID válido
+        if (orderData.order_type === 'pickup') {
+            // Para pickup, remover address_id se estiver presente
+            if (orderData.address_id !== undefined) {
+                delete orderData.address_id;
+            }
+        } else {
+            // Para delivery, address_id é obrigatório e deve ser válido
+            if (!isValidOrderId(orderData.address_id)) {
+                throw new Error('ID do endereço inválido');
+            }
         }
 
         if (!orderData.payment_method || typeof orderData.payment_method !== 'string') {
@@ -78,20 +88,28 @@ export async function createOrder(orderData) {
  * Calcula o total do pedido sem criar
  * @param {Array} items - Itens do pedido
  * @param {number} [points_to_redeem] - Pontos para resgatar
+ * @param {string} [order_type] - Tipo do pedido ('delivery' ou 'pickup')
  * @returns {Promise<Object>} Cálculo do total
  */
-export async function calculateOrderTotal(items, points_to_redeem = 0) {
+export async function calculateOrderTotal(items, points_to_redeem = 0, order_type = 'delivery') {
     try {
         if (!items || !Array.isArray(items) || items.length === 0) {
             throw new Error('Itens são obrigatórios');
         }
 
+        const requestBody = {
+            items: items,
+            points_to_redeem: points_to_redeem
+        };
+
+        // Incluir order_type se especificado
+        if (order_type) {
+            requestBody.order_type = order_type;
+        }
+
         const data = await apiRequest('/api/orders/calculate-total', {
             method: 'POST',
-            body: {
-                items: items,
-                points_to_redeem: points_to_redeem
-            }
+            body: requestBody
         });
 
         return {

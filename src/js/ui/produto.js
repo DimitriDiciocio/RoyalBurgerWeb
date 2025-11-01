@@ -686,7 +686,15 @@ const VALIDATION_LIMITS = {
                             }
                         );
                     } else {
-                        alert(state.isEditing ? 'Item atualizado na cesta!' : 'Item adicionado à cesta!');
+                        // Fallback: usar showToast diretamente (já importado)
+                        showToast(
+                            state.isEditing ? 'Item atualizado na cesta!' : 'Item adicionado à cesta!',
+                            {
+                                type: 'success',
+                                title: state.isEditing ? 'Item Atualizado' : 'Item Adicionado',
+                                autoClose: 3000
+                            }
+                        );
                     }
 
                     // Definir flag para abrir modal ao chegar no index
@@ -709,19 +717,19 @@ const VALIDATION_LIMITS = {
                 }
 
             } catch (err) {
-                // TODO: Implementar logging estruturado em produção
-                console.error('Erro ao adicionar à cesta:', err.message);
+                // Log apenas em desenvolvimento para evitar exposição de erros em produção
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.error('Erro ao adicionar à cesta:', err.message);
+                }
                 
                 const friendly = getFriendlyAddToCartError(err?.message);
-                if (typeof showToast === 'function') {
-                    showToast(friendly, {
-                        type: 'error',
-                        title: 'Não foi possível adicionar',
-                        autoClose: 5000
-                    });
-                } else {
-                    alert(friendly);
-                }
+                // Usar showToast diretamente (já importado)
+                showToast(friendly, {
+                    type: 'error',
+                    title: 'Não foi possível adicionar',
+                    autoClose: 5000
+                });
                 // Em caso de estoque insuficiente, opcionalmente abrir a modal de extras
                 if (err?.message && err.message.includes('Estoque insuficiente')) {
                     openExtrasModal();

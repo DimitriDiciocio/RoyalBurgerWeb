@@ -3,9 +3,11 @@
  * Interface para clientes visualizarem seus pedidos
  */
 
-import { getMyOrders, getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from '../api/orders.js';
-import { getIngredients } from '../api/ingredients.js';
-import { showError, showSuccess } from './alerts.js';
+import { getMyOrders, getOrderDetails, formatOrderStatus } from '../api/orders.js';
+import { showError } from './alerts.js';
+
+// Importar helper de configurações
+import * as settingsHelper from '../utils/settings-helper.js';
 
 // Função de sanitização para prevenir XSS
 function escapeHTML(text) {
@@ -16,13 +18,15 @@ function escapeHTML(text) {
 }
 
 (function initOrderHistory() {
+    // Verificar se estamos na página de histórico de pedidos
     if (!window.location.pathname.includes('hist-pedidos.html')) return;
 
+    // Cache para prazos de entrega (evita múltiplas chamadas à API)
+    let estimatedTimesCache = null;
+    
     const state = {
         orders: [],
         filteredOrders: [],
-        currentOrder: null,
-        ingredientsCache: null, // Cache de ingredientes para buscar preços
         filters: {
             status: ''
         },
@@ -47,84 +51,194 @@ function escapeHTML(text) {
 
             // Lista de pedidos
             ordersContainer: document.getElementById('orders-container'),
-            pagination: document.getElementById('pagination'),
-
-            // Modal não é mais necessária - redireciona para info-pedido.html
+            pagination: document.getElementById('pagination')
         };
     }
 
-    // Carregar cache de ingredientes para buscar preços
-    async function loadIngredientsCache() {
-        if (state.ingredientsCache) return state.ingredientsCache;
+    // ============================================================================
+    // Funções utilitárias para formatação (apenas exibição)
+    // ============================================================================
+
+    // Formatar data para exibição
+    function formatDate(dateString) {
+        if (!dateString) return 'Data não disponível';
         
         try {
-            const response = await getIngredients({ page_size: 1000 });
-            const ingredients = response.items || [];
-            state.ingredientsCache = {};
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
             
-            // Criar um mapa ID -> ingrediente para busca rápida
-            ingredients.forEach(ing => {
-                state.ingredientsCache[ing.id] = {
-                    price: parseFloat(ing.price) || 0,
-                    additional_price: parseFloat(ing.additional_price) || 0
-                };
+            return date.toLocaleDateString('pt-BR', {
+                weekday: 'short',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             });
-            
-            // Log apenas em desenvolvimento
-            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                console.log('Cache de ingredientes carregado:', Object.keys(state.ingredientsCache).length, 'ingredientes');
-            }
-            return state.ingredientsCache;
-        } catch (err) {
-            // Log apenas em desenvolvimento
-            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                console.warn('Erro ao carregar ingredientes para cache:', err);
-            }
-            state.ingredientsCache = {};
-            return state.ingredientsCache;
+        } catch (e) {
+            return dateString;
         }
     }
 
-    // Carregar pedidos do usuário
+    // Formatar valor monetário
+    function formatCurrency(value) {
+        const numValue = parseFloat(value || 0);
+        return numValue.toFixed(2).replace('.', ',');
+    }
+
+    // Formatar telefone para exibição
+    function formatarTelefone(telefone) {
+        if (!telefone || telefone === '(00)0000-000' || telefone === 'Não informado') {
+            return telefone || '(00)0000-000';
+        }
+        
+        if (typeof telefone !== 'string' && typeof telefone !== 'number') {
+            return String(telefone);
+        }
+        
+        const telefoneLimpo = String(telefone).replace(/\D/g, '');
+        
+        if (telefoneLimpo.length === 11) {
+            return telefoneLimpo.replace(/(\d{2})(\d{5})(\d{4})/, '($1)$2-$3');
+        } else if (telefoneLimpo.length === 10) {
+            return telefoneLimpo.replace(/(\d{2})(\d{4})(\d{4})/, '($1)$2-$3');
+        }
+        
+        return telefone;
+    }
+
+    // ============================================================================
+    // Funções de carregamento e exibição de pedidos
+    // ============================================================================
+    
+    /**
+     * Valores padrão para prazos de entrega (fallback)
+     * @constant
+     */
+    const DEFAULT_ESTIMATED_TIMES = {
+        initiation_minutes: 5,
+        preparation_minutes: 20,
+        dispatch_minutes: 5,
+        delivery_minutes: 15
+    };
+    
+    /**
+     * Carrega prazos de entrega estimados das configurações públicas
+     * @returns {Promise<void>}
+     */
+    async function loadEstimatedTimes() {
+        try {
+            if (settingsHelper && typeof settingsHelper.getEstimatedDeliveryTimes === 'function') {
+                estimatedTimesCache = await settingsHelper.getEstimatedDeliveryTimes();
+            }
+            
+            // Se não conseguiu carregar, usar valores padrão
+            if (!estimatedTimesCache) {
+                estimatedTimesCache = { ...DEFAULT_ESTIMATED_TIMES };
+            }
+        } catch (error) {
+            // Fallback para valores padrão em caso de erro
+            // Log apenas em desenvolvimento para evitar exposição de erros
+            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+            if (isDev) {
+                console.warn('Erro ao carregar prazos estimados, usando padrão:', error.message);
+            }
+            estimatedTimesCache = { ...DEFAULT_ESTIMATED_TIMES };
+        }
+    }
+    
+    /**
+     * Calcula tempo estimado de entrega baseado nos prazos do sistema
+     * Conforme o guia completo: considera todos os prazos para delivery ou pickup
+     * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
+     * @returns {Object} Objeto com minTime e maxTime em minutos
+     */
+    function calculateEstimatedDeliveryTime(orderType = 'delivery') {
+        // Validar orderType
+        const validOrderType = (orderType === 'pickup' || orderType === 'delivery') ? orderType : 'delivery';
+        
+        if (!estimatedTimesCache) {
+            // Fallback se não carregou os tempos
+            // Delivery: 5+20+5+15 = 45, Pickup: 5+20+5+0 = 30
+            const fallbackTotal = validOrderType === 'delivery' ? 45 : 30;
+            return {
+                minTime: fallbackTotal,
+                maxTime: fallbackTotal + 15
+            };
+        }
+        
+        // Extrair prazos do cache (com fallbacks seguros)
+        const initiation = Number(estimatedTimesCache.initiation_minutes) || 5;
+        const preparation = Number(estimatedTimesCache.preparation_minutes) || 20;
+        const dispatch = Number(estimatedTimesCache.dispatch_minutes) || 5;
+        const delivery = validOrderType === 'delivery' 
+            ? (Number(estimatedTimesCache.delivery_minutes) || 15) 
+            : 0;
+        
+        // Validar que os valores são números positivos
+        const safeInitiation = Math.max(0, initiation);
+        const safePreparation = Math.max(0, preparation);
+        const safeDispatch = Math.max(0, dispatch);
+        const safeDelivery = Math.max(0, delivery);
+        
+        // Calcular tempo total conforme fluxo do pedido
+        // Para pedido novo (pending): inclui todos os prazos
+        // Delivery: iniciação + preparo + envio + entrega
+        // Pickup: iniciação + preparo + envio (sem entrega)
+        const totalMinutes = safeInitiation + safePreparation + safeDispatch + safeDelivery;
+        
+        // Tempo mínimo = soma dos prazos
+        const minTime = Math.max(0, totalMinutes);
+        
+        // Tempo máximo = soma dos prazos + 15 minutos (margem de segurança)
+        const maxTime = Math.max(minTime, totalMinutes + 15);
+        
+        return { minTime, maxTime };
+    }
+
+    /**
+     * Máximo de requisições simultâneas para evitar sobrecarga da API
+     * @constant
+     */
+    const MAX_CONCURRENT_REQUESTS = 10;
+    
+    /**
+     * Carregar pedidos do usuário (apenas exibição)
+     * @returns {Promise<void>}
+     */
     async function loadOrders() {
+        // Prevenir múltiplas chamadas simultâneas
+        if (state.loading) return;
+        
         state.loading = true;
         state.error = null;
 
         try {
-            // Log apenas em desenvolvimento
-            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-            
-            if (isDev) {
-                console.log('Carregando pedidos...');
-            }
-            
-            // Carregar cache de ingredientes primeiro
-            await loadIngredientsCache();
-            
             const result = await getMyOrders();
-            
-            if (isDev) {
-                console.log('Resultado da API:', result);
-            }
             
             if (result.success) {
                 const ordersList = result.data || [];
                 
-                if (isDev) {
-                    console.log('Pedidos carregados:', ordersList);
-                    console.log(`Buscando detalhes de ${ordersList.length} pedido(s)...`);
-                }
-                
-                // Buscar detalhes completos de cada pedido para obter itens e totais
-                // Usar Promise.allSettled para evitar falha completa se um pedido falhar
+                // Buscar detalhes completos de cada pedido para exibir itens
+                // Limitar concorrência para evitar sobrecarga da API
                 const ordersWithDetails = await Promise.allSettled(
-                    ordersList.map(async (order) => {
+                    ordersList.map(async (order, index) => {
                         const orderId = order.order_id || order.id;
+                        
+                        // Validar orderId antes de fazer requisição
+                        if (!orderId || (typeof orderId !== 'number' && typeof orderId !== 'string')) {
+                            return order;
+                        }
+                        
+                        // Rate limiting: aguardar se exceder limite de concorrência
+                        if (index >= MAX_CONCURRENT_REQUESTS) {
+                            await new Promise(resolve => setTimeout(resolve, 100 * Math.floor(index / MAX_CONCURRENT_REQUESTS)));
+                        }
+                        
                         try {
                             const detailsResult = await getOrderDetails(orderId);
                             
                             if (detailsResult.success && detailsResult.data) {
-                                // Combinar dados básicos com detalhes completos
                                 return {
                                     ...order,
                                     ...detailsResult.data,
@@ -133,37 +247,35 @@ function escapeHTML(text) {
                             }
                             return order;
                         } catch (err) {
+                            // Log apenas em desenvolvimento
+                            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
                             if (isDev) {
-                                console.error(`Erro ao buscar detalhes do pedido ${orderId}:`, err);
+                                console.warn(`Erro ao carregar detalhes do pedido ${orderId}:`, err.message);
                             }
                             return order;
                         }
                     })
                 ).then(results => 
-                    results.map(result => result.status === 'fulfilled' ? result.value : null)
-                           .filter(order => order !== null)
+                    results
+                        .map(result => result.status === 'fulfilled' ? result.value : null)
+                        .filter(order => order !== null)
                 );
                 
                 state.orders = ordersWithDetails;
                 applyFilters();
             } else {
-                state.error = result.error;
-                showError('Erro ao carregar pedidos: ' + (result.error || 'Erro desconhecido'));
+                state.error = result.error || 'Erro desconhecido';
+                showError('Erro ao carregar pedidos: ' + state.error);
             }
         } catch (error) {
-            // Log apenas em desenvolvimento - erro já é exibido ao usuário via showError
-            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-            if (isDev) {
-                console.error('Erro ao carregar pedidos:', error);
-            }
-            state.error = error.message;
-            showError('Erro ao carregar pedidos: ' + error.message);
+            state.error = error.message || 'Erro desconhecido';
+            showError('Erro ao carregar pedidos: ' + state.error);
         } finally {
             state.loading = false;
         }
     }
 
-    // Aplicar filtros
+    // Aplicar filtros (apenas por status)
     function applyFilters() {
         let filtered = [...state.orders];
 
@@ -180,7 +292,7 @@ function escapeHTML(text) {
     // Atualizar paginação
     function updatePagination() {
         state.pagination.totalItems = state.filteredOrders.length;
-        state.pagination.currentPage = 1; // Reset para primeira página
+        state.pagination.currentPage = 1;
         renderPagination();
     }
 
@@ -224,58 +336,27 @@ function escapeHTML(text) {
         el.pagination.innerHTML = html;
     }
 
-    // Formatar data para exibição
-    function formatDate(dateString) {
-        if (!dateString) return 'Data não disponível';
-        
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return dateString;
-            
-            return date.toLocaleDateString('pt-BR', {
-                weekday: 'short',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (e) {
-            return dateString;
-        }
+    /**
+     * Obtém classe CSS baseada no status do pedido
+     * @param {string} status - Status do pedido
+     * @returns {string} Classe CSS correspondente
+     */
+    function getStatusCssClass(status) {
+        const statusMap = {
+            'preparing': 'preparo',
+            'on_the_way': 'entrega',
+            'completed': 'concluido',
+            'delivered': 'concluido',
+            'pending': 'recebido',
+            'cancelled': 'cancelado'
+        };
+        return statusMap[status] || 'recebido';
     }
-
-    // Formatar valor monetário
-    function formatCurrency(value) {
-        const numValue = parseFloat(value || 0);
-        return numValue.toFixed(2).replace('.', ',');
-    }
-
-    // Formatar telefone para exibição
-    function formatarTelefone(telefone) {
-        if (!telefone || telefone === '(00)0000-000' || telefone === 'Não informado') {
-            return telefone || '(00)0000-000';
-        }
-        
-        if (typeof telefone !== 'string' && typeof telefone !== 'number') {
-            return String(telefone);
-        }
-        
-        const telefoneLimpo = String(telefone).replace(/\D/g, '');
-        
-        if (telefoneLimpo.length === 11) {
-            // Celular: (XX) XXXXX-XXXX
-            return telefoneLimpo.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-        } else if (telefoneLimpo.length === 10) {
-            // Fixo: (XX) XXXX-XXXX
-            return telefoneLimpo.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-        }
-        
-        // Se não tiver tamanho válido, retorna o original
-        return telefone;
-    }
-
-    // Renderizar lista de pedidos
+    
+    /**
+     * Renderizar lista de pedidos (apenas exibição)
+     * @returns {void}
+     */
     function renderOrders() {
         if (!el.ordersContainer) return;
 
@@ -295,64 +376,102 @@ function escapeHTML(text) {
             return;
         }
 
-        // Buscar dados do usuário para exibir nome e telefone
+        // Buscar dados do usuário para exibir
         const usuario = window.getStoredUser ? window.getStoredUser() : null;
         const nomeUsuario = usuario?.full_name || usuario?.name || 'Nome Completo';
         const telefoneBruto = usuario?.phone || usuario?.telefone || '(00)0000-000';
         const telefoneUsuario = formatarTelefone(telefoneBruto);
 
         const ordersHtml = ordersToShow.map(order => {
-            // Extrair ID do pedido (pode ser order_id ou id)
+            // Validar orderId antes de processar
             const orderId = order.order_id || order.id;
-            // Obter código de confirmação (sanitizado)
+            if (!orderId) {
+                // Log apenas em desenvolvimento
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.warn('Pedido sem ID válido:', order);
+                }
+                return ''; // Retornar vazio para pedidos inválidos
+            }
+            
+            // Validar e converter orderId para número para uso seguro em atributos
+            const orderIdNum = parseInt(String(orderId), 10);
+            if (isNaN(orderIdNum) || orderIdNum <= 0) {
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.warn('Pedido com ID inválido:', orderId);
+                }
+                return '';
+            }
+            
             const confirmationCode = escapeHTML(order.confirmation_code || 'N/A');
-            // Mapear texto do status - usando "Recebido" em vez de "Pendente"
+            
+            // Status formatado
             let statusText = formatOrderStatus(order.status);
             if (order.status === 'pending') {
                 statusText = 'Recebido';
             }
-            // Sanitizar texto do status
             statusText = escapeHTML(statusText);
+            
             const createdAt = formatDate(order.created_at);
-            
-            // Formatar endereço (sanitizado)
             const address = escapeHTML(order.address || 'Endereço não informado');
-            
-            // Formatar total
             const total = order.total_amount || order.total || 0;
             const totalFormatted = formatCurrency(total);
+            const items = Array.isArray(order.items) ? order.items : [];
             
-            // Obter itens do pedido
-            const items = order.items || [];
-            // Remover cálculo não utilizado para limpeza de código
+            // Classe CSS do status
+            const statusCssClass = getStatusCssClass(order.status);
             
-            // Determinar classe CSS do status para o HTML
-            let statusCssClass = '';
-            switch(order.status) {
-                case 'preparing':
-                    statusCssClass = 'preparo';
-                    break;
-                case 'on_the_way':
-                    statusCssClass = 'entrega';
-                    break;
-                case 'completed':
-                case 'delivered':
-                    statusCssClass = 'concluido';
-                    break;
-                case 'pending':
-                    statusCssClass = 'recebido';
-                    break;
-                case 'cancelled':
-                    statusCssClass = 'cancelado';
-                    break;
-                default:
-                    statusCssClass = 'recebido';
-                    break;
-            }
+            // Calcular tempo estimado baseado nos prazos do sistema
+            // Validar orderType para evitar valores inválidos
+            const orderType = (order.order_type === 'pickup' || order.order_type === 'delivery') 
+                ? order.order_type 
+                : 'delivery';
+            const timeEstimate = calculateEstimatedDeliveryTime(orderType);
+            const tempoTexto = `${timeEstimate.minTime} - ${timeEstimate.maxTime} min`;
             
-            // Log removido de produção - dados sensíveis
+            // Renderizar itens (usar valores já calculados da API)
+            const itemsHtml = items.length > 0 ? items.map(item => {
+                // Validar item antes de processar
+                if (!item || typeof item !== 'object') {
+                    return '';
+                }
+                
+                const itemName = escapeHTML(item.product_name || item.product?.name || 'Produto');
+                const itemQuantity = parseInt(item.quantity || 1, 10);
+                
+                // Validar quantidade
+                if (isNaN(itemQuantity) || itemQuantity <= 0) {
+                    return '';
+                }
+                
+                // Usar subtotal do item (já calculado pela API)
+                const itemTotal = item.item_subtotal || item.subtotal || 
+                                 (parseFloat(item.unit_price || 0) * itemQuantity);
+                
+                return `
+                    <div class="pedido">
+                        <div>
+                            <p class="qtd">${itemQuantity}</p>
+                            <p class="nome">${itemName}</p>
+                        </div>
+                        <p class="preco">R$ ${formatCurrency(itemTotal)}</p>
+                    </div>
+                `;
+            }).filter(html => html !== '').join('') : `
+                <div class="pedido">
+                    <div>
+                        <p class="qtd">-</p>
+                        <p class="nome">Carregando itens...</p>
+                    </div>
+                    <p class="preco">-</p>
+                </div>
+            `;
 
-            return `<div class="quadro-pedido" data-order-id="${escapeHTML(String(orderId))}">
+            // Escapar orderId para uso seguro em atributos HTML
+            const safeOrderId = escapeHTML(String(orderIdNum));
+            
+            return `<div class="quadro-pedido" data-order-id="${safeOrderId}">
                     <div class="header">
                         <div class="div1">
                             <div class="principal">
@@ -361,10 +480,9 @@ function escapeHTML(text) {
                             </div>
                             <div class="prazo">
                                 <i class="fa-solid fa-clock"></i>
-                                <p>35 - 50min</p>
+                                <p>${tempoTexto}</p>
                             </div>
                         </div>
-
                         <p class="tempo-pedido">${createdAt}</p>
                     </div>
 
@@ -372,13 +490,11 @@ function escapeHTML(text) {
                         <div class="div-1">
                             <div class="div-2">
                                 <p>${escapeHTML(nomeUsuario)}</p>
-
                                 <div class="fone">
                                     <i class="fa-solid fa-phone"></i>
                                     <p>${escapeHTML(telefoneUsuario)}</p>
                                 </div>
                             </div>
-
                             <div class="endereco">
                                 <i class="fa-solid fa-location-dot"></i>
                                 <p>${address}</p>
@@ -386,132 +502,48 @@ function escapeHTML(text) {
                         </div>
 
                         <div class="pedidos">
-                            ${items.length > 0 ? items.map(item => {
-                                // Sanitizar nome do produto
-                                const itemName = escapeHTML(item.product_name || item.product?.name || 'Produto');
-                                const itemQuantity = parseInt(item.quantity || 1, 10);
-                                
-                                // Calcular preço total incluindo extras e modificações
-                                let itemTotal = 0;
-                                
-                                // Priorizar item_subtotal se disponível
-                                if (item.item_subtotal !== undefined && item.item_subtotal !== null) {
-                                    itemTotal = parseFloat(item.item_subtotal) || 0;
-                                } else if (item.subtotal !== undefined && item.subtotal !== null) {
-                                    itemTotal = parseFloat(item.subtotal) || 0;
-                                } else {
-                                    // Calcular manualmente: unit_price do produto + unit_price de cada extra
-                                    const basePrice = parseFloat(item.unit_price || item.product?.price || 0);
-                                    
-                                    // Somar unit_price de cada EXTRA vinculado ao produto e pedido
-                                    let extrasTotal = 0;
-                                    if (Array.isArray(item.extras) && item.extras.length > 0) {
-                                        extrasTotal = item.extras.reduce((sum, extra) => {
-                                            // Usar unit_price do extra (valor unitário do ingrediente extra)
-                                            const unitPrice = parseFloat(
-                                                extra.unit_price || 
-                                                extra.ingredient_unit_price || 
-                                                extra.ingredient_price || 
-                                                extra.price || 
-                                                extra.additional_price || 
-                                                0
-                                            );
-                                            return sum + unitPrice;
-                                        }, 0);
-                                    }
-                                    
-                                    // Somar unit_price de cada BASE_MODIFICATION vinculado ao produto e pedido
-                                    // BASE_MODIFICATIONS: cobrar apenas pelo delta positivo (quantidade extra além da receita base)
-                                    let baseModsTotal = 0;
-                                    if (Array.isArray(item.base_modifications) && item.base_modifications.length > 0) {
-                                        baseModsTotal = item.base_modifications.reduce((sum, mod) => {
-                                            const delta = parseInt(String(mod.delta || 0), 10);
-                                            if (delta > 0) {
-                                                // Buscar preço do ingrediente pelo ingredient_id usando cache
-                                                const ingredientId = mod.ingredient_id || mod.id;
-                                                let unitPrice = 0;
-                                                
-                                                if (ingredientId && state.ingredientsCache) {
-                                                    const ingredient = state.ingredientsCache[ingredientId];
-                                                    if (ingredient) {
-                                                        // Usar additional_price se disponível, senão usar price
-                                                        unitPrice = ingredient.additional_price || ingredient.price || 0;
-                                                    }
-                                                }
-                                                
-                                                // Fallback: tentar campos diretos no mod se o cache não tiver o ingrediente
-                                                if (unitPrice === 0) {
-                                                    unitPrice = parseFloat(
-                                                        mod.unit_price || 
-                                                        mod.ingredient_unit_price || 
-                                                        mod.ingredient_price || 
-                                                        mod.price || 
-                                                        0
-                                                    );
-                                                }
-                                                
-                                                // Multiplicar pelo delta (quantidade extra)
-                                                return sum + (unitPrice * delta);
-                                            }
-                                            return sum;
-                                        }, 0);
-                                    }
-                                    
-                                    // Preço unitário total = unit_price do produto + unit_price de cada extra + unit_price * delta de cada modificação
-                                    const unitTotal = basePrice + extrasTotal + baseModsTotal;
-                                    
-                                    // Total = preço unitário total * quantidade do item
-                                    itemTotal = unitTotal * itemQuantity;
-                                }
-                                
-                                return `
-                                    <div class="pedido">
-                                        <div>
-                                            <p class="qtd">${itemQuantity}</p>
-                                            <p class="nome">${itemName}</p>
-                                        </div>
-
-                                        <p class="preco">R$ ${formatCurrency(itemTotal)}</p>
-                                    </div>
-                                `;
-                            }).join('') : `
-                                <div class="pedido">
-                                    <div>
-                                        <p class="qtd">-</p>
-                                        <p class="nome">Carregando itens...</p>
-                                    </div>
-
-                                    <p class="preco">-</p>
-                                </div>
-                            `}
+                            ${itemsHtml}
                         </div>
                     </div>
 
                     <div class="footer">
-                        <button class="btn-view-details" data-order-id="${orderId}">Ver mais</button>
+                        <button class="btn-view-details" data-order-id="${safeOrderId}">Ver mais</button>
                         <div>
                             <p>Total</p>
                             <p>R$ ${totalFormatted}</p>
                         </div>
                     </div>
-            </div>`;
-        }).join('');
+                </div>`;
+        }).filter(html => html !== '').join(''); // Filtrar entradas vazias
 
         el.ordersContainer.innerHTML = ordersHtml;
     }
 
-    // Carregar detalhes do pedido - Redireciona para página de detalhes
+    /**
+     * Redirecionar para página de detalhes (apenas navegação)
+     * @param {number} orderId - ID do pedido
+     * @returns {void}
+     */
     function loadOrderDetails(orderId) {
-        // Redirecionar para página de detalhes do pedido
-        window.location.href = `info-pedido.html?id=${orderId}`;
+        // Validar orderId antes de redirecionar
+        const orderIdNum = parseInt(String(orderId), 10);
+        if (isNaN(orderIdNum) || orderIdNum <= 0) {
+            showError('ID do pedido inválido');
+            return;
+        }
+        
+        // Escapar orderId na URL para prevenir XSS
+        const safeOrderId = encodeURIComponent(String(orderIdNum));
+        window.location.href = `info-pedido.html?id=${safeOrderId}`;
     }
 
-    // Nota: Detalhes do pedido são visualizados na página info-pedido.html
-    // Esta função redireciona para lá ao invés de renderizar em modal
+    // ============================================================================
+    // Eventos (apenas interação com exibição)
+    // ============================================================================
 
     // Anexar eventos
     function attachEvents() {
-        // Filtros
+        // Filtro de status
         if (el.filterStatus) {
             el.filterStatus.addEventListener('change', (e) => {
                 state.filters.status = e.target.value;
@@ -540,8 +572,7 @@ function escapeHTML(text) {
             });
         }
 
-
-        // Lista de pedidos (delegation)
+        // Botão "Ver mais" - redireciona para detalhes
         if (el.ordersContainer) {
             el.ordersContainer.addEventListener('click', (e) => {
                 const btn = e.target.closest('button');
@@ -550,7 +581,6 @@ function escapeHTML(text) {
                 const orderId = btn.dataset.orderId;
                 if (!orderId) return;
                 
-                // Validar que orderId é um número válido
                 const orderIdNum = parseInt(String(orderId), 10);
                 if (isNaN(orderIdNum) || orderIdNum <= 0) {
                     showError('ID do pedido inválido');
@@ -564,15 +594,19 @@ function escapeHTML(text) {
         }
     }
 
-    // Utilitários de notificação (usando sistema global de alerts)
-    // As funções showError e showSuccess são importadas de alerts.js
-
-    // Verificar se usuário está logado
+    /**
+     * Verificar se usuário está logado
+     * @returns {boolean} true se logado, false caso contrário
+     */
     function checkUserLogin() {
         const user = window.getStoredUser ? window.getStoredUser() : null;
         if (!user) {
-            alert('Você precisa estar logado para ver seu histórico de pedidos.');
-            window.location.href = 'login.html';
+            // Usar sistema customizado de alertas em vez de alert() nativo
+            showError('Você precisa estar logado para ver seu histórico de pedidos.');
+            // Pequeno delay para permitir exibição do alerta antes do redirecionamento
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 500);
             return false;
         }
         return true;
@@ -583,6 +617,10 @@ function escapeHTML(text) {
         if (!checkUserLogin()) return;
 
         initElements();
+        
+        // Carregar prazos de entrega estimados das configurações públicas
+        await loadEstimatedTimes();
+        
         attachEvents();
         await loadOrders();
     }

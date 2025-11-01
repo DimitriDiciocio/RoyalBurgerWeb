@@ -5,6 +5,9 @@
 import { getLoyaltyBalance } from '../api/loyalty.js';
 import { getDefaultAddress, getAddresses, setDefaultAddress } from '../api/address.js';
 
+// Importar sistema de alertas customizado
+import { showError, showSuccess } from './alerts.js';
+
 // Chaves usadas na aplicação
 const RB_STORAGE_KEYS = {
   token: 'rb.token',
@@ -573,7 +576,7 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     const enderecos = await getAddresses();
     
     if (enderecos.length <= 1) {
-      alert('Você não tem endereços adicionais para alternar.');
+      showError('Você não tem endereços adicionais para alternar.');
       return;
     }
     
@@ -665,7 +668,7 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     if (isDev) {
       console.error('Erro ao mostrar modal de alteração de endereço:', error.message);
     }
-    alert('Erro ao carregar endereços. Tente novamente.');
+    showError('Erro ao carregar endereços. Tente novamente.');
   }
 }
 
@@ -683,11 +686,7 @@ async function alterarEnderecoPrincipal(addressId) {
     await carregarEndereco();
     
     // Mostrar mensagem de sucesso
-    if (typeof showToast === 'function') {
-      showToast('Endereço principal alterado com sucesso!', { type: 'success' });
-    } else {
-      alert('Endereço principal alterado com sucesso!');
-    }
+    showSuccess('Endereço principal alterado com sucesso!');
     
   } catch (error) {
     // Log apenas em desenvolvimento - erro já é exibido ao usuário
@@ -695,7 +694,7 @@ async function alterarEnderecoPrincipal(addressId) {
     if (isDev) {
       console.error('Erro ao alterar endereço principal:', error.message);
     }
-    alert('Erro ao alterar endereço principal. Tente novamente.');
+    showError('Erro ao alterar endereço principal. Tente novamente.');
   }
 }
 

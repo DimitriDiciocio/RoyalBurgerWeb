@@ -5,6 +5,13 @@
 
 import { getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from '../api/orders.js';
 
+// Importar helper de configurações
+// Importação estática garante que o módulo esteja disponível quando necessário
+import * as settingsHelper from '../utils/settings-helper.js';
+
+// Importar sistema de alertas customizado
+import { showError, showSuccess } from './alerts.js';
+
 (function initOrderDetails() {
     if (!window.location.pathname.includes('info-pedido.html')) return;
 
@@ -100,6 +107,17 @@ import { getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from 
         
         // Mostrar/esconder ações
         updateOrderActions(order.status);
+        
+        // Se o pedido foi concluído, recarregar pontos do header para atualizar saldo
+        // Os pontos foram creditados quando o status mudou para 'completed'
+        if (order.status === 'completed' || order.status === 'delivered') {
+            // Recarregar pontos no header (se a função estiver disponível)
+            if (typeof window.updateHeaderState === 'function') {
+                // O header tem sua própria lógica de carregamento de pontos
+                // Apenas forçar atualização do estado
+                window.updateHeaderState();
+            }
+        }
     }
 
     // Atualizar status e progresso
@@ -217,12 +235,74 @@ import { getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from 
     }
 
     // Atualizar resumo financeiro
-    function updateOrderSummary(order) {
-        const subtotal = order.items ? order.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) : 0;
-        const deliveryFee = 5.00; // Taxa fixa
-        const discount = 0; // Desconto por pontos (seria calculado)
-        const total = subtotal + deliveryFee - discount;
-        const pointsEarned = Math.floor(total * 10); // 10 pontos por real
+    async function updateOrderSummary(order) {
+        // Priorizar valores vindos da API se disponíveis
+        const subtotal = order.subtotal !== undefined ? order.subtotal : 
+                         (order.items ? order.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) : 0);
+            
+        // Usar taxa de entrega da configuração (fallback para 5.00 se API falhar)
+        let deliveryFee = 5.00;
+        if (settingsHelper && typeof settingsHelper.getDeliveryFee === 'function') {
+            try {
+                deliveryFee = await settingsHelper.getDeliveryFee();
+            } catch (error) {
+                console.warn('Usando taxa de entrega padrão:', error.message);
+            }
+        }
+        
+        // Usar desconto da API se disponível
+        const discount = order.discount !== undefined ? order.discount : 0;
+        
+        // Usar total da API se disponível (já calculado corretamente)
+        const total = order.total_amount !== undefined ? order.total_amount : 
+                      (subtotal + deliveryFee - discount);
+        
+        // Calcular pontos ganhos usando configuração dinâmica
+        // IMPORTANTE: Pontos são calculados sobre SUBTOTAL (produtos), NÃO sobre total (com entrega)
+        // Conforme padrão de programas de fidelidade: pontos não incluem taxas de entrega
+        // O backend calcula pontos considerando desconto proporcional ao subtotal
+        let pointsEarned = 0;
+        
+        // Verificar se o pedido já foi concluído (pontos já foram creditados)
+        const isCompleted = order.status === 'completed' || order.status === 'delivered';
+        
+        // Calcular base para pontos: subtotal (produtos apenas, sem taxa de entrega)
+        // Se houver desconto, considerar apenas o desconto proporcional ao subtotal
+        let basePontos = subtotal;
+        if (discount > 0 && total > 0) {
+            // Calcular desconto proporcional ao subtotal
+            // desconto_no_subtotal = desconto * (subtotal / total_antes_desconto)
+            const orderType = order.order_type || 'delivery';
+            const isPickup = orderType === 'pickup';
+            const deliveryFeeForCalc = isPickup ? 0 : deliveryFee;
+            const totalAntesDesconto = subtotal + deliveryFeeForCalc;
+            
+            if (totalAntesDesconto > 0) {
+                const descontoProporcionalSubtotal = discount * (subtotal / totalAntesDesconto);
+                basePontos = Math.max(0, subtotal - descontoProporcionalSubtotal);
+            }
+        }
+        
+        if (settingsHelper && typeof settingsHelper.calculatePointsEarned === 'function') {
+            try {
+                pointsEarned = await settingsHelper.calculatePointsEarned(basePontos);
+            } catch (error) {
+                // Fallback: 10 pontos por real (R$ 0,10 = 1 ponto)
+                pointsEarned = Math.floor(basePontos * 10);
+            }
+        } else {
+            // Fallback: 10 pontos por real (R$ 0,10 = 1 ponto)
+            pointsEarned = Math.floor(basePontos * 10);
+        }
+        
+        // Mostrar indicação visual se os pontos já foram creditados
+        if (el.pointsEarned) {
+            el.pointsEarned.textContent = pointsEarned;
+            // Adicionar tooltip ou classe para indicar se já foram creditados
+            if (isCompleted && el.pointsEarned.parentElement) {
+                el.pointsEarned.parentElement.title = 'Pontos já creditados na sua conta';
+            }
+        }
 
         if (el.subtotalValue) {
             el.subtotalValue.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
@@ -340,29 +420,15 @@ import { getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from 
         }
     }
 
-    // Utilitários de notificação
-    function showSuccess(message) {
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, { type: 'success' });
-        } else {
-            alert(message);
-        }
-    }
-
-    function showError(message) {
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, { type: 'error' });
-        } else {
-            alert(message);
-        }
-    }
-
     // Verificar se usuário está logado
     function checkUserLogin() {
         const user = window.getStoredUser ? window.getStoredUser() : null;
         if (!user) {
-            alert('Você precisa estar logado para ver detalhes do pedido.');
-            window.location.href = 'login.html';
+            showError('Você precisa estar logado para ver detalhes do pedido.');
+            // Pequeno delay para permitir exibição do alerta antes do redirecionamento
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 500);
             return false;
         }
         return true;
