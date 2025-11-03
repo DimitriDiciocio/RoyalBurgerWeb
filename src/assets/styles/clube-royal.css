@@ -181,7 +181,7 @@ main{
 
             & #historico-container {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
                 gap: 20px;
                 width: 100%;
             }
@@ -190,7 +190,7 @@ main{
 
     /* Estilos para cards do histórico */
     & .quandro{
-        width: 400px;
+        width: 100%;
         display: flex;
         flex-direction: column;
         box-shadow: var(--box-shadow);
@@ -1011,30 +1011,74 @@ main{
             }
 
             & .quandro{
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                box-shadow: var(--box-shadow);
+                border-radius: var(--border-radius);
+                background: var(--cor-div-primary);
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                height: fit-content;
+
+                &:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                }
+
                 & .faixa{
+                    background-color: var(--color-primary);
+                    width: 100%;
+                    border-radius: 10px 10px 0px 0px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 40px;
+
                     & i{
                         padding: 10px;
-                        font-size: 0.8rem;
+                        color: var(--cor-div-primary);
+                        font-size: 1.2rem;
                     }
                 }
 
                 & .texto{
-                    padding: 10px 10px;
-                    gap: 10px;
+                    display: flex;
+                    flex-direction: column;
+                    padding: 20px 30px;
+                    gap: 15px;
 
                     & .informa{
-                        font-size: 0.9rem;
+                        font-size: 1rem;
+                        color: var(--color-texto-black);
+                        font-weight: 600;
+                        line-height: 1.4;
+
+                        & span{
+                            color: var(--color-primary);
+                            font-weight: 700;
+                        }
                     }
 
                     & .descricao{
-                        font-size: 0.75rem;
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 5px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        color: #888888;
+                        font-size: 0.85rem;
+                        flex-wrap: wrap;
+                        gap: 10px;
 
-                        & .claro {
-                            width: 100%;
-                            justify-content: flex-start;
+                        & .escuro{
+                            font-weight: 600;
+                            color: var(--color-texto-black);
+                        }
+
+                        & .claro{
+                            font-weight: 400;
+                            display: flex;
+                            justify-content: end;
+                            width: 50%;
+                            color: var(--color-texto-erased);
                         }
                     }
                 }
