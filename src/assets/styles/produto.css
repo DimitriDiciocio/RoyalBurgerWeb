@@ -42,6 +42,7 @@
             flex-direction: column;
             align-items: flex-start;
             justify-content: center;
+
             & .valor {
                 color: var(--color-texto-light);
                 font-size: 16px;
@@ -435,5 +436,697 @@
         padding: 30px;
         color: var(--color-texto-light);
         font-size: 14px;
+    }
+}
+
+
+/* RESPONSIVO */
+
+@media (max-width: 1440px) {
+
+}
+
+@media (max-width: 1280px) {
+    
+}
+
+@media (max-width: 1024px) {
+    .informa {
+        align-items: flex-start;
+        
+        & .esquerda {
+            width: 40vw;
+            gap: 20px;
+
+            & .voltar {
+                font-size: 1rem;
+            }
+
+            & img {
+                height: 280px;
+                width: 100%;
+            }
+
+            & .area-adicionar {
+                width: 100%;
+
+                & .valor {
+                    font-size: 16px;
+
+                    & span {
+                        font-size: 20px;
+                    }
+                }
+
+                & .quadro {
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    width: 100%;
+
+                    & .quantidade {
+                        padding: 5px 5px;
+                        gap: 10px;
+
+                        & i {
+                            font-size: 0.6rem;
+                        }
+
+                        & p {
+                            font-size: 0.7rem;
+                        }
+                    }
+
+                    & #valor {
+                        font-size: 0.9rem;
+                    }
+
+                    & button {
+                        padding: 5px 15px;
+                        font-size: 0.6rem;
+                    }
+                }
+            }
+        }
+
+        & .direita {
+            padding: 0px 20px;
+            width: 50vw;
+
+            & #nome-produto {
+                font-size: 2rem;
+            }
+
+            & #descricao-produto {
+                font-size: 1rem;
+                padding-right: 20px;
+            }
+
+            & .monte {
+                gap: 20px;
+                padding: 25px 0;
+
+                & p {
+                    color: var(--color-texto-black);
+                    font-size: 1.8rem;
+                }
+
+                & .rolagem {
+                    overflow-y: scroll;
+                    padding-right: 10px;
+                    height: 200px;
+
+
+                    & .item {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 10px;
+                        border-bottom: 0.5px solid #D9D9D9;
+                        border-top: 0.5px solid #D9D9D9;
+
+                        & .item-adicional-container{
+                            display: flex;
+                            flex-direction: column;
+                            gap: 5px;
+
+                            & .nome-adicional {
+                                font-size: 1rem;
+                                font-weight: 500;
+                                color: var(--color-texto-black);
+                            }
+
+                            & .preco-adicional {
+                                font-size: 0.8rem;
+                                font-weight: 400;
+                                color: var(--color-texto-light);
+                            }
+                        }
+
+                        & img {
+                            width: 30px;
+                            height: 30px;
+                        }
+
+                        & .quantidade {
+                            background-color: #ECECEC;
+                            border-radius: 5px;
+                            padding: 5px 10px;
+                            gap: 20px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+
+                            & i {
+                                font-size: 10px;
+                                color: var(--color-secondary);
+                                cursor: pointer;
+
+                                &:hover {
+                                    color: #be0000;
+                                }
+
+                                &.dessativo {
+                                    color: #cccccc;
+                                    cursor: not-allowed;
+                                }
+                            }
+
+                            & p {
+                                font-size: 14px;
+                                color: var(--color-texto-black);
+                            }
+                        }
+                    }
+                }
+
+                & button {
+                    background-color: var(--color-texto-black);
+                    color: var(--color-texto-white);
+                    border: none;
+                    width: 165px;
+                    font-size: 14px;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    padding: 5px 25px;
+                    cursor: pointer;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin: 0 auto;
+                position: relative;
+
+                    &:hover {
+                        background-color: rgb(55, 55, 55);
+                    }
+
+                    &:active {
+                        background-color: rgb(147, 147, 147);
+                    }
+
+                & .extras-badge {
+                    position: absolute;
+                    top: -6px;
+                    left: -6px;
+                    background: var(--color-primary);
+                    color: var(--color-texto-black);
+                    border-radius: 999px;
+                    width: 20px;
+                    height: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 12px;
+                    font-weight: 700;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                }
+                }
+            }
+
+            & .observacao {
+                width: 100%;
+
+                & .div-input {
+
+                    & label {
+                        background-color: var(--color-background);
+                    }
+
+                    & .limite {
+                        position: absolute;
+                        bottom: 8px;
+                        right: 12px;
+                        font-size: 0.75rem;
+                        color: var(--color-texto-erased);
+                        z-index: 3;
+                        pointer-events: none;
+                    }
+                }
+            }
+
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    .informa {
+        padding: 0px 0vh 0px 0vh;
+        flex-direction: column;
+        gap: 10px;
+
+        & .esquerda {
+            width: 100%;
+            gap: 20px;
+
+            & .voltar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: var(--color-texto-black);
+                font-size: 1rem;
+            }
+
+            & img {
+                height: 320px;
+                width: 100%;
+            }
+
+            & .area-adicionar {
+                width: 100%;
+
+                & .valor {
+                    font-size: 0.9rem;
+
+                    & span {
+                        font-size: 1rem;
+                    }
+                }
+
+                & .quadro {
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    width: 100%;
+
+                    & .quantidade {
+                        padding: 5px 5px;
+                        gap: 10px;
+
+                        & i {
+                            font-size: 0.6rem;
+                        }
+
+                        & p {
+                            font-size: 0.7rem;
+                        }
+                    }
+
+                    & #valor {
+                        font-size: 0.9rem;
+                    }
+
+                    & button {
+                        padding: 5px 15px;
+                        font-size: 0.6rem;
+                    }
+                }
+            }
+        }
+
+        & .direita {
+            padding: 0px 0px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 50px;
+
+            & #nome-produto {
+                font-size: 1.5rem;
+            }
+
+            & #descricao-produto {
+                font-size: 0.9rem;
+                padding-right: 0px;
+            }
+
+            & .monte {
+                gap: 20px;
+                padding: 5px 0;
+
+                & p {
+                    font-size: 1.5rem;
+                }
+
+                & .rolagem {
+                    overflow-y: scroll;
+                    padding-right: 10px;
+                    height: 200px;
+
+
+                    & .item {
+                        & .item-adicional-container{
+                            gap: 0px;
+
+                            & .nome-adicional {
+                                font-size: 0.9rem;
+                            }
+
+                            & .preco-adicional {
+                                font-size: 0.7rem;
+                            }
+                        }
+
+                        & .quantidade {
+                            padding: 5px 5px;
+                            gap: 10px;
+
+                            & i {
+                                font-size: 0.6rem;
+                            }
+
+                            & p {
+                                font-size: 0.7rem;
+                            }
+                        }
+                    }
+                }
+
+                & button {
+                    width: 70vw;
+                    font-size: 0.9rem;
+                    padding: 5px 25px;
+                }
+            }
+
+            & .observacao {
+                width: 100%;
+
+                & .div-input {
+
+                    & label {
+                        background-color: var(--color-background);
+                    }
+
+                    & .limite {
+                        position: absolute;
+                        bottom: 8px;
+                        right: 12px;
+                        font-size: 0.75rem;
+                        color: var(--color-texto-erased);
+                        z-index: 3;
+                        pointer-events: none;
+                    }
+                }
+            }
+
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    .informa {
+        padding: 0px 0vh 0px 0vh;
+        flex-direction: column;
+        gap: 10px;
+
+        & .esquerda {
+            width: 100%;
+            gap: 20px;
+
+            & .voltar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: var(--color-texto-black);
+                font-size: 1rem;
+            }
+
+            & img {
+                height: 260px;
+                width: 100%;
+            }
+
+            & .area-adicionar {
+                width: 100%;
+                & .valor {
+                    font-size: 0.9rem;
+
+                    & span {
+                        font-size: 1rem;
+                    }
+                }
+
+                & .quadro {
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    width: 100%;
+
+                    & .quantidade {
+                        padding: 5px 5px;
+                        gap: 10px;
+
+                        & i {
+                            font-size: 0.6rem;
+                        }
+
+                        & p {
+                            font-size: 0.7rem;
+                        }
+                    }
+
+                    & #valor {
+                        font-size: 0.9rem;
+                    }
+
+                    & button {
+                        padding: 5px 15px;
+                        font-size: 0.6rem;
+                    }
+                }
+            }
+        }
+
+        & .direita {
+            padding: 0px 0px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 50px;
+
+            & #nome-produto {
+                font-size: 1.5rem;
+            }
+
+            & #descricao-produto {
+                font-size: 0.9rem;
+                padding-right: 0px;
+            }
+
+            & .monte {
+                gap: 20px;
+                padding: 5px 0;
+
+                & p {
+                    font-size: 1.5rem;
+                }
+
+                & .rolagem {
+                    overflow-y: scroll;
+                    padding-right: 10px;
+                    height: 200px;
+
+
+                    & .item {
+                        & .item-adicional-container{
+                            gap: 0px;
+
+                            & .nome-adicional {
+                                font-size: 0.9rem;
+                            }
+
+                            & .preco-adicional {
+                                font-size: 0.7rem;
+                            }
+                        }
+
+                        & .quantidade {
+                            padding: 5px 5px;
+                            gap: 10px;
+
+                            & i {
+                                font-size: 0.6rem;
+                            }
+
+                            & p {
+                                font-size: 0.7rem;
+                            }
+                        }
+                    }
+                }
+
+                & button {
+                    width: 70vw;
+                    font-size: 0.9rem;
+                    padding: 5px 25px;
+                }
+            }
+
+            & .observacao {
+                width: 100%;
+
+                & .div-input {
+
+                    & label {
+                        background-color: var(--color-background);
+                    }
+
+                    & .limite {
+                        position: absolute;
+                        bottom: 8px;
+                        right: 12px;
+                        font-size: 0.75rem;
+                        color: var(--color-texto-erased);
+                        z-index: 3;
+                        pointer-events: none;
+                    }
+                }
+            }
+
+        }
+    }
+}
+
+@media (max-width: 320px){
+    .informa {
+        padding: 0px 0vh 0px 0vh;
+        flex-direction: column;
+        gap: 10px;
+
+        & .esquerda {
+            width: 100%;
+            gap: 20px;
+
+            & .voltar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: var(--color-texto-black);
+                font-size: 1rem;
+            }
+
+            & img {
+                height: 200px;
+                width: 100%;
+            }
+
+            & .area-adicionar {
+                width: 100%;
+
+                & .valor {
+                    font-size: 0.9rem;
+
+                    & span {
+                        font-size: 1rem;
+                    }
+                }
+
+                & .quadro {
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    width: 100%;
+
+                    & .quantidade {
+                        padding: 5px 5px;
+                        gap: 10px;
+
+                        & i {
+                            font-size: 0.6rem;
+                        }
+
+                        & p {
+                            font-size: 0.7rem;
+                        }
+                    }
+
+                    & #valor {
+                        font-size: 0.9rem;
+                    }
+
+                    & button {
+                        padding: 5px 15px;
+                        font-size: 0.6rem;
+                    }
+                }
+            }
+        }
+
+        & .direita {
+            padding: 0px 0px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 50px;
+
+            & #nome-produto {
+                font-size: 1.5rem;
+            }
+
+            & #descricao-produto {
+                font-size: 0.9rem;
+                padding-right: 0px;
+            }
+
+            & .monte {
+                gap: 20px;
+                padding: 5px 0;
+
+                & p {
+                    font-size: 1.5rem;
+                }
+
+                & .rolagem {
+                    overflow-y: scroll;
+                    padding-right: 10px;
+                    height: 200px;
+
+
+                    & .item {
+                        & .item-adicional-container{
+                            gap: 0px;
+
+                            & .nome-adicional {
+                                font-size: 0.9rem;
+                            }
+
+                            & .preco-adicional {
+                                font-size: 0.7rem;
+                            }
+                        }
+
+                        & .quantidade {
+                            padding: 5px 5px;
+                            gap: 10px;
+
+                            & i {
+                                font-size: 0.6rem;
+                            }
+
+                            & p {
+                                font-size: 0.7rem;
+                            }
+                        }
+                    }
+                }
+
+                & button {
+                    width: 70vw;
+                    font-size: 0.9rem;
+                    padding: 5px 25px;
+                }
+            }
+
+            & .observacao {
+                width: 100%;
+
+                & .div-input {
+
+                    & label {
+                        background-color: var(--color-background);
+                    }
+
+                    & .limite {
+                        position: absolute;
+                        bottom: 8px;
+                        right: 12px;
+                        font-size: 0.75rem;
+                        color: var(--color-texto-erased);
+                        z-index: 3;
+                        pointer-events: none;
+                    }
+                }
+            }
+
+        }
     }
 }
