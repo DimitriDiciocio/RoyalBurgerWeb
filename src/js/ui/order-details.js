@@ -7,6 +7,7 @@ import { getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from 
 import { getProductById, searchProducts } from '../api/products.js';
 import { getAddresses, getDefaultAddress } from '../api/address.js';
 import { getIngredients } from '../api/ingredients.js';
+import { API_BASE_URL } from '../api/api.js';
 
 // Importar helper de configurações
 // Importação estática garante que o módulo esteja disponível quando necessário
@@ -806,18 +807,9 @@ const isDevelopment = () => {
             return pathStr;
         }
         
-        // URL base dinâmica baseada na origem atual
-        const currentOrigin = window.location.origin;
-        let baseUrl;
-        
-        // Se estamos em localhost, usar localhost:5000
-        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-            baseUrl = 'http://localhost:5000';
-        } else {
-            // Para outros ambientes, usar a mesma origem mas porta 5000
-            const hostname = window.location.hostname;
-            baseUrl = `http://${hostname}:5000`;
-        }
+        // CORREÇÃO: Usar API_BASE_URL do api.js para garantir funcionamento em qualquer servidor
+        // Isso evita erros quando o código é colocado em outros servidores
+        const baseUrl = API_BASE_URL;
         
         // Usa hash da imagem se disponível, senão usa timestamp
         const cacheParam = imageHash || new Date().getTime();

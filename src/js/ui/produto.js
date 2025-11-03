@@ -4,6 +4,7 @@ import { getProductById, getProductIngredients, getProductImageUrl } from '../ap
 import { getIngredients } from '../api/ingredients.js';
 import { addToCart, updateCartItem, getCart } from '../api/cart.js';
 import { showToast } from './alerts.js';
+import { API_BASE_URL } from '../api/api.js';
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -160,15 +161,9 @@ const VALIDATION_LIMITS = {
             return '../assets/img/tudo.jpeg';
         }
         
-        const currentOrigin = window.location.origin;
-        let baseUrl;
-        
-        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-            baseUrl = 'http://localhost:5000';
-        } else {
-            const hostname = window.location.hostname;
-            baseUrl = `http://${hostname}:5000`;
-        }
+        // CORREÇÃO: Usar API_BASE_URL do api.js para garantir funcionamento em qualquer servidor
+        // Isso evita erros quando o código é colocado em outros servidores
+        const baseUrl = API_BASE_URL;
         
         const cacheParam = imageHash || new Date().getTime();
         

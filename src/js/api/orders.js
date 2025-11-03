@@ -63,6 +63,16 @@ export async function createOrder(orderData) {
             throw new Error('Itens do pedido são obrigatórios quando não usar carrinho');
         }
 
+        // IMPORTANTE: Quando use_cart=true, o backend buscará os itens diretamente do carrinho do usuário
+        // O backend Python processa automaticamente a conversão de unidades (g → kg, mL → L, etc.)
+        // através do sistema _convert_unit() e _calculate_consumption_in_stock_unit()
+        // Os itens do carrinho devem estar no formato:
+        //   - product_id: int
+        //   - quantity: int >= 1
+        //   - extras: [{ ingredient_id: int, quantity: int >= 1 }]
+        //   - base_modifications: [{ ingredient_id: int, delta: int != 0 }]
+        // A validação de estoque e conversão de unidades é feita automaticamente pelo backend
+
         // Limpar campos undefined e normalizar tipos antes de enviar
         const cleanedOrderData = {};
         for (const key in orderData) {
@@ -118,6 +128,13 @@ export async function createOrder(orderData) {
             if (isMigrationError) {
                 errorMessage = 'Erro no banco de dados: Coluna CHANGE_FOR_AMOUNT não existe. Execute a migração SQL no banco de dados.';
             }
+        }
+        
+        // Detectar erros de estoque (status 422) - a mensagem do backend já vem formatada
+        if (error.status === 422) {
+            // Manter mensagem original do backend que inclui unidades e valores
+            // Exemplo: "Estoque insuficiente para Pão. Disponível: 17.000 kg, Necessário: 56.000 kg"
+            // Não modificar a mensagem, apenas garantir que seja exibida
         }
         
         return {

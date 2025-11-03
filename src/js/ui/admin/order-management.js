@@ -1278,7 +1278,7 @@ const isDevelopment = () => {
                         <div class="item-info">
                             <span class="item-qtd">${itemQuantity}</span>
                             <span class="item-name">${itemName}</span>
-                            <span class="item-price">R$ ${escapeHTML(String(formatCurrency ? formatCurrency(itemTotal) : itemTotal.toFixed(2).replace('.', ',')))}</span>
+                            <span class="item-price">${escapeHTML(String(formatCurrency ? formatCurrency(itemTotal) : itemTotal.toFixed(2).replace('.', ',')))}</span>
                         </div>
                         ${modificationsHtml ? `<div class="order-item-modifications">${modificationsHtml}</div>` : ''}
                     </div>
@@ -1344,7 +1344,7 @@ const isDevelopment = () => {
                     <div class="order-footer">
                         <div class="order-total">
                             <span class="total-label">Total</span>
-                            <span class="total-value">R$ ${escapeHTML(String(formatCurrency ? formatCurrency(total) : total.toFixed(2).replace('.', ',')))}</span>
+                            <span class="total-value"> ${escapeHTML(String(formatCurrency ? formatCurrency(total) : total.toFixed(2).replace('.', ',')))}</span>
                         </div>
                         ${canUpdate ? `
                             <button class="order-action-btn" data-order-id="${escapeHTML(String(orderId))}" data-next-status="${escapeHTML(nextStatus)}">

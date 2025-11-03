@@ -78,9 +78,10 @@ class InsumoDataManager {
                 custo: parseFloat(insumo.price) || 0,
                 preco_adicional: parseFloat(insumo.additional_price) || 0,
                 unidade: insumo.stock_unit || 'un',
-                min: parseInt(insumo.min_stock_threshold) || 0,
-                max: parseInt(insumo.max_stock) || 100,
-                atual: parseInt(insumo.current_stock) || 0,
+                // CORREÇÃO: Usar parseFloat para preservar decimais do estoque (ex: 17.000 kg)
+                min: parseFloat(insumo.min_stock_threshold) || 0,
+                max: parseFloat(insumo.max_stock) || 100,
+                atual: parseFloat(insumo.current_stock) || 0,
                 ativo: insumo.is_available !== undefined ? insumo.is_available : true,
                 fornecedor: insumo.supplier || 'Não informado',
                 quantidade_porcao: parseFloat(insumo.base_portion_quantity) || 1,
@@ -436,9 +437,10 @@ class InsumoManager {
                 custo: parseFloat(insumo.price) || 0,
                 preco_adicional: parseFloat(insumo.additional_price) || 0,
                 unidade: insumo.stock_unit || 'un',
-                min: parseInt(insumo.min_stock_threshold) || 0,
-                max: parseInt(insumo.max_stock) || 100,
-                atual: parseInt(insumo.current_stock) || 0,
+                // CORREÇÃO: Usar parseFloat para preservar decimais do estoque (ex: 17.000 kg)
+                min: parseFloat(insumo.min_stock_threshold) || 0,
+                max: parseFloat(insumo.max_stock) || 100,
+                atual: parseFloat(insumo.current_stock) || 0,
                 ativo: insumo.is_available !== undefined ? insumo.is_available : true,
                 fornecedor: insumo.supplier || 'Não informado',
                 quantidade_porcao: parseFloat(insumo.base_portion_quantity) || 1,
@@ -540,6 +542,28 @@ class InsumoManager {
     /**
      * Calcula progresso da barra de estoque
      */
+    /**
+     * Formata valor de estoque com até 3 casas decimais (remove zeros desnecessários)
+     * Exemplos: 17.000 → "17.000", 17.5 → "17.5", 17.123 → "17.123", 17 → "17"
+     * @param {number} value - Valor a ser formatado
+     * @returns {string} Valor formatado
+     */
+    formatStockValue(value) {
+        if (value === null || value === undefined || isNaN(value)) {
+            return '0';
+        }
+        
+        const numValue = parseFloat(value);
+        
+        // Formata com até 3 casas decimais
+        let formatted = numValue.toFixed(3);
+        
+        // Remove zeros à direita desnecessários, mas mantém pelo menos 1 casa decimal se o valor tiver parte decimal
+        // Exemplos: "17.000" → "17.000", "17.500" → "17.500", "17.123" → "17.123"
+        // Mantém sempre 3 casas decimais para consistência com o formato do backend
+        return formatted;
+    }
+
     calculateProgress(insumo) {
         if (insumo.max <= 0) return 0;
         const progress = (insumo.atual / insumo.max) * 100;
@@ -604,7 +628,7 @@ class InsumoManager {
             <div class="controle-estoque">
                 <div class="estoque-atual">
                     <div class="label">Estoque Atual</div>
-                    <div class="quantidade">${(insumo.atual || 0).toFixed(1)} ${insumo.unidade || 'un'}</div>
+                    <div class="quantidade">${this.formatStockValue(insumo.atual || 0)} ${insumo.unidade || 'un'}</div>
                 </div>
                 
                 <div class="barra-progresso">
@@ -612,8 +636,8 @@ class InsumoManager {
                 </div>
                 
                 <div class="limites">
-                    <span>Min: ${(insumo.min || 0).toFixed(1)}</span>
-                    <span>Max: ${(insumo.max || 100).toFixed(1)}</span>
+                    <span>Min: ${this.formatStockValue(insumo.min || 0)}</span>
+                    <span>Max: ${this.formatStockValue(insumo.max || 100)}</span>
                 </div>
                 
                 ${insumo.ativo ? `
@@ -793,7 +817,7 @@ class InsumoManager {
         const quantidadeElement = card.querySelector('.quantidade');
         if (quantidadeElement) {
             const unidade = quantidadeElement.textContent.split(' ')[1] || 'un';
-            quantidadeElement.textContent = `${newValue.toFixed(1)} ${unidade}`;
+            quantidadeElement.textContent = `${this.formatStockValue(newValue)} ${unidade}`;
         }
         
         // Atualizar barra de progresso
@@ -1226,7 +1250,7 @@ class InsumoManager {
         const quantidadeElement = card.querySelector('.quantidade');
         if (quantidadeElement) {
             const unidade = quantidadeElement.textContent.split(' ')[1];
-            quantidadeElement.textContent = `${currentQuantity.toFixed(1)} ${unidade}`;
+            quantidadeElement.textContent = `${this.formatStockValue(currentQuantity)} ${unidade}`;
         }
         
         // Atualizar barra de progresso
@@ -2049,9 +2073,10 @@ class InsumoManager {
             custo: parseFloat(insumoData.price || insumoData.custo) || 0,
             preco_adicional: parseFloat(insumoData.additional_price || insumoData.preco_adicional) || 0,
             unidade: insumoData.stock_unit || insumoData.unidade || 'un',
-            min: parseInt(insumoData.min_stock_threshold || insumoData.min) || 0,
-            max: parseInt(insumoData.max_stock || insumoData.max) || 100,
-            atual: parseInt(insumoData.current_stock || insumoData.atual) || 0,
+            // CORREÇÃO: Usar parseFloat para preservar decimais do estoque (ex: 17.000 kg)
+            min: parseFloat(insumoData.min_stock_threshold || insumoData.min) || 0,
+            max: parseFloat(insumoData.max_stock || insumoData.max) || 100,
+            atual: parseFloat(insumoData.current_stock || insumoData.atual) || 0,
             ativo: insumoData.is_available !== undefined ? insumoData.is_available : true,
             fornecedor: insumoData.supplier || insumoData.fornecedor || 'Não informado',
             quantidade_porcao: parseFloat(insumoData.base_portion_quantity || insumoData.quantidade_porcao) || 1,
@@ -2096,8 +2121,8 @@ class InsumoManager {
 
         // Atualizar limites
         const limitesElements = card.querySelectorAll('.limites span');
-        if (limitesElements[0]) limitesElements[0].textContent = `Min: ${(insumoData.min || 0).toFixed(1)}`;
-        if (limitesElements[1]) limitesElements[1].textContent = `Max: ${(insumoData.max || 100).toFixed(1)}`;
+        if (limitesElements[0]) limitesElements[0].textContent = `Min: ${this.formatStockValue(insumoData.min || 0)}`;
+        if (limitesElements[1]) limitesElements[1].textContent = `Max: ${this.formatStockValue(insumoData.max || 100)}`;
 
         // CORREÇÃO: Atualizar status visual do card
         const newStatusClass = this.getStatusClass(insumoData);

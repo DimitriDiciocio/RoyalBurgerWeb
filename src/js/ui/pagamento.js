@@ -14,6 +14,7 @@ import { createOrder, calculateOrderTotal } from '../api/orders.js';
 import { getCart } from '../api/cart.js';
 import { showError, showSuccess, showToast, showConfirm } from './alerts.js';
 import { getIngredients } from '../api/ingredients.js';
+import { API_BASE_URL } from '../api/api.js';
 
 // Importar helper de configurações
 // Importação estática garante que o módulo esteja disponível quando necessário
@@ -157,11 +158,14 @@ const VALIDATION_LIMITS = {
                     if (ingredient && ingredient.id != null) {
                         // Normalizar ID para string para garantir busca consistente
                         const id = String(ingredient.id);
-                        state.ingredientsCache[id] = {
-                            additional_price: parseFloat(ingredient.additional_price) || 0,
-                            price: parseFloat(ingredient.price) || 0,
-                            name: ingredient.name || ''
-                        };
+                // CORREÇÃO: Validar que preços são números válidos (evita NaN)
+                const additionalPrice = parseFloat(ingredient.additional_price);
+                const price = parseFloat(ingredient.price);
+                state.ingredientsCache[id] = {
+                    additional_price: Number.isFinite(additionalPrice) && additionalPrice >= 0 ? additionalPrice : 0,
+                    price: Number.isFinite(price) && price >= 0 ? price : 0,
+                    name: ingredient.name || ''
+                };
                     }
                 });
                 return state.ingredientsCache;
@@ -225,18 +229,9 @@ const VALIDATION_LIMITS = {
             return imagePath;
         }
         
-        // URL base dinâmica baseada na origem atual
-        const currentOrigin = window.location.origin;
-        let baseUrl;
-        
-        // Se estamos em localhost, usar localhost:5000
-        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-            baseUrl = 'http://localhost:5000';
-        } else {
-            // Para outros ambientes, usar a mesma origem mas porta 5000
-            const hostname = window.location.hostname;
-            baseUrl = `http://${hostname}:5000`;
-        }
+        // CORREÇÃO: Usar API_BASE_URL do api.js para garantir funcionamento em qualquer servidor
+        // Isso evita erros quando o código é colocado em outros servidores
+        const baseUrl = API_BASE_URL;
         
         // Usa hash da imagem se disponível, senão usa timestamp
         const cacheParam = imageHash || new Date().getTime();
@@ -260,6 +255,28 @@ const VALIDATION_LIMITS = {
         return `${baseUrl}/api/uploads/products/${imagePath}?v=${cacheParam}`;
     }
 
+    // Valida se um ID é um inteiro positivo válido (alinhado com validações do backend)
+    function validateId(id, fieldName = 'ID') {
+        if (id === null || id === undefined) return null;
+        try {
+            const parsed = typeof id === 'string' ? parseInt(id.trim(), 10) : parseInt(id, 10);
+            return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+        } catch {
+            return null;
+        }
+    }
+
+    // Valida quantidade (deve ser >= 1, alinhado com backend)
+    function validateQuantity(quantity) {
+        if (quantity === null || quantity === undefined) return 1;
+        try {
+            const parsed = typeof quantity === 'string' ? parseInt(quantity.trim(), 10) : parseInt(quantity, 10);
+            return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
+        } catch {
+            return 1;
+        }
+    }
+
     // Carregar dados da cesta via API
     async function carregarCesta() {
         try {
@@ -267,64 +284,101 @@ const VALIDATION_LIMITS = {
             
             if (cartResult.success && cartResult.data.items) {
                 // Converter formato da API para formato local
-                state.cesta = cartResult.data.items.map(item => {
-                    // Mapear EXTRAS (ingredientes adicionais fora da receita)
-                    const rawExtras = item.extras || item.additional_items || item.additional_ingredients || item.ingredients_extras || [];
-                    const extrasMapeados = (Array.isArray(rawExtras) ? rawExtras : []).map(extra => {
-                        const id = extra.ingredient_id ?? extra.id;
-                        const nome = extra.ingredient_name ?? extra.name ?? extra.title ?? 'Ingrediente';
-                        
-                        // Buscar preço do cache de ingredientes primeiro
-                        let preco = 0;
-                        if (id) {
-                            preco = getIngredientPrice(id);
+                // IMPORTANTE: Validar e normalizar dados para garantir compatibilidade com validações rigorosas do backend
+                // CORREÇÃO: Combina filter e map em um único processamento para evitar duplicação de validação
+                state.cesta = cartResult.data.items
+                    .map(item => {
+                        // Validar product_id uma única vez (evita duplicação)
+                        const productId = validateId(item.product_id);
+                        if (!productId) {
+                            // Retornar null para item inválido (será filtrado depois)
+                            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                            if (isDev) {
+                                console.warn('Item com product_id inválido removido da cesta:', item.product_id);
+                            }
+                            return null;
                         }
-                        // Se não encontrou no cache, tentar nos dados do extra
-                        if (preco === 0) {
-                            preco = parseFloat(extra.ingredient_price ?? extra.price ?? extra.additional_price ?? 0) || 0;
-                        }
-                        
-                        const quantidade = parseInt(extra.quantity ?? extra.qty ?? 0, 10) || 0;
-                        return { id, nome, preco, quantidade };
-                    });
 
-                    // Mapear BASE_MODIFICATIONS (modificações da receita base)
-                    const rawBaseMods = item.base_modifications || [];
-                    const baseModsMapeados = (Array.isArray(rawBaseMods) ? rawBaseMods : []).map(bm => {
-                        const id = bm.ingredient_id ?? bm.id;
-                        const nome = bm.ingredient_name ?? bm.name ?? 'Ingrediente';
-                        const delta = parseInt(bm.delta ?? 0, 10) || 0;
-                        
-                        // Buscar preço do cache de ingredientes
-                        let preco = 0;
-                        if (id) {
-                            preco = getIngredientPrice(id);
-                        }
-                        
-                        return { id, nome, delta, preco };
-                    });
+                        // Mapear EXTRAS (ingredientes adicionais fora da receita)
+                        const rawExtras = item.extras || item.additional_items || item.additional_ingredients || item.ingredients_extras || [];
+                        const extrasMapeados = (Array.isArray(rawExtras) ? rawExtras : [])
+                            .map(extra => {
+                                const id = validateId(extra.ingredient_id ?? extra.id, 'ingredient_id');
+                                // Filtrar extras com IDs inválidos (backend rejeita null/undefined)
+                                if (!id) return null;
+                                
+                                const nome = extra.ingredient_name ?? extra.name ?? extra.title ?? 'Ingrediente';
+                                
+                                // Buscar preço do cache de ingredientes primeiro
+                                let preco = getIngredientPrice(id);
+                                // Se não encontrou no cache, tentar nos dados do extra
+                                if (preco === 0) {
+                                    const extraPrice = parseFloat(extra.ingredient_price ?? extra.price ?? extra.additional_price ?? 0);
+                                    preco = Number.isFinite(extraPrice) && extraPrice >= 0 ? extraPrice : 0;
+                                }
+                                
+                                // Validar quantidade (backend requer >= 1)
+                                const quantidade = validateQuantity(extra.quantity ?? extra.qty);
+                                return { id, nome, preco, quantidade };
+                            })
+                            .filter(extra => extra !== null); // Remove extras inválidos
 
-                    return {
-                        id: item.product_id,
-                        nome: item.product.name,
-                        descricao: item.product.description,
-                        preco: item.product.price,
-                        precoTotal: item.item_subtotal,
-                        quantidade: item.quantity,
-                        extras: extrasMapeados,
-                        base_modifications: baseModsMapeados,
-                        observacao: item.notes || '',
-                        imagem: item.product.image_url || 'tudo.jpeg',
-                        imageHash: item.product.image_hash
-                    };
-                });
+                        // Mapear BASE_MODIFICATIONS (modificações da receita base)
+                        const rawBaseMods = item.base_modifications || [];
+                        const baseModsMapeados = (Array.isArray(rawBaseMods) ? rawBaseMods : [])
+                            .map(bm => {
+                                const id = validateId(bm.ingredient_id ?? bm.id, 'ingredient_id');
+                                // Filtrar base_modifications com IDs inválidos
+                                if (!id) return null;
+                                
+                                const nome = bm.ingredient_name ?? bm.name ?? 'Ingrediente';
+                                const delta = parseInt(bm.delta ?? 0, 10) || 0;
+                                
+                                // Buscar preço do cache de ingredientes
+                                const preco = getIngredientPrice(id);
+                                
+                                return { id, nome, delta, preco };
+                            })
+                            .filter(bm => bm !== null); // Remove base_modifications inválidos
+
+                        // Validar quantidade do item (backend requer >= 1)
+                        const quantidade = validateQuantity(item.quantity);
+
+                        return {
+                            id: productId,
+                            nome: item.product?.name || 'Produto',
+                            descricao: item.product?.description || '',
+                            // CORREÇÃO: Validar que preços são números válidos (evita NaN/Infinity)
+                            preco: (() => {
+                                const priceRaw = parseFloat(item.product?.price);
+                                return Number.isFinite(priceRaw) && priceRaw >= 0 ? priceRaw : 0;
+                            })(),
+                            precoTotal: (() => {
+                                const subtotalRaw = parseFloat(item.item_subtotal);
+                                return Number.isFinite(subtotalRaw) && subtotalRaw >= 0 ? subtotalRaw : 0;
+                            })(),
+                            quantidade: quantidade, // Já validado por validateQuantity (>= 1)
+                            extras: extrasMapeados,
+                            base_modifications: baseModsMapeados,
+                            observacao: item.notes || '',
+                            imagem: item.product?.image_url || 'tudo.jpeg',
+                            imageHash: item.product?.image_hash
+                        };
+                    })
+                    .filter(item => item !== null && item.quantidade >= 1); // Remove itens inválidos e garante quantidade válida
                 
                 // Atualizar totais da API
+                // CORREÇÃO: Validar que valores são números válidos (evita NaN/Infinity de cálculos malformados)
                 if (cartResult.data.summary) {
-                    state.subtotal = cartResult.data.summary.subtotal || 0;
-                    state.taxaEntrega = cartResult.data.summary.fees || 5.00;
-                    state.descontos = cartResult.data.summary.discounts || 0;
-                    state.total = cartResult.data.summary.total || 0;
+                    const subtotalRaw = parseFloat(cartResult.data.summary.subtotal);
+                    const feesRaw = parseFloat(cartResult.data.summary.fees);
+                    const discountsRaw = parseFloat(cartResult.data.summary.discounts);
+                    const totalRaw = parseFloat(cartResult.data.summary.total);
+                    
+                    state.subtotal = Number.isFinite(subtotalRaw) && subtotalRaw >= 0 ? subtotalRaw : 0;
+                    state.taxaEntrega = Number.isFinite(feesRaw) && feesRaw >= 0 ? feesRaw : 5.00;
+                    state.descontos = Number.isFinite(discountsRaw) && discountsRaw >= 0 ? discountsRaw : 0;
+                    state.total = Number.isFinite(totalRaw) && totalRaw >= 0 ? totalRaw : 0;
                 }
             } else {
                 state.cesta = [];
@@ -388,8 +442,6 @@ const VALIDATION_LIMITS = {
         }
     }
 
-    // REMOVED: Função vazia mantida por compatibilidade - não é mais necessária
-
     // Carregar pontos Royal do usuário via API
     async function carregarPontos() {
         if (!state.usuario || !state.usuario.id) {
@@ -406,7 +458,9 @@ const VALIDATION_LIMITS = {
 
         try {
             const balanceData = await getLoyaltyBalance(state.usuario.id);
-            state.pontosDisponiveis = balanceData.current_balance || 0;
+            // CORREÇÃO: Validar que balance é número válido (evita NaN)
+            const balanceRaw = parseFloat(balanceData?.current_balance);
+            state.pontosDisponiveis = (Number.isFinite(balanceRaw) && balanceRaw >= 0) ? Math.floor(balanceRaw) : 0;
         } catch (error) {
             // Log apenas em desenvolvimento
             const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
@@ -422,10 +476,18 @@ const VALIDATION_LIMITS = {
 
     // Calcular totais
     function calcularTotais() {
-        state.subtotal = state.cesta.reduce((sum, item) => sum + item.precoTotal, 0);
+        // CORREÇÃO: Validar que precoTotal é número válido antes de somar (evita NaN)
+        state.subtotal = state.cesta.reduce((sum, item) => {
+            const itemTotal = typeof item.precoTotal === 'number' && Number.isFinite(item.precoTotal) 
+                ? item.precoTotal 
+                : 0;
+            return sum + itemTotal;
+        }, 0);
         
         // Total antes do desconto (subtotal + taxa de entrega, se delivery)
-        const totalAntesDesconto = state.subtotal + (isPickupOrder() ? 0 : state.taxaEntrega);
+        // CORREÇÃO: Garantir que taxaEntrega é número válido antes de calcular
+        const taxaEntregaValida = Number.isFinite(state.taxaEntrega) && state.taxaEntrega >= 0 ? state.taxaEntrega : 0;
+        const totalAntesDesconto = state.subtotal + (isPickupOrder() ? 0 : taxaEntregaValida);
         
         // Validar resgate de pontos se estiver usando
         // IMPORTANTE: O desconto pode ser aplicado sobre subtotal + entrega (se delivery)
@@ -470,9 +532,13 @@ const VALIDATION_LIMITS = {
         //   (Cliente não recebe crédito de R$ 34,50 que sobraria)
         //
         const descontoPontos = state.usarPontos ? calculateDiscountFromPoints(state.pontosParaUsar) : 0;
-        state.descontos = Math.min(descontoPontos, totalAntesDesconto);
+        // CORREÇÃO: Validar que desconto é número válido antes de calcular
+        const descontoValido = Number.isFinite(descontoPontos) && descontoPontos >= 0 ? descontoPontos : 0;
+        state.descontos = Math.min(descontoValido, totalAntesDesconto);
         
-        state.total = totalAntesDesconto - state.descontos;
+        // CORREÇÃO: Garantir que total é um número válido (evita NaN em cálculos)
+        const totalCalculado = totalAntesDesconto - state.descontos;
+        state.total = Number.isFinite(totalCalculado) && totalCalculado >= 0 ? totalCalculado : 0;
         
         // Atualizar exibição do troco se dinheiro estiver selecionado
         // Se o total ficou 0 devido aos pontos, limpar o troco
@@ -508,7 +574,8 @@ const VALIDATION_LIMITS = {
             if (item.extras && item.extras.length > 0) {
                 const extrasItems = item.extras.map(extra => {
                     // Buscar preço do cache ou usar o preço já mapeado
-                    let preco = extra.preco || 0;
+                    // CORREÇÃO: Validar que preço é um número válido antes de usar
+                    let preco = (typeof extra.preco === 'number' && Number.isFinite(extra.preco) && extra.preco >= 0) ? extra.preco : 0;
                     if (preco === 0 && extra.id) {
                         preco = getIngredientPrice(extra.id);
                     }
@@ -1736,27 +1803,12 @@ const VALIDATION_LIMITS = {
             data: new Date().toISOString()
         };
 
-        // Salvar pedido no localStorage (simulação)
-        try {
-            const pedidos = JSON.parse(localStorage.getItem('royal_pedidos') || '[]');
-            pedidos.push(pedido);
-            localStorage.setItem('royal_pedidos', JSON.stringify(pedidos));
-            
-            // Limpar cesta
-            localStorage.removeItem('royal_cesta');
-            
-            // Mostrar sucesso
-            showSuccess('Pedido realizado com sucesso!');
-            
-            // Redirecionar para página de sucesso ou histórico
-            window.location.href = 'hist-pedidos.html';
-        } catch (err) {
-            // Log apenas em desenvolvimento - erro já é exibido ao usuário
-            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-            if (isDev) {
-                console.error('Erro ao salvar pedido:', err.message);
-            }
-            showError('Erro ao processar pedido. Tente novamente.');
+        // DEPRECATED: Esta função não é mais utilizada - pedidos são criados via API
+        // Mantida apenas para compatibilidade/comentada para evitar uso acidental
+        // TODO: Remover em refatoração futura quando garantir que não há dependências
+        showError('Método obsoleto. Use criarPedidoAPI() para criar pedidos via API.');
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.warn('salvarPedido() está obsoleta. Pedidos devem ser criados via API (criarPedidoAPI).');
         }
     }
 
@@ -2030,9 +2082,10 @@ const VALIDATION_LIMITS = {
 
     function confirmarTroco() {
         const valor = el.valorTroco?.value?.trim();
+        // Validação robusta: usar Number.isFinite ao invés de isNaN
         const valorPago = parseFloat(valor);
         const valorTotal = state.total;
-        const isFullyPaidWithPoints = valorTotal <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+        const isFullyPaidWithPoints = Number.isFinite(valorTotal) && valorTotal <= 0 && state.usarPontos && state.pontosParaUsar > 0;
         
         // Se o pedido está completamente pago com pontos, não precisa de troco
         if (isFullyPaidWithPoints) {
@@ -2044,13 +2097,16 @@ const VALIDATION_LIMITS = {
         }
         
         // Validação normal para pedidos com valor
-        if (!valor || isNaN(valorPago) || valorPago <= 0) {
+        if (!valor || !Number.isFinite(valorPago) || valorPago <= 0) {
             showError('Digite um valor válido para o troco.');
             return;
         }
         
-        if (valorPago < valorTotal) {
-            showError(`O valor pago (R$ ${valorPago.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${valorTotal.toFixed(2).replace('.', ',')}).`);
+        // Validação: garantir que valorTotal também é um número válido
+        if (!Number.isFinite(valorTotal) || valorPago < valorTotal) {
+            const valorPagoFormatado = valorPago.toFixed(2).replace('.', ',');
+            const totalFormatado = (valorTotal || 0).toFixed(2).replace('.', ',');
+            showError(`O valor pago (R$ ${valorPagoFormatado}) deve ser maior ou igual ao total do pedido (R$ ${totalFormatado}).`);
             return;
         }
 
@@ -2091,18 +2147,21 @@ const VALIDATION_LIMITS = {
         }
     }
 
-    function confirmarPedido() {
+    // Helper: Reabilitar botão de confirmação (reduz duplicação de código)
+    function reabilitarBotaoConfirmar() {
+        if (el.btnConfirmarPedido) {
+            el.btnConfirmarPedido.disabled = false;
+            el.btnConfirmarPedido.textContent = 'Confirmar pedido';
+        }
+    }
+
+    async function confirmarPedido() {
         try {
-            // Verificar se é pickup
-            const isPickupOrder = state.endereco && (
-                state.endereco.type === 'pickup' || 
-                state.endereco.order_type === 'pickup' ||
-                state.endereco.delivery_type === 'pickup' || 
-                state.enderecoSelecionado === 'pickup'
-            );
+            // Usar função centralizada para verificar pickup
+            const isPickupOrderCheck = isPickupOrder();
             
             // Validar endereço (aceita pickup ou endereço com id)
-            if (!state.endereco || (!isPickupOrder && !state.endereco.id)) {
+            if (!state.endereco || (!isPickupOrderCheck && !state.endereco.id)) {
                 showError('Selecione um endereço de entrega ou retirada no local.');
                 return;
             }
@@ -2110,6 +2169,26 @@ const VALIDATION_LIMITS = {
             // Validar cesta (pode estar vazia se já foi processada, mas verificamos se o carrinho tem itens)
             if (!state.cesta || state.cesta.length === 0) {
                 showError('Sua cesta está vazia!');
+                return;
+            }
+
+            // Validação preventiva: verificar se todos os itens têm IDs válidos antes de enviar
+            // O backend agora valida rigorosamente e rejeita IDs inválidos
+            const itensInvalidos = state.cesta.filter(item => {
+                const productId = validateId(item.id);
+                if (!productId) return true;
+                
+                // Verificar se há extras ou base_modifications com IDs inválidos
+                const extrasInvalidos = item.extras?.some(extra => !validateId(extra.id));
+                const baseModsInvalidos = item.base_modifications?.some(bm => !validateId(bm.id));
+                
+                return extrasInvalidos || baseModsInvalidos;
+            });
+
+            if (itensInvalidos.length > 0) {
+                showError('Alguns itens da sua cesta contêm dados inválidos. Por favor, recarregue a página e tente novamente.');
+                // Recarregar cesta para obter dados atualizados
+                await carregarCesta();
                 return;
             }
 
@@ -2141,7 +2220,7 @@ const VALIDATION_LIMITS = {
             let pontosParaResgate = 0;
             if (state.usarPontos && state.pontosDisponiveis > 0 && state.pontosParaUsar > 0) {
                 // Calcular total antes do desconto (subtotal + taxa de entrega, se delivery)
-                const totalAntesDesconto = state.subtotal + (isPickupOrder ? 0 : state.taxaEntrega);
+                const totalAntesDesconto = state.subtotal + (isPickupOrderCheck ? 0 : state.taxaEntrega);
                 
                 // Validar novamente antes de enviar usando total com entrega
                 const validacao = validatePointsRedemption(
@@ -2186,7 +2265,20 @@ const VALIDATION_LIMITS = {
 
             // Preparar dados do pedido para API
             // IMPORTANTE: Quando use_cart=true, NÃO enviamos items manualmente
-            // O backend buscará os items diretamente do carrinho do usuário
+            // O backend Python buscará os items diretamente do carrinho do usuário no banco de dados
+            // e processará automaticamente:
+            //   1. Validação de estoque com conversão de unidades (validate_stock_for_items)
+            //   2. Cálculo de consumo convertido para unidade do estoque (_calculate_consumption_in_stock_unit)
+            //   3. Dedução de estoque após criação do pedido (deduct_stock_for_order)
+            // 
+            // O backend espera que os itens do carrinho estejam no formato:
+            //   - product_id: int
+            //   - quantity: int >= 1
+            //   - extras: [{ ingredient_id: int, quantity: int >= 1 }]
+            //   - base_modifications: [{ ingredient_id: int, delta: int != 0 }]
+            // 
+            // A conversão de unidades (ex: 100g → 0.100kg) é feita automaticamente pelo backend
+            // usando BASE_PORTION_QUANTITY, BASE_PORTION_UNIT e STOCK_UNIT dos ingredientes
             const orderData = {
                 payment_method: backendPaymentMethod,
                 notes: state.cesta.map(item => 
@@ -2194,28 +2286,23 @@ const VALIDATION_LIMITS = {
                 ).filter(note => note).join('; ') || '',
                 cpf_on_invoice: (state.cpf && state.cpf.trim() !== '') ? state.cpf.trim() : null,
                 points_to_redeem: pontosParaResgate,
-                use_cart: true, // CRÍTICO: Indica ao backend para usar o carrinho atual
-                order_type: isPickupOrder ? 'pickup' : 'delivery' // Especificar tipo de pedido (pickup ou delivery)
+                use_cart: true, // CRÍTICO: Indica ao backend para usar o carrinho atual (busca do banco de dados)
+                order_type: isPickupOrderCheck ? 'pickup' : 'delivery' // Especificar tipo de pedido (pickup ou delivery)
             };
             
             // Se for delivery, validar e incluir address_id
-            if (!isPickupOrder) {
+            if (!isPickupOrderCheck) {
                 if (!state.endereco || !state.endereco.id) {
                     showError('Endereço inválido. Por favor, selecione um endereço válido.');
-                    if (el.btnConfirmarPedido) {
-                        el.btnConfirmarPedido.disabled = false;
-                        el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-                    }
+                    reabilitarBotaoConfirmar();
                     return;
                 }
                 
-                const addressId = parseInt(state.endereco.id, 10);
-                if (isNaN(addressId) || addressId <= 0) {
+                // Usar validateId para consistência com outras validações
+                const addressId = validateId(state.endereco.id, 'address_id');
+                if (!addressId) {
                     showError('Endereço inválido. Por favor, selecione um endereço válido.');
-                    if (el.btnConfirmarPedido) {
-                        el.btnConfirmarPedido.disabled = false;
-                        el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-                    }
+                    reabilitarBotaoConfirmar();
                     return;
                 }
                 
@@ -2227,31 +2314,26 @@ const VALIDATION_LIMITS = {
             if (!isFullyPaidWithPoints && state.formaPagamento === 'dinheiro') {
                 if (!state.valorTroco || state.valorTroco === null) {
                     showError('Para pagamento em dinheiro, é necessário informar o valor pago.');
-                    if (el.btnConfirmarPedido) {
-                        el.btnConfirmarPedido.disabled = false;
-                        el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-                    }
+                    reabilitarBotaoConfirmar();
                     return;
                 }
                 
                 // Validar e converter amount_paid (usar parseFloat para valores decimais)
                 const amountPaid = parseFloat(state.valorTroco);
-                if (isNaN(amountPaid) || amountPaid <= 0) {
+                // Validação robusta: verificar NaN e valores inválidos
+                if (!Number.isFinite(amountPaid) || amountPaid <= 0) {
                     showError('O valor pago deve ser um número válido maior que zero.');
-                    if (el.btnConfirmarPedido) {
-                        el.btnConfirmarPedido.disabled = false;
-                        el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-                    }
+                    reabilitarBotaoConfirmar();
                     return;
                 }
                 
                 // Validar que amount_paid >= total (backend também valida, mas melhor prevenir)
-                if (amountPaid < state.total) {
-                    showError(`O valor pago (R$ ${amountPaid.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${state.total.toFixed(2).replace('.', ',')}).`);
-                    if (el.btnConfirmarPedido) {
-                        el.btnConfirmarPedido.disabled = false;
-                        el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-                    }
+                // Usar Number.isFinite para garantir que ambos os valores são números válidos
+                if (!Number.isFinite(state.total) || amountPaid < state.total) {
+                    const valorPagoFormatado = amountPaid.toFixed(2).replace('.', ',');
+                    const totalFormatado = (state.total || 0).toFixed(2).replace('.', ',');
+                    showError(`O valor pago (R$ ${valorPagoFormatado}) deve ser maior ou igual ao total do pedido (R$ ${totalFormatado}).`);
+                    reabilitarBotaoConfirmar();
                     return;
                 }
                 
@@ -2277,10 +2359,7 @@ const VALIDATION_LIMITS = {
             showError('Erro ao processar pedido. Tente novamente.');
             
             // Reabilitar botão em caso de erro
-            if (el.btnConfirmarPedido) {
-                el.btnConfirmarPedido.disabled = false;
-                el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-            }
+            reabilitarBotaoConfirmar();
         }
     }
 
@@ -2318,15 +2397,18 @@ const VALIDATION_LIMITS = {
                 }
                 
                 // Log para debug (apenas em desenvolvimento)
+                // Não incluir dados sensíveis como CPF, valores de pagamento completos
                 const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
                 if (isDev) {
                     console.log('Pedido criado com sucesso:', {
                         orderId,
                         confirmationCode,
                         pontosPrevistos,
+                        // Não logar valores financeiros completos em produção
                         subtotal: state.subtotal,
                         total: state.total,
                         orderType: orderData.order_type
+                        // CPF e dados de pagamento não são logados por segurança
                     });
                 }
                 
@@ -2390,6 +2472,23 @@ const VALIDATION_LIMITS = {
                     errorMessage = 'CPF inválido. Verifique o CPF informado.';
                 } else if (errorMessage.includes('INVALID_DISCOUNT')) {
                     errorMessage = 'Valor do desconto inválido. Verifique os pontos selecionados.';
+                } else if (errorMessage.includes('INSUFFICIENT_STOCK') || errorMessage.toLowerCase().includes('estoque insuficiente')) {
+                    // Erro de estoque insuficiente - a mensagem do backend já vem formatada com unidades e valores
+                    // Exemplo: "Estoque insuficiente para Pão. Disponível: 17.000 kg, Necessário: 56.000 kg"
+                    // Manter a mensagem original do backend e adicionar instrução ao usuário
+                    errorMessage = `⚠️ ${errorMessage}\n\nPor favor, verifique sua cesta e remova itens que não estão mais disponíveis. Você pode atualizar a cesta e tentar novamente.`;
+                } else if (errorMessage.includes('STOCK_VALIDATION_ERROR') || errorMessage.toLowerCase().includes('erro na conversão de unidades')) {
+                    // Erro de validação de estoque ou conversão de unidades
+                    // A mensagem do backend pode incluir detalhes sobre o problema de conversão
+                    if (errorMessage.toLowerCase().includes('conversão')) {
+                        // Manter mensagem original que inclui detalhes da conversão
+                        errorMessage = `⚠️ ${errorMessage}\n\nPor favor, entre em contato com o suporte se o problema persistir.`;
+                    } else if (errorMessage.toLowerCase().includes('product id') || errorMessage.toLowerCase().includes('id de produto')) {
+                        // Erro específico de ID inválido - recarregar cesta pode ajudar
+                        errorMessage = `⚠️ ${errorMessage}\n\nPor favor, recarregue sua cesta e tente novamente.`;
+                    } else {
+                        errorMessage = 'Erro ao verificar estoque disponível. Tente novamente em alguns instantes.';
+                    }
                 } else if (errorMessage.includes('VALIDATION_ERROR')) {
                     // Manter mensagem original de validação do backend (remover prefixo se existir)
                     errorMessage = errorMessage.replace(/^VALIDATION_ERROR:\s*/i, '').replace(/^VALIDATION_ERROR$/i, errorMessage);
@@ -2398,25 +2497,20 @@ const VALIDATION_LIMITS = {
                 showError(errorMessage);
                 
                 // Reabilitar botão
-                if (el.btnConfirmarPedido) {
-                    el.btnConfirmarPedido.disabled = false;
-                    el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-                }
+                reabilitarBotaoConfirmar();
             }
         } catch (error) {
-            // Log apenas em desenvolvimento
+            // Log apenas em desenvolvimento - não expor detalhes sensíveis em produção
             const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
             if (isDev) {
-                console.error('Erro ao criar pedido:', error.message);
+                // Log apenas mensagem de erro, não objeto completo (pode conter dados sensíveis)
+                console.error('Erro ao criar pedido:', error?.message || 'Erro desconhecido');
             }
             
             showError('Erro ao processar pedido. Tente novamente.');
             
             // Reabilitar botão
-            if (el.btnConfirmarPedido) {
-                el.btnConfirmarPedido.disabled = false;
-                el.btnConfirmarPedido.textContent = 'Confirmar pedido';
-            }
+            reabilitarBotaoConfirmar();
         }
     }
 

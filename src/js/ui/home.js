@@ -6,6 +6,7 @@
 // Importar helper de configurações públicas
 // Importação estática garante que o módulo esteja disponível quando necessário
 import * as settingsHelper from '../utils/settings-helper.js';
+import { API_BASE_URL } from '../api/api.js';
 
 // Cache para produtos e categorias com TTL
 let productsCache = null;
@@ -204,18 +205,9 @@ function buildImageUrl(imagePath, imageHash = null) {
         return imagePath;
     }
     
-    // URL base dinâmica baseada na origem atual
-    const currentOrigin = window.location.origin;
-    let baseUrl;
-    
-    // Se estamos em localhost, usar localhost:5000
-    if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-        baseUrl = 'http://localhost:5000';
-    } else {
-        // Para outros ambientes, usar a mesma origem mas porta 5000
-        const hostname = window.location.hostname;
-        baseUrl = `http://${hostname}:5000`;
-    }
+    // CORREÇÃO: Usar API_BASE_URL do api.js para garantir funcionamento em qualquer servidor
+    // Isso evita erros quando o código é colocado em outros servidores
+    const baseUrl = API_BASE_URL;
     
     // Usa hash da imagem se disponível, senão usa timestamp
     const cacheParam = imageHash || new Date().getTime();

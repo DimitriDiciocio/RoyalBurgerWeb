@@ -8,27 +8,7 @@ const STORAGE_KEYS = {
 
 // Ajuste se necessário. Mantém flexível para backends montados em outras portas.
 export const API_BASE_URL = (() => {
-    try {
-        // 1) Permite override via window.API_BASE_URL ou meta tag <meta name="api-base-url" content="...">
-        if (typeof window !== 'undefined') {
-            if (window.API_BASE_URL && typeof window.API_BASE_URL === 'string') {
-                return window.API_BASE_URL;
-            }
-            const meta = document.querySelector('meta[name="api-base-url"]');
-            if (meta && meta.content) return meta.content;
-
-            // 2) Se estiver rodando o Live Server (porta 5500), aponta para Flask (5000)
-            const { origin } = window.location;
-            if (/:(5500)(\/|$)/.test(origin)) {
-                return origin.replace(':5500', ':5000');
-            }
-
-            // 3) Caso contrário, usa a própria origem
-            return origin || 'http://127.0.0.1:5000';
-        }
-    } catch (_e) { }
-    // Fallback
-    return 'http://127.0.0.1:5000';
+    return 'http://10.92.3.135:5000';
 })();
 
 export function getStoredToken() {
@@ -139,6 +119,10 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
             } else if (response.status === 308) {
                 // Redirecionamento permanente - problema de CORS
                 errorMessage = 'Erro de configuração do servidor. Verifique se o CORS está configurado corretamente.';
+            } else if (response.status === 422) {
+                // Unprocessable Entity - usado para erros de validação de estoque, ingredientes indisponíveis, etc.
+                // A mensagem do backend já vem formatada com detalhes (ex: unidades, quantidades)
+                errorMessage = (data && (data.error || data.message)) || 'Erro de validação. Verifique os dados enviados.';
             } else {
                 // Outros erros
                 errorMessage = (data && (data.error || data.msg || data.message)) || `Erro ${response.status}`;

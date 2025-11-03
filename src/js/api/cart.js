@@ -164,6 +164,9 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
         const cartId = getCartIdFromStorage();
 
         // Normalizar extras para garantir formato aceito pelo backend
+        // IMPORTANTE: O backend Python usa estes dados para calcular consumo de estoque
+        // com conversão de unidades (BASE_PORTION_QUANTITY, BASE_PORTION_UNIT → STOCK_UNIT)
+        // Formato esperado: [{ ingredient_id: int, quantity: int >= 1 }]
         const normalizedExtras = Array.isArray(extras)
             ? extras
                 .map((e) => {
@@ -178,6 +181,10 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             : [];
 
         // Normalizar base_modifications para garantir formato aceito pelo backend
+        // IMPORTANTE: O backend Python usa DELTA para calcular mudanças na receita base
+        // DELTA é multiplicado por BASE_PORTION_QUANTITY e convertido para STOCK_UNIT
+        // Formato esperado: [{ ingredient_id: int, delta: int != 0 }]
+        // delta > 0 = adiciona ingrediente, delta < 0 = remove ingrediente
         const normalizedBaseMods = Array.isArray(base_modifications)
             ? base_modifications
                 .map((bm) => {
