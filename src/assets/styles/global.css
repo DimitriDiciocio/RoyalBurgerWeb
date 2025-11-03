@@ -25,6 +25,240 @@ main {
     background-color: var(--color-background);
 }
 
+/* ============================================================================
+   ESTILOS PADRONIZADOS PARA EXTRAS, MODIFICAÇÕES E OBSERVAÇÕES
+   ============================================================================ */
+
+/* Separador padrão para seções de modificações */
+.item-modifications-separator {
+    height: 1px;
+    background: #e0e1e4;
+    margin: 0.75rem 0;
+}
+
+/* Separador para extras (compatibilidade) */
+.item-extras-separator {
+    height: 1px;
+    background: #e0e1e4;
+    margin: 0.75rem 0;
+}
+
+/* Container para extras, modificações e observações */
+.item-modifications-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* Estilos padronizados para lista de extras */
+.item-extras-list {
+    padding: 0;
+    margin: 0;
+}
+
+.item-extras-list strong {
+    font-size: 0.8rem;
+    color: var(--color-texto-black);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+
+.item-extras-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.item-extras-list li {
+    font-size: 0.75rem;
+    color: var(--color-texto-erased);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1.3;
+}
+
+.extra-quantity-badge {
+    background: var(--color-primary);
+    color: var(--color-texto-black);
+    font-size: 0.65rem;
+    font-weight: 600;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+    padding: 0 4px;
+}
+
+.extra-name {
+    flex: 1;
+    word-break: break-word;
+}
+
+.extra-price {
+    font-size: 0.7rem;
+    color: #4caf50;
+    font-weight: 600;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Estilos padronizados para modificações da receita base */
+.item-base-mods-list {
+    padding: 0;
+    margin: 0;
+}
+
+.item-base-mods-list strong {
+    font-size: 0.8rem;
+    color: var(--color-texto-black);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+
+.item-base-mods-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.item-base-mods-list li {
+    font-size: 0.75rem;
+    color: var(--color-texto-erased);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1.3;
+}
+
+.base-mod-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.7rem;
+}
+
+.base-mod-icon.mod-add {
+    color: #4caf50;
+    background-color: rgba(76, 175, 80, 0.15);
+}
+
+.base-mod-icon.mod-remove {
+    color: #f44336;
+    background-color: rgba(244, 67, 54, 0.15);
+}
+
+.base-mod-quantity {
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--color-texto-black);
+    min-width: 16px;
+}
+
+.base-mod-name {
+    flex: 1;
+    word-break: break-word;
+}
+
+.base-mod-price {
+    font-size: 0.7rem;
+    color: #4caf50;
+    font-weight: 600;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Estilos padronizados para observações */
+.item-observacao {
+    font-size: 0.75rem;
+    color: var(--color-texto-erased);
+    font-style: italic;
+    line-height: 1.4;
+    padding: 0.5rem;
+    background-color: rgba(255, 199, 0, 0.08);
+    border-left: 3px solid var(--color-primary);
+    border-radius: 4px;
+}
+
+.item-observacao strong {
+    color: var(--color-texto-black);
+    font-style: normal;
+    font-weight: 600;
+    margin-right: 0.25rem;
+}
+
+/* Versão compacta para cards de pedidos */
+.order-item-modifications {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.order-item-modifications-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--color-texto-erased);
+}
+
+.order-item-modifications-compact .modification-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    background-color: #f5f5f5;
+    border-radius: 12px;
+    font-size: 0.7rem;
+}
+
+.order-item-modifications-compact .modification-badge.extra {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.order-item-modifications-compact .modification-badge.mod-add {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.order-item-modifications-compact .modification-badge.mod-remove {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+}
+
+.order-item-modifications-compact .modification-count {
+    font-weight: 600;
+    color: var(--color-texto-black);
+}
+
+.order-item-notes-compact {
+    font-size: 0.7rem;
+    color: var(--color-texto-erased);
+    font-style: italic;
+    margin-top: 0.35rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--color-primary);
+}
+
 .div-input {
     height: fit-content;
     display: flex;

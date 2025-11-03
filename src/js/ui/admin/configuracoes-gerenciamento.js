@@ -2003,25 +2003,101 @@ class ConfiguracoesManager {
 
     /**
      * Validar horários antes de salvar
+     * Permite horários que atravessam a meia-noite (ex: fecha 01h, abre 05h)
      */
     validateStoreHours() {
         const errors = [];
+        const missingTimes = [];
+        const invalidTimes = [];
 
         this.storeHours.forEach(day => {
             if (day.is_open) {
                 if (!day.opening_time || !day.closing_time) {
-                    errors.push(`${day.day_name}: Horários de abertura e fechamento são obrigatórios quando a loja está aberta.`);
+                    missingTimes.push(day.day_name);
                 } else {
-                    // Validar se horário de abertura é antes do fechamento
                     const opening = this.timeToMinutes(day.opening_time);
                     const closing = this.timeToMinutes(day.closing_time);
                     
-                    if (opening >= closing) {
-                        errors.push(`${day.day_name}: Horário de abertura deve ser anterior ao horário de fechamento.`);
+                    // Validação permite horários que atravessam a meia-noite
+                    // Exemplos válidos:
+                    // - Horário normal: 10h abre, 22h fecha (opening < closing)
+                    // - Atravessa meia-noite: 05h abre, 01h fecha (closing < opening, fecha até 12h do dia seguinte)
+                    // - Atravessa meia-noite: 18h abre, 02h fecha (closing < opening, fecha até 12h do dia seguinte)
+                    
+                    // Casos inválidos:
+                    // - opening < closing mas closing < opening (impossível matematicamente, mas serve como checagem)
+                    // - closing < opening mas closing > 720 (fecha muito tarde >12h após meia-noite) - provável erro
+                    // - opening < closing mas closing < 360 (fecha antes das 6h no mesmo dia) - provável erro
+                    
+                    // Validação principal
+                    let isValid = false;
+                    
+                    if (opening < closing) {
+                        // Horário normal: abre e fecha no mesmo dia
+                        // Fechamento deve ser após 6h (360min) para evitar casos como "10h abre, 8h fecha"
+                        if (closing >= 360) {
+                            isValid = true;
+                        }
+                    } else if (closing < opening) {
+                        // Atravessa meia-noite: fecha no dia seguinte
+                        // Exemplos válidos:
+                        // - 05h abre, 01h fecha (abre 5h, fecha 1h do dia seguinte)
+                        // - 18h abre, 02h fecha (abre 18h, fecha 2h do dia seguinte)
+                        // 
+                        // Para ser válido:
+                        // - Fechamento deve ser até 12h (720min) do dia seguinte
+                        // - E (abertura >= 12h OU (abertura < 12h mas closing <= opening em valor absoluto))
+                        // 
+                        // Isso permite casos como:
+                        // - 05h-01h (válido: fecha cedo no dia seguinte)
+                        // - 18h-02h (válido: fecha cedo no dia seguinte)
+                        // Mas rejeita casos como:
+                        // - 10h-08h (erro: 8h vem antes de 10h no mesmo dia)
+                        
+                        if (closing <= 720) {
+                            // Se abertura é após 12h, sempre válido (ex: 18h-02h)
+                            if (opening >= 720) {
+                                isValid = true;
+                            } 
+                            // Se abertura é antes de 12h, verificar se fechamento é realmente do dia seguinte
+                            // (closing < opening já garante isso, mas adicionar verificação extra para evitar erros)
+                            else if (opening < 720 && closing < opening) {
+                                // Permitir se fechamento é muito cedo (até 6h), indicando que fecha de madrugada
+                                // E abertura é antes de fechamento em minutos, mas fechamento vem depois em horas do dia
+                                if (closing <= 360) { // Fecha até 6h da manhã
+                                    isValid = true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!isValid) {
+                        invalidTimes.push(day.day_name);
                     }
                 }
             }
         });
+
+        // Construir mensagens agrupadas e mais concisas
+        if (missingTimes.length > 0) {
+            if (missingTimes.length === 1) {
+                errors.push(`${missingTimes[0]}: Horários obrigatórios.`);
+            } else if (missingTimes.length <= 3) {
+                errors.push(`${missingTimes.join(', ')}: Horários obrigatórios.`);
+            } else {
+                errors.push(`${missingTimes.length} dias sem horários: ${missingTimes.slice(0, 2).join(', ')} e mais.`);
+            }
+        }
+
+        if (invalidTimes.length > 0) {
+            if (invalidTimes.length === 1) {
+                errors.push(`${invalidTimes[0]}: Horário inválido. Verifique os horários.`);
+            } else if (invalidTimes.length <= 3) {
+                errors.push(`${invalidTimes.join(', ')}: Horários inválidos.`);
+            } else {
+                errors.push(`${invalidTimes.length} dias com horários inválidos: ${invalidTimes.slice(0, 2).join(', ')} e mais.`);
+            }
+        }
 
         return errors;
     }

@@ -21,7 +21,7 @@ function isValidOrderId(orderId) {
  * @returns {boolean} True se válido
  */
 function isValidStatus(status) {
-    const validStatuses = ['pending', 'preparing', 'ready', 'on_the_way', 'delivered', 'paid', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'preparing', 'ready', 'in_progress', 'on_the_way', 'delivered', 'paid', 'completed', 'cancelled'];
     return typeof status === 'string' && validStatuses.includes(status);
 }
 
@@ -32,7 +32,7 @@ function isValidStatus(status) {
  * @param {Array} orderData.items - Itens do pedido
  * @param {string} orderData.payment_method - Método de pagamento
  * @param {string} [orderData.notes] - Observações
- * @param {number} [orderData.change_for_amount] - Troco para
+ * @param {number} [orderData.amount_paid] - Valor pago (obrigatório para pagamento em dinheiro, API calcula troco automaticamente)
  * @param {string} [orderData.cpf_on_invoice] - CPF na nota
  * @param {number} [orderData.points_to_redeem] - Pontos para resgatar
  * @param {boolean} [orderData.use_cart] - Usar carrinho
@@ -44,15 +44,12 @@ export async function createOrder(orderData) {
             throw new Error('Dados do pedido são obrigatórios');
         }
 
-        // Validar address_id: se order_type for 'pickup', não deve estar presente
-        // Caso contrário, deve ser um ID válido
+        // Validar e tratar address_id conforme order_type
         if (orderData.order_type === 'pickup') {
-            // Para pickup, remover address_id se estiver presente
-            if (orderData.address_id !== undefined) {
-                delete orderData.address_id;
-            }
+            // Para pickup, remover address_id completamente (backend não espera este campo)
+            delete orderData.address_id;
         } else {
-            // Para delivery, address_id é obrigatório e deve ser válido
+            // Para delivery, address_id é obrigatório
             if (!isValidOrderId(orderData.address_id)) {
                 throw new Error('ID do endereço inválido');
             }
@@ -66,9 +63,31 @@ export async function createOrder(orderData) {
             throw new Error('Itens do pedido são obrigatórios quando não usar carrinho');
         }
 
+        // Limpar campos undefined e normalizar tipos antes de enviar
+        const cleanedOrderData = {};
+        for (const key in orderData) {
+            if (orderData[key] !== undefined) {
+                // Para pickup, garantir que address_id não esteja presente (já removido acima, mas dupla verificação)
+                if (orderData.order_type === 'pickup' && key === 'address_id') {
+                    continue;
+                }
+                
+                // Normalizar amount_paid para número (evitar envio como string)
+                if (key === 'amount_paid' && orderData[key] !== null) {
+                    cleanedOrderData[key] = parseFloat(orderData[key]);
+                    // Validar conversão
+                    if (isNaN(cleanedOrderData[key])) {
+                        throw new Error('Valor pago inválido');
+                    }
+                } else {
+                    cleanedOrderData[key] = orderData[key];
+                }
+            }
+        }
+
         const data = await apiRequest('/api/orders/', {
             method: 'POST',
-            body: orderData
+            body: cleanedOrderData
         });
 
         return {
@@ -76,10 +95,34 @@ export async function createOrder(orderData) {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao criar pedido:', error.message);
+        // Extrair mensagem de erro mais específica se disponível
+        let errorMessage = error.message || 'Erro interno do servidor';
+        
+        // Tentar extrair mensagem do payload do erro (vindo do apiRequest)
+        if (error.payload && error.payload.error) {
+            errorMessage = error.payload.error;
+        } else if (error.error) {
+            errorMessage = error.error;
+        } else if (typeof error === 'object' && error.data && error.data.error) {
+            errorMessage = error.data.error;
+        }
+        
+        // Detectar erro de migração do banco e ajustar mensagem
+        if (error.status === 500) {
+            const errorMsgLower = errorMessage.toLowerCase();
+            const isMigrationError = errorMsgLower.includes('change_for_amount') || 
+                errorMsgLower.includes('column') || 
+                errorMsgLower.includes('migração') ||
+                errorMsgLower.includes('alter table');
+            
+            if (isMigrationError) {
+                errorMessage = 'Erro no banco de dados: Coluna CHANGE_FOR_AMOUNT não existe. Execute a migração SQL no banco de dados.';
+            }
+        }
+        
         return {
             success: false,
-            error: error.message
+            error: errorMessage
         };
     }
 }
@@ -131,9 +174,7 @@ export async function calculateOrderTotal(items, points_to_redeem = 0, order_typ
  */
 export async function getMyOrders() {
     try {
-        const data = await apiRequest('/api/orders/', {
-            method: 'GET'
-        });
+        const data = await apiRequest('/api/orders/', { method: 'GET' });
 
         return {
             success: true,
@@ -294,6 +335,7 @@ export function formatOrderStatus(status) {
         'pending': 'Pendente',
         'preparing': 'Preparando',
         'ready': 'Pronto',
+        'in_progress': 'Pronto', // Fallback do backend quando 'ready' não está na constraint
         'on_the_way': 'Saiu para entrega',
         'delivered': 'Entregue',
         'paid': 'Pago',

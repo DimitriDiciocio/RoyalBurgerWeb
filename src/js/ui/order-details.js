@@ -4,6 +4,9 @@
  */
 
 import { getOrderDetails, cancelOrder, formatOrderStatus, getStatusColor } from '../api/orders.js';
+import { getProductById, searchProducts } from '../api/products.js';
+import { getAddresses, getDefaultAddress } from '../api/address.js';
+import { getIngredients } from '../api/ingredients.js';
 
 // Importar helper de configurações
 // Importação estática garante que o módulo esteja disponível quando necessário
@@ -12,6 +15,20 @@ import * as settingsHelper from '../utils/settings-helper.js';
 // Importar sistema de alertas customizado
 import { showError, showSuccess } from './alerts.js';
 
+// Constantes
+const VISIBILITY_DELAY_MS = 500; // Delay para exibição de alerta antes de redirecionamento
+
+// Verificar se está em modo de desenvolvimento (browser-safe)
+const isDevelopment = () => {
+    try {
+        return window.location.hostname === 'localhost' || 
+               window.location.hostname === '127.0.0.1' ||
+               window.location.hostname.includes('.local');
+    } catch {
+        return false;
+    }
+};
+
 (function initOrderDetails() {
     if (!window.location.pathname.includes('info-pedido.html')) return;
 
@@ -19,7 +36,8 @@ import { showError, showSuccess } from './alerts.js';
         order: null,
         orderId: null,
         loading: false,
-        error: null
+        error: null,
+        ingredientsCache: null // Cache para preços dos ingredientes
     };
 
     // Refs DOM
@@ -28,6 +46,9 @@ import { showError, showSuccess } from './alerts.js';
     // Inicializar elementos DOM
     function initElements() {
         el = {
+            // Navegação
+            btnVoltar: document.querySelector('.voltar'),
+
             // Status e progresso
             orderStatusMessage: document.getElementById('order-status-message'),
             stepPending: document.getElementById('step-pending'),
@@ -41,6 +62,7 @@ import { showError, showSuccess } from './alerts.js';
             paymentPixIcon: document.getElementById('payment-pix-icon'),
             paymentCardIcon: document.getElementById('payment-card-icon'),
             paymentMoneyIcon: document.getElementById('payment-money-icon'),
+            changeAmount: document.getElementById('change-amount'),
 
             // Itens e resumo
             orderItems: document.getElementById('order-items'),
@@ -59,6 +81,112 @@ import { showError, showSuccess } from './alerts.js';
         };
     }
 
+    // Logger desativado (no-op)
+    function debugLog() {}
+
+    // Carregar ingredientes e criar mapa de preços
+    async function loadIngredientsCache() {
+        if (state.ingredientsCache) {
+            return state.ingredientsCache;
+        }
+
+        try {
+            const response = await getIngredients({ page_size: 1000 });
+            // Validar resposta antes de processar
+            if (response && Array.isArray(response.items) && response.items.length > 0) {
+                // Criar mapa de ID -> preço adicional (normalizar IDs como string)
+                state.ingredientsCache = {};
+                response.items.forEach(ingredient => {
+                    if (ingredient && ingredient.id != null) {
+                        // Normalizar ID para string para garantir busca consistente
+                        const id = String(ingredient.id);
+                        state.ingredientsCache[id] = {
+                            additional_price: parseFloat(ingredient.additional_price) || 0,
+                            price: parseFloat(ingredient.price) || 0,
+                            name: ingredient.name || ''
+                        };
+                    }
+                });
+                return state.ingredientsCache;
+            }
+            // Resposta vazia ou inválida - inicializar cache vazio
+            state.ingredientsCache = {};
+        } catch (error) {
+            // Log apenas em desenvolvimento - não expor detalhes em produção
+            if (isDevelopment()) {
+                console.error('Erro ao carregar ingredientes:', error);
+            }
+            state.ingredientsCache = {};
+        }
+        return state.ingredientsCache || {};
+    }
+
+    // Buscar preço adicional de um ingrediente pelo ID
+    // Valida tipo e existência antes de buscar no cache
+    function getIngredientPrice(ingredientId) {
+        if (!state.ingredientsCache || !ingredientId) {
+            return 0;
+        }
+        // Normalizar ID para string (algumas APIs retornam number, outras string)
+        const normalizedId = String(ingredientId);
+        const ingredient = state.ingredientsCache[normalizedId];
+        // Retornar additional_price (preço quando adicionado como extra)
+        return ingredient ? (ingredient.additional_price || 0) : 0;
+    }
+
+    /**
+     * Buscar preço de ingrediente a partir de múltiplas fontes
+     * Extrai lógica duplicada para evitar repetição de código
+     * @param {Object} ingredientData - Dados do ingrediente (extra ou base_modification)
+     * @param {string|number} ingredientId - ID do ingrediente
+     * @returns {number} Preço encontrado ou 0
+     */
+    function findIngredientPrice(ingredientData, ingredientId) {
+        // Primeiro tentar cache se tiver ID
+        if (ingredientId) {
+            const cachedPrice = getIngredientPrice(ingredientId);
+            if (cachedPrice > 0) {
+                return cachedPrice;
+            }
+        }
+
+        // Tentar nos dados do ingrediente
+        const priceCandidates = [
+            ingredientData.ingredient_price,
+            ingredientData.price,
+            ingredientData.additional_price,
+            ingredientData.unit_price,
+            ingredientData.preco,
+            ingredientData.valor
+        ];
+
+        for (const candidate of priceCandidates) {
+            if (candidate !== undefined && candidate !== null) {
+                const priceNum = parseFloat(candidate);
+                if (!isNaN(priceNum) && priceNum > 0) {
+                    return priceNum;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    // Handler global para erro de imagem (log + placeholder)
+    function handleImageError(imgEl) {
+        try {
+            debugLog('Falha ao carregar imagem do item', { src: imgEl?.src });
+        } catch (_) {}
+        if (imgEl && imgEl.outerHTML) {
+            imgEl.outerHTML = "<div class='imagem-placeholder'><i class='fa-solid fa-image'></i><p>Sem imagem</p></div>";
+        }
+    }
+    // Disponibilizar no escopo global para uso no atributo onerror do <img>
+    // REVISAR: Considerar usar addEventListener ao invés de atributo onerror inline
+    if (typeof window !== 'undefined') {
+        window._rbImgErr = handleImageError;
+    }
+
     // Obter ID do pedido da URL
     function getOrderIdFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -74,6 +202,20 @@ import { showError, showSuccess } from './alerts.js';
             const result = await getOrderDetails(orderId);
             if (result.success) {
                 state.order = result.data;
+                // Enriquecer itens com dados do produto (imagem) quando necessário
+                try {
+                    if (Array.isArray(state.order?.items) && state.order.items.length > 0) {
+                        state.order.items = await enrichItemsWithProductData(state.order.items);
+                    }
+                } catch (e) {
+                    debugLog('Falha ao enriquecer itens com dados do produto', e?.message);
+                }
+                // Enriquecer endereço quando ausente no retorno do pedido
+                try {
+                    state.order = await enrichOrderAddressIfMissing(state.order);
+                } catch (e) {
+                    // silencioso
+                }
                 renderOrderDetails();
             } else {
                 state.error = result.error;
@@ -85,6 +227,124 @@ import { showError, showSuccess } from './alerts.js';
         } finally {
             state.loading = false;
         }
+    }
+
+    // Enriquecer itens com imagem do produto quando faltarem caminhos de imagem no item
+    async function enrichItemsWithProductData(items) {
+        const enriched = await Promise.allSettled(items.map(async (item) => {
+            try {
+                const candidates = [
+                    item?.product?.image_url,
+                    item?.product?.image,
+                    item?.product_image_url,
+                    item?.image_url,
+                    item?.image,
+                    item?.product?.imagePath,
+                    item?.product?.image_path
+                ];
+                const hasImage = candidates.some(Boolean);
+                if (hasImage) return item;
+
+                const productId = item?.product_id || item?.product?.id;
+                if (!productId) {
+                    // Fallback por nome do produto
+                    const name = item?.product_name || item?.product?.name;
+                    if (!name) return item;
+                    debugLog('Sem product_id, buscando por nome', { name });
+                    try {
+                        const resp = await searchProducts({ name });
+                        const list = Array.isArray(resp?.items) ? resp.items : [];
+                        const match = list.find(p => String(p?.name || '').toLowerCase() === String(name).toLowerCase()) || list[0];
+                        if (match) {
+                            return {
+                                ...item,
+                                product: item.product || match,
+                                product_image_url: match.image_url || match.image || item.product_image_url,
+                                product_image_hash: match.image_hash || item.product_image_hash
+                            };
+                        }
+                    } catch (e) {
+                        debugLog('Erro ao buscar produto por nome', { error: e?.message });
+                    }
+                    return item;
+                }
+
+                debugLog('Buscando produto para obter imagem', { productId, productName: item?.product_name || item?.product?.name });
+                const product = await getProductById(productId);
+                if (product && (product.image_url || product.image)) {
+                    return {
+                        ...item,
+                        product: item.product || product,
+                        product_image_url: product.image_url || item.product_image_url,
+                        product_image_hash: product.image_hash || item.product_image_hash
+                    };
+                }
+                return item;
+            } catch (err) {
+                debugLog('Erro ao buscar produto por ID', { error: err?.message });
+                return item;
+            }
+        }));
+
+        // Performance: Evitar O(n²) - usar índices diretamente
+        return enriched.map((result, index) => 
+            result.status === 'fulfilled' ? result.value : items[index]
+        );
+    }
+
+    // Tentar resolver endereço do pedido quando API não retornar linhas de endereço
+    async function enrichOrderAddressIfMissing(order) {
+        const isPickupOrder = order?.order_type === 'pickup' || order?.delivery_type === 'pickup';
+        if (isPickupOrder) return order;
+
+        const hasAnyAddress = Boolean(order?.address || order?.delivery_address || order?.address_data);
+        if (hasAnyAddress) return order;
+
+        const addressId = order?.address_id || order?.delivery_address_id || order?.customer_address_id;
+        let chosenAddress = null;
+
+        try {
+            const list = await getAddresses();
+            if (Array.isArray(list) && list.length > 0) {
+                if (addressId) {
+                    chosenAddress = list.find(a => String(a.id) === String(addressId)) || null;
+                }
+                // Fallback: usar endereço padrão
+                if (!chosenAddress) {
+                    chosenAddress = list.find(a => a.is_default) || list[0] || null;
+                }
+            } else {
+                // Segundo fallback: tentar pegar default direto
+                chosenAddress = await getDefaultAddress();
+            }
+        } catch (_) {}
+
+        if (chosenAddress) {
+            const mainParts = [];
+            if (chosenAddress.street) mainParts.push(chosenAddress.street);
+            if (chosenAddress.number) mainParts.push(chosenAddress.number);
+            if (chosenAddress.complement) mainParts.push(chosenAddress.complement);
+            const mainLine = (mainParts.join(', ') || chosenAddress.delivery_address || chosenAddress.address || 'Endereço não informado').trim();
+
+            const addrData = {
+                street: chosenAddress.street,
+                number: chosenAddress.number,
+                complement: chosenAddress.complement,
+                neighborhood: chosenAddress.neighborhood || chosenAddress.district,
+                city: chosenAddress.city,
+                state: chosenAddress.state,
+                zip_code: chosenAddress.zip_code,
+                delivery_address: mainLine
+            };
+            return {
+                ...order,
+                address: mainLine,
+                address_data: addrData,
+                delivery_address: mainLine
+            };
+        }
+
+        return order;
     }
 
     // Renderizar detalhes do pedido
@@ -101,6 +361,9 @@ import { showError, showSuccess } from './alerts.js';
         
         // Renderizar itens
         renderOrderItems(order.items || []);
+        
+        // Renderizar observações do pedido
+        renderOrderNotes(order);
         
         // Atualizar resumo financeiro
         updateOrderSummary(order);
@@ -167,24 +430,81 @@ import { showError, showSuccess } from './alerts.js';
         }
     }
 
-    // Atualizar informações do pedido
-    function updateOrderInfo(order) {
-        // Endereço (simulado - seria necessário buscar dados do endereço)
-        if (el.orderAddress) {
-            el.orderAddress.textContent = order.address || 'Endereço não informado';
-        }
-        if (el.orderNeighborhood) {
-            el.orderNeighborhood.textContent = 'Bairro - Cidade';
-        }
-
-        // Método de pagamento
-        const paymentMethods = {
-            'pix': { text: 'PIX', icon: 'payment-pix-icon' },
-            'cartao': { text: 'Cartão', icon: 'payment-card-icon' },
-            'dinheiro': { text: 'Dinheiro', icon: 'payment-money-icon' }
+    // Extrair endereço do pedido de forma robusta (diferentes formatos da API)
+    function extractOrderAddressInfo(order) {
+        const addr = order?.address_data || {};
+        const lines = {
+            street: addr.street || order?.street || order?.delivery_street || null,
+            number: addr.number || order?.number || order?.delivery_number || null,
+            complement: addr.complement || order?.complement || order?.delivery_complement || null,
+            neighborhood: addr.neighborhood || order?.neighborhood || order?.delivery_neighborhood || null,
+            city: addr.city || order?.city || order?.delivery_city || null,
+            state: addr.state || order?.state || order?.delivery_state || null,
+            full: addr.delivery_address || order?.delivery_address || order?.address || null
         };
 
-        const payment = paymentMethods[order.payment_method] || paymentMethods['pix'];
+        // Linha principal
+        let mainLine = '';
+        if (lines.full) {
+            mainLine = lines.full;
+        } else {
+            const parts = [];
+            if (lines.street) parts.push(lines.street);
+            if (lines.number) parts.push(lines.number);
+            if (lines.complement) parts.push(lines.complement);
+            mainLine = parts.join(', ');
+        }
+        if (!mainLine || mainLine.trim() === '') mainLine = 'Endereço não informado';
+
+        // Linha secundária (bairro - cidade[/UF])
+        const subParts = [];
+        if (lines.neighborhood) subParts.push(lines.neighborhood);
+        if (lines.city) subParts.push(lines.city + (lines.state ? '/' + lines.state : ''));
+        let subLine = subParts.length > 0 ? subParts.join(' - ') : 'Localização não informada';
+
+        return { mainLine, subLine };
+    }
+
+    // Atualizar informações do pedido
+    function updateOrderInfo(order) {
+        // Verificar se é pickup
+        const isPickup = order.order_type === 'pickup' || order.delivery_type === 'pickup';
+        
+        // Formatar endereço
+        if (isPickup) {
+            if (el.orderAddress) {
+                el.orderAddress.textContent = 'Retirada no balcão';
+            }
+            if (el.orderNeighborhood) {
+                el.orderNeighborhood.textContent = 'Balcão - Retirada na loja';
+            }
+        } else {
+            const { mainLine, subLine } = extractOrderAddressInfo(order);
+            if (el.orderAddress) {
+                el.orderAddress.textContent = mainLine;
+            }
+            if (el.orderNeighborhood) {
+                el.orderNeighborhood.textContent = subLine;
+            }
+        }
+
+        // Método de pagamento (normalizado + ícone)
+        const normalizePaymentMethod = (raw) => {
+            const m = String(raw || '').toLowerCase();
+            if (!m) return 'pix';
+            if (m.includes('pix')) return 'pix';
+            if (m.includes('card') || m.includes('cart') || m.includes('credit') || m.includes('debit')) return 'card';
+            if (m.includes('din') || m.includes('cash') || m.includes('money')) return 'money';
+            return 'pix';
+        };
+
+        const methodKey = normalizePaymentMethod(order.payment_method);
+        const paymentConfig = {
+            pix:   { text: 'PIX',      elKey: 'paymentPixIcon'   },
+            card:  { text: 'Cartão',   elKey: 'paymentCardIcon'  },
+            money: { text: 'Dinheiro', elKey: 'paymentMoneyIcon' }
+        };
+        const payment = paymentConfig[methodKey] || paymentConfig.pix;
 
         if (el.paymentMethod) {
             el.paymentMethod.textContent = payment.text;
@@ -195,10 +515,135 @@ import { showError, showSuccess } from './alerts.js';
         if (el.paymentCardIcon) el.paymentCardIcon.style.display = 'none';
         if (el.paymentMoneyIcon) el.paymentMoneyIcon.style.display = 'none';
 
-        const iconElement = el[payment.icon];
+        const iconElement = el[payment.elKey];
         if (iconElement) {
             iconElement.style.display = 'flex';
         }
+
+        // Exibir troco se o método de pagamento for dinheiro e houver valor de troco
+        if (el.changeAmount) {
+            if (methodKey === 'money') {
+                // Buscar valor do troco retornado pela API (já calculado pelo backend)
+                // A API retorna change_for_amount que é calculado como: amount_paid - total_amount
+                let changeValue = order.change_for_amount ?? null;
+                
+                // Fallback: calcular troco se tiver amount_paid e total_amount
+                if (changeValue === null && order.amount_paid && order.total_amount) {
+                    const amountPaid = parseFloat(order.amount_paid);
+                    const totalAmount = parseFloat(order.total_amount);
+                    if (!isNaN(amountPaid) && !isNaN(totalAmount) && amountPaid > totalAmount) {
+                        changeValue = amountPaid - totalAmount;
+                    }
+                }
+                
+                if (changeValue !== null && changeValue !== undefined) {
+                    const changeNum = parseFloat(changeValue);
+                    if (!isNaN(changeNum) && changeNum > 0) {
+                        // Formatar valor do troco em R$
+                        const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { 
+                            style: 'currency', 
+                            currency: 'BRL' 
+                        }).format(v || 0);
+                        el.changeAmount.textContent = `Troco: ${formatBRL(changeNum)}`;
+                        el.changeAmount.style.display = 'block';
+                    } else {
+                        el.changeAmount.style.display = 'none';
+                    }
+                } else {
+                    el.changeAmount.style.display = 'none';
+                }
+            } else {
+                // Ocultar troco se não for dinheiro
+                el.changeAmount.style.display = 'none';
+            }
+        }
+
+        debugLog('Pagamento', { raw: order.payment_method, normalized: methodKey, shownIcon: payment.elKey });
+    }
+
+    /**
+     * Renderizar HTML dos extras do item
+     * Extraído para melhorar legibilidade
+     * @param {Array} extras - Array de extras
+     * @returns {string} HTML dos extras
+     */
+    function renderItemExtras(extras) {
+        if (!extras || extras.length === 0) {
+            return '';
+        }
+
+        const extrasItems = extras.map(extra => {
+            const nome = extra.ingredient_name || extra.name || extra.title || extra.nome || 'Ingrediente';
+            const quantidade = parseInt(extra.quantity ?? extra.qty ?? extra.quantidade ?? 0, 10) || 0;
+            const ingredientId = extra.ingredient_id || extra.id;
+            
+            // Buscar preço usando função centralizada
+            const preco = findIngredientPrice(extra, ingredientId);
+            
+            // Formatar preço se houver
+            const precoFormatado = preco > 0 ? ` <span class="extra-price">+R$ ${preco.toFixed(2).replace('.', ',')}</span>` : '';
+            
+            return `<li><span class="extra-quantity-badge">${quantidade}</span> <span class="extra-name">${escapeHTML(nome)}</span>${precoFormatado}</li>`;
+        }).join('');
+
+        return `
+            <div class="item-extras-separator"></div>
+            <div class="item-extras-list">
+                <strong>Extras:</strong>
+                <ul>
+                    ${extrasItems}
+                </ul>
+            </div>
+        `;
+    }
+
+    /**
+     * Renderizar HTML das modificações da receita base
+     * Extraído para melhorar legibilidade
+     * @param {Array} baseMods - Array de modificações base
+     * @returns {string} HTML das modificações
+     */
+    function renderItemBaseModifications(baseMods) {
+        if (!baseMods || baseMods.length === 0) {
+            return '';
+        }
+
+        const baseModsItems = baseMods.map(bm => {
+            const nome = bm.ingredient_name || bm.name || bm.nome || 'Ingrediente';
+            const delta = parseInt(bm.delta ?? 0, 10) || 0;
+            const ingredientId = bm.ingredient_id || bm.id;
+            
+            // Buscar preço usando função centralizada
+            const preco = findIngredientPrice(bm, ingredientId);
+            
+            const isPositive = delta > 0;
+            const icon = isPositive ? 'plus' : 'minus';
+            const colorClass = isPositive ? 'mod-add' : 'mod-remove';
+            const deltaValue = Math.abs(delta);
+            
+            // Formatar preço se houver (apenas para adições, remoções não têm custo)
+            const precoFormatado = (preco > 0 && isPositive) ? ` <span class="base-mod-price">+R$ ${preco.toFixed(2).replace('.', ',')}</span>` : '';
+            
+            return `
+                <li>
+                    <span class="base-mod-icon ${colorClass}">
+                        <i class="fa-solid fa-circle-${icon}"></i>
+                    </span>
+                    <span class="base-mod-quantity">${deltaValue}</span>
+                    <span class="base-mod-name">${escapeHTML(nome)}</span>${precoFormatado}
+                </li>
+            `;
+        }).join('');
+
+        return `
+            <div class="item-extras-separator"></div>
+            <div class="item-base-mods-list">
+                <strong>Modificações:</strong>
+                <ul>
+                    ${baseModsItems}
+                </ul>
+            </div>
+        `;
     }
 
     // Renderizar itens do pedido
@@ -211,22 +656,80 @@ import { showError, showSuccess } from './alerts.js';
         }
 
         const itemsHtml = items.map(item => {
-            let extrasHtml = '';
-            if (item.extras && item.extras.length > 0) {
-                extrasHtml = `
-                    <p class="adicional">+ ${item.extras.length} adicional(is)</p>
-                `;
+            const extras = item.extras || item.additional_items || [];
+            const baseMods = item.base_modifications || [];
+            
+            // Renderizar extras e modificações usando funções auxiliares
+            let extrasHtml = renderItemExtras(extras);
+            extrasHtml += renderItemBaseModifications(baseMods);
+
+            // Construir URL da imagem a partir de múltiplas possibilidades ou usar placeholder
+            const imagePathCandidates = [
+                item?.product?.image_url,
+                item?.product?.image,
+                item?.product_image_url,
+                item?.image_url,
+                item?.image,
+                item?.product?.imagePath,
+                item?.product?.image_path
+            ];
+            const imageHashCandidates = [
+                item?.product?.image_hash,
+                item?.product_image_hash,
+                item?.image_hash,
+                item?.product?.imageHash
+            ];
+            const selectedImagePath = imagePathCandidates.find(Boolean);
+            const selectedImageHash = imageHashCandidates.find(Boolean);
+
+            let imageHtml = '';
+            if (selectedImagePath) {
+                const builtUrl = buildImageUrl(selectedImagePath, selectedImageHash);
+                debugLog('Imagem do item', {
+                    productName: item?.product_name || item?.product?.name,
+                    candidates: imagePathCandidates,
+                    selected: selectedImagePath,
+                    hash: selectedImageHash,
+                    builtUrl
+                });
+                if (builtUrl) {
+                    const altText = escapeHTML(item.product_name || item.product?.name || 'Produto');
+                    // SECURITY: URL é validada por buildImageUrl, mas escapeHTML no alt previne XSS
+                    imageHtml = `<img src="${escapeHTML(builtUrl)}" alt="${altText}" loading="lazy" onerror="window._rbImgErr && window._rbImgErr(this)">`;
+                } else {
+                    debugLog('buildImageUrl retornou vazio, usando placeholder');
+                    imageHtml = `<div class="imagem-placeholder"><i class="fa-solid fa-image"></i><p>Sem imagem</p></div>`;
+                }
+            } else {
+                debugLog('Nenhum caminho de imagem válido encontrado para o item', {
+                    productName: item?.product_name || item?.product?.name,
+                    candidates: imagePathCandidates
+                });
+                imageHtml = `<div class="imagem-placeholder"><i class="fa-solid fa-image"></i><p>Sem imagem</p></div>`;
             }
 
+            // Calcular preço total do item com fallback seguro
+            const unitPrice = parseFloat(item.unit_price) || 0;
+            const quantity = parseInt(item.quantity, 10) || 1;
+            const itemSubtotal = parseFloat(item.item_subtotal) || parseFloat(item.subtotal) || 0;
+            const itemTotal = itemSubtotal > 0 ? itemSubtotal : (unitPrice * quantity);
+
             return `
-                <div class="quadro-produto">
-                    <img src="../assets/img/tudo.jpeg" alt="${item.product_name}">
-                    <div>
-                        <p class="nome">${item.product_name}</p>
-                        <p class="descricao">${item.product_description || ''}</p>
-                        ${extrasHtml}
+                <div class="item">
+                    <div class="item-header">
+                        <div class="item-image">
+                            ${imageHtml}
+                        </div>
+                        <div class="item-header-info">
+                            <p class="nome">${escapeHTML(item.product_name || item.product?.name || 'Produto')}</p>
+                            <p class="descricao">${escapeHTML(item.product_description || item.product?.description || '')}</p>
+                        </div>
                     </div>
-                    <p class="preco">R$ ${(item.unit_price * item.quantity).toFixed(2).replace('.', ',')}</p>
+                    ${extrasHtml}
+                    <div class="item-footer">
+                        <p class="item-preco">R$ ${itemTotal.toFixed(2).replace('.', ',')}</p>
+                        <p class="item-quantidade">Qtd: ${item.quantity || 1}</p>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -234,20 +737,151 @@ import { showError, showSuccess } from './alerts.js';
         el.orderItems.innerHTML = itemsHtml;
     }
 
+    // Renderizar observações do pedido (notas gerais, não por item)
+    function renderOrderNotes(order) {
+        if (!order) return;
+        
+        const orderNotes = order.notes || order.observacao;
+        
+        // Criar ou atualizar elemento de observações do pedido
+        let notesContainer = document.getElementById('order-notes-container');
+        
+        if (!orderNotes || String(orderNotes).trim() === '') {
+            // Remover se não houver notas
+            if (notesContainer) {
+                notesContainer.remove();
+            }
+            return;
+        }
+
+        // Criar container se não existir
+        if (!notesContainer) {
+            notesContainer = document.createElement('div');
+            notesContainer.id = 'order-notes-container';
+            notesContainer.className = 'order-notes-section';
+            
+            // Inserir após os itens do pedido
+            if (el.orderItems && el.orderItems.parentElement) {
+                // Inserir após orderItems
+                el.orderItems.parentElement.insertBefore(notesContainer, el.orderItems.nextSibling);
+            } else if (el.orderItems) {
+                // Fallback: adicionar como próximo elemento
+                el.orderItems.after(notesContainer);
+            }
+        }
+
+        notesContainer.innerHTML = `
+            <div class="item-observacao order-level-notes">
+                <strong>Observação do Pedido:</strong> ${escapeHTML(String(orderNotes).trim())}
+            </div>
+        `;
+    }
+
+    // Função auxiliar para escapar HTML
+    function escapeHTML(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Função auxiliar para construir URL da imagem
+    function buildImageUrl(imagePath, imageHash = null) {
+        if (!imagePath) return null;
+        
+        // Validar que imagePath é string antes de processar
+        const pathStr = String(imagePath);
+        
+        // SECURITY: Validar que não contém caracteres perigosos
+        if (/[<>"']/.test(pathStr)) {
+            if (isDevelopment()) {
+                console.warn('Caminho de imagem contém caracteres inválidos:', pathStr);
+            }
+            return null;
+        }
+        
+        // Se já é uma URL completa, usar diretamente (após validação)
+        if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
+            debugLog('URL de imagem já completa, usando diretamente', pathStr);
+            return pathStr;
+        }
+        
+        // URL base dinâmica baseada na origem atual
+        const currentOrigin = window.location.origin;
+        let baseUrl;
+        
+        // Se estamos em localhost, usar localhost:5000
+        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
+            baseUrl = 'http://localhost:5000';
+        } else {
+            // Para outros ambientes, usar a mesma origem mas porta 5000
+            const hostname = window.location.hostname;
+            baseUrl = `http://${hostname}:5000`;
+        }
+        
+        // Usa hash da imagem se disponível, senão usa timestamp
+        const cacheParam = imageHash || new Date().getTime();
+        
+        // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
+        if (pathStr.startsWith('/api/uploads/products/')) {
+            const url = `${baseUrl}${pathStr}?v=${cacheParam}`;
+            debugLog('Imagem via /api/uploads/products', { imagePath: pathStr, url });
+            return url;
+        }
+        
+        // Se é um caminho antigo (/uploads/products/ID.jpeg)
+        if (pathStr.startsWith('/uploads/products/')) {
+            const url = `${baseUrl}${pathStr.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
+            debugLog('Imagem via /uploads/products (ajustada p/ /api/uploads/)', { imagePath: pathStr, url });
+            return url;
+        }
+        
+        // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
+        if (pathStr.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
+            const url = `${baseUrl}/api/uploads/products/${pathStr}?v=${cacheParam}`;
+            debugLog('Imagem via nome de arquivo simples', { imagePath: pathStr, url });
+            return url;
+        }
+        
+        // Fallback: assumir que é um caminho relativo (após validação básica)
+        const fallbackUrl = `${baseUrl}/api/uploads/products/${pathStr}?v=${cacheParam}`;
+        debugLog('Imagem via fallback relativo', { imagePath: pathStr, fallbackUrl });
+        return fallbackUrl;
+    }
+
     // Atualizar resumo financeiro
     async function updateOrderSummary(order) {
         // Priorizar valores vindos da API se disponíveis
         const subtotal = order.subtotal !== undefined ? order.subtotal : 
-                         (order.items ? order.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) : 0);
+                         (order.items ? order.items.reduce((sum, item) => {
+                             const itemPrice = parseFloat(item.unit_price) || 0;
+                             const itemQty = parseInt(item.quantity, 10) || 1;
+                             return sum + (itemPrice * itemQty);
+                         }, 0) : 0);
             
-        // Usar taxa de entrega da configuração (fallback para 5.00 se API falhar)
-        let deliveryFee = 5.00;
-        if (settingsHelper && typeof settingsHelper.getDeliveryFee === 'function') {
+        // Usar taxa de entrega da API se disponível, senão da configuração, senão 0
+        let deliveryFee = 0;
+        
+        // Verificar se a API já retornou a taxa de entrega
+        if (order.delivery_fee !== undefined && order.delivery_fee !== null) {
+            deliveryFee = parseFloat(order.delivery_fee) || 0;
+        } else if (order.fees !== undefined && order.fees !== null) {
+            deliveryFee = parseFloat(order.fees) || 0;
+        } else if (settingsHelper && typeof settingsHelper.getDeliveryFee === 'function') {
             try {
                 deliveryFee = await settingsHelper.getDeliveryFee();
             } catch (error) {
-                console.warn('Usando taxa de entrega padrão:', error.message);
+                // Log apenas em desenvolvimento
+                if (isDevelopment()) {
+                    console.warn('Usando taxa de entrega padrão:', error.message);
+                }
             }
+        }
+        
+        // Verificar se é pickup - não deve cobrar taxa de entrega
+        const isPickup = order.order_type === 'pickup' || order.delivery_type === 'pickup';
+        if (isPickup) {
+            deliveryFee = 0;
         }
         
         // Usar desconto da API se disponível
@@ -312,9 +946,6 @@ import { showError, showSuccess } from './alerts.js';
         }
         if (el.totalValue) {
             el.totalValue.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
-        }
-        if (el.pointsEarned) {
-            el.pointsEarned.textContent = pointsEarned;
         }
 
         // Mostrar/esconder linha de desconto
@@ -385,6 +1016,13 @@ import { showError, showSuccess } from './alerts.js';
 
     // Anexar eventos
     function attachEvents() {
+        // Botão voltar - redireciona para histórico de pedidos
+        if (el.btnVoltar) {
+            el.btnVoltar.addEventListener('click', () => {
+                window.location.href = 'hist-pedidos.html';
+            });
+        }
+
         // Botão cancelar pedido
         if (el.btnCancelOrder) {
             el.btnCancelOrder.addEventListener('click', () => {
@@ -428,7 +1066,7 @@ import { showError, showSuccess } from './alerts.js';
             // Pequeno delay para permitir exibição do alerta antes do redirecionamento
             setTimeout(() => {
                 window.location.href = 'login.html';
-            }, 500);
+            }, VISIBILITY_DELAY_MS);
             return false;
         }
         return true;
@@ -436,11 +1074,17 @@ import { showError, showSuccess } from './alerts.js';
 
     // Inicializar
     async function init() {
-        if (!checkUserLogin()) return;
+        debugLog('DOMContentLoaded -> init() chamado');
+        if (!checkUserLogin()) {
+            debugLog('Usuário não logado, abortando init');
+            return;
+        }
 
         const orderId = getOrderIdFromUrl();
+        debugLog('orderId extraído da URL', { orderId, search: window.location.search });
         if (!orderId) {
             showError('ID do pedido não encontrado na URL.');
+            try { debugLog('Redirecionando para histórico de pedidos'); } catch(_) {}
             window.location.href = 'hist-pedidos.html';
             return;
         }
@@ -448,9 +1092,15 @@ import { showError, showSuccess } from './alerts.js';
         state.orderId = orderId;
         initElements();
         attachEvents();
+        
+        // Carregar cache de ingredientes antes de carregar o pedido
+        await loadIngredientsCache();
+        
         await loadOrderDetails(orderId);
     }
 
     // Inicializar quando DOM estiver pronto
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        init();
+    });
 })();

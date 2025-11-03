@@ -367,6 +367,17 @@
     line-height: 1;
 }
 
+.extra-name {
+    flex: 1;
+}
+
+.extra-price {
+    font-size: 0.8rem;
+    color: #4caf50;
+    font-weight: 600;
+    margin-left: auto;
+}
+
 /* Estilos para modificações da receita base */
 .item-base-mods-list {
     padding: 0;
@@ -425,6 +436,13 @@
 
 .base-mod-name {
     flex: 1;
+}
+
+.base-mod-price {
+    font-size: 0.8rem;
+    color: #4caf50;
+    font-weight: 600;
+    margin-left: auto;
 }
 
 /* Observação */

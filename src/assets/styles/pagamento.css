@@ -132,8 +132,9 @@ main{
             }
 
             & .formas-pagamento{
-                display: flex;
-                justify-content: space-between;
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
                 margin: 0px 20px 20px 20px;
 
                 & .quadro-forma{
@@ -357,6 +358,17 @@ main{
                                     flex-shrink: 0;
                                     line-height: 1;
                                 }
+
+                                & .extra-name {
+                                    flex: 1;
+                                }
+
+                                & .extra-price {
+                                    font-size: 0.8rem;
+                                    color: #4caf50;
+                                    font-weight: 600;
+                                    margin-left: auto;
+                                }
                             }
                         }
                     }
@@ -416,6 +428,13 @@ main{
                                 & .base-mod-name {
                                     flex: 1;
                                     color: #757575;
+                                }
+
+                                & .base-mod-price {
+                                    font-size: 0.8rem;
+                                    color: #4caf50;
+                                    font-weight: 600;
+                                    margin-left: auto;
                                 }
                             }
                         }

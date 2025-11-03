@@ -3,6 +3,7 @@
 
 import { showConfirm, showError, showToast } from './alerts.js';
 import { getCart, updateCartItem, removeCartItem, clearCart, claimGuestCart } from '../api/cart.js';
+import { getIngredients } from '../api/ingredients.js';
 
 // Importar helper de configurações
 // Importação estática garante que o módulo esteja disponível quando necessário
@@ -21,7 +22,8 @@ const state = {
     taxaEntrega: 5.00, // Fallback padrão (será carregado dinamicamente)
     descontos: 0.00,
     subtotal: 0,
-    total: 0
+    total: 0,
+    ingredientsCache: null // Cache para preços dos ingredientes
 };
 
 // Refs DOM
@@ -49,6 +51,57 @@ const el = {
 
 // Utils
 const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+
+// Carregar ingredientes e criar mapa de preços
+async function loadIngredientsCache() {
+    if (state.ingredientsCache) {
+        return state.ingredientsCache;
+    }
+
+    try {
+        const response = await getIngredients({ page_size: 1000 });
+        // Validar resposta antes de processar
+        if (response && Array.isArray(response.items) && response.items.length > 0) {
+            // Criar mapa de ID -> preço adicional (normalizar IDs como string)
+            state.ingredientsCache = {};
+            response.items.forEach(ingredient => {
+                if (ingredient && ingredient.id != null) {
+                    // Normalizar ID para string para garantir busca consistente
+                    const id = String(ingredient.id);
+                    state.ingredientsCache[id] = {
+                        additional_price: parseFloat(ingredient.additional_price) || 0,
+                        price: parseFloat(ingredient.price) || 0,
+                        name: ingredient.name || ''
+                    };
+                }
+            });
+            return state.ingredientsCache;
+        }
+        // Resposta vazia ou inválida - inicializar cache vazio
+        state.ingredientsCache = {};
+    } catch (error) {
+        // Log apenas em desenvolvimento - não expor detalhes em produção
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.error('Erro ao carregar ingredientes:', error);
+        }
+        state.ingredientsCache = {};
+    }
+    return state.ingredientsCache || {};
+}
+
+// Buscar preço adicional de um ingrediente pelo ID
+// Valida tipo e existência antes de buscar no cache
+function getIngredientPrice(ingredientId) {
+    if (!state.ingredientsCache || !ingredientId) {
+        return 0;
+    }
+    // Normalizar ID para string (algumas APIs retornam number, outras string)
+    const normalizedId = String(ingredientId);
+    const ingredient = state.ingredientsCache[normalizedId];
+    // Retornar additional_price (preço quando adicionado como extra)
+    return ingredient ? (ingredient.additional_price || 0) : 0;
+}
 
 /**
  * Sanitiza texto para evitar XSS
@@ -180,7 +233,17 @@ async function carregarCesta() {
                 const extrasMapeados = (Array.isArray(rawExtras) ? rawExtras : []).map(extra => {
                     const id = extra.ingredient_id ?? extra.id;
                     const nome = extra.ingredient_name ?? extra.name ?? extra.title ?? 'Ingrediente';
-                    const preco = parseFloat(extra.ingredient_price ?? extra.price ?? extra.additional_price ?? 0) || 0;
+                    
+                    // Buscar preço do cache de ingredientes primeiro
+                    let preco = 0;
+                    if (id) {
+                        preco = getIngredientPrice(id);
+                    }
+                    // Se não encontrou no cache, tentar nos dados do extra
+                    if (preco === 0) {
+                        preco = parseFloat(extra.ingredient_price ?? extra.price ?? extra.additional_price ?? 0) || 0;
+                    }
+                    
                     const quantidade = parseInt(extra.quantity ?? extra.qty ?? 0, 10) || 0;
                     return { id, nome, preco, quantidade };
                 });
@@ -191,7 +254,14 @@ async function carregarCesta() {
                     const id = bm.ingredient_id ?? bm.id;
                     const nome = bm.ingredient_name ?? bm.name ?? 'Ingrediente';
                     const delta = parseInt(bm.delta ?? 0, 10) || 0;
-                    return { id, nome, delta };
+                    
+                    // Buscar preço do cache de ingredientes
+                    let preco = 0;
+                    if (id) {
+                        preco = getIngredientPrice(id);
+                    }
+                    
+                    return { id, nome, delta, preco };
                 });
 
                 const quantidade = parseInt(String(item.quantity || 1), 10);
@@ -315,6 +385,9 @@ function calcularTotais() {
     }, 0);
     
     // Taxa de entrega só é aplicada se houver itens na cesta
+    // NOTA: A modal da cesta sempre mostra a taxa de entrega porque é exibida ANTES
+    // da seleção do endereço. A verificação de "retirada no local" (pickup) que zera
+    // a taxa de entrega é feita na página de pagamento após selecionar o endereço.
     const taxaEntrega = state.itens.length > 0 ? state.taxaEntrega : 0;
     
     state.total = state.subtotal + taxaEntrega - state.descontos;
@@ -364,7 +437,15 @@ function renderItem(item, index) {
     let extrasHtml = '';
     if (item.extras && item.extras.length > 0) {
         const extrasItems = item.extras.map(extra => {
-            return `<li><span class="extra-quantity-badge">${extra.quantidade}</span> ${escapeHTML(extra.nome)}</li>`;
+            // Buscar preço do cache ou usar o preço já mapeado
+            let preco = extra.preco || 0;
+            if (preco === 0 && extra.id) {
+                preco = getIngredientPrice(extra.id);
+            }
+            
+            // Formatar preço se houver
+            const precoFormatado = preco > 0 ? ` <span class="extra-price">+R$ ${preco.toFixed(2).replace('.', ',')}</span>` : '';
+            return `<li><span class="extra-quantity-badge">${extra.quantidade}</span> <span class="extra-name">${escapeHTML(extra.nome)}</span>${precoFormatado}</li>`;
         }).join('');
         extrasHtml = `
             <div class="item-extras-separator"></div>
@@ -385,13 +466,17 @@ function renderItem(item, index) {
             const icon = isPositive ? '+' : '-';
             const colorClass = isPositive ? 'mod-add' : 'mod-remove';
             const deltaValue = Math.abs(bm.delta);
+            
+            // Formatar preço se houver (apenas para adições, remoções não têm custo)
+            const precoFormatado = (bm.preco > 0 && isPositive) ? ` <span class="base-mod-price">+R$ ${bm.preco.toFixed(2).replace('.', ',')}</span>` : '';
+            
             return `
                 <li>
                     <span class="base-mod-icon ${colorClass}">
                         <i class="fa-solid fa-circle-${isPositive ? 'plus' : 'minus'}"></i>
                     </span>
                     <span class="base-mod-quantity">${deltaValue}</span>
-                    <span class="base-mod-name">${escapeHTML(bm.nome)}</span>
+                    <span class="base-mod-name">${escapeHTML(bm.nome)}</span>${precoFormatado}
                 </li>
             `;
         }).join('');
@@ -833,6 +918,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('Usando taxa de entrega padrão:', error.message);
         }
     }
+    
+    // Carregar cache de ingredientes
+    await loadIngredientsCache();
     
     await carregarCesta();
     

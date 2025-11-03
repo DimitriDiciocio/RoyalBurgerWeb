@@ -20,6 +20,7 @@
     <script src="../js/ui/alerts.js" type="module" defer></script>
     <script src="../js/ui/imports.js" type="module" defer></script>
     <script src="../js/ui/modais.js" type="module" defer></script>
+    <script src="../js/ui/order-details.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -31,7 +32,7 @@
 
     <main>
         <section class="imagem-fundo">
-            <div class="voltar">
+            <div class="voltar" style="cursor: pointer;">
                 <i class="fa-solid fa-chevron-left"></i>
                 <p>Voltar</p>
             </div>
@@ -40,12 +41,12 @@
         <div class="teste">
             <section class="conteudo-1">
                 <div class="etapa">
-                    <p>Seu pedido está em rota de entrega!</p>
+                    <p id="order-status-message">Carregando pedido...</p>
 
                     <div class="etapas">
-                        <div class="etapa-1 completo"></div>
-                        <div class="etapa-2 completo"></div>
-                        <div class="etapa-3"></div>
+                        <div class="etapa-1" id="step-pending"></div>
+                        <div class="etapa-2" id="step-preparing"></div>
+                        <div class="etapa-3" id="step-delivered"></div>
                     </div>
                 </div>
 
@@ -54,48 +55,37 @@
                         <i class="fa-solid fa-location-dot"></i>
 
                         <div>
-                            <p>R. Antônio Simões, 4</p>
-                            <p>Centro  - Fateb</p>
+                            <p id="order-address">Carregando...</p>
+                            <p id="order-neighborhood">Carregando...</p>
                         </div>
                     </div>
 
                     <div>
-                        <i class="fa-brands fa-pix" style="display: flex;"></i>
-                        <i class="fa-solid fa-credit-card" style="display: none;"></i>
-                        <i class="fa-solid fa-money-bill" style="display: none;"></i>
+                        <i class="fa-brands fa-pix" id="payment-pix-icon" style="display: flex;"></i>
+                        <i class="fa-solid fa-credit-card" id="payment-card-icon" style="display: none;"></i>
+                        <i class="fa-solid fa-money-bill" id="payment-money-icon" style="display: none;"></i>
 
-                        <div>
-                            <p>Pagamento na entraga</p>
-                            <p>Pix</p>
+                        <div style="cursor: pointer; gap:0px">
+                            <p>Pagamento na entrega</p>
+                            <p id="payment-method">Carregando...</p>
+                            <p id="change-amount" style="display: none; color: #4caf50; font-weight: 600; margin-top: 2px;"></p>
                         </div>
                     </div>
                 </div>
             </section>
 
             <section class="conteudo-2">
-                <div class="produtos">
+                <div class="produtos" id="order-items">
                     <div class="quadro-produto">
-                        <img src="../assets/img/tudo.jpeg" alt="">
+                        <img src="" alt="">
 
                         <div>
-                            <p class="nome">Nome do produto</p>
-                            <p class="descricao">Descrição dos itens do produto</p>
-                            <p class="adicional">1 item adicional</p>
+                            <p class="nome">Carregando...</p>
+                            <p class="descricao"></p>
+                            <p class="adicional" style="display: none;"></p>
                         </div>
 
-                        <p class="preco">R$50,00</p>
-                    </div>
-
-                    <div class="quadro-produto">
-                        <img src="../assets/img/tudo.jpeg" alt="">
-
-                        <div>
-                            <p class="nome">Nome do produto</p>
-                            <p class="descricao">Descrição dos itens do produto</p>
-                            <p class="adicional">1 item adicional</p>
-                        </div>
-
-                        <p class="preco">R$50,00</p>
+                        <p class="preco">R$ 0,00</p>
                     </div>
                 </div>
 
@@ -104,28 +94,24 @@
                         
                         <div class="valor">
                             <p>Subtotal</p>
-                            <p>R$ 100,00</p>
+                            <p id="subtotal-value">R$ 0,00</p>
                         </div>
                         <div class="valor">
                             <p>Taxa de entrega</p>
-                            <p>R$ 5,00</p>
+                            <p id="delivery-fee-value">R$ 0,00</p>
                         </div>
-                        <div class="valor">
-                            <p>Taxa de serviço</p>
-                            <p>R$ 1,00</p>
-                        </div>
-                        <div class="valor">
+                        <div class="valor" id="discount-row" style="display: none;">
                             <p>Descontos</p>
-                            <p>R$ 00,00</p>
+                            <p id="discount-value">R$ 0,00</p>
                         </div>
 
                         <div class="total">
                             <div>
                                 <p>Total</p>
-                                <p>Nessa compra, você ganhará <span>20</span> pontos Royal</p>
+                                <p>Nessa compra, você ganhou <span id="points-earned">0</span> pontos Royal</p>
                             </div>
 
-                            <p class="p">R$ 56,00</p>
+                            <p class="p" id="total-value">R$ 0,00</p>
                         </div>
                 </div>
                 

@@ -45,6 +45,9 @@ function escapeHTML(text) {
     // Inicializar elementos DOM
     function initElements() {
         el = {
+            // Navegação
+            btnVoltar: document.querySelector('.btn-voltar'),
+
             // Filtros
             filterStatus: document.getElementById('filter-status'),
             btnRefresh: document.getElementById('btn-refresh'),
@@ -91,6 +94,33 @@ function escapeHTML(text) {
         if (!telefone || telefone === '(00)0000-000' || telefone === 'Não informado') {
             return telefone || '(00)0000-000';
         }
+
+    // Format address with pickup fallback
+    function formatOrderAddress(order) {
+        const isPickup = order?.order_type === 'pickup' || order?.delivery_type === 'pickup';
+        if (isPickup) {
+            return 'Retirada no balcão';
+        }
+
+        const addrData = order?.address_data || {};
+        const fullLine = addrData.delivery_address || order?.delivery_address || order?.address;
+        if (fullLine && fullLine.trim() !== '') {
+            return fullLine;
+        }
+
+        const parts = [];
+        const street = addrData.street || order?.street || order?.delivery_street;
+        const number = addrData.number || order?.number || order?.delivery_number;
+        const complement = addrData.complement || order?.complement || order?.delivery_complement;
+        if (street) parts.push(street);
+        if (number) parts.push(number);
+        if (complement) parts.push(complement);
+        if (parts.length > 0) {
+            return parts.join(', ');
+        }
+
+        return 'Endereço não informado';
+    }
         
         if (typeof telefone !== 'string' && typeof telefone !== 'number') {
             return String(telefone);
@@ -139,10 +169,6 @@ function escapeHTML(text) {
         } catch (error) {
             // Fallback para valores padrão em caso de erro
             // Log apenas em desenvolvimento para evitar exposição de erros
-            const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-            if (isDev) {
-                console.warn('Erro ao carregar prazos estimados, usando padrão:', error.message);
-            }
             estimatedTimesCache = { ...DEFAULT_ESTIMATED_TIMES };
         }
     }
@@ -215,10 +241,10 @@ function escapeHTML(text) {
 
         try {
             const result = await getMyOrders();
-            
+
             if (result.success) {
                 const ordersList = result.data || [];
-                
+
                 // Buscar detalhes completos de cada pedido para exibir itens
                 // Limitar concorrência para evitar sobrecarga da API
                 const ordersWithDetails = await Promise.allSettled(
@@ -250,7 +276,7 @@ function escapeHTML(text) {
                             // Log apenas em desenvolvimento
                             const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
                             if (isDev) {
-                                console.warn(`Erro ao carregar detalhes do pedido ${orderId}:`, err.message);
+                                console.warn(`Erro ao carregar detalhes do pedido ${orderId}:`, err?.message);
                             }
                             return order;
                         }
@@ -337,20 +363,22 @@ function escapeHTML(text) {
     }
 
     /**
-     * Obtém classe CSS baseada no status do pedido
+     * Obtém classe CSS baseada no status do pedido (padronizada com painel admin)
      * @param {string} status - Status do pedido
      * @returns {string} Classe CSS correspondente
      */
     function getStatusCssClass(status) {
         const statusMap = {
+            'pending': 'novo',
             'preparing': 'preparo',
+            'ready': 'pronto',
             'on_the_way': 'entrega',
-            'completed': 'concluido',
             'delivered': 'concluido',
-            'pending': 'recebido',
+            'paid': 'concluido',
+            'completed': 'concluido',
             'cancelled': 'cancelado'
         };
-        return statusMap[status] || 'recebido';
+        return statusMap[status] || 'novo';
     }
     
     /**
@@ -370,7 +398,7 @@ function escapeHTML(text) {
                     <i class="fa-solid fa-clipboard-list" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
                     <h3>Nenhum pedido encontrado</h3>
                     <p>Você ainda não fez nenhum pedido ou não há pedidos que correspondam aos filtros selecionados.</p>
-                    <a href="../../index.html" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: #ff6b35; color: white; text-decoration: none; border-radius: 8px;">Fazer primeiro pedido</a>
+                    <a href="../../index.html" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: #101010; color: white; text-decoration: none; border-radius: 8px;">Fazer primeiro pedido</a>
                 </div>
             `;
             return;
@@ -414,7 +442,28 @@ function escapeHTML(text) {
             statusText = escapeHTML(statusText);
             
             const createdAt = formatDate(order.created_at);
-            const address = escapeHTML(order.address || 'Endereço não informado');
+            // Endereço com fallback para pickup e address_data (inline para evitar dependência externa)
+            const isPickup = (order.order_type === 'pickup' || order.delivery_type === 'pickup');
+            let addressStr;
+            if (isPickup) {
+                addressStr = 'Retirada no balcão';
+            } else {
+                const ad = order.address_data || {};
+                const full = ad.delivery_address || order.delivery_address || order.address;
+                if (full && String(full).trim() !== '') {
+                    addressStr = full;
+                } else {
+                    const parts = [];
+                    const street = ad.street || order.street || order.delivery_street;
+                    const number = ad.number || order.number || order.delivery_number;
+                    const complement = ad.complement || order.complement || order.delivery_complement;
+                    if (street) parts.push(street);
+                    if (number) parts.push(number);
+                    if (complement) parts.push(complement);
+                    addressStr = parts.length > 0 ? parts.join(', ') : 'Endereço não informado';
+                }
+            }
+            const address = escapeHTML(addressStr);
             const total = order.total_amount || order.total || 0;
             const totalFormatted = formatCurrency(total);
             const items = Array.isArray(order.items) ? order.items : [];
@@ -449,69 +498,118 @@ function escapeHTML(text) {
                 const itemTotal = item.item_subtotal || item.subtotal || 
                                  (parseFloat(item.unit_price || 0) * itemQuantity);
                 
-                return `
-                    <div class="pedido">
-                        <div>
-                            <p class="qtd">${itemQuantity}</p>
-                            <p class="nome">${itemName}</p>
+                // Preparar HTML para extras e modificações (versão compacta)
+                const extras = item.extras || item.additional_items || [];
+                const baseMods = item.base_modifications || [];
+                const notes = item.notes || item.observacao || '';
+                const hasModifications = extras.length > 0 || baseMods.length > 0;
+                const hasNotes = notes && String(notes).trim() !== '';
+                
+                let modificationsHtml = '';
+                if (hasModifications || hasNotes) {
+                    const badges = [];
+                    
+                    if (extras.length > 0) {
+                        badges.push(`<span class="modification-badge extra"><i class="fa-solid fa-plus"></i> ${extras.length} extra(s)</span>`);
+                    }
+                    
+                    const addCount = baseMods.filter(bm => parseInt(bm.delta || 0, 10) > 0).length;
+                    const removeCount = baseMods.filter(bm => parseInt(bm.delta || 0, 10) < 0).length;
+                    
+                    if (addCount > 0) {
+                        badges.push(`<span class="modification-badge mod-add"><i class="fa-solid fa-circle-plus"></i> +${addCount}</span>`);
+                    }
+                    if (removeCount > 0) {
+                        badges.push(`<span class="modification-badge mod-remove"><i class="fa-solid fa-circle-minus"></i> -${removeCount}</span>`);
+                    }
+                    
+                    modificationsHtml = `
+                        <div class="order-item-modifications">
+                            ${badges.length > 0 ? `<div class="order-item-modifications-compact">${badges.join('')}</div>` : ''}
+                            ${hasNotes ? `<div class="order-item-notes-compact"><strong>Obs:</strong> ${escapeHTML(String(notes).trim())}</div>` : ''}
                         </div>
-                        <p class="preco">R$ ${formatCurrency(itemTotal)}</p>
+                    `;
+                }
+                
+                return `
+                    <div class="order-item">
+                        <div class="item-info">
+                            <span class="item-qtd">${itemQuantity}</span>
+                            <span class="item-name">${itemName}</span>
+                        </div>
+                        <span class="item-price">R$ ${formatCurrency(itemTotal)}</span>
+                        ${modificationsHtml}
                     </div>
                 `;
             }).filter(html => html !== '').join('') : `
-                <div class="pedido">
-                    <div>
-                        <p class="qtd">-</p>
-                        <p class="nome">Carregando itens...</p>
+                <div class="order-item">
+                    <div class="item-info">
+                        <span class="item-name">Carregando itens...</span>
                     </div>
-                    <p class="preco">-</p>
+                    <span class="item-price">-</span>
                 </div>
             `;
 
             // Escapar orderId para uso seguro em atributos HTML
             const safeOrderId = escapeHTML(String(orderIdNum));
+
+            // Determinar cor do tempo estimado baseado no status
+            let timeColorClass = 'time-green';
+            const timeParts = tempoTexto.split(' - ');
+            if (timeParts.length === 2) {
+                const minTime = parseInt(timeParts[0], 10);
+                const maxTime = parseInt(timeParts[1].replace(' min', ''), 10);
+                // Aplicar lógica simples de cor (verde para status novos, amarelo/vermelho conforme necessário)
+                if (order.status === 'pending' || order.status === 'preparing') {
+                    timeColorClass = minTime > maxTime * 0.8 ? 'time-yellow' : 'time-green';
+                    if (minTime > maxTime) timeColorClass = 'time-red';
+                } else {
+                    timeColorClass = 'time-green';
+                }
+            }
             
-            return `<div class="quadro-pedido" data-order-id="${safeOrderId}">
-                    <div class="header">
-                        <div class="div1">
-                            <div class="principal">
-                                <p class="n-pedido">${confirmationCode}</p>
-                                <p class="status-pedido ${statusCssClass}">${statusText}</p>
+            return `<div class="order-card" data-order-id="${safeOrderId}">
+                    <div class="order-header">
+                        <div class="order-id-status">
+                            <div class="order-id">
+                                <span class="id-text">${confirmationCode}</span>
+                                <span class="status-badge status-${statusCssClass}">${statusText}</span>
                             </div>
-                            <div class="prazo">
+                            <div class="order-time-estimate ${timeColorClass}">
                                 <i class="fa-solid fa-clock"></i>
-                                <p>${tempoTexto}</p>
+                                <span class="time-display">
+                                    <span class="time-text">${tempoTexto}</span>
+                                </span>
                             </div>
                         </div>
-                        <p class="tempo-pedido">${createdAt}</p>
+                        <div class="order-date">${createdAt}</div>
                     </div>
-
-                    <div class="main">
-                        <div class="div-1">
-                            <div class="div-2">
-                                <p>${escapeHTML(nomeUsuario)}</p>
-                                <div class="fone">
-                                    <i class="fa-solid fa-phone"></i>
-                                    <p>${escapeHTML(telefoneUsuario)}</p>
-                                </div>
+                    
+                    <div class="order-customer">
+                        <div class="customer-name">${escapeHTML(nomeUsuario)}</div>
+                        <div class="customer-info">
+                            <div class="info-item">
+                                <i class="fa-solid fa-phone"></i>
+                                <span>${escapeHTML(telefoneUsuario)}</span>
                             </div>
-                            <div class="endereco">
-                                <i class="fa-solid fa-location-dot"></i>
-                                <p>${address}</p>
+                            <div class="info-item ${isPickup ? 'order-pickup' : ''}">
+                                <i class="fa-solid ${isPickup ? 'fa-store' : 'fa-location-dot'}"></i>
+                                <span>${address}</span>
+                                ${isPickup ? '<span class="pickup-badge">Retirada</span>' : ''}
                             </div>
-                        </div>
-
-                        <div class="pedidos">
-                            ${itemsHtml}
                         </div>
                     </div>
 
-                    <div class="footer">
-                        <button class="btn-view-details" data-order-id="${safeOrderId}">Ver mais</button>
-                        <div>
-                            <p>Total</p>
-                            <p>R$ ${totalFormatted}</p>
+                    <div class="order-items">
+                        ${itemsHtml}
+                    </div>
+
+                    <div class="order-footer">
+                        <div class="order-total">
+                            <span class="total-label">Total</span>
+                            <span class="total-value">R$ ${totalFormatted}</span>
                         </div>
+                        <button class="order-action-btn btn-view-details" data-order-id="${safeOrderId}">Ver mais</button>
                     </div>
                 </div>`;
         }).filter(html => html !== '').join(''); // Filtrar entradas vazias
@@ -543,6 +641,13 @@ function escapeHTML(text) {
 
     // Anexar eventos
     function attachEvents() {
+        // Botão voltar - redireciona para página inicial
+        if (el.btnVoltar) {
+            el.btnVoltar.addEventListener('click', () => {
+                window.location.href = '../../index.html';
+            });
+        }
+
         // Filtro de status
         if (el.filterStatus) {
             el.filterStatus.addEventListener('change', (e) => {
