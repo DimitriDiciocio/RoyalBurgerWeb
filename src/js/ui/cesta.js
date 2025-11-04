@@ -621,6 +621,45 @@ function atualizarPontosHeader() {
     }
 }
 
+/**
+ * Formata mensagem de erro de atualização de item para exibição
+ * @param {string} rawMessage - Mensagem de erro do backend
+ * @returns {string} Mensagem formatada para exibição
+ */
+function getFriendlyUpdateError(rawMessage) {
+    const msg = (rawMessage || '').toString().trim();
+    if (!msg) return 'Não foi possível atualizar a quantidade. Tente novamente.';
+    
+    // Mensagens de estoque insuficiente já vêm formatadas do backend com detalhes
+    if (msg.includes('Estoque insuficiente')) {
+        return msg; // Exibir mensagem completa do backend (ex: "Estoque insuficiente para extra 'Presunto'. Necessário: 0.450 kg, Disponível: 2.000 kg")
+    }
+    
+    // Erros conhecidos
+    if (msg.includes('da receita base')) {
+        return 'Você tentou modificar um ingrediente da receita base. Ajuste apenas os extras.';
+    }
+    if (msg.toLowerCase().includes('unauthorized') || msg.includes('Sessão expirada')) {
+        return 'Sua sessão expirou. Faça login e tente novamente.';
+    }
+    if (msg.includes('Serviço não encontrado')) {
+        return 'Serviço indisponível. Verifique se o servidor está em execução.';
+    }
+    if (msg.includes('INVALID_QUANTITY')) {
+        return 'Quantidade inválida. Verifique os limites permitidos.';
+    }
+    if (msg.includes('EXTRA_OUT_OF_RANGE')) {
+        return msg; // Exibir mensagem do backend que já inclui os limites
+    }
+    
+    // Fallback: exibir a mensagem do backend se não for genérica
+    if (!/^erro\s?\d+/i.test(msg) && msg.length > 0) {
+        return msg;
+    }
+    
+    return 'Não foi possível atualizar a quantidade. Tente novamente.';
+}
+
 // Alterar quantidade de um item
 async function alterarQuantidade(index, delta) {
     if (index < 0 || index >= state.itens.length) return;
@@ -649,22 +688,28 @@ async function alterarQuantidade(index, delta) {
             // Recarregar cesta da API para garantir sincronização
             await carregarCesta();
         } else {
-            showToast('Erro ao atualizar quantidade. Tente novamente.', {
+            // Extrair mensagem de erro do resultado
+            const errorMessage = result.error || 'Erro ao atualizar quantidade';
+            const friendlyMessage = getFriendlyUpdateError(errorMessage);
+            
+            showToast(friendlyMessage, {
                 type: 'error',
-                title: 'Erro',
-                autoClose: 3000
+                title: 'Erro ao atualizar quantidade',
+                autoClose: 5000 // Aumentar tempo para mensagens detalhadas de estoque
             });
         }
     } catch (err) {
-        // Log apenas em desenvolvimento - erro já é exibido ao usuário
-        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-        if (isDev) {
-            console.error('Erro ao alterar quantidade:', err.message);
-        }
-        showToast('Erro ao atualizar quantidade. Tente novamente.', {
+        // Log do erro para debug
+        console.error('[CESTA] Erro ao alterar quantidade:', err);
+        
+        // Extrair mensagem de erro
+        const errorMessage = err?.message || err?.error || 'Erro desconhecido';
+        const friendlyMessage = getFriendlyUpdateError(errorMessage);
+        
+        showToast(friendlyMessage, {
             type: 'error',
-            title: 'Erro',
-            autoClose: 3000
+            title: 'Erro ao atualizar quantidade',
+            autoClose: 5000
         });
     }
 }

@@ -1,6 +1,24 @@
 /**
  * API de Carrinho
  * Gerencia operações do carrinho híbrido (usuário logado e convidado)
+ * 
+ * SISTEMA DE CONVERSÃO DE UNIDADES:
+ * O backend Python faz conversão automática de unidades ao validar e descontar estoque.
+ * 
+ * IMPORTANTE - MULTIPLICAÇÃO POR QUANTIDADE DO PRODUTO:
+ * Os extras e base_modifications são MULTIPLICADOS pela quantidade do produto/item.
+ * 
+ * - Extras: quantity representa número de PORÇÕES por item (não kg/g direto)
+ *   Backend calcula: quantity_extra × BASE_PORTION_QUANTITY × item_quantity (convertido para STOCK_UNIT)
+ *   Exemplo: 5 porções × 30g × 1 item = 150g → 0.15kg
+ *   Exemplo: 5 porções × 30g × 3 itens = 450g → 0.45kg (multiplicado!)
+ * 
+ * - Base Modifications: delta representa mudança em PORÇÕES por item
+ *   Backend calcula: delta × BASE_PORTION_QUANTITY × item_quantity (convertido para STOCK_UNIT)
+ *   Apenas deltas positivos consomem estoque
+ *   Exemplo: delta=2 × 30g × 3 itens = 180g → 0.18kg (multiplicado!)
+ * 
+ * As mensagens de erro do backend já incluem valores convertidos corretamente.
  */
 
 import { apiRequest, getStoredToken } from './api.js';
@@ -164,9 +182,34 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
         const cartId = getCartIdFromStorage();
 
         // Normalizar extras para garantir formato aceito pelo backend
-        // IMPORTANTE: O backend Python usa estes dados para calcular consumo de estoque
-        // com conversão de unidades (BASE_PORTION_QUANTITY, BASE_PORTION_UNIT → STOCK_UNIT)
+        // 
+        // SISTEMA DE CONVERSÃO DE UNIDADES:
+        // O backend Python faz a conversão automática de unidades ao calcular consumo de estoque.
+        // 
+        // IMPORTANTE - Formato dos dados e MULTIPLICAÇÃO:
+        // - quantity (extras) representa o número de PORÇÕES por item (não quantidade direta em kg/g)
+        // - Backend calcula: consumo = quantity_extra * BASE_PORTION_QUANTITY * item_quantity (convertido para STOCK_UNIT)
+        // 
+        // EXTRAS SÃO MULTIPLICADOS PELA QUANTIDADE DO PRODUTO:
+        // - Se você adiciona 1 produto com 5 extras de presunto (30g cada)
+        // - E depois aumenta a quantidade do produto para 3
+        // - O consumo total será: 5 extras × 30g × 3 produtos = 450g = 0.45kg
+        // 
+        // Exemplo de conversão (1 produto):
+        // - Frontend envia: quantity_extra=5 (5 porções extras), quantity_item=1
+        // - Backend busca: BASE_PORTION_QUANTITY=30, BASE_PORTION_UNIT='g', STOCK_UNIT='kg'
+        // - Backend calcula: 5 × 30g × 1 item = 150g
+        // - Backend converte: 150g / 1000 = 0.15kg
+        // - Backend valida: 0.15kg vs estoque disponível em kg
+        // 
+        // Exemplo de conversão (3 produtos):
+        // - Frontend envia: quantity_extra=5, quantity_item=3
+        // - Backend calcula: 5 × 30g × 3 itens = 450g
+        // - Backend converte: 450g / 1000 = 0.45kg
+        // - Backend valida: 0.45kg vs estoque disponível em kg
+        // 
         // Formato esperado: [{ ingredient_id: int, quantity: int >= 1 }]
+        // quantity = número de porções extras POR ITEM do produto
         const normalizedExtras = Array.isArray(extras)
             ? extras
                 .map((e) => {
@@ -181,10 +224,23 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             : [];
 
         // Normalizar base_modifications para garantir formato aceito pelo backend
-        // IMPORTANTE: O backend Python usa DELTA para calcular mudanças na receita base
-        // DELTA é multiplicado por BASE_PORTION_QUANTITY e convertido para STOCK_UNIT
+        // 
+        // SISTEMA DE CONVERSÃO DE UNIDADES:
+        // O backend Python faz a conversão automática de unidades ao calcular consumo de estoque.
+        // 
+        // IMPORTANTE - Formato dos dados e MULTIPLICAÇÃO:
+        // - delta representa mudança em PORÇÕES por item (não quantidade direta em kg/g)
+        // - Backend calcula: consumo = delta * BASE_PORTION_QUANTITY * item_quantity (convertido para STOCK_UNIT)
+        // - Apenas deltas positivos consomem estoque (deltas negativos reduzem ingrediente)
+        // 
+        // BASE_MODIFICATIONS SÃO MULTIPLICADOS PELA QUANTIDADE DO PRODUTO:
+        // - Se você adiciona 1 produto com delta=2 (adiciona 2 porções de ingrediente)
+        // - E depois aumenta a quantidade do produto para 3
+        // - O consumo total será: 2 porções × BASE_PORTION_QUANTITY × 3 produtos
+        // 
         // Formato esperado: [{ ingredient_id: int, delta: int != 0 }]
-        // delta > 0 = adiciona ingrediente, delta < 0 = remove ingrediente
+        // delta > 0 = adiciona ingrediente (consome estoque) - multiplicado por quantidade do produto
+        // delta < 0 = remove ingrediente (não consome estoque)
         const normalizedBaseMods = Array.isArray(base_modifications)
             ? base_modifications
                 .map((bm) => {
@@ -215,6 +271,17 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             payload.guest_cart_id = cartId;
         }
 
+        // DEBUG: Log do payload para diagnóstico de conversão de unidades
+        if (normalizedExtras.length > 0 || normalizedBaseMods.length > 0) {
+            console.debug('[CART] Adicionando item ao carrinho com conversão de unidades:', {
+                productId,
+                quantity,
+                extras: normalizedExtras,
+                base_modifications: normalizedBaseMods,
+                nota: 'Backend calcula consumo: quantity × BASE_PORTION_QUANTITY × item_quantity (convertido para STOCK_UNIT)'
+            });
+        }
+
         const data = await apiRequest('/api/cart/items', {
             method: 'POST',
             body: payload,
@@ -233,11 +300,32 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             isAuthenticated: data.is_authenticated
         };
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao adicionar ao carrinho:', error.message);
+        // Extrair mensagem de erro do backend
+        let errorMessage = error.message || 'Erro ao adicionar item ao carrinho';
+        
+        // Se o erro tem payload (vindo do apiRequest), tentar extrair mensagem mais detalhada
+        if (error.payload) {
+            if (error.payload.error) {
+                errorMessage = error.payload.error;
+            } else if (error.payload.message) {
+                errorMessage = error.payload.message;
+            }
+        }
+        
+        // Log do erro para debug
+        console.error('[CART] Erro ao adicionar ao carrinho:', {
+            message: errorMessage,
+            status: error.status,
+            payload: error.payload
+        });
+        
+        // Mensagens de erro de estoque do backend já incluem informações detalhadas
+        // sobre conversão de unidades (ex: "Necessário: 0.150 kg, Disponível: 2.000 kg")
+        // Apenas logamos para debug, mas retornamos a mensagem original do backend
+        
         return {
             success: false,
-            error: error.message
+            error: errorMessage
         };
     }
 }
@@ -304,8 +392,24 @@ export async function getCart() {
 
 /**
  * Atualiza item do carrinho
+ * 
+ * IMPORTANTE - VALIDAÇÃO DE ESTOQUE AO ATUALIZAR QUANTIDADE:
+ * Quando você atualiza a quantidade de um produto que já está na cesta com extras,
+ * o backend valida se há estoque suficiente considerando a NOVA quantidade total.
+ * 
+ * Exemplo:
+ * - Item na cesta: 1 produto com 5 extras de presunto (30g cada)
+ * - Consumo atual: 5 × 30g × 1 = 150g = 0.15kg
+ * - Você atualiza quantidade para 3 produtos
+ * - Backend valida: 5 × 30g × 3 = 450g = 0.45kg
+ * - Se não houver 0.45kg disponível, retorna erro de estoque insuficiente
+ * 
  * @param {number} itemId - ID do item
  * @param {Object} updates - Dados para atualização
+ * @param {number} [updates.quantity] - Nova quantidade do produto (valida estoque com extras multiplicados)
+ * @param {Array} [updates.extras] - Novos extras (valida estoque)
+ * @param {string} [updates.notes] - Novas observações
+ * @param {Array} [updates.base_modifications] - Novas modificações da receita base
  * @returns {Promise<Object>} Resultado da operação
  */
 export async function updateCartItem(itemId, updates) {
@@ -328,9 +432,60 @@ export async function updateCartItem(itemId, updates) {
         const isAuth = isAuthenticated();
         const cartId = getCartIdFromStorage();
         
+        // Normalizar extras e base_modifications se fornecidos (mesmo formato de addToCart)
         const payload = { ...updates };
+        
+        // Normalizar extras se fornecidos
+        if (updates.extras !== undefined) {
+            const normalizedExtras = Array.isArray(updates.extras)
+                ? updates.extras
+                    .map((e) => {
+                        const id = parseInt(e?.ingredient_id ?? e?.id, 10);
+                        const qty = parseInt(e?.quantity, 10);
+                        return {
+                            ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                            quantity: Number.isInteger(qty) && qty > 0 ? Math.min(qty, VALIDATION_LIMITS.MAX_QUANTITY) : null
+                        };
+                    })
+                    .filter((e) => e.ingredient_id !== null && e.quantity !== null)
+                : [];
+            payload.extras = normalizedExtras;
+        }
+        
+        // Normalizar base_modifications se fornecidos
+        if (updates.base_modifications !== undefined) {
+            const normalizedBaseMods = Array.isArray(updates.base_modifications)
+                ? updates.base_modifications
+                    .map((bm) => {
+                        const id = parseInt(bm?.ingredient_id, 10);
+                        const delta = parseInt(bm?.delta, 10);
+                        return {
+                            ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                            delta: Number.isInteger(delta) && delta !== 0 ? delta : null
+                        };
+                    })
+                    .filter((bm) => bm.ingredient_id !== null && bm.delta !== null)
+                : [];
+            payload.base_modifications = normalizedBaseMods;
+        }
+        
         if (!isAuth && cartId) {
             payload.guest_cart_id = cartId;
+        }
+
+        // DEBUG: Log do payload para diagnóstico de conversão de unidades
+        if (payload.quantity !== undefined || (payload.extras && payload.extras.length > 0) || (payload.base_modifications && payload.base_modifications.length > 0)) {
+            console.debug('[CART] Atualizando item do carrinho:', {
+                itemId,
+                updates: {
+                    quantity: payload.quantity,
+                    extras: payload.extras,
+                    base_modifications: payload.base_modifications
+                },
+                nota: payload.quantity !== undefined 
+                    ? 'Backend valida estoque: extras existentes × BASE_PORTION_QUANTITY × nova_quantity (convertido para STOCK_UNIT)'
+                    : 'Backend calcula consumo: quantity × BASE_PORTION_QUANTITY × item_quantity (convertido para STOCK_UNIT)'
+            });
         }
 
         const data = await apiRequest(`/api/cart/items/${itemId}`, {
@@ -349,11 +504,29 @@ export async function updateCartItem(itemId, updates) {
             data: data
         };
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao atualizar item:', error.message);
+        // Extrair mensagem de erro do backend
+        let errorMessage = error.message || 'Erro ao atualizar item do carrinho';
+        
+        // Se o erro tem payload (vindo do apiRequest), tentar extrair mensagem mais detalhada
+        if (error.payload) {
+            if (error.payload.error) {
+                errorMessage = error.payload.error;
+            } else if (error.payload.message) {
+                errorMessage = error.payload.message;
+            }
+        }
+        
+        // Log do erro para debug
+        console.error('[CART] Erro ao atualizar item:', {
+            itemId,
+            message: errorMessage,
+            status: error.status,
+            payload: error.payload
+        });
+        
         return {
             success: false,
-            error: error.message
+            error: errorMessage
         };
     }
 }
