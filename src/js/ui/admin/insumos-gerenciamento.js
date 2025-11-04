@@ -103,10 +103,10 @@ class InsumoDataManager {
                 name: insumoData.nome,
                 price: parseFloat(insumoData.custo) || 0,
                 additional_price: parseFloat(insumoData.preco_adicional) || 0,
-                current_stock: parseInt(insumoData.atual) || 0,
+                current_stock: parseFloat(insumoData.atual) || 0,
                 stock_unit: insumoData.unidade || 'un',
-                min_stock_threshold: parseInt(insumoData.min) || 0,
-                max_stock: parseInt(insumoData.max) || 100,
+                min_stock_threshold: parseFloat(insumoData.min) || 0,
+                max_stock: parseFloat(insumoData.max) || 100,
                 supplier: insumoData.fornecedor || '',
                 category: insumoData.categoria || 'outros',
                 base_portion_quantity: parseFloat(insumoData.quantidade_porcao) || 1,
@@ -139,10 +139,10 @@ class InsumoDataManager {
                 price: parseFloat(insumoData.custo) || 0,
                 additional_price: parseFloat(insumoData.preco_adicional) || 0,
                 is_available: insumoData.ativo !== undefined ? insumoData.ativo : true,
-                current_stock: parseInt(insumoData.atual) || 0,
+                current_stock: parseFloat(insumoData.atual) || 0,
                 stock_unit: insumoData.unidade || 'un',
-                min_stock_threshold: parseInt(insumoData.min) || 0,
-                max_stock: parseInt(insumoData.max) || 100,
+                min_stock_threshold: parseFloat(insumoData.min) || 0,
+                max_stock: parseFloat(insumoData.max) || 100,
                 supplier: insumoData.fornecedor || '',
                 category: insumoData.categoria || 'outros',
                 base_portion_quantity: parseFloat(insumoData.quantidade_porcao) || 1,
@@ -323,60 +323,12 @@ class InsumoManager {
             }
         });
 
-        // Event delegation para botões de quantidade
+                // Event delegation para botão de editar estoque
         section.addEventListener('click', (e) => {
-            if (e.target.matches('.btn-quantidade, .fa-minus, .fa-plus')) {
-                // Só executa se não houve ajuste contínuo
-                if (!this.continuousAdjustment || !this.continuousAdjustment.isRunning) {
-                    this.handleQuantityChange(e.target);
-                }
-            }
-        });
-
-        // Event listeners para segurar botão (ajuste contínuo)
-        section.addEventListener('mousedown', (e) => {
-            if (e.target.matches('.btn-quantidade, .fa-minus, .fa-plus')) {
-                e.preventDefault(); // Prevenir seleção de texto
-                // Usar setTimeout para distinguir clique simples de segurado
-                this.mouseDownTimeout = setTimeout(() => {
-                    this.startContinuousAdjustment(e.target);
-                }, 1500); // Delay de 300ms para distinguir clique simples
-            }
-        });
-
-        section.addEventListener('mouseup', (e) => {
-            if (e.target.matches('.btn-quantidade, .fa-minus, .fa-plus')) {
-                // Cancelar timeout se ainda não foi executado
-                if (this.mouseDownTimeout) {
-                    clearTimeout(this.mouseDownTimeout);
-                    this.mouseDownTimeout = null;
-                }
-                this.stopContinuousAdjustment();
-            }
-        });
-
-        section.addEventListener('mouseleave', (e) => {
-            if (e.target.matches('.btn-quantidade, .fa-minus, .fa-plus')) {
-                // Cancelar timeout se ainda não foi executado
-                if (this.mouseDownTimeout) {
-                    clearTimeout(this.mouseDownTimeout);
-                    this.mouseDownTimeout = null;
-                }
-                this.stopContinuousAdjustment();
-            }
-        });
-
-        // Event listeners para touch (dispositivos móveis)
-        section.addEventListener('touchstart', (e) => {
-            if (e.target.matches('.btn-quantidade, .fa-minus, .fa-plus')) {
-                e.preventDefault();
-                this.startContinuousAdjustment(e.target);
-            }
-        });
-
-        section.addEventListener('touchend', (e) => {
-            if (e.target.matches('.btn-quantidade, .fa-minus, .fa-plus')) {
-                this.stopContinuousAdjustment();
+            if (e.target.matches('.btn-editar-estoque, .fa-edit') || 
+                e.target.closest('.btn-editar-estoque')) {     
+                const button = e.target.matches('.btn-editar-estoque') ? e.target : e.target.closest('.btn-editar-estoque');
+                this.handleEditEstoqueClick(button);
             }
         });
 
@@ -642,11 +594,9 @@ class InsumoManager {
                 
                 ${insumo.ativo ? `
                 <div class="botoes-quantidade">
-                    <button class="btn-quantidade" data-change="-1" title="Diminuir estoque">
-                        <i class="fa-solid fa-minus"></i>
-                    </button>
-                    <button class="btn-quantidade" data-change="1" title="Aumentar estoque">
-                        <i class="fa-solid fa-plus"></i>
+                    <button class="btn-editar-estoque" title="Editar estoque">
+                        <i class="fa-solid fa-edit"></i>
+                        <span>Editar Estoque</span>
                     </button>
                 </div>
                 ` : ''}
@@ -684,7 +634,7 @@ class InsumoManager {
         this.openInsumoModal();
     }
 
-    /**
+        /**
      * Trata clique no botão de editar
      */
     async handleEditClick(button) {
@@ -692,14 +642,202 @@ class InsumoManager {
         const insumoId = parseInt(card.dataset.ingredientId);
 
         try {
-            const insumo = await this.dataManager.getInsumoById(insumoId);
+            const insumo = await this.dataManager.getInsumoById(insumoId);      
             if (insumo) {
                 this.currentEditingId = insumoId;
                 this.openInsumoModal(insumo);
             }
         } catch (error) {
-            console.error('Erro ao buscar insumo para edição:', error);
+            console.error('Erro ao buscar insumo para edição:', error);       
             this.showErrorMessage('Erro ao carregar dados do insumo');
+        }
+    }
+
+    /**
+     * Trata clique no botão de editar estoque
+     */
+    async handleEditEstoqueClick(button) {
+        const card = button.closest('.card-ingrediente');
+        const insumoId = parseInt(card.dataset.ingredientId);
+
+        try {
+            const insumo = await this.dataManager.getInsumoById(insumoId);
+            if (insumo) {
+                this.openEditarEstoqueModal(insumo);
+            }
+        } catch (error) {
+            console.error('Erro ao buscar insumo para edição de estoque:', error);
+            this.showErrorMessage('Erro ao carregar dados do insumo');
+        }
+    }
+
+    /**
+     * Abre modal para editar estoque
+     */
+    openEditarEstoqueModal(insumo) {
+        const modal = document.getElementById('modal-editar-estoque');
+        if (!modal) return;
+
+        // Preencher dados do insumo na modal
+        const nomeInput = document.getElementById('nome-insumo-estoque');
+        const valorInput = document.getElementById('valor-estoque');
+        const unidadeDisplay = document.getElementById('unidade-estoque-display');
+
+                if (nomeInput) nomeInput.value = insumo.nome || '';
+        if (valorInput) valorInput.value = this.formatStockValue(insumo.atual || 0);                                                                            
+        if (unidadeDisplay) {
+            const unidade = insumo.unidade || 'un';
+            unidadeDisplay.textContent = unidade;
+        }
+
+        // Armazenar ID do insumo na modal
+        modal.dataset.ingredientId = insumo.id;
+
+        // Configurar event listeners da modal
+        this.setupEditarEstoqueModalListeners();
+
+        // Mostrar modal usando função global se disponível
+        if (window.abrirModal) {
+            window.abrirModal('modal-editar-estoque');
+        } else {
+            modal.style.display = 'flex';
+        }
+    }
+
+    /**
+     * Configura event listeners da modal de editar estoque
+     */
+    setupEditarEstoqueModalListeners() {
+        const modal = document.getElementById('modal-editar-estoque');
+        if (!modal) return;
+
+        // Remover listeners anteriores para evitar duplicação
+        const cancelarBtn = document.getElementById('cancelar-editar-estoque');
+        const salvarBtn = document.getElementById('salvar-editar-estoque');
+        const overlay = modal.querySelector('.div-overlay');
+
+        // Criar novos handlers
+        const cancelarHandler = () => this.closeEditarEstoqueModal();
+        const salvarHandler = () => this.saveEditarEstoque();
+        const overlayHandler = (e) => {
+            if (e.target === overlay) {
+                this.closeEditarEstoqueModal();
+            }
+        };
+
+        // Remover listeners antigos se existirem
+        if (cancelarBtn) {
+            cancelarBtn.replaceWith(cancelarBtn.cloneNode(true));
+            document.getElementById('cancelar-editar-estoque').addEventListener('click', cancelarHandler);
+        }
+        if (salvarBtn) {
+            salvarBtn.replaceWith(salvarBtn.cloneNode(true));
+            document.getElementById('salvar-editar-estoque').addEventListener('click', salvarHandler);
+        }
+        if (overlay) {
+            overlay.replaceWith(overlay.cloneNode(true));
+            modal.querySelector('.div-overlay').addEventListener('click', overlayHandler);
+        }
+
+        // Fechar modal ao pressionar ESC
+        const escHandler = (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                this.closeEditarEstoqueModal();
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+        modal.dataset.escHandler = 'true';
+    }
+
+    /**
+     * Fecha modal de editar estoque
+     */
+    closeEditarEstoqueModal() {
+        const modal = document.getElementById('modal-editar-estoque');
+        if (!modal) return;
+
+        // Fechar modal usando função global se disponível
+        if (window.fecharModal) {
+            window.fecharModal('modal-editar-estoque');
+        } else {
+            modal.style.display = 'none';
+        }
+        
+        // Limpar dados
+        const nomeInput = document.getElementById('nome-insumo-estoque');
+        const valorInput = document.getElementById('valor-estoque');
+        const unidadeDisplay = document.getElementById('unidade-estoque-display');
+
+        if (nomeInput) nomeInput.value = '';
+        if (valorInput) valorInput.value = '';
+        if (unidadeDisplay) unidadeDisplay.textContent = '';
+        if (modal.dataset.ingredientId) delete modal.dataset.ingredientId;
+    }
+
+    /**
+     * Salva novo valor de estoque
+     */
+    async saveEditarEstoque() {
+        const modal = document.getElementById('modal-editar-estoque');
+        if (!modal) return;
+
+        const insumoId = parseInt(modal.dataset.ingredientId);
+        const valorInput = document.getElementById('valor-estoque');
+
+        if (!insumoId || !valorInput) {
+            this.showErrorMessage('Erro ao obter dados do insumo');
+            return;
+        }
+
+        const novoValor = parseFloat(valorInput.value);
+        
+        // Validação
+        if (isNaN(novoValor) || novoValor < 0) {
+            this.showErrorMessage('Por favor, insira um valor válido maior ou igual a zero');
+            valorInput.focus();
+            return;
+        }
+
+        // Desabilitar botão durante salvamento
+        const salvarBtn = document.getElementById('salvar-editar-estoque');
+        if (salvarBtn) {
+            salvarBtn.disabled = true;
+            salvarBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+        }
+
+        try {
+            // Buscar dados atuais do insumo
+            const insumoAtual = await this.dataManager.getInsumoById(insumoId);
+            
+            // Atualizar apenas o estoque
+            await this.dataManager.updateInsumo(insumoId, {
+                ...insumoAtual,
+                atual: novoValor
+            });
+
+            // Atualizar card visualmente
+            const card = document.querySelector(`.card-ingrediente[data-ingredient-id="${insumoId}"]`);
+            if (card) {
+                this.updateQuantityDisplay(card, novoValor);
+            }
+
+            // Atualizar resumo
+            await this.loadResumoEstoque();
+
+            // Recarregar insumos para garantir sincronização
+            await this.loadInsumos();
+
+            this.showSuccessMessage('Estoque atualizado com sucesso!');
+            this.closeEditarEstoqueModal();
+        } catch (error) {
+            console.error('Erro ao salvar estoque:', error);
+            this.handleApiError(error, 'atualizar estoque do insumo');
+        } finally {
+            // Reabilitar botão
+            if (salvarBtn) {
+                salvarBtn.disabled = false;
+                salvarBtn.innerHTML = 'Salvar';
+            }
         }
     }
 
@@ -2209,11 +2347,9 @@ class InsumoManager {
                 if (controleEstoque) {
                     const botoesHtml = `
                         <div class="botoes-quantidade">
-                            <button class="btn-quantidade" data-change="-1" title="Diminuir estoque">
-                                <i class="fa-solid fa-minus"></i>
-                            </button>
-                            <button class="btn-quantidade" data-change="1" title="Aumentar estoque">
-                                <i class="fa-solid fa-plus"></i>
+                            <button class="btn-editar-estoque" title="Editar estoque">
+                                <i class="fa-solid fa-edit"></i>
+                                <span>Editar Estoque</span>
                             </button>
                         </div>
                     `;

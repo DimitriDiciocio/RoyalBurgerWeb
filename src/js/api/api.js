@@ -8,7 +8,7 @@ const STORAGE_KEYS = {
 
 // Ajuste se necessário. Mantém flexível para backends montados em outras portas.
 export const API_BASE_URL = (() => {
-    return 'http://10.92.3.135:5000';
+    return 'http://127.0.0.1:5000';
 })();
 
 export function getStoredToken() {

@@ -1821,6 +1821,41 @@ main {
                     }
 
                 }
+
+                & .btn-editar-estoque {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 8px 16px;
+                    border: 1px solid #e0e1e4;
+                    background-color: white;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    color: var(--color-texto-black);
+
+                    &:hover {
+                        background-color: var(--color-primary);
+                        border-color: var(--color-primary);
+                        color: var(--color-texto-black);
+                        transform: translateY(-1px);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    }
+
+                    &:active {
+                        transform: translateY(0);
+                    }
+
+                    & i {
+                        font-size: 0.75rem;
+                    }
+
+                    & span {
+                        font-size: 0.85rem;
+                    }
+                }
             }
         }
 

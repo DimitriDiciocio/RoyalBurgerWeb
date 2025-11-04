@@ -48,10 +48,10 @@
 
                 <div class="pontos">
                     <i class="fa-solid fa-crown"></i>
-                    <p id="pontos-atual">100</p>
+                    <p id="pontos-atual">0</p>
                 </div>
 
-                <p class="txt2">Faltam <span id="dias-expiram">XX</span> dias para seus pontos expirarem</p>
+                <p class="txt2" id="texto-expiracao" style="display: none;">Faltam <span id="dias-expiram"></span> dias para seus pontos expirarem</p>
 
                 <button id="btn-alternar">Histórico de pontos</button>
             </div>
@@ -65,7 +65,7 @@
                             <p>Acumule pontos em cada compra!</p>
                         </div>
 
-                        <p class="descricao">A cada R$ 1,00 que você gasta, ganha 10 pontos Royal automaticamente. Quanto mais você compra, mais pontos acumula!</p>
+                        <p class="descricao"></p>
                     </div>
 
                     <div>
@@ -74,7 +74,7 @@
                             <p>Use seus pontos para descontos!</p>
                         </div>
 
-                        <p class="descricao">Na finalização do pedido, você pode usar seus pontos para obter descontos reais. 100 pontos = R$ 1,00 de desconto!</p>
+                        <p class="descricao"></p>
                     </div>
 
                     <div>
@@ -83,7 +83,7 @@
                             <p>Como funciona o sistema?</p>
                         </div>
 
-                        <p class="descricao">É simples: você gasta dinheiro real e ganha pontos virtuais. Depois usa os pontos para ganhar dinheiro de volta em descontos!</p>
+                        <p class="descricao"></p>
                     </div>
 
                     <div>
@@ -92,14 +92,14 @@
                             <p>Os pontos expiram?</p>
                         </div>
 
-                        <p class="descricao">Sim, mas não se preocupe! Seus pontos só expiram se você ficar 60 dias sem fazer nenhuma compra. A cada nova compra, todos os pontos se renovam!</p>
+                        <p class="descricao"></p>
                     </div>
                 </div>
             </div>
 
-            <!-- Seção de histórico -->
-            <div class="secao-historico" id="secao-historico" style="display: none;">
-                <p class="vencimento">Seus pontos vencem daqui <span id="vencimento-dias">42</span> dias</p>
+                        <!-- Seção de histórico -->
+            <div class="secao-historico" id="secao-historico" style="display: none;">                                                                           
+                <p class="vencimento" id="texto-vencimento" style="display: none;">Seus pontos vencem daqui <span id="vencimento-dias"></span> dias</p>
                 <div id="historico-container">
                     <!-- Histórico será renderizado aqui -->
                 </div>

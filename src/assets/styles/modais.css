@@ -4981,6 +4981,142 @@
   background-color: #374151;
 }
 
+/* Modal de Editar Estoque */
+#modal-editar-estoque {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1200;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#modal-editar-estoque .div-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 1;
+}
+
+#modal-editar-estoque .modal-content-grupo-insumo-form {
+  z-index: 2;
+  position: relative;
+  background-color: var(--cor-div-primary);
+  padding: 30px;
+  max-width: 450px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+#modal-editar-estoque .header-modal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+#modal-editar-estoque .header-modal h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-texto-black);
+  margin: 0;
+}
+
+#modal-editar-estoque .header-modal .fechar-modal {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--color-texto-erased);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: 0.3s;
+}
+
+#modal-editar-estoque .header-modal .fechar-modal:hover {
+  color: var(--color-secondary);
+}
+
+#modal-editar-estoque .conteudo-modal {
+  margin-bottom: 20px;
+}
+
+#modal-editar-estoque .div-input {
+  margin-bottom: 20px;
+}
+
+#modal-editar-estoque .div-input label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-texto-black);
+}
+
+#modal-editar-estoque .div-input input {
+  width: 100%;
+  padding: 10px 15px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+#modal-editar-estoque .div-input input:focus {
+  outline: none;
+  border-color: var(--color-texto-black);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+#modal-editar-estoque .footer-modal {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+#modal-editar-estoque .footer-modal button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+#modal-editar-estoque .btn-cancelar {
+  background-color: #f3f4f6;
+  color: var(--color-texto-black);
+}
+
+#modal-editar-estoque .btn-cancelar:hover {
+  background-color: #e5e7eb;
+}
+
+#modal-editar-estoque .btn-salvar {
+  background-color: var(--color-texto-black);
+  color: var(--color-texto-white);
+}
+
+#modal-editar-estoque .btn-salvar:hover {
+  background-color: #374151;
+}
+
 /* ============================================================================ */
 /* MODAL DE INGREDIENTE DA RECEITA */
 /* ============================================================================ */
@@ -5177,7 +5313,8 @@
 
   #modal-insumos-extras-produto .modal-content-selecao-insumos,
   #modal-grupos-extras-produto .modal-content-grupos-insumos,
-  #modal-config-extra .modal-content-grupo-insumo-form {
+  #modal-config-extra .modal-content-grupo-insumo-form,
+  #modal-editar-estoque .modal-content-grupo-insumo-form {
     width: 95%;
     padding: 20px;
     max-height: 90vh;
@@ -5185,20 +5322,23 @@
 
   #modal-insumos-extras-produto .header-modal h2,
   #modal-grupos-extras-produto .header-modal h2,
-  #modal-config-extra .header-modal h2 {
+  #modal-config-extra .header-modal h2,
+  #modal-editar-estoque .header-modal h2 {
     font-size: 1.2rem;
   }
 
   #modal-insumos-extras-produto .footer-modal,
   #modal-grupos-extras-produto .footer-modal,
-  #modal-config-extra .footer-modal {
+  #modal-config-extra .footer-modal,
+  #modal-editar-estoque .footer-modal {
     flex-direction: column;
     gap: 8px;
   }
 
   #modal-insumos-extras-produto .footer-modal button,
   #modal-grupos-extras-produto .footer-modal button,
-  #modal-config-extra .footer-modal button {
+  #modal-config-extra .footer-modal button,
+  #modal-editar-estoque .footer-modal button {
     width: 100%;
   }
 }

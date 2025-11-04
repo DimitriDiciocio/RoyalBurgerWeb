@@ -1111,45 +1111,8 @@
             </div>
 
             <div class="conteudo-modal">
-                <div class="grupos-disponiveis">
-                    <div class="grupo-item" data-grupo-id="1">
-                        <div class="info-grupo">
-                            <h4>Queijos</h4>
-                            <p>Seleção de queijos para o produto</p>
-                        </div>
-                        <div class="acoes-grupo">
-                            <button type="button" class="btn-selecionar-grupo">
-                                <i class="fa-solid fa-plus"></i>
-                                Selecionar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="grupo-item" data-grupo-id="2">
-                        <div class="info-grupo">
-                            <h4>Molhos</h4>
-                            <p>Diversos molhos para acompanhar</p>
-                        </div>
-                        <div class="acoes-grupo">
-                            <button type="button" class="btn-selecionar-grupo">
-                                <i class="fa-solid fa-plus"></i>
-                                Selecionar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="grupo-item" data-grupo-id="3">
-                        <div class="info-grupo">
-                            <h4>Vegetais</h4>
-                            <p>Vegetais frescos para o produto</p>
-                        </div>
-                        <div class="acoes-grupo">
-                            <button type="button" class="btn-selecionar-grupo">
-                                <i class="fa-solid fa-plus"></i>
-                                Selecionar
-                            </button>
-                        </div>
-                    </div>
+                <div class="grupos-disponiveis" id="grupos-disponiveis">
+                    <!-- Grupos de extras serão carregados dinamicamente -->
                 </div>
             </div>
 
@@ -1261,21 +1224,21 @@
                 <!-- Perfil do Funcionário -->
                 <div class="perfil-funcionario">
                     <div class="avatar">
-                        <span id="iniciais-funcionario">YB</span>
+                        <span id="iniciais-funcionario"></span>
                     </div>
                     <div class="info-funcionario">
                         <div class="nome-cargo">
-                            <h3 id="nome-funcionario-metricas">Nome do Funcionário</h3>
-                            <span id="cargo-funcionario-metricas" class="cargo-tag">Gerente</span>
+                            <h3 id="nome-funcionario-metricas"></h3>
+                            <span id="cargo-funcionario-metricas" class="cargo-tag"></span>
                         </div>
                         <div class="email">
                             <i class="fa-solid fa-envelope"></i>
-                            <span id="email-funcionario-metricas">email@gmail.com</span>
+                            <span id="email-funcionario-metricas"></span>
                         </div>
                     </div>
                     <div class="tempo-atividade">
                         <p class="label">Tempo em atividade:</p>
-                        <p class="valor" id="tempo-atividade">40 Dias</p>
+                        <p class="valor" id="tempo-atividade"></p>
                     </div>
                 </div>
 
@@ -1283,15 +1246,15 @@
                 <div class="dados-pessoais">
                     <div class="campo-dados">
                         <label>CPF</label>
-                        <span id="cpf-funcionario">000.000.000-11</span>
+                        <span id="cpf-funcionario"></span>
                     </div>
                     <div class="campo-dados">
                         <label>Data de nascimento</label>
-                        <span id="nascimento-funcionario">10/10/2010</span>
+                        <span id="nascimento-funcionario"></span>
                     </div>
                     <div class="campo-dados">
                         <label>Telefone</label>
-                        <span id="telefone-funcionario">(00) 00000-0000</span>
+                        <span id="telefone-funcionario"></span>
                     </div>
                 </div>
 
@@ -1303,7 +1266,7 @@
                             <p id="metrica-1-subtitulo">Pedidos concluídos</p>
                         </div>
                         <div class="metrica-valor">
-                            <span id="metrica-1-valor">200</span>
+                            <span id="metrica-1-valor"></span>
                         </div>
                     </div>
 
@@ -1313,7 +1276,7 @@
                             <p id="metrica-2-subtitulo">Período sob gestão</p>
                         </div>
                         <div class="metrica-valor">
-                            <span id="metrica-2-valor">R$ 0,00</span>
+                            <span id="metrica-2-valor"></span>
                         </div>
                     </div>
 
@@ -1322,7 +1285,7 @@
                             <h4 id="metrica-3-titulo">Avaliação da gestão</h4>
                         </div>
                         <div class="metrica-valor">
-                            <span id="metrica-3-valor">4.6</span>
+                            <span id="metrica-3-valor"></span>
                         </div>
                     </div>
                 </div>
@@ -1606,6 +1569,36 @@
             <div class="footer-modal">
                 <button class="btn-cancelar" id="cancelar-grupos-extras-produto">Cancelar</button>
                 <button class="btn-salvar" id="adicionar-grupos-extras-produto">Adicionar Grupos</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- Modal Editar Estoque do Insumo -->
+    <div id="modal-editar-estoque" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-grupo-insumo-form">
+            <div class="header-modal">
+                <h2 id="titulo-editar-estoque">Editar Estoque</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-editar-estoque"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input">
+                    <label for="nome-insumo-estoque" id="label-nome-insumo-estoque">Insumo</label>
+                    <input type="text" id="nome-insumo-estoque" name="nome-insumo-estoque" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
+                </div>
+                <div class="div-input">
+                    <label for="valor-estoque">Valor do Estoque</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="valor-estoque" name="valor-estoque" step="0.001" min="0" autocomplete="off" required style="flex: 1;">                              
+                        <span id="unidade-estoque-display" style="font-weight: 500; color: #666; font-size: 0.9rem; white-space: nowrap;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-editar-estoque">Cancelar</button>
+                <button class="btn-salvar" id="salvar-editar-estoque">Salvar</button>
             </div>
         </div>
     </div>

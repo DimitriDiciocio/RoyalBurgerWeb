@@ -449,18 +449,45 @@ function escapeHTML(text) {
                 addressStr = 'Retirada no balcão';
             } else {
                 const ad = order.address_data || {};
-                const full = ad.delivery_address || order.delivery_address || order.address;
-                if (full && String(full).trim() !== '') {
+                // Verificar se address_data é um objeto com propriedades ou se é um objeto vazio
+                let full = ad.delivery_address || order.delivery_address || order.address;
+                
+                // Se full é um objeto, construir string a partir das propriedades
+                if (full && typeof full === 'object' && !Array.isArray(full)) {
+                    const parts = [];
+                    if (full.street) parts.push(full.street);
+                    if (full.number) parts.push(full.number);
+                    if (full.complement) parts.push(full.complement);
+                    full = parts.length > 0 ? parts.join(', ') : null;
+                }
+                
+                // Verificar se full é uma string válida e não é "[object Object]"
+                if (full && typeof full === 'string' && full.trim() !== '' && full !== '[object Object]') {
                     addressStr = full;
                 } else {
+                    // Construir endereço a partir das propriedades individuais
                     const parts = [];
                     const street = ad.street || order.street || order.delivery_street;
                     const number = ad.number || order.number || order.delivery_number;
                     const complement = ad.complement || order.complement || order.delivery_complement;
+                    const neighborhood = ad.neighborhood || order.neighborhood || order.delivery_neighborhood;
+                    const city = ad.city || order.city || order.delivery_city;
+                    
                     if (street) parts.push(street);
                     if (number) parts.push(number);
                     if (complement) parts.push(complement);
+                    
                     addressStr = parts.length > 0 ? parts.join(', ') : 'Endereço não informado';
+                    
+                    // Adicionar bairro e cidade se disponíveis
+                    if (neighborhood || city) {
+                        const locationParts = [];
+                        if (neighborhood) locationParts.push(neighborhood);
+                        if (city) locationParts.push(city);
+                        if (locationParts.length > 0) {
+                            addressStr += ' - ' + locationParts.join(' - ');
+                        }
+                    }
                 }
             }
             const address = escapeHTML(addressStr);
