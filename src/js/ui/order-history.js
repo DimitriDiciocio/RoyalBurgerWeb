@@ -12,7 +12,6 @@ import { showError } from "./alerts.js";
 
 // Importar helper de configurações
 import * as settingsHelper from "../utils/settings-helper.js";
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML para prevenir XSS
 import { escapeHTML } from "../utils/html-sanitizer.js";
 
 (function initOrderHistory() {

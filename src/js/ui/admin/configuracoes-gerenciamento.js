@@ -7,8 +7,13 @@ import { abrirModal, fecharModal } from "../modais.js";
 import { showSuccess, showError } from "../alerts.js";
 import { getAllSettings, updateSettings } from "../../api/settings.js";
 import { getStoreHours, bulkUpdateStoreHours } from "../../api/store.js";
-// OTIMIZAÇÃO 1.9: Debounce para eventos de input frequentes
 import { debounce } from "../../utils/performance-utils.js";
+import { escapeHTML } from "../../utils/html-sanitizer.js";
+import {
+  validateCNPJ,
+  validatePhone,
+  validateEmail,
+} from "../../utils/validators.js";
 
 /**
  * Gerenciador de configurações
@@ -470,18 +475,6 @@ class ConfiguracoesManager {
   }
 
   /**
-   * Escapar HTML para prevenir XSS
-   * @param {string} text - Texto a ser escapado
-   * @returns {string} HTML escapado
-   */
-  escapeHTML(text) {
-    if (text === null || text === undefined) return "";
-    const div = document.createElement("div");
-    div.textContent = String(text);
-    return div.innerHTML;
-  }
-
-  /**
    * Inicializar elementos DOM
    */
   initElements() {
@@ -830,7 +823,8 @@ class ConfiguracoesManager {
       placeholder: "00.000.000/0000-00",
       validator: (value) => {
         const cnpj = value.replace(/\D/g, "");
-        return cnpj.length === 14;
+        const validation = validateCNPJ(cnpj);
+        return validation.valid;
       },
       formatter: (value) => {
         const cnpj = value.replace(/\D/g, "");
@@ -883,8 +877,8 @@ class ConfiguracoesManager {
       inputType: "text",
       placeholder: "(00) 00000-0000",
       validator: (value) => {
-        const phone = value.replace(/\D/g, "");
-        return phone.length >= 10 && phone.length <= 11;
+        const validation = validatePhone(value);
+        return validation.valid;
       },
       formatter: (value) => {
         const phone = value.replace(/\D/g, "");
@@ -917,8 +911,8 @@ class ConfiguracoesManager {
       inputType: "email",
       placeholder: "contato@exemplo.com",
       validator: (value) => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(value);
+        const validation = validateEmail(value);
+        return validation.valid;
       },
       onSave: async (value) => {
         return await this.saveConfig("email", value.trim().toLowerCase());
@@ -1069,7 +1063,6 @@ class ConfiguracoesManager {
             }
           }
 
-          // OTIMIZAÇÃO 1.9: Validação em tempo real com debounce centralizado
           // Evitar validações excessivas durante digitação rápida
           if (!this._debouncedValidate) {
             this._debouncedValidate = debounce(() => {
@@ -1709,12 +1702,18 @@ class ConfiguracoesManager {
     // Mensagens de erro personalizadas
     let errorMessage = "";
     if (!isValid && value) {
+      // Validar novamente para obter mensagem específica
+      let validation = null;
       if (handler.configKey === "cnpj") {
-        errorMessage = "CNPJ deve conter 14 dígitos";
+        const cnpj = value.replace(/\D/g, "");
+        validation = validateCNPJ(cnpj);
+        errorMessage = validation.message || "CNPJ inválido";
       } else if (handler.configKey === "telefone-empresa") {
-        errorMessage = "Telefone deve conter 10 ou 11 dígitos";
+        validation = validatePhone(value);
+        errorMessage = validation.message || "Telefone inválido";
       } else if (handler.configKey === "email-empresa") {
-        errorMessage = "Digite um e-mail válido";
+        validation = validateEmail(value);
+        errorMessage = validation.message || "Digite um e-mail válido";
       } else if (handler.inputType === "number") {
         errorMessage = "Digite um valor válido";
       } else {

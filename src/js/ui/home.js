@@ -3,20 +3,15 @@
  * Carrega produtos e categorias da API e exibe dinamicamente na home
  */
 
-// OTIMIZAÇÃO 1.1: Usar cache manager compartilhado
 import { cacheManager } from "../utils/cache-manager.js";
 import { getProducts } from "../api/products.js";
 import { getCategories } from "../api/categories.js";
-// OTIMIZAÇÃO 1.3: Event delegation
 import { delegate } from "../utils/performance-utils.js";
-// OTIMIZAÇÃO 1.4: Cache de referências DOM
 import { $q, $qa } from "../utils/dom-cache.js";
-// OTIMIZAÇÃO 1.6: Renderização incremental para listas grandes
 import {
   renderListInChunks,
   createIncrementalRenderer,
 } from "../utils/virtual-scroll.js";
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML para prevenir XSS
 import { escapeHTML, escapeAttribute } from "../utils/html-sanitizer.js";
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
@@ -46,7 +41,6 @@ function clearProductsCache() {
  */
 async function loadProducts() {
   try {
-    // OTIMIZAÇÃO 1.1: Verificar cache primeiro
     const cached = cacheManager.get(CACHE_KEYS.products);
     if (cached) {
       return cached;
@@ -68,7 +62,6 @@ async function loadProducts() {
       return isActive;
     });
 
-    // OTIMIZAÇÃO 1.1: Armazenar no cache compartilhado
     cacheManager.set(CACHE_KEYS.products, activeProducts, CACHE_TTL);
 
     return activeProducts;
@@ -87,7 +80,6 @@ async function loadProducts() {
  */
 async function loadCategories() {
   try {
-    // OTIMIZAÇÃO 1.1: Verificar cache primeiro
     const cached = cacheManager.get(CACHE_KEYS.categories);
     if (cached) {
       return cached;
@@ -98,7 +90,6 @@ async function loadCategories() {
     });
     const categories = response?.items || [];
 
-    // OTIMIZAÇÃO 1.1: Armazenar no cache compartilhado
     cacheManager.set(CACHE_KEYS.categories, categories, CACHE_TTL);
 
     return categories;
@@ -239,14 +230,12 @@ function createProductHTML(product) {
     `;
 }
 
-// OTIMIZAÇÃO 2.1: escapeHTML agora importado de html-sanitizer.js (função removida - usando import)
 
 /**
  * Atualiza imagens de produtos existentes de forma inteligente
  */
 function updateExistingProductImages(products) {
   // Busca todas as imagens de produtos na página
-  // OTIMIZAÇÃO 1.4: Usar cache DOM ao invés de query direta
   const productImages = $qa("#ficha-produto img");
 
   productImages.forEach((img) => {
@@ -273,7 +262,6 @@ async function updateProductSections() {
     // Atualizar seção "Os mais pedidos" com produtos reais
     updateMostOrderedSection(products);
 
-    // OTIMIZAÇÃO 1.6: Aguardar renderização incremental das seções de categorias
     await updateCategorySectionsWithProducts(products, categories);
 
     // Atualizar menu de categorias com categorias reais
@@ -287,14 +275,12 @@ async function updateProductSections() {
   }
 }
 
-// OTIMIZAÇÃO 1.6: Armazenar renderizadores incrementais por seção
 let incrementalRenderers = new Map();
 
 /**
  * Atualiza as seções de categorias com produtos organizados por categoria
  */
 async function updateCategorySectionsWithProducts(products, categories) {
-  // OTIMIZAÇÃO 1.4: Usar cache DOM
   const rolagemInfinita = $q(".rolagem-infinita");
 
   if (!rolagemInfinita) return;
@@ -327,7 +313,6 @@ async function updateCategorySectionsWithProducts(products, categories) {
       sectionDiv.style.display = categoryIndex === 0 ? "block" : "none";
       rolagemInfinita.appendChild(sectionDiv);
 
-      // OTIMIZAÇÃO 1.6: Usar renderização incremental para listas grandes (>50 itens)
       // Renderizar em chunks para não bloquear a UI
       const totalPairs = Math.ceil(categoryProducts.length / 2);
       const ITEM_THRESHOLD = 50; // Threshold para usar renderização incremental
@@ -411,7 +396,6 @@ function groupProductsByCategory(products, categories) {
  * Atualiza a seção "Os mais pedidos" (mantendo formatação original)
  */
 function updateMostOrderedSection(products) {
-  // OTIMIZAÇÃO 1.4: Usar cache DOM
   const containers = $qa(".mostruario-horizontal .container .rolagem");
 
   // Atualizar todos os containers com os mesmos produtos (como estava antes)
@@ -429,7 +413,6 @@ function updateMostOrderedSection(products) {
  * Atualiza o menu de categorias com apenas as categorias que existem
  */
 function updateCategoryMenu(categories) {
-  // OTIMIZAÇÃO 1.4: Usar cache DOM
   const categoryMenu = $q(".categoias");
 
   if (!categoryMenu) return;
@@ -472,14 +455,12 @@ function updateCategoryMenu(categories) {
   addCategoryListeners();
 }
 
-// OTIMIZAÇÃO 1.3: Cleanup handlers para event delegation
 let categoryListenerCleanup = null;
 
 /**
  * Adiciona event listeners para troca de categorias usando event delegation
  */
 function addCategoryListeners() {
-  // OTIMIZAÇÃO 1.4: Usar cache DOM
   const categoryMenu = $q(".categoias");
   if (!categoryMenu) return;
 
@@ -488,13 +469,11 @@ function addCategoryListeners() {
     categoryListenerCleanup();
   }
 
-  // OTIMIZAÇÃO 1.3: Usar event delegation ao invés de adicionar listener em cada item
   categoryListenerCleanup = delegate(
     categoryMenu,
     "click",
     'p[id^="categoria"]',
     (e, target) => {
-      // OTIMIZAÇÃO 1.4: Usar cache DOM
       const categoryItems = $qa('.categoias p[id^="categoria"]');
       const sections = $qa('.rolagem-infinita > div[id^="secao-cat-"]');
 

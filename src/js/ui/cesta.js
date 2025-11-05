@@ -11,10 +11,13 @@ import {
 } from "../api/cart.js";
 import { delegate } from "../utils/performance-utils.js";
 import { renderList } from "../utils/dom-renderer.js";
-// OTIMIZAÇÃO 1.4: Cache de referências DOM
 import { $id, $q } from "../utils/dom-cache.js";
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML para prevenir XSS
 import { escapeHTML } from "../utils/html-sanitizer.js";
+import {
+  stateManager,
+  STATE_KEYS,
+  STATE_EVENTS,
+} from "../utils/state-manager.js";
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -57,7 +60,6 @@ const el = {
   cestaValorFlutuante: null,
 };
 
-// OTIMIZAÇÃO 1.3: Cleanup handlers para event delegation
 let cleanupDelegates = [];
 
 // Utils
@@ -65,8 +67,6 @@ const formatBRL = (v) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     v || 0
   );
-
-// OTIMIZAÇÃO 2.1: escapeHTML agora importado de html-sanitizer.js (função removida - usando import)
 
 /**
  * Valida se um item é válido
@@ -195,6 +195,12 @@ async function carregarCesta() {
     state.itens = [];
   }
 
+  calcularTotais();
+  stateManager.getEventBus().emit(STATE_EVENTS.CART_UPDATED, {
+    items: state.itens,
+    total: state.total,
+  });
+
   // Renderizar cesta após carregar dados
   renderCesta();
 }
@@ -278,6 +284,11 @@ function calcularTotais() {
   }, 0);
   state.total =
     state.subtotal + state.taxaEntrega + state.taxaServico - state.descontos;
+
+  stateManager.setMultiple({
+    [STATE_KEYS.CART_ITEMS]: state.itens,
+    [STATE_KEYS.CART_TOTAL]: state.total,
+  });
 }
 
 // Calcular pontos Royal (10 pontos a cada R$ 1,00 gasto)
@@ -400,7 +411,6 @@ function renderCesta() {
   if (el.resumoContainer) el.resumoContainer.style.display = "block";
   if (el.btnLimpar) el.btnLimpar.style.display = "block";
 
-  // OTIMIZAÇÃO 1.2: Renderização incremental usando renderList
   renderList(
     el.listaItens,
     state.itens,
@@ -420,8 +430,6 @@ function renderCesta() {
   atualizarHeaderCesta();
   atualizarBotaoFlutuante();
   atualizarPontosHeader();
-
-  // OTIMIZAÇÃO 1.3: Event delegation já configurado em setupEventDelegation(), não precisa chamar attachItemHandlers()
 }
 
 // Atualizar header da cesta (ícone no topo)
@@ -500,6 +508,13 @@ async function alterarQuantidade(index, delta) {
     if (result.success) {
       item.quantidade = novaQtd;
       item.precoTotal = item.precoUnitario * item.quantidade;
+
+      calcularTotais();
+      stateManager.getEventBus().emit(STATE_EVENTS.CART_ITEM_UPDATED, {
+        item: item,
+        index: index,
+      });
+
       renderCesta();
     } else {
       showToast("Erro ao atualizar quantidade. Tente novamente.", {
@@ -529,6 +544,13 @@ async function removerItem(index) {
     const result = await removeCartItem(item.cartItemId);
     if (result.success) {
       state.itens.splice(index, 1);
+
+      calcularTotais();
+      stateManager.getEventBus().emit(STATE_EVENTS.CART_ITEM_REMOVED, {
+        item: item,
+        index: index,
+      });
+
       renderCesta();
     } else {
       showToast("Erro ao remover item. Tente novamente.", {
@@ -566,6 +588,10 @@ async function limparCesta() {
     const result = await clearCart();
     if (result.success) {
       state.itens = [];
+
+      calcularTotais();
+      stateManager.getEventBus().emit(STATE_EVENTS.CART_CLEARED);
+
       renderCesta();
       showToast("Cesta limpa com sucesso!", {
         type: "success",
@@ -599,7 +625,6 @@ function editarItem(index) {
   window.location.href = `src/pages/produto.html?id=${item.id}&editIndex=${index}`;
 }
 
-// OTIMIZAÇÃO 1.3: Event Delegation - Configurar uma vez ao invés de adicionar listeners a cada renderização
 function setupEventDelegation() {
   if (!el.listaItens) return;
 
@@ -656,15 +681,11 @@ function setupEventDelegation() {
   cleanupDelegates.push(cleanupEditar);
 }
 
-// Função antiga mantida para compatibilidade, mas não é mais usada
-// OTIMIZAÇÃO 1.3: Removida em favor de event delegation
 function attachItemHandlers() {
   // Esta função não é mais necessária, mas mantida para não quebrar código que possa chamá-la
   // O event delegation é configurado uma vez em setupEventDelegation()
 }
 
-// Inicializar elementos DOM
-// OTIMIZAÇÃO 1.4: Usar cache de DOM ao invés de getElementById direto
 function initElements() {
   el.modal = $id("modal-cesta");
   el.cestaVazia = $id("cesta-vazia-modal");
@@ -687,7 +708,6 @@ function initElements() {
   el.cestaBadgeCount = $id("cesta-badge-count");
   el.cestaValorFlutuante = $id("cesta-valor-flutuante");
 
-  // OTIMIZAÇÃO 1.3: Configurar event delegation uma vez após elementos serem inicializados
   setupEventDelegation();
 }
 

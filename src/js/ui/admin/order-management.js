@@ -17,8 +17,8 @@ import {
 } from "../../api/dashboard.js";
 import { getUserById } from "../../api/user.js";
 import { showSuccess, showError, showConfirm } from "../alerts.js";
-// OTIMIZAÇÃO 1.9: Debounce para eventos de input frequentes
 import { debounce } from "../../utils/performance-utils.js";
+import { escapeHTML as escapeHTMLCentralized } from "../../utils/html-sanitizer.js";
 
 // Constantes
 const MAX_CONCURRENT_REQUESTS = 10;
@@ -140,21 +140,12 @@ const isDevelopment = () => {
 
   /**
    * Sanitizar HTML para prevenir XSS
+   * @deprecated Use escapeHTMLCentralized de html-sanitizer.js diretamente
    * @param {any} text - Texto a ser sanitizado
    * @returns {string} HTML sanitizado
    */
   function escapeHTML(text) {
-    if (text === null || text === undefined) return "";
-    if (typeof text !== "string") {
-      try {
-        return String(text);
-      } catch (e) {
-        return "";
-      }
-    }
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+    return escapeHTMLCentralized(text);
   }
 
   /**
@@ -1643,7 +1634,6 @@ const isDevelopment = () => {
    * Anexar eventos aos elementos DOM
    */
   function attachEvents() {
-    // OTIMIZAÇÃO 1.9: Busca com debounce centralizado
     if (el.searchInput) {
       const debouncedSearch = debounce((value) => {
         state.filters.search = value;

@@ -6,7 +6,6 @@ import * as settingsHelper from "../utils/settings-helper.js";
 
 // Importar sistema de alertas customizado
 import { showError } from "./alerts.js";
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML para prevenir XSS
 import { escapeHTML } from "../utils/html-sanitizer.js";
 
 // Constantes para validação e limites
@@ -62,7 +61,6 @@ const VALIDATION_LIMITS = {
     }
   };
 
-  // OTIMIZAÇÃO 2.1: escapeHTML agora importado de html-sanitizer.js (função removida - usando import)
 
   /**
    * Valida se um ID de usuário é válido

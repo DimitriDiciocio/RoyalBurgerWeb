@@ -88,7 +88,6 @@ export function gerenciarEstadoInputs() {
     // Verificar estado inicial
     atualizarEstadoLabel();
 
-    // OTIMIZAÇÃO 1.7: Usar MutationObserver ao invés de setInterval para detectar mudanças programáticas
     try {
       // Usar eventos nativos do input para mudanças de valor (mais eficiente)
       // O MutationObserver será usado apenas como fallback para mudanças programáticas

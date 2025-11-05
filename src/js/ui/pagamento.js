@@ -24,11 +24,11 @@ import { getCart } from "../api/cart.js";
 import { showError, showSuccess, showToast, showConfirm } from "./alerts.js";
 import { getIngredients } from "../api/ingredients.js";
 import { API_BASE_URL } from "../api/api.js";
+import { validateCPF } from "../utils/validators.js";
 
 // Importar helper de configurações
 // Importação estática garante que o módulo esteja disponível quando necessário
 import * as settingsHelper from "../utils/settings-helper.js";
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML para prevenir XSS
 import { escapeHTML } from "../utils/html-sanitizer.js";
 
 // Constantes para validação e limites
@@ -242,7 +242,6 @@ const VALIDATION_LIMITS = {
     return ingredient ? ingredient.additional_price || 0 : 0;
   }
 
-  // OTIMIZAÇÃO 2.1: escapeHTML agora importado de html-sanitizer.js (função removida - usando import)
 
   function buildImageUrl(imagePath, imageHash = null) {
     if (!imagePath) return null;
@@ -2025,9 +2024,12 @@ const VALIDATION_LIMITS = {
     }
 
     // Validar CPF se preenchido
-    if (state.cpf && !validarCPF(state.cpf)) {
-      showError("CPF inválido!");
-      return;
+    if (state.cpf) {
+      const cpfValidation = validateCPF(state.cpf);
+      if (!cpfValidation.valid) {
+        showError(cpfValidation.message || "CPF inválido!");
+        return;
+      }
     }
 
     // Preparar dados do pedido
@@ -2063,40 +2065,6 @@ const VALIDATION_LIMITS = {
     }
   }
 
-  // Validar CPF - Algoritmo oficial da Receita Federal
-  // Valida dígitos verificadores e rejeita CPFs com todos dígitos iguais
-  function validarCPF(cpf) {
-    if (!cpf || typeof cpf !== "string") return false;
-
-    // Remove caracteres não numéricos
-    cpf = cpf.replace(/[^\d]/g, "");
-
-    // Verifica se tem 11 dígitos
-    if (cpf.length !== 11) return false;
-
-    // Verifica se todos os dígitos são iguais (ex: 111.111.111-11)
-    if (/^(\d)\1{10}$/.test(cpf)) return false;
-
-    // Validação do primeiro dígito verificador
-    let soma = 0;
-    for (let i = 0; i < 9; i++) {
-      soma += parseInt(cpf.charAt(i)) * (10 - i);
-    }
-    let resto = 11 - (soma % 11);
-    if (resto === 10 || resto === 11) resto = 0;
-    if (resto !== parseInt(cpf.charAt(9))) return false;
-
-    // Validação do segundo dígito verificador
-    soma = 0;
-    for (let i = 0; i < 10; i++) {
-      soma += parseInt(cpf.charAt(i)) * (11 - i);
-    }
-    resto = 11 - (soma % 11);
-    if (resto === 10 || resto === 11) resto = 0;
-    if (resto !== parseInt(cpf.charAt(10))) return false;
-
-    return true;
-  }
 
   // ====== Integração com IBGE (UF e municípios) e ViaCEP (CEP) ======
   let ufSelectForm = null;
@@ -2485,9 +2453,12 @@ const VALIDATION_LIMITS = {
       }
 
       // Validar CPF se preenchido
-      if (state.cpf && state.cpf.trim() !== "" && !validarCPF(state.cpf)) {
-        showError("CPF inválido!");
-        return;
+      if (state.cpf && state.cpf.trim() !== "") {
+        const cpfValidation = validateCPF(state.cpf);
+        if (!cpfValidation.valid) {
+          showError(cpfValidation.message || "CPF inválido!");
+          return;
+        }
       }
 
       // Verificar se o pedido está completamente pago com pontos

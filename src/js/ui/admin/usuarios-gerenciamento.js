@@ -13,8 +13,16 @@ import {
 
 import { showToast } from "../alerts.js";
 
-// OTIMIZAÇÃO 1.9: Debounce para eventos de input frequentes
 import { debounce } from "../../utils/performance-utils.js";
+import { renderListInChunks } from "../../utils/virtual-scroll.js";
+import { escapeHTML } from "../../utils/html-sanitizer.js";
+import {
+  validateEmail,
+  validatePhone,
+  validateBirthDate,
+  validatePassword,
+  applyFieldValidation,
+} from "../../utils/validators.js";
 
 // Constantes de configuração
 const CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
@@ -335,25 +343,13 @@ class UsuarioManager {
 
   /**
    * Sanitiza string para prevenir XSS
+   * @deprecated Use escapeHTML de html-sanitizer.js ao invés disso
    * @param {string} str - String a ser sanitizada
    * @returns {string} String segura para innerHTML
    */
   sanitizeHTML(str) {
-    if (!str || typeof str !== "string") {
-      return "";
-    }
-    // Usar DOMPurify se disponível, senão fallback seguro
-    if (typeof DOMPurify !== "undefined") {
-      return DOMPurify.sanitize(str, { ALLOWED_TAGS: [] });
-    }
-    // Fallback: escape completo de caracteres HTML
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#x27;")
-      .replace(/\//g, "&#x2F;");
+    // Delegar para o módulo centralizado
+    return escapeHTML(str);
   }
 
   /**
@@ -484,7 +480,6 @@ class UsuarioManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-funcionario");
     if (searchInput) {
-      // OTIMIZAÇÃO 1.9: Usar debounce centralizado ao invés de executar a cada keystroke
       const debouncedFilter = debounce(() => {
         this.applyAllFilters();
       }, 300);
@@ -501,7 +496,7 @@ class UsuarioManager {
   async loadUsuarios() {
     try {
       const usuarios = await this.dataManager.getAllUsuarios();
-      this.renderUsuarioCards(usuarios);
+      await this.renderUsuarioCards(usuarios);
       // Aplicar filtros após carregar os dados
       this.applyAllFilters();
     } catch (error) {
@@ -513,7 +508,7 @@ class UsuarioManager {
   /**
    * Renderiza cards de usuários
    */
-  renderUsuarioCards(usuarios) {
+  async renderUsuarioCards(usuarios) {
     const container = document.querySelector(
       "#secao-funcionarios .funcionarios"
     );
@@ -531,10 +526,31 @@ class UsuarioManager {
       return;
     }
 
-    usuarios.forEach((usuario) => {
-      const card = this.createUsuarioCard(usuario);
-      container.appendChild(card);
-    });
+    const THRESHOLD_FOR_INCREMENTAL = 50;
+    if (usuarios.length > THRESHOLD_FOR_INCREMENTAL) {
+      // Renderização incremental em chunks
+      await renderListInChunks(
+        container,
+        usuarios,
+        (usuario) => {
+          const card = this.createUsuarioCard(usuario);
+          return card.outerHTML;
+        },
+        {
+          chunkSize: 20,
+          delay: 0,
+          onProgress: (rendered, total) => {
+            // Callback de progresso opcional (pode mostrar loading indicator)
+          },
+        }
+      );
+    } else {
+      // Para listas menores, usar renderização direta (mais simples)
+      usuarios.forEach((usuario) => {
+        const card = this.createUsuarioCard(usuario);
+        container.appendChild(card);
+      });
+    }
   }
 
   /**
@@ -546,12 +562,12 @@ class UsuarioManager {
     card.dataset.funcionarioId = usuario.id;
 
     // Validação e sanitização dos dados (XSS Protection)
-    const nome = this.sanitizeHTML(
+    const nome = escapeHTML(
       usuario.nome || usuario.full_name || "Nome não informado"
     );
-    const email = this.sanitizeHTML(usuario.email || "Email não informado");
-    const telefone = this.sanitizeHTML(usuario.telefone || usuario.phone || "");
-    const cpf = this.sanitizeHTML(usuario.cpf || "");
+    const email = escapeHTML(usuario.email || "Email não informado");
+    const telefone = escapeHTML(usuario.telefone || usuario.phone || "");
+    const cpf = escapeHTML(usuario.cpf || "");
     // Usar o role da API (em inglês) diretamente
     const roleAPI = usuario.role || usuario.cargo || "attendant";
     const ativo =
@@ -563,7 +579,7 @@ class UsuarioManager {
 
     const statusClass = ativo ? "ativo" : "inativo";
     const statusText = ativo ? "Ativo" : "Inativo";
-    const cargoText = this.sanitizeHTML(this.getCargoText(roleAPI));
+    const cargoText = escapeHTML(this.getCargoText(roleAPI));
     const cargoClass = this.getCargoClass(roleAPI);
 
     card.innerHTML = `
@@ -1153,38 +1169,7 @@ class UsuarioManager {
    * Valida telefone
    */
   isValidPhone(telefone) {
-    if (!telefone || typeof telefone !== "string") {
-      return { valid: false, message: "Telefone inválido" };
-    }
-
-    const telefoneLimpo = telefone.replace(/\D/g, "");
-
-    if (telefoneLimpo.length < 10) {
-      return {
-        valid: false,
-        message: "Telefone deve ter pelo menos 10 dígitos",
-      };
-    }
-
-    if (telefoneLimpo.length > 11) {
-      return {
-        valid: false,
-        message: "Telefone deve ter no máximo 11 dígitos",
-      };
-    }
-
-    // Verificar se é um celular (11 dígitos) e se o nono dígito é 9
-    if (telefoneLimpo.length === 11 && telefoneLimpo.charAt(2) !== "9") {
-      return { valid: false, message: "Celular deve começar com 9" };
-    }
-
-    // Verificar DDD válido (11-99)
-    const ddd = telefoneLimpo.substring(0, 2);
-    if (parseInt(ddd) < 11 || parseInt(ddd) > 99) {
-      return { valid: false, message: "DDD inválido" };
-    }
-
-    return { valid: true, message: "" };
+    return validatePhone(telefone);
   }
 
   /**
@@ -1196,56 +1181,14 @@ class UsuarioManager {
       return true;
     }
 
-    const validation = this.isValidPhone(input.value);
-    if (!validation.valid) {
-      this.showFieldError(input, validation.message);
-      return false;
-    }
-
-    this.clearFieldError(input);
-    input.classList.add("valid");
-    return true;
+    return applyFieldValidation(input, (value) => validatePhone(value));
   }
 
   /**
    * Valida email com validação robusta
    */
   isValidEmailRobust(email) {
-    if (!email || typeof email !== "string" || email.trim() === "") {
-      return { valid: false, message: "Email é obrigatório" };
-    }
-
-    // Regex robusta para validação de email
-    const emailRegex =
-      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-    if (!emailRegex.test(email)) {
-      return { valid: false, message: "Formato de email inválido" };
-    }
-
-    if (email.includes(" ")) {
-      return { valid: false, message: "Email não pode conter espaços" };
-    }
-
-    if (email.includes("..") || email.includes("@@")) {
-      return { valid: false, message: "Email contém caracteres inválidos" };
-    }
-
-    const partes = email.split("@");
-    if (partes.length !== 2) {
-      return { valid: false, message: "Email deve ter um @" };
-    }
-
-    const dominio = partes[1];
-    if (
-      !dominio.includes(".") ||
-      dominio.endsWith(".") ||
-      dominio.startsWith(".")
-    ) {
-      return { valid: false, message: "Domínio do email inválido" };
-    }
-
-    return { valid: true, message: "" };
+    return validateEmail(email);
   }
 
   /**
@@ -1257,68 +1200,14 @@ class UsuarioManager {
       return false;
     }
 
-    const validation = this.isValidEmailRobust(input.value);
-    if (!validation.valid) {
-      this.showFieldError(input, validation.message);
-      return false;
-    }
-
-    this.clearFieldError(input);
-    input.classList.add("valid");
-    return true;
+    return applyFieldValidation(input, (value) => validateEmail(value));
   }
 
   /**
    * Valida data de nascimento
    */
   isValidBirthDate(data) {
-    if (!data || data.trim() === "") {
-      return { valid: false, message: "Data de nascimento é obrigatória" };
-    }
-
-    const dataSelecionada = new Date(data);
-    const hoje = new Date();
-    const dataMinima = new Date("1850-01-01");
-
-    if (isNaN(dataSelecionada.getTime())) {
-      return { valid: false, message: "Data inválida" };
-    }
-
-    if (dataSelecionada > hoje) {
-      return {
-        valid: false,
-        message: "Data de nascimento não pode ser no futuro",
-      };
-    }
-
-    if (dataSelecionada < dataMinima) {
-      return { valid: false, message: "Data de nascimento muito antiga" };
-    }
-
-    // Calcular idade real
-    const idade = hoje.getFullYear() - dataSelecionada.getFullYear();
-    const mesAtual = hoje.getMonth();
-    const mesNascimento = dataSelecionada.getMonth();
-    const diaAtual = hoje.getDate();
-    const diaNascimento = dataSelecionada.getDate();
-
-    let idadeReal = idade;
-    if (
-      mesNascimento > mesAtual ||
-      (mesNascimento === mesAtual && diaNascimento > diaAtual)
-    ) {
-      idadeReal--;
-    }
-
-    if (idadeReal < 18) {
-      return { valid: false, message: "Você deve ter pelo menos 18 anos" };
-    }
-
-    if (idadeReal > 120) {
-      return { valid: false, message: "Idade inválida" };
-    }
-
-    return { valid: true, message: "" };
+    return validateBirthDate(data);
   }
 
   /**
@@ -1330,26 +1219,19 @@ class UsuarioManager {
       return false;
     }
 
-    const validation = this.isValidBirthDate(input.value);
-    if (!validation.valid) {
-      this.showFieldError(input, validation.message);
-      return false;
-    }
-
-    this.clearFieldError(input);
-    input.classList.add("valid");
-    return true;
+    return applyFieldValidation(input, (value) => validateBirthDate(value));
   }
 
   /**
    * Valida força da senha em tempo real
    */
   validatePasswordStrength(senha) {
+    const validacao = validatePassword(senha);
     const requisitos = {
-      maiuscula: /[A-Z]/.test(senha),
-      numero: /\d/.test(senha),
-      especial: /[!@#$%^&*(),.?":{}|<>]/.test(senha),
-      tamanho: senha.length >= 8,
+      maiuscula: validacao.requirements?.uppercase || false,
+      numero: validacao.requirements?.number || false,
+      especial: validacao.requirements?.special || false,
+      tamanho: validacao.requirements?.length || false,
     };
 
     // Atualizar visual dos requisitos
@@ -1364,7 +1246,7 @@ class UsuarioManager {
     if (reqEspecial) reqEspecial.classList.toggle("valid", requisitos.especial);
     if (reqTamanho) reqTamanho.classList.toggle("valid", requisitos.tamanho);
 
-    return Object.values(requisitos).every((req) => req);
+    return validacao.valid;
   }
 
   /**
@@ -1570,8 +1452,9 @@ class UsuarioManager {
       return false;
     }
 
-    if (!this.isValidEmail(email)) {
-      this.showErrorMessage("Email inválido");
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      this.showErrorMessage(emailValidation.message || "Email inválido");
       return false;
     }
 
@@ -1620,11 +1503,12 @@ class UsuarioManager {
   }
 
   /**
-   * Valida email
+   * Valida email (simples)
+   * @deprecated Use validateEmail de validators.js diretamente
    */
   isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const validation = validateEmail(email);
+    return validation.valid;
   }
 
   /**
@@ -1698,10 +1582,10 @@ class UsuarioManager {
    */
   populateUsuarioMetricas(usuario) {
     // Validação e sanitização dos dados (XSS Protection)
-    const nome = this.sanitizeHTML(
+    const nome = escapeHTML(
       usuario.nome || usuario.full_name || "Nome não informado"
     );
-    const email = this.sanitizeHTML(usuario.email || "Email não informado");
+    const email = escapeHTML(usuario.email || "Email não informado");
     const telefone = usuario.telefone || usuario.phone || "Não informado";
     const cpf = usuario.cpf || "Não informado";
     const roleAPI = usuario.role || usuario.cargo || "attendant";

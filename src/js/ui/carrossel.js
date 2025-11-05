@@ -10,7 +10,6 @@ $(document).ready(function () {
   let temporizadorCarrossel;
   let animationFrameId = null;
 
-  // OTIMIZAÇÃO 1.8: Variáveis para controlar visibilidade
   let isPageVisible = !document.hidden;
   let isCarouselVisible = true;
   let visibilityObserver = null;
@@ -24,7 +23,6 @@ $(document).ready(function () {
 
   // --- Funções de Ajuda ---
 
-  // OTIMIZAÇÃO 1.8: Função para atualizar o transform do carrossel usando requestAnimationFrame
   function aplicarTransform(offset = 0) {
     // Cancelar animação anterior se existir
     if (animationFrameId !== null) {
@@ -81,14 +79,12 @@ $(document).ready(function () {
 
   // --- Funções de Temporizador (otimizadas) ---
 
-  // OTIMIZAÇÃO 1.8: Verificar se o carrossel deve estar rodando
   function deveRodar() {
     return isPageVisible && isCarouselVisible && totalImagens > 1;
   }
 
   function iniciarTemporizador() {
     pararTemporizador();
-    // OTIMIZAÇÃO 1.8: Só iniciar se a página e o carrossel estiverem visíveis
     if (deveRodar()) {
       temporizadorCarrossel = setInterval(avancarCarrossel, tempoDeEspera);
     }
@@ -181,7 +177,6 @@ $(document).ready(function () {
 
   // --- Event Listeners para arrastar ---
 
-  // OTIMIZAÇÃO 1.8: Event listeners de arrastar - mousedown/touchstart apenas no carrossel,
   // mas mousemove/touchmove precisam ser globais para capturar quando o mouse sai do elemento
   carrosselImagens.on("mousedown", iniciarArrasto);
   $(document).on("mousemove.carrossel", duranteArrasto);
@@ -199,7 +194,6 @@ $(document).ready(function () {
     );
   }
 
-  // OTIMIZAÇÃO 1.8: Page Visibility API - Pausar quando página está em background
   function handleVisibilityChange() {
     isPageVisible = !document.hidden;
     if (isPageVisible && isCarouselVisible) {
@@ -210,7 +204,6 @@ $(document).ready(function () {
   }
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
-  // OTIMIZAÇÃO 1.8: Intersection Observer - Pausar quando carrossel não está visível
   function setupIntersectionObserver() {
     const carouselElement = $(".carrossel")[0];
     if (!carouselElement || !("IntersectionObserver" in window)) {

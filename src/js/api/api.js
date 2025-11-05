@@ -1,5 +1,6 @@
 // Utilitários de requisição para a API
 // Centraliza base URL, headers, token e tratamento de erros
+import { robustFetch, classifyNetworkError } from "../utils/network-error-handler.js";
 
 const STORAGE_KEYS = {
   token: "rb.token",
@@ -47,7 +48,15 @@ export function clearStoredUser() {
 
 export async function apiRequest(
   path,
-  { method = "GET", body, headers = {}, skipAuth = false } = {}
+  {
+    method = "GET",
+    body,
+    headers = {},
+    skipAuth = false,
+    timeout = 30000, // 30 segundos padrão
+    maxRetries = 3, // 3 tentativas padrão
+    skipRetry = false, // Para desabilitar retry em casos específicos (ex: login)
+  } = {}
 ) {
   const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
 
@@ -65,20 +74,40 @@ export async function apiRequest(
     if (token) baseHeaders["Authorization"] = `Bearer ${token}`;
   }
 
+  const fetchOptions = {
+    method,
+    headers: baseHeaders,
+    body: body
+      ? body instanceof FormData
+        ? body
+        : typeof body === "string"
+        ? body
+        : JSON.stringify(body)
+      : undefined,
+    credentials: "include",
+    mode: "cors", // Força modo CORS
+  };
+
   try {
-    const response = await fetch(url, {
-      method,
-      headers: baseHeaders,
-      body: body
-        ? body instanceof FormData
-          ? body
-          : typeof body === "string"
-          ? body
-          : JSON.stringify(body)
-        : undefined,
-      credentials: "include",
-      mode: "cors", // Força modo CORS
-    });
+    // Usar robustFetch se retry não estiver desabilitado
+    const response = skipRetry
+      ? await fetch(url, fetchOptions)
+      : await robustFetch(url, fetchOptions, {
+          timeout,
+          maxRetries,
+          // Não fazer retry para erros 401 (token expirado) ou 403 (acesso negado)
+          onRetry: (attempt, delay, error) => {
+            // Log apenas em desenvolvimento
+            const isDev =
+              typeof process !== "undefined" &&
+              process.env?.NODE_ENV === "development";
+            if (isDev) {
+              console.log(
+                `Tentativa ${attempt} de requisição para ${path} após ${delay}ms`
+              );
+            }
+          },
+        });
 
     let data;
     const contentType = response.headers.get("content-type") || "";
@@ -158,7 +187,19 @@ export async function apiRequest(
 
     return data;
   } catch (fetchError) {
-    // Erro de rede ou conexão
+    const classification = classifyNetworkError(fetchError);
+
+    // Se não tem status, definir como 0 (erro de rede)
+    if (!fetchError.status && fetchError.status !== 0) {
+      fetchError.status = 0;
+    }
+
+    // Adicionar informações de classificação ao erro
+    fetchError.errorType = classification.type;
+    fetchError.userMessage = classification.userMessage;
+    fetchError.isRetryable = classification.retryable;
+
+    // Erro de rede ou conexão (não tratado acima)
     if (
       fetchError.name === "TypeError" &&
       fetchError.message.includes("fetch")
@@ -168,23 +209,23 @@ export async function apiRequest(
         fetchError.message.includes("CORS") ||
         fetchError.message.includes("blocked")
       ) {
-        const corsError = new Error(
-          "Erro de CORS: O servidor não permite requisições do frontend. Configure o CORS no backend Flask."
-        );
+        const corsError = new Error(classification.userMessage);
         corsError.status = 0;
         corsError.isCorsError = true;
+        corsError.errorType = classification.type;
+        corsError.userMessage = classification.userMessage;
         throw corsError;
       }
 
-      const connectionError = new Error(
-        "Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet."
-      );
+      const connectionError = new Error(classification.userMessage);
       connectionError.status = 0;
       connectionError.isConnectionError = true;
+      connectionError.errorType = classification.type;
+      connectionError.userMessage = classification.userMessage;
       throw connectionError;
     }
 
-    // Re-throw outros erros
+    // Re-throw outros erros (com classificação adicionada)
     throw fetchError;
   }
 }

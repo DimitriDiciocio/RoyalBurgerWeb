@@ -1,6 +1,5 @@
 // src/js/utils/dom-renderer.js
 // Renderização Incremental de Listas - Seção 1.2 da análise de performance
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML
 import { createSafeElement } from "./html-sanitizer.js";
 
 /**
@@ -105,13 +104,11 @@ export function renderListBatch(container, items, templateFn) {
 
 /**
  * Cria um elemento DOM a partir de HTML string de forma segura
- * OTIMIZAÇÃO 2.1: Usa sanitização automática
  * @param {string} htmlString - String HTML a ser convertida
  * @param {boolean} sanitize - Se deve sanitizar (padrão: true)
  * @returns {HTMLElement|null} Elemento criado ou null se inválido
  */
 export function createElementFromHTML(htmlString, sanitize = true) {
-  // OTIMIZAÇÃO 2.1: Usar sanitização automática
   if (sanitize) {
     return createSafeElement(htmlString, true);
   }
@@ -124,7 +121,6 @@ export function createElementFromHTML(htmlString, sanitize = true) {
 
 /**
  * Cria múltiplos elementos a partir de HTML string
- * OTIMIZAÇÃO 2.1: Usa sanitização automática
  * @param {string} htmlString - String HTML contendo múltiplos elementos
  * @param {boolean} sanitize - Se deve sanitizar (padrão: true)
  * @returns {Array<HTMLElement>} Array de elementos criados
@@ -134,7 +130,6 @@ export function createElementsFromHTML(htmlString, sanitize = true) {
     return [];
   }
 
-  // OTIMIZAÇÃO 2.1: Usar sanitização automática
   if (sanitize && typeof window !== "undefined" && window.DOMPurify) {
     const tempDiv = document.createElement("div");
     tempDiv.innerHTML = window.DOMPurify.sanitize(htmlString);

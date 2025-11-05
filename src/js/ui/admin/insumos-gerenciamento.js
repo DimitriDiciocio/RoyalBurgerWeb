@@ -16,8 +16,8 @@ import {
 
 import { showToast, showConfirm, toastFromApiError } from "../alerts.js";
 
-// OTIMIZAÇÃO 1.9: Debounce para eventos de input frequentes
 import { debounce } from "../../utils/performance-utils.js";
+import { escapeHTML } from "../../utils/html-sanitizer.js";
 
 /**
  * Gerenciador de dados de insumos
@@ -376,7 +376,6 @@ class InsumoManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-ingrediente");
     if (searchInput) {
-      // OTIMIZAÇÃO 1.9: Usar debounce centralizado ao invés de executar a cada keystroke
       const debouncedFilter = debounce(() => {
         this.applyAllFilters();
       }, 300);
@@ -557,22 +556,22 @@ class InsumoManager {
     card.innerHTML = `
             <div class="cabecalho-ingrediente">
                 <div class="nome-ingrediente">
-                    <h3>${insumo.nome || "Nome não informado"}</h3>
+                    <h3>${escapeHTML(insumo.nome || "Nome não informado")}</h3>
                     <div class="info-ingrediente">
                         <div class="info-ingrediente-container">
                             <div class="categoria-fornecedor">
                                 <i class="fa-solid fa-tag"></i>
-                                <span>${categoriaNome}</span>
+                                <span>${escapeHTML(categoriaNome)}</span>
                 </div>
                             <div class="categoria-fornecedor">
                                 <i class="fa-solid fa-truck"></i>
-                                <span>${
+                                <span>${escapeHTML(
                                   insumo.fornecedor || "Não informado"
-                                }</span>
+                                )}</span>
                             </div>
                         </div>
                         <div class="tag-status ${statusClass}">
-                            ${statusText}
+                            ${escapeHTML(statusText)}
                         </div>
                 </div>
             </div>

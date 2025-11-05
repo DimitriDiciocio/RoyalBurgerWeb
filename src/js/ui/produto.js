@@ -9,14 +9,22 @@ import { getIngredients } from "../api/ingredients.js";
 import { addToCart, updateCartItem, getCart } from "../api/cart.js";
 import { showToast } from "./alerts.js";
 import { API_BASE_URL } from "../api/api.js";
-// OTIMIZAÇÃO 1.4: Cache de referências DOM
+import { cacheManager } from "../utils/cache-manager.js";
+import { delegate } from "../utils/performance-utils.js";
 import { $id, $q } from "../utils/dom-cache.js";
-// OTIMIZAÇÃO 2.1: Sanitização automática de HTML para prevenir XSS
 import {
   escapeHTML,
   escapeAttribute,
   sanitizeURL,
 } from "../utils/html-sanitizer.js";
+
+// Constantes de cache
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const CACHE_KEYS = {
+  product: (id) => `product_${id}`,
+  productIngredients: (id) => `product_ingredients_${id}`,
+  allIngredients: "ingredients_all",
+};
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -45,8 +53,9 @@ const VALIDATION_LIMITS = {
     cartItemId: null,
   };
 
+  const cleanupDelegates = new Map();
+
   // DOM refs
-  // OTIMIZAÇÃO 1.4: Usar cache de DOM ao invés de getElementById/querySelector direto
   const el = {
     nome: $id("nome-produto"),
     descricao: $id("descricao-produto"),
@@ -101,7 +110,6 @@ const VALIDATION_LIMITS = {
     return "Não foi possível adicionar o item à cesta. Tente novamente.";
   }
 
-  // OTIMIZAÇÃO 2.1: escapeHTML e escapeAttribute agora importados de html-sanitizer.js (funções removidas - usando import)
 
   // SECURITY FIX: Validação robusta de IDs
   function validateIngredientId(id) {
@@ -474,37 +482,38 @@ const VALIDATION_LIMITS = {
       })
       .join("");
 
-    // PERFORMANCE FIX: Remover listener anterior antes de adicionar
-    const oldListeners = el.listaExtrasModal.querySelectorAll(
-      ".item [data-has-listener]"
-    );
-    oldListeners.forEach((btn) => btn.removeAttribute("data-has-listener"));
-
     attachIngredienteHandlers(el.listaExtrasModal);
-
-    // PERFORMANCE FIX: Event delegation ao invés de múltiplos listeners
-    el.listaExtrasModal
-      .querySelectorAll(".item .fa-minus, .item .fa-plus")
-      .forEach((btn) => {
-        if (!btn.hasAttribute("data-has-listener")) {
-          btn.setAttribute("data-has-listener", "true");
-          btn.addEventListener("click", () => {
-            renderMonteSeuJeitoList();
-            updateTotals();
-            updateExtrasBadge();
-          });
-        }
-      });
   }
 
   function attachIngredienteHandlers(container) {
     if (!container) return;
 
-    container.querySelectorAll(".item").forEach((itemEl) => {
+    // Limpar cleanup anteriores deste container
+    if (cleanupDelegates.has(container)) {
+      cleanupDelegates.get(container).forEach((cleanup) => cleanup());
+      cleanupDelegates.delete(container);
+    }
+
+    const containerCleanups = [];
+
+    // Helper para processar clique em botão de ingrediente
+    function handleIngredientButtonClick(e, isMinus) {
+      const button = e.target.closest(".fa-minus, .fa-plus");
+      if (!button) return;
+
+      if (button.classList.contains("dessativo")) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      const itemEl = button.closest(".item");
+      if (!itemEl) return;
+
       // SECURITY FIX: Validação de ID
       const rawId = itemEl.getAttribute("data-ingrediente-id");
       const id = validateIngredientId(rawId);
-      if (!id) return; // Skip ingredientes com ID inválido
+      if (!id) return;
 
       // SECURITY FIX: Validação de preço
       const price = Math.max(
@@ -518,91 +527,109 @@ const VALIDATION_LIMITS = {
       const minQuantity = parseFloat(itemEl.getAttribute("data-min-qty"));
       const maxQuantity = parseFloat(itemEl.getAttribute("data-max-qty"));
 
-      const minus = itemEl.querySelector(".fa-minus");
-      const plus = itemEl.querySelector(".fa-plus");
       const qtdEl = itemEl.querySelector(".qtd-extra");
       const nomeEl = itemEl.querySelector(".nome-adicional");
 
-      const ensureExtra = () => {
-        if (!state.extrasById.has(id)) {
-          state.extrasById.set(id, {
-            id,
-            name: nomeEl?.textContent || "Ingrediente",
-            price,
-            quantity: 0,
-            basePortions,
-            minQuantity,
-            maxQuantity,
-          });
-        }
-        return state.extrasById.get(id);
-      };
-
-      const updateButtonStates = (extra) => {
-        const effectiveQty = basePortions + extra.quantity;
-
-        if (minus && !(effectiveQty > minQuantity)) {
-          minus.remove();
-        }
-        if (plus && !(effectiveQty < maxQuantity)) {
-          plus.remove();
-        }
-      };
-
-      if (minus)
-        minus.addEventListener("click", (e) => {
-          if (minus.classList.contains("dessativo")) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-
-          const extra = ensureExtra();
-          const effectiveQty = basePortions + extra.quantity;
-
-          if (effectiveQty > minQuantity) {
-            extra.quantity -= 1;
-            const newEffective = basePortions + extra.quantity;
-            qtdEl.textContent = String(newEffective).padStart(2, "0");
-            updateTotals();
-
-            if (basePortions > 0) {
-              renderMonteSeuJeitoList();
-            } else {
-              renderExtrasModal();
-            }
-            if (basePortions === 0) updateExtrasBadge();
-          }
+      // Garantir que o extra existe no state
+      if (!state.extrasById.has(id)) {
+        state.extrasById.set(id, {
+          id,
+          name: nomeEl?.textContent || "Ingrediente",
+          price,
+          quantity: 0,
+          basePortions,
+          minQuantity,
+          maxQuantity,
         });
+      }
 
-      if (plus)
-        plus.addEventListener("click", (e) => {
-          if (plus.classList.contains("dessativo")) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
+      const extra = state.extrasById.get(id);
+      const effectiveQty = basePortions + extra.quantity;
 
-          const extra = ensureExtra();
-          const effectiveQty = basePortions + extra.quantity;
+      if (isMinus && effectiveQty > minQuantity) {
+        extra.quantity -= 1;
+        const newEffective = basePortions + extra.quantity;
+        if (qtdEl) qtdEl.textContent = String(newEffective).padStart(2, "0");
+        updateTotals();
 
-          if (effectiveQty < maxQuantity) {
-            extra.quantity += 1;
-            const newEffective = basePortions + extra.quantity;
-            qtdEl.textContent = String(newEffective).padStart(2, "0");
-            updateTotals();
+        if (basePortions > 0) {
+          renderMonteSeuJeitoList();
+        } else {
+          renderExtrasModal();
+        }
+        if (basePortions === 0) updateExtrasBadge();
+      } else if (!isMinus && effectiveQty < maxQuantity) {
+        extra.quantity += 1;
+        const newEffective = basePortions + extra.quantity;
+        if (qtdEl) qtdEl.textContent = String(newEffective).padStart(2, "0");
+        updateTotals();
 
-            if (basePortions > 0) {
-              renderMonteSeuJeitoList();
-            } else {
-              renderExtrasModal();
-            }
-            if (basePortions === 0) updateExtrasBadge();
-          }
+        if (basePortions > 0) {
+          renderMonteSeuJeitoList();
+        } else {
+          renderExtrasModal();
+        }
+        if (basePortions === 0) updateExtrasBadge();
+      }
+    }
+
+    const cleanupMinus = delegate(container, "click", ".fa-minus", (e) =>
+      handleIngredientButtonClick(e, true)
+    );
+    containerCleanups.push(cleanupMinus);
+
+    const cleanupPlus = delegate(container, "click", ".fa-plus", (e) =>
+      handleIngredientButtonClick(e, false)
+    );
+    containerCleanups.push(cleanupPlus);
+
+    // Armazenar cleanups deste container
+    cleanupDelegates.set(container, containerCleanups);
+
+    // Atualizar estados dos botões após renderização
+    container.querySelectorAll(".item").forEach((itemEl) => {
+      const rawId = itemEl.getAttribute("data-ingrediente-id");
+      const id = validateIngredientId(rawId);
+      if (!id) return;
+
+      const basePortions = Math.max(
+        0,
+        parseFloat(itemEl.getAttribute("data-porcoes")) || 0
+      );
+      const minQuantity = parseFloat(itemEl.getAttribute("data-min-qty"));
+      const maxQuantity = parseFloat(itemEl.getAttribute("data-max-qty"));
+
+      const minus = itemEl.querySelector(".fa-minus");
+      const plus = itemEl.querySelector(".fa-plus");
+
+      // Garantir que o extra existe
+      if (!state.extrasById.has(id)) {
+        const nomeEl = itemEl.querySelector(".nome-adicional");
+        const price = Math.max(
+          0,
+          parseFloat(itemEl.getAttribute("data-preco")) || 0
+        );
+        state.extrasById.set(id, {
+          id,
+          name: nomeEl?.textContent || "Ingrediente",
+          price,
+          quantity: 0,
+          basePortions,
+          minQuantity,
+          maxQuantity,
         });
+      }
 
-      const extra = ensureExtra();
-      updateButtonStates(extra);
+      const extra = state.extrasById.get(id);
+      const effectiveQty = basePortions + extra.quantity;
+
+      // Atualizar estados dos botões
+      if (minus && !(effectiveQty > minQuantity)) {
+        minus.remove();
+      }
+      if (plus && !(effectiveQty < maxQuantity)) {
+        plus.remove();
+      }
     });
   }
 
@@ -819,18 +846,33 @@ const VALIDATION_LIMITS = {
 
   async function loadIngredientes(productId) {
     try {
-      const resp = await getProductIngredients(productId);
+      const cacheKeyIngredients = CACHE_KEYS.productIngredients(productId);
+      let resp = cacheManager.get(cacheKeyIngredients);
+      if (!resp) {
+        resp = await getProductIngredients(productId);
+        cacheManager.set(cacheKeyIngredients, resp, CACHE_TTL);
+      }
       const productIngredients = Array.isArray(resp) ? resp : resp?.items || [];
 
       let allIngredients = [];
-      try {
-        const allIngredientsResp = await getIngredients({ page_size: 1000 });
-        allIngredients = Array.isArray(allIngredientsResp)
-          ? allIngredientsResp
-          : allIngredientsResp?.items || [];
-      } catch (err) {
-        // IMPROVEMENT: Silencioso propositalmente - autenticação não obrigatória
-        allIngredients = [];
+      const cachedAllIngredients = cacheManager.get(CACHE_KEYS.allIngredients);
+      if (cachedAllIngredients) {
+        allIngredients = cachedAllIngredients;
+      } else {
+        try {
+          const allIngredientsResp = await getIngredients({ page_size: 1000 });
+          allIngredients = Array.isArray(allIngredientsResp)
+            ? allIngredientsResp
+            : allIngredientsResp?.items || [];
+          cacheManager.set(
+            CACHE_KEYS.allIngredients,
+            allIngredients,
+            CACHE_TTL
+          );
+        } catch (err) {
+          // IMPROVEMENT: Silencioso propositalmente - autenticação não obrigatória
+          allIngredients = [];
+        }
       }
 
       const enrichedIngredients = productIngredients.map((productIng) => {
@@ -889,10 +931,21 @@ const VALIDATION_LIMITS = {
     if (!state.productId) return;
 
     try {
-      const [produto] = await Promise.all([
-        getProductById(state.productId),
+      const cacheKeyProduct = CACHE_KEYS.product(state.productId);
+      let produto = cacheManager.get(cacheKeyProduct);
+
+      // Carregar produto e ingredientes em paralelo (com cache)
+      const [produtoData] = await Promise.all([
+        produto ? Promise.resolve(produto) : getProductById(state.productId),
         loadIngredientes(state.productId),
       ]);
+
+      // Se não estava em cache, salvar agora
+      if (!produto) {
+        produto = produtoData;
+        cacheManager.set(cacheKeyProduct, produto, CACHE_TTL);
+      }
+
       state.product = produto;
       updateTitle();
       renderProdutoInfo();

@@ -25,8 +25,9 @@ import { showToast } from "../alerts.js";
 import { abrirModal, fecharModal } from "../modais.js";
 import { ProdutoExtrasManager } from "./produto-extras-manager.js";
 import { API_BASE_URL } from "../../api/api.js";
-// OTIMIZAÇÃO 1.9: Debounce para eventos de input frequentes
 import { debounce } from "../../utils/performance-utils.js";
+import { renderListInChunks } from "../../utils/virtual-scroll.js";
+import { escapeHTML } from "../../utils/html-sanitizer.js";
 
 /**
  * Gerenciador de dados de produtos
@@ -543,7 +544,6 @@ class ProdutoManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-produto");
     if (searchInput) {
-      // OTIMIZAÇÃO 1.9: Usar debounce centralizado ao invés de setTimeout manual
       const debouncedFilter = debounce(() => {
         this.applyAllFilters();
       }, 300);
@@ -573,7 +573,7 @@ class ProdutoManager {
         this.mapProdutoFromAPI(produto)
       );
 
-      this.renderProdutoCards(produtos);
+      await this.renderProdutoCards(produtos);
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
       this.showErrorMessage("Erro ao carregar produtos");
@@ -646,7 +646,7 @@ class ProdutoManager {
   /**
    * Renderiza cards de produtos
    */
-  renderProdutoCards(produtos) {
+  async renderProdutoCards(produtos) {
     const container = document.querySelector(".produtos");
     if (!container) return;
 
@@ -654,13 +654,53 @@ class ProdutoManager {
     const existingCards = container.querySelectorAll(".card-produto");
     existingCards.forEach((card) => card.remove());
 
-    // Adicionar novos cards
-    produtos.forEach((produto) => {
-      const card = this.createProdutoCard(produto);
-      container.appendChild(card);
-      // Atualiza custo estimado real baseado nos ingredientes
-      this.refreshProductEstimatedCost(produto.id, card);
-    });
+    if (!produtos || produtos.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <i class="fa-solid fa-box-open"></i>
+          <p>Nenhum produto encontrado</p>
+        </div>
+      `;
+      return;
+    }
+
+    const THRESHOLD_FOR_INCREMENTAL = 50;
+    if (produtos.length > THRESHOLD_FOR_INCREMENTAL) {
+      // Renderização incremental em chunks
+      await renderListInChunks(
+        container,
+        produtos,
+        (produto) => {
+          const card = this.createProdutoCard(produto);
+          return card.outerHTML;
+        },
+        {
+          chunkSize: 20,
+          delay: 0,
+          onProgress: (rendered, total) => {
+            // Callback de progresso opcional (pode mostrar loading indicator)
+          },
+        }
+      );
+
+      // Atualizar custos estimados após renderização completa
+      produtos.forEach((produto) => {
+        const card = container.querySelector(
+          `[data-produto-id="${produto.id}"]`
+        );
+        if (card) {
+          this.refreshProductEstimatedCost(produto.id, card);
+        }
+      });
+    } else {
+      // Para listas menores, usar renderização direta (mais simples)
+      produtos.forEach((produto) => {
+        const card = this.createProdutoCard(produto);
+        container.appendChild(card);
+        // Atualiza custo estimado real baseado nos ingredientes
+        this.refreshProductEstimatedCost(produto.id, card);
+      });
+    }
   }
 
   /**
@@ -744,8 +784,8 @@ class ProdutoManager {
     if (imageUrl) {
       // Usar createElement para evitar XSS
       const img = document.createElement("img");
-      img.src = this.escapeHtml(imageUrl);
-      img.alt = this.escapeHtml(produto.nome || "Produto");
+      img.src = escapeHTML(imageUrl);
+      img.alt = escapeHTML(produto.nome || "Produto");
       img.className = "produto-imagem";
       img.loading = "lazy"; // CORREÇÃO: Lazy loading para melhor performance
 
@@ -817,7 +857,7 @@ class ProdutoManager {
 
             <div class="info-produto">
                 <div class="cabecalho-produto">
-                    <h3>${this.escapeHtml(produto.nome)}</h3>
+                    <h3>${escapeHTML(produto.nome)}</h3>
                     <div class="controles-produto">
                         <label class="toggle">
                             <input type="checkbox" ${
@@ -830,12 +870,12 @@ class ProdutoManager {
                     </div>
                 </div>
                 
-                <p class="descricao-produto">${this.escapeHtml(
+                <p class="descricao-produto">${escapeHTML(
                   descricaoLimitada
                 )}</p>
 
                 <div class="categoria-status">
-                    <div class="categoria">${this.escapeHtml(
+                    <div class="categoria">${escapeHTML(
                       categoriaNome
                     )}</div>
                     <div class="status ${
@@ -2402,7 +2442,7 @@ class ProdutoManager {
       // Atualizar nome
       const nomeElement = card.querySelector("h3");
       if (nomeElement && produto.nome) {
-        nomeElement.textContent = this.escapeHtml(produto.nome);
+        nomeElement.textContent = escapeHTML(produto.nome);
       }
 
       // Atualizar descrição
@@ -2412,7 +2452,7 @@ class ProdutoManager {
           produto.descricao || "Sem descrição",
           50
         );
-        descricaoElement.textContent = this.escapeHtml(descricaoLimitada);
+        descricaoElement.textContent = escapeHTML(descricaoLimitada);
       }
 
       // Atualizar preço
@@ -2426,7 +2466,7 @@ class ProdutoManager {
       const categoriaElement = card.querySelector(".categoria");
       if (categoriaElement) {
         const categoriaNome = this.getCategoriaNome(produto.categoriaId);
-        categoriaElement.textContent = this.escapeHtml(categoriaNome);
+        categoriaElement.textContent = escapeHTML(categoriaNome);
       }
 
       // Atualizar status de forma segura
@@ -2464,11 +2504,11 @@ class ProdutoManager {
         );
       }
       if (textEl) {
-        textEl.textContent = this.escapeHtml(statusText);
+        textEl.textContent = escapeHTML(statusText);
       } else {
         statusElement.insertAdjacentHTML(
           "beforeend",
-          ` <span class="status-text">${this.escapeHtml(statusText)}</span>`
+          ` <span class="status-text">${escapeHTML(statusText)}</span>`
         );
       }
       toggleCheckbox.checked = Boolean(produto.ativo);
@@ -2847,7 +2887,7 @@ class ProdutoManager {
 
     ingredienteElement.innerHTML = `
             <div class="ingrediente-header">
-                <span class="nome">${this.escapeHtml(ingrediente.name)}</span>
+                <span class="nome">${escapeHTML(ingrediente.name)}</span>
                 <span class="badge-custo" data-custo="${custoTotal}">R$ ${this.formatCurrency(
       custoTotal
     )}</span>

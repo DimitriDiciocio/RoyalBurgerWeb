@@ -200,56 +200,99 @@ export function showConfirm({ title = 'Confirmação', message = 'Deseja continu
 
 export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
     let title = 'Erro';
-    let msg = (err && (err.payload?.error || err.payload?.message || err.message)) || fallback;
-    
-    // Tratamento específico para erros de conexão
-    if (err?.isConnectionError || err?.status === 0) {
-        title = 'Problema de Conexão';
-        msg = 'Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet.';
-    } else if (err?.status >= 500) {
-        title = 'Servidor Indisponível';
-        msg = 'O servidor está temporariamente indisponível. Tente novamente em alguns minutos.';
-    } else if (err?.status === 404) {
-        // Verificar se é erro de login (credenciais inválidas) ou endpoint não encontrado
-        const isLoginError = err.message && (
-            err.message.includes('E-mail ou senha incorretos') ||
-            err.message.includes('credenciais') ||
-            err.message.includes('incorretos')
-        );
+    let msg = fallback;
 
-        
-        if (isLoginError) {
-            // É um erro de login - usar a mensagem original
-            title = 'Erro de Login';
-            msg = err.message;
-        } else {
-            // Endpoint não encontrado
-            title = 'Serviço Não Encontrado';
-            msg = 'O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.';
+    // Se o erro já tem userMessage (classificado pelo network-error-handler), usar
+    if (err?.userMessage) {
+        msg = err.userMessage;
+        // Definir título baseado no tipo de erro
+        switch (err.errorType) {
+            case 'timeout':
+                title = 'Timeout';
+                break;
+            case 'connection':
+                title = 'Problema de Conexão';
+                break;
+            case 'cors':
+                title = 'Erro de Configuração';
+                break;
+            case 'unauthorized':
+                title = 'Sessão Expirada';
+                break;
+            case 'forbidden':
+                title = 'Acesso Negado';
+                break;
+            case 'not_found':
+                title = 'Serviço Não Encontrado';
+                break;
+            case 'rate_limit':
+                title = 'Muitas Requisições';
+                break;
+            case 'server_error':
+                title = 'Servidor Indisponível';
+                break;
+            case 'validation_error':
+                title = 'Erro de Validação';
+                break;
+            case 'network':
+                title = 'Erro de Conexão';
+                break;
+            default:
+                title = 'Erro';
         }
-    } else if (err?.status === 403) {
-        // Verificar se é erro de conta inativa
-        const msgLower = msg.toLowerCase();
-        if (msgLower.includes('conta inativa') || 
-            msgLower.includes('conta desativada') ||
-            msgLower.includes('usuário inativo') ||
-            msgLower.includes('account inactive') ||
-            msgLower.includes('user inactive') ||
-            msgLower.includes('conta suspensa') ||
-            msgLower.includes('conta bloqueada')) {
-            title = 'Conta Inativa';
-            msg = 'Sua conta está inativa. Entre em contato com o suporte para reativá-la.';
-        } else if (msgLower.includes('email não verificado') || 
-                   msgLower.includes('email não está verificado') ||
-                   msgLower.includes('verifique seu email') ||
-                   msgLower.includes('não verificado')) {
-            title = 'Email Não Verificado';
-            // Manter a mensagem original do backend
-        } else {
-            title = 'Acesso Negado';
-            // Manter a mensagem original do backend
+    } else {
+        // Fallback para tratamento antigo (compatibilidade)
+        msg = (err && (err.payload?.error || err.payload?.message || err.message)) || fallback;
+        
+        // Tratamento específico para erros de conexão
+        if (err?.isConnectionError || err?.status === 0) {
+            title = 'Problema de Conexão';
+            msg = 'Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet.';
+        } else if (err?.status >= 500) {
+            title = 'Servidor Indisponível';
+            msg = 'O servidor está temporariamente indisponível. Tente novamente em alguns minutos.';
+        } else if (err?.status === 404) {
+            // Verificar se é erro de login (credenciais inválidas) ou endpoint não encontrado
+            const isLoginError = err.message && (
+                err.message.includes('E-mail ou senha incorretos') ||
+                err.message.includes('credenciais') ||
+                err.message.includes('incorretos')
+            );
+
+            if (isLoginError) {
+                // É um erro de login - usar a mensagem original
+                title = 'Erro de Login';
+                msg = err.message;
+            } else {
+                // Endpoint não encontrado
+                title = 'Serviço Não Encontrado';
+                msg = 'O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.';
+            }
+        } else if (err?.status === 403) {
+            // Verificar se é erro de conta inativa
+            const msgLower = msg.toLowerCase();
+            if (msgLower.includes('conta inativa') || 
+                msgLower.includes('conta desativada') ||
+                msgLower.includes('usuário inativo') ||
+                msgLower.includes('account inactive') ||
+                msgLower.includes('user inactive') ||
+                msgLower.includes('conta suspensa') ||
+                msgLower.includes('conta bloqueada')) {
+                title = 'Conta Inativa';
+                msg = 'Sua conta está inativa. Entre em contato com o suporte para reativá-la.';
+            } else if (msgLower.includes('email não verificado') || 
+                       msgLower.includes('email não está verificado') ||
+                       msgLower.includes('verifique seu email') ||
+                       msgLower.includes('não verificado')) {
+                title = 'Email Não Verificado';
+                // Manter a mensagem original do backend
+            } else {
+                title = 'Acesso Negado';
+                // Manter a mensagem original do backend
+            }
         }
     }
+    
     return showErrorBar(title, msg);
 }
 

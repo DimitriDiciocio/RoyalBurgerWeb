@@ -6,6 +6,7 @@
 import { showToast, showActionModal } from '../alerts.js';
 import { getIngredients } from '../../api/ingredients.js';
 import { getGroups, getGroupById } from '../../api/groups.js';
+import { escapeHTML } from '../../utils/html-sanitizer.js';
 
 // Constantes de configuração
 const CONFIG = {
@@ -13,14 +14,6 @@ const CONFIG = {
     DEFAULT_MIN_QUANTITY: 0,
     DEFAULT_MAX_QUANTITY: 1,
     GROUPS_DESCRIPTION_LIMIT: 3
-};
-
-// Utilitário para sanitizar HTML (previne XSS)
-const escapeHtml = (unsafe) => {
-    if (!unsafe) return '';
-    const div = document.createElement('div');
-    div.textContent = unsafe;
-    return div.innerHTML;
 };
 
 // Utilitário para parsing seguro de inteiros
@@ -264,7 +257,7 @@ export class ProdutoExtrasManager {
                 : '';
             
             // Sanitizar nome para prevenir XSS
-            const nomeSeguro = escapeHtml(insumo.name);
+            const nomeSeguro = escapeHTML(insumo.name);
 
             return `
                 <div class="insumo-selecao-item ${checked ? 'selecionado' : ''}" 
@@ -438,7 +431,7 @@ export class ProdutoExtrasManager {
             if (grupo.ingredients && grupo.ingredients.length > 0) {
                 const nomes = grupo.ingredients
                     .slice(0, CONFIG.GROUPS_DESCRIPTION_LIMIT)
-                    .map(ing => escapeHtml(ing.name)); // Sanitizar nomes
+                    .map(ing => escapeHTML(ing.name)); // Sanitizar nomes
                 descricao = nomes.join(', ');
                 if (grupo.ingredients.length > CONFIG.GROUPS_DESCRIPTION_LIMIT) {
                     descricao += ` e mais ${grupo.ingredients.length - CONFIG.GROUPS_DESCRIPTION_LIMIT}...`;
@@ -446,7 +439,7 @@ export class ProdutoExtrasManager {
             }
             
             // Sanitizar nome do grupo
-            const nomeGrupoSeguro = escapeHtml(grupo.name);
+            const nomeGrupoSeguro = escapeHTML(grupo.name);
 
             return `
                 <div class="grupo-selecao-item ${checked ? 'selecionado' : ''}" 
@@ -619,7 +612,7 @@ export class ProdutoExtrasManager {
                 : '';
             
             // Sanitizar nome
-            const nomeSeguro = escapeHtml(item.name);
+            const nomeSeguro = escapeHTML(item.name);
 
             return `
                 <div class="extra-item" data-ingredient-id="${item.ingredient_id}">

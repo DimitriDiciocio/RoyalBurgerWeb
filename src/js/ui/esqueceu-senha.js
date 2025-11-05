@@ -2,7 +2,6 @@
 import { inicializarGerenciamentoInputs } from "../utils.js";
 import { showToast, toastFromApiError } from "./alerts.js";
 import { requestPasswordReset } from "../api/user.js";
-// OTIMIZAÇÃO 1.9: Debounce para eventos de input frequentes
 import { debounce } from "../utils/performance-utils.js";
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -31,7 +30,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // OTIMIZAÇÃO 1.9: Usar debounce na validação para não executar a cada keystroke
   const debouncedAtualizarBotao = debounce(atualizarBotao, 200);
 
   // Validar em tempo real (com debounce para reduzir execuções desnecessárias)
