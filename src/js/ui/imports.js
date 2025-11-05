@@ -4,581 +4,624 @@
 const VALIDATION_LIMITS = {
   MAX_RETRY_ATTEMPTS: 5,
   RETRY_DELAY: 100,
-  MAX_PATH_LENGTH: 200
+  MAX_PATH_LENGTH: 200,
 };
 
 /**
  * Determina o caminho correto para o footer.html baseado na página atual
  */
 function getFooterPath() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/');
-    const isInSrcFolder = currentPath.includes('/src/');
-  
-    if (isInPagesFolder) {
-      return '../components/layout/footer.html';
-    } else if (isInSrcFolder) {
-      return 'components/layout/footer.html';
-    } else {
-      return 'src/components/layout/footer.html';
-    }
+  const currentPath = window.location.pathname;
+  const isInPagesFolder = currentPath.includes("/pages/");
+  const isInSrcFolder = currentPath.includes("/src/");
+
+  if (isInPagesFolder) {
+    return "../components/layout/footer.html";
+  } else if (isInSrcFolder) {
+    return "components/layout/footer.html";
+  } else {
+    return "src/components/layout/footer.html";
   }
-  
-  /**
-   * Tenta carregar o footer de múltiplos caminhos possíveis
-   */
-  async function tryLoadFooter() {
-    const possiblePaths = [
-      '../components/layout/footer.html',
-      'components/layout/footer.html', 
-      'src/components/layout/footer.html'
-    ];
-  
-    for (const path of possiblePaths) {
-      try {
-        const response = await fetch(path);
-        if (response.ok) {
-          const data = await response.text();
-          return { success: true, data };
-        }
-      } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        continue;
-      }
-    }
-    
-    return { success: false, data: null };
-  }
-  
-  /**
-   * Carrega o footer dinamicamente
-   */
-  async function loadFooter() {
+}
+
+/**
+ * Tenta carregar o footer de múltiplos caminhos possíveis
+ */
+async function tryLoadFooter() {
+  const possiblePaths = [
+    "../components/layout/footer.html",
+    "components/layout/footer.html",
+    "src/components/layout/footer.html",
+  ];
+
+  for (const path of possiblePaths) {
     try {
-      const footerPath = getFooterPath();
-      let response = await fetch(footerPath);
-  
-      if (!response.ok) {
-        const result = await tryLoadFooter();
-        if (result.success) {
-          document.getElementById("footer-container").innerHTML = result.data;
-        } else {
-          throw new Error('Não foi possível carregar o footer de nenhum caminho');
-        }
-      } else {
+      const response = await fetch(path);
+      if (response.ok) {
         const data = await response.text();
-        document.getElementById("footer-container").innerHTML = data;
+        return { success: true, data };
       }
-      
-      // Corrigir caminhos após carregar o footer
-      fixFooterPaths();
     } catch (error) {
       // TODO: Implementar logging estruturado em produção
-      console.error('Erro ao carregar o footer:', error.message);
-      // Fallback HTML básico
-      document.getElementById("footer-container").innerHTML = `
+      continue;
+    }
+  }
+
+  return { success: false, data: null };
+}
+
+/**
+ * Carrega o footer dinamicamente
+ */
+async function loadFooter() {
+  try {
+    const footerPath = getFooterPath();
+    let response = await fetch(footerPath);
+
+    if (!response.ok) {
+      const result = await tryLoadFooter();
+      if (result.success) {
+        document.getElementById("footer-container").innerHTML = result.data;
+      } else {
+        throw new Error("Não foi possível carregar o footer de nenhum caminho");
+      }
+    } else {
+      const data = await response.text();
+      document.getElementById("footer-container").innerHTML = data;
+    }
+
+    // Corrigir caminhos após carregar o footer
+    fixFooterPaths();
+  } catch (error) {
+    // TODO: Implementar logging estruturado em produção
+    console.error("Erro ao carregar o footer:", error.message);
+    // Fallback HTML básico
+    document.getElementById("footer-container").innerHTML = `
         <footer>
           <div class="segunda">
             <p>© Copyright 2025 - Royal Burguer</p>
           </div>
         </footer>
       `;
-    }
   }
-  
-  /**
-   * Corrige os caminhos das imagens no footer baseado na página atual
-   */
-  function fixFooterPaths() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
-    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
-  
-    const logoImg = document.querySelector('footer img');
-    if (logoImg) {
-      let logoPath;
-      if (isInPagesFolder && isInSrcFolder) {
-        logoPath = '../../src/assets/img/logo-texto.png';
-      } else if (isInPagesFolder) {
-        logoPath = '../../assets/img/logo-texto.png';
-      } else if (isInSrcFolder) {
-        logoPath = '../assets/img/logo-texto.png';
-      } else {
-        logoPath = 'src/assets/img/logo-texto.png';
-      }
-      logoImg.src = logoPath;
-      logoImg.alt = 'Royal Burguer Logo';
-    }
-  }
+}
 
-  // Caminho correto da logo (SVG) baseado na página atual
-  function getLogoSvgPath() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
-    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
+/**
+ * Corrige os caminhos das imagens no footer baseado na página atual
+ */
+function fixFooterPaths() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
 
+  const logoImg = document.querySelector("footer img");
+  if (logoImg) {
+    let logoPath;
     if (isInPagesFolder && isInSrcFolder) {
-      return '../../src/assets/svg/logo.svg';
+      logoPath = "../../src/assets/img/logo-texto.png";
     } else if (isInPagesFolder) {
-      return '../../assets/svg/logo.svg';
+      logoPath = "../../assets/img/logo-texto.png";
     } else if (isInSrcFolder) {
-      return '../assets/svg/logo.svg';
+      logoPath = "../assets/img/logo-texto.png";
     } else {
-      return 'src/assets/svg/logo.svg';
+      logoPath = "src/assets/img/logo-texto.png";
     }
+    logoImg.src = logoPath;
+    logoImg.alt = "Royal Burguer Logo";
   }
-  
-  // Executa quando a página carregar
-  document.addEventListener("DOMContentLoaded", () => {
-    loadFooter();
-    // dispara o carregamento do header também
-    if (typeof window.loadHeader === 'function') {
-      window.loadHeader();
+}
+
+// Caminho correto da logo (SVG) baseado na página atual
+function getLogoSvgPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
+
+  if (isInPagesFolder && isInSrcFolder) {
+    return "../../src/assets/svg/logo.svg";
+  } else if (isInPagesFolder) {
+    return "../../assets/svg/logo.svg";
+  } else if (isInSrcFolder) {
+    return "../assets/svg/logo.svg";
+  } else {
+    return "src/assets/svg/logo.svg";
+  }
+}
+
+// Executa quando a página carregar
+document.addEventListener("DOMContentLoaded", () => {
+  loadFooter();
+  // dispara o carregamento do header também
+  if (typeof window.loadHeader === "function") {
+    window.loadHeader();
+  } else {
+    // fallback leve: tenta novamente um pouco depois
+    setTimeout(() => {
+      if (typeof window.loadHeader === "function") window.loadHeader();
+    }, VALIDATION_LIMITS.RETRY_DELAY);
+  }
+});
+
+// Função para verificar se é página de login
+function isLoginPage() {
+  return window.location.pathname.includes("login.html");
+}
+
+// Função para verificar se é página de cadastro
+function isCadastroPage() {
+  return window.location.pathname.includes("cadastro.html");
+}
+
+// Função para configurar o header baseado no estado
+function configureHeader() {
+  const header = document.querySelector("header");
+  const navMenu = document.getElementById("nav-menu");
+  const loginHeader = document.getElementById("login-header");
+  const userHeader = document.getElementById("user-header");
+  const navLoggedOnlyLinks = document.querySelectorAll(".nav-logged-only");
+  const conta = document.querySelector(".conta");
+  const hamburgerBtn = document.querySelector(".hamburger-btn");
+  const navModalAuth = document.querySelector("#nav-modal .nav-modal-auth");
+
+  if (!header) return;
+
+  const isLoggedIn =
+    typeof window.isUserLoggedIn === "function"
+      ? window.isUserLoggedIn()
+      : false;
+  const isLogin = isLoginPage();
+  const isCadastro = isCadastroPage();
+
+  // Obter perfil do usuário
+  const userProfile =
+    typeof window.getUserProfile === "function"
+      ? window.getUserProfile()
+      : null;
+
+  // Determinar estado "mobile" de forma robusta (MQ + visibilidade real do botão)
+  const mq = window.matchMedia && window.matchMedia("(max-width: 1024px)");
+  let isMobile = !!(mq && mq.matches);
+  try {
+    if (!isMobile && hamburgerBtn) {
+      const cs = window.getComputedStyle(hamburgerBtn);
+      if (cs && cs.display !== "none") {
+        isMobile = true;
+      }
+    }
+  } catch (_e) {}
+
+  // Reset classes
+  header.classList.remove(
+    "header-login",
+    "header-logged-out",
+    "header-logged-in"
+  );
+  header.classList.remove(
+    "header-profile-visitor",
+    "header-profile-customer",
+    "header-profile-attendant",
+    "header-profile-manager",
+    "header-profile-admin"
+  );
+
+  if (isLogin || isCadastro) {
+    // Página de login/cadastro: apenas logo centralizada
+    header.classList.add("header-login");
+    if (navMenu) navMenu.style.display = "none";
+    if (loginHeader) loginHeader.style.display = "none";
+    if (userHeader) userHeader.style.display = "none";
+    if (hamburgerBtn) hamburgerBtn.style.display = "none";
+    if (navModalAuth) navModalAuth.style.display = "";
+  } else if (isLoggedIn) {
+    // Usuário logado
+    header.classList.add("header-logged-in");
+
+    // Aplicar classe de perfil baseada no perfil do usuário
+    if (userProfile) {
+      const normalizedProfile = userProfile.toLowerCase();
+      switch (normalizedProfile) {
+        case "customer":
+          header.classList.add("header-profile-customer");
+          break;
+        case "attendant":
+          header.classList.add("header-profile-attendant");
+          break;
+        case "manager":
+          header.classList.add("header-profile-manager");
+          break;
+        case "admin":
+          header.classList.add("header-profile-admin");
+          break;
+        default:
+          // Fallback para customer se perfil não reconhecido
+          header.classList.add("header-profile-customer");
+      }
     } else {
-      // fallback leve: tenta novamente um pouco depois
-      setTimeout(() => { 
-        if (typeof window.loadHeader === 'function') window.loadHeader(); 
-      }, VALIDATION_LIMITS.RETRY_DELAY);
+      // Fallback para customer se não conseguir obter perfil
+      header.classList.add("header-profile-customer");
+    }
+
+    if (isMobile) {
+      // Mobile: esconder nav e manter hambúrguer + ícone de usuário
+      if (navMenu) navMenu.style.setProperty("display", "none", "important");
+      if (loginHeader) loginHeader.style.display = "none";
+      if (userHeader) userHeader.style.display = "flex";
+      if (hamburgerBtn) hamburgerBtn.style.display = "";
+      if (navModalAuth) navModalAuth.style.display = "none";
+    } else {
+      // Desktop: mostrar navegação completa
+      if (navMenu) navMenu.style.removeProperty("display");
+      if (navMenu) navMenu.style.display = "flex";
+      if (loginHeader) loginHeader.style.display = "none";
+      if (userHeader) userHeader.style.display = "flex";
+      if (hamburgerBtn) hamburgerBtn.style.display = "none";
+      if (navModalAuth) navModalAuth.style.display = "none";
+    }
+
+    // Links específicos por perfil são controlados pelo CSS
+
+    // Atualiza ícone com iniciais do usuário
+    const user =
+      typeof window.getStoredUser === "function"
+        ? window.getStoredUser()
+        : null;
+    if (conta) {
+      const tamanho = 36;
+      const gerar =
+        typeof window.gerarIconeUsuario === "function"
+          ? window.gerarIconeUsuario
+          : () => "";
+      conta.innerHTML = gerar(user || "", tamanho);
+      // Torna o ícone da conta clicável para ir aos dados da conta
+      try {
+        conta.style.cursor = "pointer";
+        conta.setAttribute("title", "Dados da conta");
+        conta.onclick = () => {
+          const path = getDadosContaPath();
+          const isAlreadyOnDados = /usuario-perfil\.html(\?.*)?(#.*)?$/.test(
+            window.location.pathname
+          );
+          if (!isAlreadyOnDados) {
+            window.location.href = path;
+          }
+        };
+      } catch (_e) {}
+    }
+  } else {
+    // Usuário não logado
+    header.classList.add("header-logged-out");
+    header.classList.add("header-profile-visitor");
+
+    if (isMobile) {
+      // Mobile: logo + botões de cadastro/entrar
+      if (navMenu) navMenu.style.setProperty("display", "none", "important");
+      if (loginHeader) loginHeader.style.display = "flex";
+      if (userHeader) userHeader.style.display = "none";
+      if (hamburgerBtn) hamburgerBtn.style.display = "none";
+      if (navModalAuth) navModalAuth.style.display = "";
+    } else {
+      // Desktop: logo + botões de cadastro/entrar (sem menu)
+      if (navMenu) navMenu.style.setProperty("display", "none", "important");
+      if (loginHeader) loginHeader.style.display = "flex";
+      if (userHeader) userHeader.style.display = "none";
+      if (hamburgerBtn) hamburgerBtn.style.display = "none";
+      if (navModalAuth) navModalAuth.style.display = "";
+    }
+
+    // Esconder links que só aparecem quando logado
+    navLoggedOnlyLinks.forEach((link) => {
+      link.style.display = "none";
+    });
+  }
+}
+
+// Função para corrigir caminhos baseado na página atual
+function fixPaths() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
+
+  // Ajustar caminhos baseado na localização atual
+  const logo = document.querySelector(".logo");
+  const navLinks = document.querySelectorAll(".nav-menu a");
+  const loginLinks = document.querySelectorAll("#login-header a");
+
+  if (logo) {
+    let logoPath;
+
+    // Lógica corrigida: priorizar a detecção mais específica
+    if (isInPagesFolder && isInSrcFolder) {
+      // Página está em src/pages/ - precisa subir 2 níveis para chegar em src/
+      logoPath = "../../src/assets/svg/logo.svg";
+    } else if (isInPagesFolder) {
+      // Página está em pages/ (não em src/) - subir 2 níveis
+      logoPath = "../../assets/svg/logo.svg";
+    } else if (isInSrcFolder) {
+      // Página está em src/ (mas não em pages/) - subir 1 nível
+      logoPath = "../assets/svg/logo.svg";
+    } else {
+      // Página está na raiz
+      logoPath = "src/assets/svg/logo.svg";
+    }
+
+    // Sempre definir o caminho correto baseado na localização atual
+    logo.src = logoPath;
+    logo.alt = "Royal Burguer Logo";
+
+    logo.onerror = function () {
+      // Tentar caminhos alternativos
+      const alternativePaths = [
+        "../assets/svg/logo.svg",
+        "../../assets/svg/logo.svg",
+        "src/assets/svg/logo.svg",
+        "./src/assets/svg/logo.svg",
+        "./assets/svg/logo.svg",
+      ];
+
+      let pathIndex = 0;
+      const tryNextPath = () => {
+        if (pathIndex < alternativePaths.length) {
+          logo.src = alternativePaths[pathIndex];
+          pathIndex++;
+        }
+      };
+
+      logo.onerror = tryNextPath;
+    };
+  }
+
+  // Ajustar links de navegação
+  navLinks.forEach((link, index) => {
+    const href = link.getAttribute("href");
+    if (href && !href.startsWith("#") && !href.startsWith("http")) {
+      let newHref = href;
+
+      if (isInPagesFolder) {
+        if (href.includes("index.html")) {
+          newHref = "../../index.html";
+        } else if (href.includes("clube-royal.html")) {
+          newHref = "clube-royal.html";
+        } else if (href.includes("hist-pedidos.html")) {
+          newHref = "hist-pedidos.html";
+        } else if (href.includes("painel-adm.html")) {
+          newHref = "painel-adm.html";
+        }
+      } else if (isInSrcFolder) {
+        if (href.includes("index.html")) {
+          newHref = "../index.html";
+        } else if (href.includes("clube-royal.html")) {
+          newHref = "pages/clube-royal.html";
+        } else if (href.includes("hist-pedidos.html")) {
+          newHref = "pages/hist-pedidos.html";
+        } else if (href.includes("painel-adm.html")) {
+          newHref = "pages/painel-adm.html";
+        }
+      } else {
+        if (href.includes("index.html")) {
+          newHref = "index.html";
+        } else if (href.includes("clube-royal.html")) {
+          newHref = "src/pages/clube-royal.html";
+        } else if (href.includes("hist-pedidos.html")) {
+          newHref = "src/pages/hist-pedidos.html";
+        } else if (href.includes("painel-adm.html")) {
+          newHref = "src/pages/painel-adm.html";
+        }
+      }
+
+      if (newHref !== href) {
+        link.href = newHref;
+      }
     }
   });
 
-  // Função para verificar se é página de login
-function isLoginPage() {
-    return window.location.pathname.includes('login.html');
-  }
-  
-  // Função para verificar se é página de cadastro
-  function isCadastroPage() {
-    return window.location.pathname.includes('cadastro.html');
-  }
-  
-  // Função para configurar o header baseado no estado
-  function configureHeader() {
-    const header = document.querySelector('header');
-    const navMenu = document.getElementById('nav-menu');
-    const loginHeader = document.getElementById('login-header');
-    const userHeader = document.getElementById('user-header');
-    const navLoggedOnlyLinks = document.querySelectorAll('.nav-logged-only');
-    const conta = document.querySelector('.conta');
-    const hamburgerBtn = document.querySelector('.hamburger-btn');
-    const navModalAuth = document.querySelector('#nav-modal .nav-modal-auth');
-  
-    if (!header) return;
-  
-    const isLoggedIn = typeof window.isUserLoggedIn === 'function' ? window.isUserLoggedIn() : false;
-    const isLogin = isLoginPage();
-    const isCadastro = isCadastroPage();
-    
-    // Obter perfil do usuário
-    const userProfile = typeof window.getUserProfile === 'function' ? window.getUserProfile() : null;
+  // Ajustar links de login/cadastro
+  loginLinks.forEach((link, index) => {
+    const href = link.getAttribute("href");
+    if (href && !href.startsWith("#") && !href.startsWith("http")) {
+      let newHref = href;
 
-    // Determinar estado "mobile" de forma robusta (MQ + visibilidade real do botão)
-    const mq = window.matchMedia && window.matchMedia('(max-width: 1024px)');
-    let isMobile = !!(mq && mq.matches);
-    try {
-      if (!isMobile && hamburgerBtn) {
-        const cs = window.getComputedStyle(hamburgerBtn);
-        if (cs && cs.display !== 'none') {
-          isMobile = true;
+      if (isInPagesFolder) {
+        if (href.includes("login.html")) {
+          newHref = "login.html";
+        } else if (href.includes("cadastro.html")) {
+          newHref = "cadastro.html";
         }
-      }
-    } catch (_e) {}
-  
-    // Reset classes
-    header.classList.remove('header-login', 'header-logged-out', 'header-logged-in');
-    header.classList.remove('header-profile-visitor', 'header-profile-customer', 'header-profile-attendant', 'header-profile-manager', 'header-profile-admin');
-  
-    if (isLogin || isCadastro) {
-      // Página de login/cadastro: apenas logo centralizada
-      header.classList.add('header-login');
-      if (navMenu) navMenu.style.display = 'none';
-      if (loginHeader) loginHeader.style.display = 'none';
-      if (userHeader) userHeader.style.display = 'none';
-      if (hamburgerBtn) hamburgerBtn.style.display = 'none';
-      if (navModalAuth) navModalAuth.style.display = '';
-    } else if (isLoggedIn) {
-      // Usuário logado
-      header.classList.add('header-logged-in');
-      
-      // Aplicar classe de perfil baseada no perfil do usuário
-      if (userProfile) {
-        const normalizedProfile = userProfile.toLowerCase();
-        switch (normalizedProfile) {
-          case 'customer':
-            header.classList.add('header-profile-customer');
-            break;
-          case 'attendant':
-            header.classList.add('header-profile-attendant');
-            break;
-          case 'manager':
-            header.classList.add('header-profile-manager');
-            break;
-          case 'admin':
-            header.classList.add('header-profile-admin');
-            break;
-          default:
-            // Fallback para customer se perfil não reconhecido
-            header.classList.add('header-profile-customer');
-        }
-      } else {
-        // Fallback para customer se não conseguir obter perfil
-        header.classList.add('header-profile-customer');
-      }
-
-      if (isMobile) {
-        // Mobile: esconder nav e manter hambúrguer + ícone de usuário
-        if (navMenu) navMenu.style.setProperty('display', 'none', 'important');
-        if (loginHeader) loginHeader.style.display = 'none';
-        if (userHeader) userHeader.style.display = 'flex';
-        if (hamburgerBtn) hamburgerBtn.style.display = '';
-        if (navModalAuth) navModalAuth.style.display = 'none';
-      } else {
-        // Desktop: mostrar navegação completa
-        if (navMenu) navMenu.style.removeProperty('display');
-        if (navMenu) navMenu.style.display = 'flex';
-        if (loginHeader) loginHeader.style.display = 'none';
-        if (userHeader) userHeader.style.display = 'flex';
-        if (hamburgerBtn) hamburgerBtn.style.display = 'none';
-        if (navModalAuth) navModalAuth.style.display = 'none';
-      }
-  
-      // Links específicos por perfil são controlados pelo CSS
-  
-      // Atualiza ícone com iniciais do usuário
-      const user = typeof window.getStoredUser === 'function' ? window.getStoredUser() : null;
-      if (conta) {
-        const tamanho = 36;
-        const gerar = (typeof window.gerarIconeUsuario === 'function') ? window.gerarIconeUsuario : () => '';
-        conta.innerHTML = gerar(user || '', tamanho);
-        // Torna o ícone da conta clicável para ir aos dados da conta
-        try {
-          conta.style.cursor = 'pointer';
-          conta.setAttribute('title', 'Dados da conta');
-          conta.onclick = () => {
-            const path = getDadosContaPath();
-            const isAlreadyOnDados = /usuario-perfil\.html(\?.*)?(#.*)?$/.test(window.location.pathname);
-            if (!isAlreadyOnDados) {
-              window.location.href = path;
-            }
-          };
-        } catch (_e) { }
-      }
-    } else {
-      // Usuário não logado
-      header.classList.add('header-logged-out');
-      header.classList.add('header-profile-visitor');
-
-      if (isMobile) {
-        // Mobile: logo + botões de cadastro/entrar
-        if (navMenu) navMenu.style.setProperty('display', 'none', 'important');
-        if (loginHeader) loginHeader.style.display = 'flex';
-        if (userHeader) userHeader.style.display = 'none';
-        if (hamburgerBtn) hamburgerBtn.style.display = 'none';
-        if (navModalAuth) navModalAuth.style.display = '';
-      } else {
-        // Desktop: logo + botões de cadastro/entrar (sem menu)
-        if (navMenu) navMenu.style.setProperty('display', 'none', 'important');
-        if (loginHeader) loginHeader.style.display = 'flex';
-        if (userHeader) userHeader.style.display = 'none';
-        if (hamburgerBtn) hamburgerBtn.style.display = 'none';
-        if (navModalAuth) navModalAuth.style.display = '';
-      }
-
-      // Esconder links que só aparecem quando logado
-      navLoggedOnlyLinks.forEach(link => {
-        link.style.display = 'none';
-      });
-    }
-  }
-  
-  // Função para corrigir caminhos baseado na página atual
-  function fixPaths() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
-    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
-  
-    // Ajustar caminhos baseado na localização atual
-    const logo = document.querySelector('.logo');
-    const navLinks = document.querySelectorAll('.nav-menu a');
-    const loginLinks = document.querySelectorAll('#login-header a');
-  
-    if (logo) {
-      let logoPath;
-  
-      // Lógica corrigida: priorizar a detecção mais específica
-      if (isInPagesFolder && isInSrcFolder) {
-        // Página está em src/pages/ - precisa subir 2 níveis para chegar em src/
-        logoPath = '../../src/assets/svg/logo.svg';
-      } else if (isInPagesFolder) {
-        // Página está em pages/ (não em src/) - subir 2 níveis
-        logoPath = '../../assets/svg/logo.svg';
       } else if (isInSrcFolder) {
-        // Página está em src/ (mas não em pages/) - subir 1 nível
-        logoPath = '../assets/svg/logo.svg';
+        if (href.includes("login.html")) {
+          newHref = "pages/login.html";
+        } else if (href.includes("cadastro.html")) {
+          newHref = "pages/cadastro.html";
+        }
       } else {
-        // Página está na raiz
-        logoPath = 'src/assets/svg/logo.svg';
-      }
-  
-      // Sempre definir o caminho correto baseado na localização atual
-      logo.src = logoPath;
-      logo.alt = 'Royal Burguer Logo';
-  
-      logo.onerror = function () {
-        // Tentar caminhos alternativos
-        const alternativePaths = [
-          '../assets/svg/logo.svg',
-          '../../assets/svg/logo.svg',
-          'src/assets/svg/logo.svg',
-          './src/assets/svg/logo.svg',
-          './assets/svg/logo.svg'
-        ];
-  
-        let pathIndex = 0;
-        const tryNextPath = () => {
-          if (pathIndex < alternativePaths.length) {
-            logo.src = alternativePaths[pathIndex];
-            pathIndex++;
-          }
-        };
-  
-        logo.onerror = tryNextPath;
-      };
-    }
-  
-    // Ajustar links de navegação
-    navLinks.forEach((link, index) => {
-      const href = link.getAttribute('href');
-      if (href && !href.startsWith('#') && !href.startsWith('http')) {
-        let newHref = href;
-  
-        if (isInPagesFolder) {
-          if (href.includes('index.html')) {
-            newHref = '../../index.html';
-          } else if (href.includes('clube-royal.html')) {
-            newHref = 'clube-royal.html';
-          } else if (href.includes('hist-pedidos.html')) {
-            newHref = 'hist-pedidos.html';
-          } else if (href.includes('painel-adm.html')) {
-            newHref = 'painel-adm.html';
-          }
-        } else if (isInSrcFolder) {
-          if (href.includes('index.html')) {
-            newHref = '../index.html';
-          } else if (href.includes('clube-royal.html')) {
-            newHref = 'pages/clube-royal.html';
-          } else if (href.includes('hist-pedidos.html')) {
-            newHref = 'pages/hist-pedidos.html';
-          } else if (href.includes('painel-adm.html')) {
-            newHref = 'pages/painel-adm.html';
-          }
-        } else {
-          if (href.includes('index.html')) {
-            newHref = 'index.html';
-          } else if (href.includes('clube-royal.html')) {
-            newHref = 'src/pages/clube-royal.html';
-          } else if (href.includes('hist-pedidos.html')) {
-            newHref = 'src/pages/hist-pedidos.html';
-          } else if (href.includes('painel-adm.html')) {
-            newHref = 'src/pages/painel-adm.html';
-          }
-        }
-  
-        if (newHref !== href) {
-          link.href = newHref;
+        if (href.includes("login.html")) {
+          newHref = "src/pages/login.html";
+        } else if (href.includes("cadastro.html")) {
+          newHref = "src/pages/cadastro.html";
         }
       }
-    });
-  
-    // Ajustar links de login/cadastro
-    loginLinks.forEach((link, index) => {
-      const href = link.getAttribute('href');
-      if (href && !href.startsWith('#') && !href.startsWith('http')) {
-        let newHref = href;
-  
-        if (isInPagesFolder) {
-          if (href.includes('login.html')) {
-            newHref = 'login.html';
-          } else if (href.includes('cadastro.html')) {
-            newHref = 'cadastro.html';
-          }
-        } else if (isInSrcFolder) {
-          if (href.includes('login.html')) {
-            newHref = 'pages/login.html';
-          } else if (href.includes('cadastro.html')) {
-            newHref = 'pages/cadastro.html';
-          }
-        } else {
-          if (href.includes('login.html')) {
-            newHref = 'src/pages/login.html';
-          } else if (href.includes('cadastro.html')) {
-            newHref = 'src/pages/cadastro.html';
-          }
-        }
-  
-        if (newHref !== href) {
-          link.href = newHref;
-        }
-      }
-    });
-  }
-  
-  // Retorna o caminho correto para a página de dados da conta, baseado na página atual
-  function getDadosContaPath() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
-    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
-  
-    if (isInPagesFolder) {
-      return 'usuario-perfil.html';
-    } else if (isInSrcFolder) {
-      return 'pages/usuario-perfil.html';
-    } else {
-      return 'src/pages/usuario-perfil.html';
-    }
-  }
 
-  // Caminho correto para a página de login
-  function getLoginPath() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
-    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
-
-    if (isInPagesFolder) {
-      return 'login.html';
-    } else if (isInSrcFolder) {
-      return 'pages/login.html';
-    } else {
-      return 'src/pages/login.html';
-    }
-  }
-  
-  // Função para obter o caminho correto do header baseado na página atual
-  function getHeaderPath() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/');
-    const isInSrcFolder = currentPath.includes('/src/');
-  
-    if (isInPagesFolder) {
-      return '../components/layout/header.html';
-    } else if (isInSrcFolder) {
-      return 'components/layout/header.html';
-    } else {
-      return 'src/components/layout/header.html';
-    }
-  }
-  
-  // Função para tentar carregar o header com diferentes caminhos
-  async function tryLoadHeader() {
-    const possiblePaths = [
-      'src/components/layout/header.html',
-      '../components/layout/header.html',
-      'components/layout/header.html',
-      './src/components/layout/header.html',
-      './components/layout/header.html'
-    ];
-  
-    for (const path of possiblePaths) {
-      try {
-        const response = await fetch(path);
-        if (response.ok) {
-          return { success: true, data: await response.text(), path: path };
-        }
-      } catch (error) {
-        continue;
+      if (newHref !== href) {
+        link.href = newHref;
       }
     }
-  
-    return { success: false, data: null, path: null };
+  });
+}
+
+// Retorna o caminho correto para a página de dados da conta, baseado na página atual
+function getDadosContaPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
+
+  if (isInPagesFolder) {
+    return "usuario-perfil.html";
+  } else if (isInSrcFolder) {
+    return "pages/usuario-perfil.html";
+  } else {
+    return "src/pages/usuario-perfil.html";
   }
-  
-  async function loadHeader() {
+}
+
+// Caminho correto para a página de login
+function getLoginPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
+
+  if (isInPagesFolder) {
+    return "login.html";
+  } else if (isInSrcFolder) {
+    return "pages/login.html";
+  } else {
+    return "src/pages/login.html";
+  }
+}
+
+// Função para obter o caminho correto do header baseado na página atual
+function getHeaderPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder = currentPath.includes("/pages/");
+  const isInSrcFolder = currentPath.includes("/src/");
+
+  if (isInPagesFolder) {
+    return "../components/layout/header.html";
+  } else if (isInSrcFolder) {
+    return "components/layout/header.html";
+  } else {
+    return "src/components/layout/header.html";
+  }
+}
+
+// Função para tentar carregar o header com diferentes caminhos
+async function tryLoadHeader() {
+  const possiblePaths = [
+    "src/components/layout/header.html",
+    "../components/layout/header.html",
+    "components/layout/header.html",
+    "./src/components/layout/header.html",
+    "./components/layout/header.html",
+  ];
+
+  for (const path of possiblePaths) {
     try {
-      // Primeiro tenta com o caminho calculado
-      const headerPath = getHeaderPath();
-      let response = await fetch(headerPath);
-  
-      if (!response.ok) {
-        // Se falhar, tenta outros caminhos
-        const result = await tryLoadHeader();
-        if (result.success) {
-          document.getElementById("header-container").innerHTML = result.data;
-        } else {
-          throw new Error('Não foi possível carregar o header de nenhum caminho');
-        }
-      } else {
-        const data = await response.text();
-        document.getElementById("header-container").innerHTML = data;
+      const response = await fetch(path);
+      if (response.ok) {
+        return { success: true, data: await response.text(), path: path };
       }
-  
-      // Corrigir caminhos baseado na página atual
-      setTimeout(() => {
-        fixPaths();
-        configureHeader();
-        
-        // Carregar sistemas do header (pontos e endereço)
-        if (typeof window.carregarPontosHeader === 'function') {
-          window.carregarPontosHeader();
-        }
-        if (typeof window.carregarEnderecoHeader === 'function') {
-          window.carregarEnderecoHeader();
-        }
-        
-        // Inicializa comportamento do modal hamburguer
-        try {
-          const headerEl = document.querySelector('header');
-          const btn = headerEl?.querySelector('.hamburger-btn');
-          const modal = document.getElementById('nav-modal');
-          const overlay = modal?.querySelector('.nav-modal-overlay');
-          const closeBtn = modal?.querySelector('.nav-modal-close');
-          const logoModal = modal?.querySelector('.logo-modal');
-          if (logoModal && typeof window.getLogoSvgPath === 'function') {
-            logoModal.src = window.getLogoSvgPath();
-          }
+    } catch (error) {
+      continue;
+    }
+  }
 
-          const openModal = () => {
-            if (!modal) return;
-            modal.classList.add('open');
-            if (btn) btn.setAttribute('aria-expanded', 'true');
-            document.body.style.overflow = 'hidden';
-          };
-          const closeModal = () => {
-            if (!modal) return;
-            modal.classList.remove('open');
-            if (btn) btn.setAttribute('aria-expanded', 'false');
-            document.body.style.overflow = '';
-          };
+  return { success: false, data: null, path: null };
+}
 
-          btn && (btn.onclick = openModal);
-          overlay && (overlay.onclick = closeModal);
-          closeBtn && (closeBtn.onclick = closeModal);
-          document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
-          });
-        } catch (_e) { }
+async function loadHeader() {
+  try {
+    // Primeiro tenta com o caminho calculado
+    const headerPath = getHeaderPath();
+    let response = await fetch(headerPath);
+
+    if (!response.ok) {
+      // Se falhar, tenta outros caminhos
+      const result = await tryLoadHeader();
+      if (result.success) {
+        document.getElementById("header-container").innerHTML = result.data;
+      } else {
+        throw new Error("Não foi possível carregar o header de nenhum caminho");
+      }
+    } else {
+      const data = await response.text();
+      document.getElementById("header-container").innerHTML = data;
+    }
+
+    // Corrigir caminhos baseado na página atual
+    setTimeout(() => {
+      fixPaths();
+      configureHeader();
+
+      // Carregar sistemas do header (pontos e endereço)
+      if (typeof window.carregarPontosHeader === "function") {
+        window.carregarPontosHeader();
+      }
+      if (typeof window.carregarEnderecoHeader === "function") {
+        window.carregarEnderecoHeader();
+      }
+
+      // Inicializa comportamento do modal hamburguer
+      try {
+        const headerEl = document.querySelector("header");
+        const btn = headerEl?.querySelector(".hamburger-btn");
+        const modal = document.getElementById("nav-modal");
+        const overlay = modal?.querySelector(".nav-modal-overlay");
+        const closeBtn = modal?.querySelector(".nav-modal-close");
+        const logoModal = modal?.querySelector(".logo-modal");
+        if (logoModal && typeof window.getLogoSvgPath === "function") {
+          logoModal.src = window.getLogoSvgPath();
+        }
+
+        const openModal = () => {
+          if (!modal) return;
+          modal.classList.add("open");
+          if (btn) btn.setAttribute("aria-expanded", "true");
+          document.body.style.overflow = "hidden";
+        };
+        const closeModal = () => {
+          if (!modal) return;
+          modal.classList.remove("open");
+          if (btn) btn.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+
+        btn && (btn.onclick = openModal);
+        overlay && (overlay.onclick = closeModal);
+        closeBtn && (closeBtn.onclick = closeModal);
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeModal();
+        });
+      } catch (_e) {}
       // Hidrata usuário se necessário (para gerar iniciais corretamente)
-        if (typeof window.isUserLoggedIn === 'function' && window.isUserLoggedIn()) {
-          if (typeof window.hydrateUserFromMe === 'function') {
-            window.hydrateUserFromMe();
-          }
+      if (
+        typeof window.isUserLoggedIn === "function" &&
+        window.isUserLoggedIn()
+      ) {
+        if (typeof window.hydrateUserFromMe === "function") {
+          window.hydrateUserFromMe();
         }
+      }
       // Reconfigura o header ao mudar o breakpoint de largura
       try {
-        const mm = window.matchMedia('(max-width: 1024px)');
+        const mm = window.matchMedia("(max-width: 1024px)");
         if (mm) {
-          if (typeof mm.addEventListener === 'function') {
-            mm.addEventListener('change', () => { if (typeof window.configureHeader === 'function') window.configureHeader(); });
-          } else if (typeof mm.addListener === 'function') {
-            mm.addListener(() => { if (typeof window.configureHeader === 'function') window.configureHeader(); });
+          if (typeof mm.addEventListener === "function") {
+            mm.addEventListener("change", () => {
+              if (typeof window.configureHeader === "function")
+                window.configureHeader();
+            });
+          } else if (typeof mm.addListener === "function") {
+            mm.addListener(() => {
+              if (typeof window.configureHeader === "function")
+                window.configureHeader();
+            });
           }
         }
-      } catch (_e) { }
-      }, VALIDATION_LIMITS.RETRY_DELAY);
-    } catch (error) {
-      // TODO: Implementar logging estruturado em produção
-      console.error('Erro ao carregar o header:', error.message);
-      // Fallback: inserir header básico em caso de erro
-      document.getElementById("header-container").innerHTML = `
+      } catch (_e) {}
+    }, VALIDATION_LIMITS.RETRY_DELAY);
+  } catch (error) {
+    // TODO: Implementar logging estruturado em produção
+    console.error("Erro ao carregar o header:", error.message);
+    // Fallback: inserir header básico em caso de erro
+    document.getElementById("header-container").innerHTML = `
         <header>
           <div class="navegacao">
             <img src="src/assets/svg/logo.svg" alt="logo" class="logo">
@@ -590,63 +633,64 @@ function isLoginPage() {
           </div>
         </header>
       `;
-    }
   }
+}
 
-  // Função para obter o caminho correto do painel administrativo
-  function getPainelAdmPath() {
-    const currentPath = window.location.pathname;
-    const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
-    const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
-  
-    if (isInPagesFolder) {
-      return 'painel-adm.html';
-    } else if (isInSrcFolder) {
-      return 'pages/painel-adm.html';
-    } else {
-      return 'src/pages/painel-adm.html';
-    }
-  }
+// Função para obter o caminho correto do painel administrativo
+function getPainelAdmPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
 
-  // Expor funções do header/footer para outros módulos
-  window.configureHeader = configureHeader;
-  window.getDadosContaPath = getDadosContaPath;
-  window.getPainelAdmPath = getPainelAdmPath;
-  window.loadHeader = loadHeader;
-  window.getLogoSvgPath = getLogoSvgPath;
-
-  // Carregar módulos de API para categorias, produtos e ingredientes
-  async function loadAPIModules() {
-    try {
-      // Carregar módulo de categorias
-      const categoriesModule = await import('../api/categories.js');
-      Object.assign(window, categoriesModule);
-      
-      // Carregar módulo de produtos
-      const productsModule = await import('../api/products.js');
-      Object.assign(window, productsModule);
-      
-      // Carregar módulo de ingredientes
-      const ingredientsModule = await import('../api/ingredients.js');
-      Object.assign(window, ingredientsModule);
-      
-      // Carregar módulo de endereços
-      const addressModule = await import('../api/address.js');
-      Object.assign(window, addressModule);
-      
-      // Carregar módulo de modais
-      const modaisModule = await import('./modais.js');
-      Object.assign(window, modaisModule);
-      
-    } catch (error) {
-      // TODO: Implementar logging estruturado em produção
-      console.error('Erro ao carregar módulos de API:', error.message);
-    }
-  }
-
-  // Carregar módulos de API quando a página estiver pronta
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadAPIModules);
+  if (isInPagesFolder) {
+    return "painel-adm.html";
+  } else if (isInSrcFolder) {
+    return "pages/painel-adm.html";
   } else {
-    loadAPIModules();
+    return "src/pages/painel-adm.html";
   }
+}
+
+// Expor funções do header/footer para outros módulos
+window.configureHeader = configureHeader;
+window.getDadosContaPath = getDadosContaPath;
+window.getPainelAdmPath = getPainelAdmPath;
+window.loadHeader = loadHeader;
+window.getLogoSvgPath = getLogoSvgPath;
+
+// Carregar módulos de API para categorias, produtos e ingredientes
+async function loadAPIModules() {
+  try {
+    // Carregar módulo de categorias
+    const categoriesModule = await import("../api/categories.js");
+    Object.assign(window, categoriesModule);
+
+    // Carregar módulo de produtos
+    const productsModule = await import("../api/products.js");
+    Object.assign(window, productsModule);
+
+    // Carregar módulo de ingredientes
+    const ingredientsModule = await import("../api/ingredients.js");
+    Object.assign(window, ingredientsModule);
+
+    // Carregar módulo de endereços
+    const addressModule = await import("../api/address.js");
+    Object.assign(window, addressModule);
+
+    // Carregar módulo de modais
+    const modaisModule = await import("./modais.js");
+    Object.assign(window, modaisModule);
+  } catch (error) {
+    // TODO: Implementar logging estruturado em produção
+    console.error("Erro ao carregar módulos de API:", error.message);
+  }
+}
+
+// Carregar módulos de API quando a página estiver pronta
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", loadAPIModules);
+} else {
+  loadAPIModules();
+}

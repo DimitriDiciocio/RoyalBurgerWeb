@@ -5,92 +5,121 @@
  * Controla a animação dos labels e cores baseado no foco e valor
  */
 export function gerenciarEstadoInputs() {
-    // Selecionar todos os inputs e selects dentro de formulários
-    const inputs = document.querySelectorAll('input, select, textarea');
-    
-    inputs.forEach(input => {
-        // Função para verificar se o input tem valor ou placeholder nativo
-        function temValorOuPlaceholder() {
-            // Para SELECT, manter o label sempre ativo para não conflitar com o option visível
-            if (input.tagName === 'SELECT') {
-                return true;
-            }
-            const valor = (input.value || '').trim();
-            const temPlaceholder = input.placeholder && input.placeholder !== '';
-            const tipoComPlaceholder = ['date', 'time', 'datetime-local', 'month', 'week'].includes(input.type);
-            return valor !== '' || temPlaceholder || tipoComPlaceholder;
-        }
-        
-        // Função para atualizar o estado do label
-        function atualizarEstadoLabel() {
-            const label = input.closest('.div-input')?.querySelector('label');
-            if (!label) return;
-            
-            const temValor = temValorOuPlaceholder();
-            const estaFocado = document.activeElement === input;
-            
-            // Adicionar/remover classe 'active' baseado no valor
-            if (temValor) {
-                label.classList.add('active');
-            } else {
-                label.classList.remove('active');
-            }
-            
-            // Adicionar/remover classe 'focused' baseado no foco
-            if (estaFocado) {
-                label.classList.add('focused');
-            } else {
-                label.classList.remove('focused');
-            }
-        }
-        
-        // Eventos para inputs de texto, email, tel, etc.
-        if (['text', 'email', 'tel', 'password', 'search', 'url'].includes(input.type)) {
-            input.addEventListener('input', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-        }
-        
-        // Eventos para selects
-        if (input.tagName === 'SELECT') {
-            input.addEventListener('change', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-        }
-        
-        // Eventos para textareas
-        if (input.tagName === 'TEXTAREA') {
-            input.addEventListener('input', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-        }
-        
-        // Eventos para inputs com placeholder nativo (date, time, etc.)
-        if (['date', 'time', 'datetime-local', 'month', 'week', 'number'].includes(input.type)) {
-            input.addEventListener('change', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-            input.addEventListener('input', atualizarEstadoLabel);
-        }
-        
-        // Verificar estado inicial
-        atualizarEstadoLabel();
+  // Selecionar todos os inputs e selects dentro de formulários
+  const inputs = document.querySelectorAll("input, select, textarea");
 
-        // Observa mudanças programáticas do value (inputs e selects)
-        try {
-            let ultimoValor = input.value;
-            const intervalo = setInterval(() => {
-                if (!document.body.contains(input)) {
-                    clearInterval(intervalo);
-                    return;
-                }
-                if (input.value !== ultimoValor) {
-                    ultimoValor = input.value;
-                    atualizarEstadoLabel();
-                }
-            }, 250);
-        } catch (_e) { }
-    });
+  inputs.forEach((input) => {
+    // Função para verificar se o input tem valor ou placeholder nativo
+    function temValorOuPlaceholder() {
+      // Para SELECT, manter o label sempre ativo para não conflitar com o option visível
+      if (input.tagName === "SELECT") {
+        return true;
+      }
+      const valor = (input.value || "").trim();
+      const temPlaceholder = input.placeholder && input.placeholder !== "";
+      const tipoComPlaceholder = [
+        "date",
+        "time",
+        "datetime-local",
+        "month",
+        "week",
+      ].includes(input.type);
+      return valor !== "" || temPlaceholder || tipoComPlaceholder;
+    }
+
+    // Função para atualizar o estado do label
+    function atualizarEstadoLabel() {
+      const label = input.closest(".div-input")?.querySelector("label");
+      if (!label) return;
+
+      const temValor = temValorOuPlaceholder();
+      const estaFocado = document.activeElement === input;
+
+      // Adicionar/remover classe 'active' baseado no valor
+      if (temValor) {
+        label.classList.add("active");
+      } else {
+        label.classList.remove("active");
+      }
+
+      // Adicionar/remover classe 'focused' baseado no foco
+      if (estaFocado) {
+        label.classList.add("focused");
+      } else {
+        label.classList.remove("focused");
+      }
+    }
+
+    // Eventos para inputs de texto, email, tel, etc.
+    if (
+      ["text", "email", "tel", "password", "search", "url"].includes(input.type)
+    ) {
+      input.addEventListener("input", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+    }
+
+    // Eventos para selects
+    if (input.tagName === "SELECT") {
+      input.addEventListener("change", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+    }
+
+    // Eventos para textareas
+    if (input.tagName === "TEXTAREA") {
+      input.addEventListener("input", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+    }
+
+    // Eventos para inputs com placeholder nativo (date, time, etc.)
+    if (
+      ["date", "time", "datetime-local", "month", "week", "number"].includes(
+        input.type
+      )
+    ) {
+      input.addEventListener("change", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+      input.addEventListener("input", atualizarEstadoLabel);
+    }
+
+    // Verificar estado inicial
+    atualizarEstadoLabel();
+
+    // OTIMIZAÇÃO 1.7: Usar MutationObserver ao invés de setInterval para detectar mudanças programáticas
+    try {
+      // Usar eventos nativos do input para mudanças de valor (mais eficiente)
+      // O MutationObserver será usado apenas como fallback para mudanças programáticas
+      let ultimoValor = input.value;
+
+      // Observer para mudanças no atributo 'value' (mudanças programáticas)
+      const observer = new MutationObserver(() => {
+        if (!document.body.contains(input)) {
+          observer.disconnect();
+          return;
+        }
+        if (input.value !== ultimoValor) {
+          ultimoValor = input.value;
+          atualizarEstadoLabel();
+        }
+      });
+
+      // Observar apenas mudanças no atributo value
+      observer.observe(input, {
+        attributes: true,
+        attributeFilter: ["value"],
+        childList: false,
+        subtree: false,
+      });
+
+      // Armazenar observer no elemento para cleanup posterior se necessário
+      input._valueObserver = observer;
+    } catch (_e) {
+      // Fallback silencioso se MutationObserver não estiver disponível
+    }
+  });
 }
 
 /**
@@ -98,28 +127,28 @@ export function gerenciarEstadoInputs() {
  * @param {string} seletor - Seletor CSS para o container dos inputs (opcional)
  */
 export function inicializarGerenciamentoInputs(seletor = null) {
-    // Aguardar o DOM estar pronto
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            if (seletor) {
-                const container = document.querySelector(seletor);
-                if (container) {
-                    gerenciarEstadoInputs();
-                }
-            } else {
-                gerenciarEstadoInputs();
-            }
-        });
-    } else {
-        if (seletor) {
-            const container = document.querySelector(seletor);
-            if (container) {
-                gerenciarEstadoInputs();
-            }
-        } else {
-            gerenciarEstadoInputs();
+  // Aguardar o DOM estar pronto
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      if (seletor) {
+        const container = document.querySelector(seletor);
+        if (container) {
+          gerenciarEstadoInputs();
         }
+      } else {
+        gerenciarEstadoInputs();
+      }
+    });
+  } else {
+    if (seletor) {
+      const container = document.querySelector(seletor);
+      if (container) {
+        gerenciarEstadoInputs();
+      }
+    } else {
+      gerenciarEstadoInputs();
     }
+  }
 }
 
 /**
@@ -127,7 +156,7 @@ export function inicializarGerenciamentoInputs(seletor = null) {
  * Útil quando novos inputs são adicionados via JavaScript
  */
 export function reaplicarGerenciamentoInputs() {
-    gerenciarEstadoInputs();
+  gerenciarEstadoInputs();
 }
 
 /**
@@ -135,69 +164,81 @@ export function reaplicarGerenciamentoInputs() {
  * @param {NodeList|Array} inputs - Lista de inputs para gerenciar
  */
 export function gerenciarInputsEspecificos(inputs) {
-    if (!inputs || inputs.length === 0) return;
-    
-    inputs.forEach(input => {
-        // Aplicar a mesma lógica da função principal
-        function temValorOuPlaceholder() {
-            const valor = input.value.trim();
-            const temPlaceholder = input.placeholder && input.placeholder !== '';
-            const tipoComPlaceholder = ['date', 'time', 'datetime-local', 'month', 'week'].includes(input.type);
-            
-            return valor !== '' || temPlaceholder || tipoComPlaceholder;
-        }
-        
-        function atualizarEstadoLabel() {
-            const label = input.closest('.div-input')?.querySelector('label');
-            if (!label) return;
-            
-            const temValor = temValorOuPlaceholder();
-            const estaFocado = document.activeElement === input;
-            
-            if (temValor) {
-                label.classList.add('active');
-            } else {
-                label.classList.remove('active');
-            }
-            
-            if (estaFocado) {
-                label.classList.add('focused');
-            } else {
-                label.classList.remove('focused');
-            }
-        }
-        
-        // Adicionar eventos baseado no tipo
-        if (['text', 'email', 'tel', 'password', 'search', 'url'].includes(input.type)) {
-            input.addEventListener('input', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-        }
-        
-        if (input.tagName === 'SELECT') {
-            input.addEventListener('change', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-        }
-        
-        if (input.tagName === 'TEXTAREA') {
-            input.addEventListener('input', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-        }
-        
-        if (['date', 'time', 'datetime-local', 'month', 'week', 'number'].includes(input.type)) {
-            input.addEventListener('change', atualizarEstadoLabel);
-            input.addEventListener('focus', atualizarEstadoLabel);
-            input.addEventListener('blur', atualizarEstadoLabel);
-            input.addEventListener('input', atualizarEstadoLabel);
-        }
-        
-        atualizarEstadoLabel();
-    });
+  if (!inputs || inputs.length === 0) return;
+
+  inputs.forEach((input) => {
+    // Aplicar a mesma lógica da função principal
+    function temValorOuPlaceholder() {
+      const valor = input.value.trim();
+      const temPlaceholder = input.placeholder && input.placeholder !== "";
+      const tipoComPlaceholder = [
+        "date",
+        "time",
+        "datetime-local",
+        "month",
+        "week",
+      ].includes(input.type);
+
+      return valor !== "" || temPlaceholder || tipoComPlaceholder;
+    }
+
+    function atualizarEstadoLabel() {
+      const label = input.closest(".div-input")?.querySelector("label");
+      if (!label) return;
+
+      const temValor = temValorOuPlaceholder();
+      const estaFocado = document.activeElement === input;
+
+      if (temValor) {
+        label.classList.add("active");
+      } else {
+        label.classList.remove("active");
+      }
+
+      if (estaFocado) {
+        label.classList.add("focused");
+      } else {
+        label.classList.remove("focused");
+      }
+    }
+
+    // Adicionar eventos baseado no tipo
+    if (
+      ["text", "email", "tel", "password", "search", "url"].includes(input.type)
+    ) {
+      input.addEventListener("input", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+    }
+
+    if (input.tagName === "SELECT") {
+      input.addEventListener("change", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+    }
+
+    if (input.tagName === "TEXTAREA") {
+      input.addEventListener("input", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+    }
+
+    if (
+      ["date", "time", "datetime-local", "month", "week", "number"].includes(
+        input.type
+      )
+    ) {
+      input.addEventListener("change", atualizarEstadoLabel);
+      input.addEventListener("focus", atualizarEstadoLabel);
+      input.addEventListener("blur", atualizarEstadoLabel);
+      input.addEventListener("input", atualizarEstadoLabel);
+    }
+
+    atualizarEstadoLabel();
+  });
 }
 
 // Auto-inicializar quando o módulo for carregado
-if (typeof window !== 'undefined') {
-    inicializarGerenciamentoInputs();
+if (typeof window !== "undefined") {
+  inicializarGerenciamentoInputs();
 }
