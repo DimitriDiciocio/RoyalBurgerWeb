@@ -6,6 +6,7 @@
 import { cacheManager } from "../utils/cache-manager.js";
 import { getProducts } from "../api/products.js";
 import { getCategories } from "../api/categories.js";
+import { API_BASE_URL } from "../api/api.js";
 import { delegate } from "../utils/performance-utils.js";
 import { $q, $qa } from "../utils/dom-cache.js";
 import {
@@ -117,21 +118,9 @@ function buildImageUrl(imagePath, imageHash = null) {
     return imagePath;
   }
 
-  // URL base dinâmica baseada na origem atual
-  const currentOrigin = window.location.origin;
-  let baseUrl;
-
-  // Se estamos em localhost, usar localhost:5000
-  if (
-    currentOrigin.includes("localhost") ||
-    currentOrigin.includes("127.0.0.1")
-  ) {
-    baseUrl = "http://localhost:5000";
-  } else {
-    // Para outros ambientes, usar a mesma origem mas porta 5000
-    const hostname = window.location.hostname;
-    baseUrl = `http://${hostname}:5000`;
-  }
+  // REVISÃO: Usar API_BASE_URL do api.js para garantir funcionamento em qualquer servidor
+  // Isso evita erros quando o código é colocado em outros servidores
+  const baseUrl = API_BASE_URL;
 
   // Usa hash da imagem se disponível, senão usa timestamp
   const cacheParam = imageHash || new Date().getTime();

@@ -21,7 +21,7 @@
  * As mensagens de erro do backend já incluem valores convertidos corretamente.
  */
 
-import { apiRequest, getStoredToken } from './api.js';
+import { apiRequest, getStoredToken, API_BASE_URL } from './api.js';
 
 // Chave para armazenar dados do carrinho no localStorage
 const CART_STORAGE_KEY = 'royal_burger_cart';
@@ -32,6 +32,38 @@ const VALIDATION_LIMITS = {
     MAX_NOTES_LENGTH: 500,
     MAX_EXTRAS_COUNT: 10
 };
+
+// AJUSTE: Cache de validação de guest_cart_id (30 segundos)
+// Armazena resultados de validação para evitar múltiplas chamadas à API
+const GUEST_CART_VALIDATION_CACHE = new Map();
+const GUEST_CART_VALIDATION_CACHE_TTL = 30000; // 30 segundos
+const GUEST_CART_VALIDATION_TIMEOUT = 3000; // 3 segundos (aumentado de 2s)
+const GUEST_CART_VALIDATION_CACHE_MAX_SIZE = 100; // Limite máximo de entradas no cache
+
+/**
+ * REVISÃO: Limpa entradas expiradas do cache de validação
+ * Previne memory leak removendo entradas antigas periodicamente
+ */
+function cleanupValidationCache() {
+    const now = Date.now();
+    const keysToDelete = [];
+    
+    for (const [key, value] of GUEST_CART_VALIDATION_CACHE.entries()) {
+        if (now - value.timestamp >= GUEST_CART_VALIDATION_CACHE_TTL) {
+            keysToDelete.push(key);
+        }
+    }
+    
+    keysToDelete.forEach(key => GUEST_CART_VALIDATION_CACHE.delete(key));
+    
+    // Se cache ainda estiver muito grande, remover entradas mais antigas
+    if (GUEST_CART_VALIDATION_CACHE.size > GUEST_CART_VALIDATION_CACHE_MAX_SIZE) {
+        const sortedEntries = Array.from(GUEST_CART_VALIDATION_CACHE.entries())
+            .sort((a, b) => a[1].timestamp - b[1].timestamp);
+        const toRemove = sortedEntries.slice(0, GUEST_CART_VALIDATION_CACHE.size - GUEST_CART_VALIDATION_CACHE_MAX_SIZE);
+        toRemove.forEach(([key]) => GUEST_CART_VALIDATION_CACHE.delete(key));
+    }
+}
 
 /**
  * Verifica se o usuário está logado
@@ -104,7 +136,10 @@ function getCartIdFromStorage() {
         
         return cartIdStr;
     } catch (error) {
-        console.error('Erro ao parsear dados do carrinho:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao parsear dados do carrinho:', error.message);
+        }
         return null;
     }
 }
@@ -139,8 +174,15 @@ function saveCartToStorage(cartId, items = []) {
         };
         
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(dataToSave));
+        // Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.debug('[CART] saveCartToStorage', { cartId: cartIdStr, itemsCount: items.length });
+        }
     } catch (error) {
-        console.error('Erro ao salvar carrinho no localStorage:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao salvar carrinho no localStorage:', error.message);
+        }
     }
 }
 
@@ -152,6 +194,106 @@ function clearCartFromStorage() {
 }
 
 /**
+ * REVISÃO: Valida guest_cart_id com sanitização e limpeza de cache
+ * Verifica se o carrinho de convidado ainda existe no backend
+ * @param {string} cartId - ID do carrinho a validar
+ * @returns {Promise<boolean>} True se válido, False se inválido
+ */
+async function validateGuestCartId(cartId) {
+    if (!cartId) return false;
+    
+    // REVISÃO: Sanitizar cartId - garantir que é numérico para prevenir injection
+    const sanitizedCartId = String(cartId).trim();
+    if (!/^\d+$/.test(sanitizedCartId)) {
+        // REVISÃO: CartId inválido (não numérico), limpar localStorage
+        clearCartFromStorage();
+        return false;
+    }
+    
+    // REVISÃO: Limpar cache expirado antes de verificar
+    cleanupValidationCache();
+    
+    // Verificar cache primeiro
+    const cacheKey = `guest_cart_${sanitizedCartId}`;
+    const cached = GUEST_CART_VALIDATION_CACHE.get(cacheKey);
+    if (cached) {
+        const now = Date.now();
+        if (now - cached.timestamp < GUEST_CART_VALIDATION_CACHE_TTL) {
+            // REVISÃO: Log apenas em desenvolvimento
+            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                console.debug('[CART] Usando cache de validação de guest_cart_id');
+            }
+            return cached.isValid;
+        }
+        // Cache expirado, remover
+        GUEST_CART_VALIDATION_CACHE.delete(cacheKey);
+    }
+    
+    try {
+        // REVISÃO: Usar apiRequest ao invés de fetch direto para consistência
+        // Timeout aumentado para 3s (melhor para conexões lentas)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), GUEST_CART_VALIDATION_TIMEOUT);
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/cart/guest/${sanitizedCartId}`, {
+                method: 'GET',
+                signal: controller.signal,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            const isValid = response.ok;
+            
+            // Salvar no cache
+            GUEST_CART_VALIDATION_CACHE.set(cacheKey, {
+                isValid,
+                timestamp: Date.now()
+            });
+            
+            // Se inválido, limpar cart_id do localStorage
+            if (!isValid && (response.status === 404 || response.status === 400)) {
+                // REVISÃO: Log apenas em desenvolvimento
+                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                    console.debug('[CART] guest_cart_id inválido, limpando localStorage');
+                }
+                clearCartFromStorage();
+            }
+            
+            return isValid;
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            
+            // REVISÃO: Timeout - retornar false para forçar nova validação na próxima tentativa
+            // Ao invés de assumir válido (que pode mascarar problemas)
+            if (fetchError.name === 'AbortError') {
+                // REVISÃO: Log apenas em desenvolvimento
+                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                    console.warn('[CART] Timeout ao validar guest_cart_id');
+                }
+                return false; // REVISÃO: Retornar false para forçar nova validação
+            }
+            
+            // Outros erros: assumir inválido
+            // REVISÃO: Log apenas em desenvolvimento
+            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                console.error('[CART] Erro ao validar guest_cart_id:', fetchError.message);
+            }
+            return false;
+        }
+    } catch (error) {
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro inesperado ao validar guest_cart_id:', error.message);
+        }
+        return false;
+    }
+}
+
+/**
  * Adiciona item ao carrinho (usuário logado ou convidado)
  * @param {number} productId - ID do produto
  * @param {number} quantity - Quantidade
@@ -160,6 +302,10 @@ function clearCartFromStorage() {
  * @returns {Promise<Object>} Resultado da operação
  */
 export async function addToCart(productId, quantity = 1, extras = [], notes = '', base_modifications = []) {
+    // Definir variáveis antes do try para que estejam disponíveis no catch
+    const isAuth = isAuthenticated();
+    let cartId = getCartIdFromStorage();
+    
     try {
         // Validar parâmetros de entrada
         if (!isValidProductId(productId)) {
@@ -177,9 +323,11 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
         if (!isValidNotes(notes)) {
             throw new Error(`Observações devem ter no máximo ${VALIDATION_LIMITS.MAX_NOTES_LENGTH} caracteres`);
         }
-        
-        const isAuth = isAuthenticated();
-        const cartId = getCartIdFromStorage();
+
+        // REVISÃO: Não validar guest_cart_id antes de adicionar item
+        // O endpoint POST /api/cart/items já cria o carrinho automaticamente se não existir
+        // Se o guest_cart_id estiver inválido, o backend retornará erro e criaremos novo
+        // Isso evita uma chamada GET desnecessária antes de cada POST
 
         // Normalizar extras para garantir formato aceito pelo backend
         // 
@@ -271,14 +419,22 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             payload.guest_cart_id = cartId;
         }
 
-        // DEBUG: Log do payload para diagnóstico de conversão de unidades
-        if (normalizedExtras.length > 0 || normalizedBaseMods.length > 0) {
-            console.debug('[CART] Adicionando item ao carrinho com conversão de unidades:', {
-                productId,
-                quantity,
-                extras: normalizedExtras,
-                base_modifications: normalizedBaseMods,
-                nota: 'Backend calcula consumo: quantity × BASE_PORTION_QUANTITY × item_quantity (convertido para STOCK_UNIT)'
+        // REVISÃO: Log apenas em desenvolvimento para não expor dados em produção
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            if (normalizedExtras.length > 0 || normalizedBaseMods.length > 0) {
+                console.debug('[CART] Adicionando item ao carrinho com conversão de unidades');
+            }
+        }
+
+        // REVISÃO: Log de debug em desenvolvimento para identificar problemas de endpoint
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.debug('[CART] Tentando adicionar item ao carrinho:', {
+                endpoint: '/api/cart/items',
+                method: 'POST',
+                isAuth,
+                hasGuestCartId: !!payload.guest_cart_id,
+                productId: payload.product_id
             });
         }
 
@@ -288,9 +444,13 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             skipAuth: !isAuth
         });
 
-        // Salva cart_id no localStorage se não logado
-        if (!isAuth && data.cart_id) {
-            saveCartToStorage(data.cart_id, data.cart?.items || []);
+        // Salva cart_id e itens no localStorage para convidados (robusto a variações de resposta)
+        if (!isAuth) {
+            const resolvedCartId = data?.cart_id || data?.cart?.cart?.id || data?.cart?.id;
+            const resolvedItems = (data?.cart && (data.cart.items || data.items)) || data?.items || [];
+            if (resolvedCartId) {
+                saveCartToStorage(resolvedCartId, Array.isArray(resolvedItems) ? resolvedItems : []);
+            }
         }
         
         return {
@@ -312,12 +472,109 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             }
         }
         
-        // Log do erro para debug
-        console.error('[CART] Erro ao adicionar ao carrinho:', {
-            message: errorMessage,
-            status: error.status,
-            payload: error.payload
-        });
+        // REVISÃO: Se for erro 404 e tiver guest_cart_id, pode ser que o carrinho não existe mais
+        // Limpar localStorage e tentar novamente sem guest_cart_id (backend criará novo)
+        if (error.status === 404 && !isAuth && cartId && errorMessage.includes('Carrinho convidado não encontrado')) {
+            // Limpar carrinho inválido do localStorage
+            clearCartFromStorage();
+            
+            // Tentar novamente sem guest_cart_id (backend criará novo carrinho)
+            try {
+                // Re-normalizar extras e base_modifications para o retry
+                const retryNormalizedExtras = Array.isArray(extras)
+                    ? extras
+                        .map((e) => {
+                            const id = parseInt(e?.ingredient_id ?? e?.id, 10);
+                            const qty = parseInt(e?.quantity, 10);
+                            return {
+                                ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                                quantity: Number.isInteger(qty) && qty > 0 ? Math.min(qty, VALIDATION_LIMITS.MAX_QUANTITY) : null
+                            };
+                        })
+                        .filter((e) => e.ingredient_id !== null && e.quantity !== null)
+                    : [];
+                
+                const retryNormalizedBaseMods = Array.isArray(base_modifications)
+                    ? base_modifications
+                        .map((bm) => {
+                            const id = parseInt(bm?.ingredient_id, 10);
+                            const delta = parseInt(bm?.delta, 10);
+                            return {
+                                ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
+                                delta: Number.isInteger(delta) && delta !== 0 ? delta : null
+                            };
+                        })
+                        .filter((bm) => bm.ingredient_id !== null && bm.delta !== null)
+                    : [];
+                
+                const retryPayload = {
+                    product_id: Number(productId),
+                    quantity: Number(quantity),
+                    extras: retryNormalizedExtras,
+                    notes: String(notes || '').slice(0, VALIDATION_LIMITS.MAX_NOTES_LENGTH)
+                };
+                
+                if (retryNormalizedBaseMods.length > 0) {
+                    retryPayload.base_modifications = retryNormalizedBaseMods;
+                }
+                
+                // REVISÃO: Log apenas em desenvolvimento
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                    console.debug('[CART] Carrinho inválido detectado, tentando criar novo carrinho');
+                }
+                
+                const retryData = await apiRequest('/api/cart/items', {
+                    method: 'POST',
+                    body: retryPayload,
+                    skipAuth: true
+                });
+                
+                // Salva novo cart_id no localStorage
+                const retryResolvedCartId = retryData?.cart_id || retryData?.cart?.cart?.id || retryData?.cart?.id;
+                const retryResolvedItems = (retryData?.cart && (retryData.cart.items || retryData.items)) || retryData?.items || [];
+                if (retryResolvedCartId) {
+                    saveCartToStorage(retryResolvedCartId, Array.isArray(retryResolvedItems) ? retryResolvedItems : []);
+                }
+                
+                return {
+                    success: true,
+                    data: retryData,
+                    cartId: retryData.cart_id,
+                    isAuthenticated: retryData.is_authenticated
+                };
+            } catch (retryError) {
+                // Se a segunda tentativa também falhar, retornar erro original
+                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                    console.error('[CART] Erro ao tentar criar novo carrinho:', retryError.message);
+                }
+            }
+        }
+        
+        // REVISÃO: Log detalhado em desenvolvimento para debug de 404
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao adicionar ao carrinho:', {
+                message: errorMessage,
+                status: error.status,
+                endpoint: '/api/cart/items',
+                method: 'POST',
+                isAuth,
+                payload: error.status === 404 ? {
+                    product_id: payload.product_id,
+                    quantity: payload.quantity,
+                    hasExtras: !!(payload.extras && payload.extras.length > 0),
+                    hasGuestCartId: !!payload.guest_cart_id
+                } : undefined
+            });
+            
+            // REVISÃO: Mensagem específica para erro 404
+            if (error.status === 404) {
+                console.error('[CART] ⚠️ Endpoint /api/cart/items não encontrado (404). Verifique:');
+                console.error('  1. A API Flask está rodando?');
+                console.error('  2. O endpoint está registrado no blueprint?');
+                console.error('  3. A URL base está correta?', API_BASE_URL);
+            }
+        }
         
         // Mensagens de erro de estoque do backend já incluem informações detalhadas
         // sobre conversão de unidades (ex: "Necessário: 0.150 kg, Disponível: 2.000 kg")
@@ -338,10 +595,21 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
 export async function getCart() {
     try {
         const isAuth = isAuthenticated();
+        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+        if (isDev) {
+            console.debug('[CART] getCart:start', { isAuth });
+        }
         
         if (isAuth) {
             // Busca carrinho do usuário logado
             const data = await apiRequest('/api/cart/me', { method: 'GET' });
+            if (isDev) {
+                console.debug('[CART] getCart:me response', {
+                    hasCart: !!data?.cart,
+                    itemsLen: data?.cart?.items?.length ?? data?.items?.length ?? 0,
+                    keys: data ? Object.keys(data) : []
+                });
+            }
             return {
                 success: true,
                 data: data,
@@ -350,6 +618,9 @@ export async function getCart() {
         } else {
             // Busca carrinho de convidado
             const cartId = getCartIdFromStorage();
+            if (isDev) {
+                console.debug('[CART] getCart:guest cartId', cartId);
+            }
             
             // Se é um ID de fallback antigo, limpar e retornar carrinho vazio
             if (cartId && typeof cartId === 'string' && cartId.startsWith('fallback_')) {
@@ -362,15 +633,36 @@ export async function getCart() {
             }
             
             if (cartId) {
-                const data = await apiRequest(`/api/cart/guest/${cartId}`, { 
-                    method: 'GET',
-                    skipAuth: true
-                });
-                return {
-                    success: true,
-                    data: data,
-                    isAuthenticated: false
-                };
+                try {
+                    const data = await apiRequest(`/api/cart/guest/${cartId}`, { 
+                        method: 'GET',
+                        skipAuth: true
+                    });
+                    if (isDev) {
+                        console.debug('[CART] getCart:guest response', {
+                            hasCart: !!data?.cart,
+                            itemsLen: data?.cart?.items?.length ?? data?.items?.length ?? 0,
+                            keys: data ? Object.keys(data) : []
+                        });
+                    }
+                    return {
+                        success: true,
+                        data: data,
+                        isAuthenticated: false
+                    };
+                } catch (error) {
+                    // REVISÃO: Se cart não existe (404), limpar localStorage e retornar vazio
+                    if (error.status === 404 || error.status === 400) {
+                        clearCartFromStorage();
+                        return {
+                            success: true,
+                            data: { cart: { items: [] }, summary: { is_empty: true } },
+                            isAuthenticated: false
+                        };
+                    }
+                    // Re-throw outros erros
+                    throw error;
+                }
             }
         }
         
@@ -380,8 +672,10 @@ export async function getCart() {
             isAuthenticated: isAuth
         };
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao buscar carrinho:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao buscar carrinho:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -430,7 +724,16 @@ export async function updateCartItem(itemId, updates) {
         }
         
         const isAuth = isAuthenticated();
-        const cartId = getCartIdFromStorage();
+        let cartId = getCartIdFromStorage();
+        
+        // REVISÃO: Validação prévia de guest_cart_id para convidados (mesmo que addToCart)
+        if (!isAuth && cartId) {
+            const isValid = await validateGuestCartId(cartId);
+            if (!isValid) {
+                cartId = null;
+                clearCartFromStorage();
+            }
+        }
         
         // Normalizar extras e base_modifications se fornecidos (mesmo formato de addToCart)
         const payload = { ...updates };
@@ -473,19 +776,11 @@ export async function updateCartItem(itemId, updates) {
             payload.guest_cart_id = cartId;
         }
 
-        // DEBUG: Log do payload para diagnóstico de conversão de unidades
-        if (payload.quantity !== undefined || (payload.extras && payload.extras.length > 0) || (payload.base_modifications && payload.base_modifications.length > 0)) {
-            console.debug('[CART] Atualizando item do carrinho:', {
-                itemId,
-                updates: {
-                    quantity: payload.quantity,
-                    extras: payload.extras,
-                    base_modifications: payload.base_modifications
-                },
-                nota: payload.quantity !== undefined 
-                    ? 'Backend valida estoque: extras existentes × BASE_PORTION_QUANTITY × nova_quantity (convertido para STOCK_UNIT)'
-                    : 'Backend calcula consumo: quantity × BASE_PORTION_QUANTITY × item_quantity (convertido para STOCK_UNIT)'
-            });
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            if (payload.quantity !== undefined || (payload.extras && payload.extras.length > 0) || (payload.base_modifications && payload.base_modifications.length > 0)) {
+                console.debug('[CART] Atualizando item do carrinho');
+            }
         }
 
         const data = await apiRequest(`/api/cart/items/${itemId}`, {
@@ -494,9 +789,13 @@ export async function updateCartItem(itemId, updates) {
             skipAuth: !isAuth
         });
 
-        // Atualiza localStorage se não logado
+        // Atualiza localStorage se não logado (robusto a variações de resposta)
         if (!isAuth) {
-            saveCartToStorage(data.cart_id, data.cart?.items || []);
+            const resolvedCartId = data?.cart_id || data?.cart?.cart?.id || data?.cart?.id;
+            const resolvedItems = (data?.cart && (data.cart.items || data.items)) || data?.items || [];
+            if (resolvedCartId) {
+                saveCartToStorage(resolvedCartId, Array.isArray(resolvedItems) ? resolvedItems : []);
+            }
         }
         
         return {
@@ -516,13 +815,14 @@ export async function updateCartItem(itemId, updates) {
             }
         }
         
-        // Log do erro para debug
-        console.error('[CART] Erro ao atualizar item:', {
-            itemId,
-            message: errorMessage,
-            status: error.status,
-            payload: error.payload
-        });
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao atualizar item:', {
+                itemId,
+                message: errorMessage,
+                status: error.status
+            });
+        }
         
         return {
             success: false,
@@ -545,7 +845,16 @@ export async function removeCartItem(itemId) {
         }
         
         const isAuth = isAuthenticated();
-        const cartId = getCartIdFromStorage();
+        let cartId = getCartIdFromStorage();
+        
+        // REVISÃO: Validação prévia de guest_cart_id para convidados
+        if (!isAuth && cartId) {
+            const isValid = await validateGuestCartId(cartId);
+            if (!isValid) {
+                cartId = null;
+                clearCartFromStorage();
+            }
+        }
         
         const payload = {};
         if (!isAuth && cartId) {
@@ -558,9 +867,13 @@ export async function removeCartItem(itemId) {
             skipAuth: !isAuth
         });
 
-        // Atualiza localStorage se não logado
+        // Atualiza localStorage se não logado (robusto a variações de resposta)
         if (!isAuth) {
-            saveCartToStorage(data.cart_id, data.cart?.items || []);
+            const resolvedCartId = data?.cart_id || data?.cart?.cart?.id || data?.cart?.id;
+            const resolvedItems = (data?.cart && (data.cart.items || data.items)) || data?.items || [];
+            if (resolvedCartId) {
+                saveCartToStorage(resolvedCartId, Array.isArray(resolvedItems) ? resolvedItems : []);
+            }
         }
         
         return {
@@ -568,8 +881,10 @@ export async function removeCartItem(itemId) {
             data: data
         };
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao remover item:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao remover item:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -604,8 +919,10 @@ export async function claimGuestCart() {
             message: data.message
         };
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao reivindicar carrinho:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao reivindicar carrinho:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -624,7 +941,17 @@ export async function syncCart() {
             return { success: true, message: 'Nenhum item para sincronizar' };
         }
 
-        const { items } = JSON.parse(cartData);
+        // REVISÃO: Proteção contra localStorage corrompido
+        let items;
+        try {
+            const parsed = JSON.parse(cartData);
+            items = parsed?.items;
+        } catch (parseError) {
+            // REVISÃO: Se localStorage estiver corrompido, limpar e retornar
+            clearCartFromStorage();
+            return { success: true, message: 'Dados do carrinho corrompidos, sincronização cancelada' };
+        }
+        
         if (!items || items.length === 0) {
             return { success: true, message: 'Nenhum item para sincronizar' };
         }
@@ -642,8 +969,10 @@ export async function syncCart() {
             message: data.message
         };
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao sincronizar carrinho:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao sincronizar carrinho:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -671,15 +1000,31 @@ export async function clearCart() {
                 message: data.message
             };
         } else {
-            // Convidado: limpar localStorage e itens do carrinho via API
+            // REVISÃO: Convidado - remover itens em paralelo para melhor performance
             if (cartId) {
-                // Buscar todos os itens do carrinho
-                const cartData = await getCart();
-                const items = cartData?.data?.items || cartData?.data?.cart?.items || [];
-                
-                // Remover cada item individualmente
-                for (const item of items) {
-                    await removeCartItem(item.id);
+                try {
+                    // Buscar todos os itens do carrinho
+                    const cartData = await getCart();
+                    const items = cartData?.data?.items || cartData?.data?.cart?.items || [];
+                    
+                    // REVISÃO: Remover itens em paralelo ao invés de sequencial
+                    if (items.length > 0) {
+                        const removePromises = items.map(item => 
+                            removeCartItem(item.id).catch(err => {
+                                // REVISÃO: Log erro individual mas continua com outros
+                                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                                    console.warn('[CART] Erro ao remover item individual:', err.message);
+                                }
+                                return { success: false, error: err.message };
+                            })
+                        );
+                        await Promise.all(removePromises);
+                    }
+                } catch (error) {
+                    // REVISÃO: Se falhar ao buscar carrinho, apenas limpar localStorage
+                    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+                        console.warn('[CART] Erro ao buscar carrinho para limpeza:', error.message);
+                    }
                 }
             }
             
@@ -692,8 +1037,10 @@ export async function clearCart() {
             };
         }
     } catch (error) {
-        // TODO: Implementar logging estruturado em produção
-        console.error('Erro ao limpar carrinho:', error.message);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao limpar carrinho:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -722,7 +1069,10 @@ function clearOldFallbackData() {
             localStorage.removeItem('royal_cesta_backup');
         }
     } catch (error) {
-        console.error('Erro ao limpar dados antigos:', error);
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.error('[CART] Erro ao limpar dados antigos:', error.message);
+        }
     }
 }
 

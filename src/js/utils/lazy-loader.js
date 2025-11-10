@@ -121,19 +121,43 @@ function getScriptBasePath() {
 }
 
 /**
- * Carrega um script dinamicamente usando tag <script>
+ * REVISÃO: Obtém o caminho correto para utils.js
+ * utils.js está em src/js/utils.js (fora da pasta ui)
+ * @returns {string} Caminho correto para utils.js
+ */
+function getUtilsPath() {
+  const path = window.location.pathname;
+  const isInPagesFolder = path.includes("/pages/") || path.includes("pages/");
+
+  if (isInPagesFolder) {
+    return "../js/utils.js";
+  }
+  return "src/js/utils.js";
+}
+
+/**
+ * REVISÃO: Carrega um script dinamicamente usando tag <script>
  * @param {string} scriptName - Nome do script (ex: 'home.js')
  * @returns {Promise<void>}
  */
 async function loadScript(scriptName) {
   try {
-    const basePath = getScriptBasePath();
-    const scriptPath = `${basePath}${scriptName}`;
+    // REVISÃO: utils.js está fora da pasta ui, usar caminho especial
+    let scriptPath;
+    if (scriptName === "utils.js") {
+      scriptPath = getUtilsPath();
+    } else {
+      const basePath = getScriptBasePath();
+      scriptPath = `${basePath}${scriptName}`;
+    }
 
     // Carregar usando tag script (compatível com módulos ES6 e scripts tradicionais)
     await loadScriptTag(scriptPath);
   } catch (error) {
-    console.error(`Erro ao carregar script ${scriptName}:`, error);
+    // REVISÃO: Log apenas em desenvolvimento
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+      console.error(`Erro ao carregar script ${scriptName}:`, error);
+    }
     throw error;
   }
 }
@@ -178,7 +202,10 @@ async function loadAdminModules(moduleNames) {
         modulePath.replace("src/js/", "../").replace("../js/", "../")
       );
     } catch (error) {
-      console.warn(`Módulo admin ${moduleName} não pôde ser carregado:`, error);
+      // REVISÃO: Log apenas em desenvolvimento
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+        console.warn(`Módulo admin ${moduleName} não pôde ser carregado:`, error);
+      }
     }
   }
 }
@@ -192,9 +219,12 @@ export async function initializeLazyLoading() {
   const pageConfig = PAGE_SCRIPTS[currentPage];
 
   if (!pageConfig) {
-    console.warn(
-      `Configuração não encontrada para página: ${currentPage}. Carregando scripts padrão.`
-    );
+    // REVISÃO: Log apenas em desenvolvimento
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+      console.warn(
+        `Configuração não encontrada para página: ${currentPage}. Carregando scripts padrão.`
+      );
+    }
     // Fallback: carregar scripts essenciais
     await loadScript("utils.js");
     await loadScript("imports.js");
@@ -209,12 +239,15 @@ export async function initializeLazyLoading() {
   );
   await Promise.all(requiredPromises);
 
-  // Carregar scripts opcionais em background (não bloqueia)
+  // REVISÃO: Carregar scripts opcionais em background (não bloqueia)
   if (pageConfig.optional && pageConfig.optional.length > 0) {
     pageConfig.optional.forEach((script) => {
-      loadScript(script).catch((err) =>
-        console.warn(`Script opcional ${script} não pôde ser carregado:`, err)
-      );
+      loadScript(script).catch((err) => {
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+          console.warn(`Script opcional ${script} não pôde ser carregado:`, err);
+        }
+      });
     });
   }
 
@@ -222,9 +255,12 @@ export async function initializeLazyLoading() {
   if (pageConfig.adminModules && pageConfig.adminModules.length > 0) {
     // Aguardar um pouco para garantir que a página está pronta
     setTimeout(() => {
-      loadAdminModules(pageConfig.adminModules).catch((err) =>
-        console.warn("Erro ao carregar módulos admin:", err)
-      );
+      loadAdminModules(pageConfig.adminModules).catch((err) => {
+        // REVISÃO: Log apenas em desenvolvimento
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+          console.warn("Erro ao carregar módulos admin:", err);
+        }
+      });
     }, 100);
   }
 }
@@ -246,7 +282,10 @@ export async function loadScriptOnDemand(scriptPath) {
       await import(normalizedPath.replace(".js", ""));
     }
   } catch (error) {
-    console.error(`Erro ao carregar script sob demanda ${scriptPath}:`, error);
+    // REVISÃO: Log apenas em desenvolvimento
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+      console.error(`Erro ao carregar script sob demanda ${scriptPath}:`, error);
+    }
     throw error;
   }
 }
@@ -258,8 +297,11 @@ if (typeof window !== "undefined" && document.readyState !== "loading") {
     'script[type="module"][src*="js/ui"]'
   ).length;
   if (scriptsLoaded === 0) {
-    initializeLazyLoading().catch((err) =>
-      console.error("Erro ao inicializar lazy loading:", err)
-    );
+    initializeLazyLoading().catch((err) => {
+      // REVISÃO: Log apenas em desenvolvimento
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+        console.error("Erro ao inicializar lazy loading:", err);
+      }
+    });
   }
 }

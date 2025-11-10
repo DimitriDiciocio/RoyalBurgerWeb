@@ -255,12 +255,15 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
       const result = await getMyOrders();
 
       if (result.success) {
-        const ordersList = result.data || [];
+        // Suporta formatos: lista direta (legacy) ou objeto com items (paginação)
+        const ordersList = Array.isArray(result.data)
+          ? result.data
+          : (result.data?.items || result.data?.orders || []);
 
         // Buscar detalhes completos de cada pedido para exibir itens
         // Limitar concorrência para evitar sobrecarga da API
         const ordersWithDetails = await Promise.allSettled(
-          ordersList.map(async (order, index) => {
+          (Array.isArray(ordersList) ? ordersList : []).map(async (order, index) => {
             const orderId = order.order_id || order.id;
 
             // Validar orderId antes de fazer requisição

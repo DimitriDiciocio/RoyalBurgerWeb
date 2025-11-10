@@ -130,9 +130,29 @@ export async function apiRequest(
         // Verificar se é erro de login (credenciais inválidas) ou endpoint não encontrado
         const isLoginEndpoint =
           path.includes("/login") || path.includes("/users/login");
+        const isCartEndpoint = path.includes("/cart");
+        
         if (isLoginEndpoint && data?.error) {
           // É um erro de login - usar a mensagem do backend
           errorMessage = data.error;
+        } else if (isCartEndpoint) {
+          // REVISÃO: Erro 404 em endpoints de carrinho - pode ser API não rodando ou endpoint não registrado
+          errorMessage =
+            (data && (data.error || data.message)) ||
+            "Endpoint do carrinho não encontrado. Verifique se a API está rodando e se o endpoint está registrado.";
+          
+          // Log detalhado em desenvolvimento para debug
+          const isDev =
+            typeof process !== "undefined" &&
+            process.env?.NODE_ENV === "development";
+          if (isDev) {
+            console.error('[API] Erro 404 em endpoint de carrinho:', {
+              path,
+              url,
+              method: fetchOptions.method,
+              data
+            });
+          }
         } else {
           // Endpoint não encontrado
           errorMessage =

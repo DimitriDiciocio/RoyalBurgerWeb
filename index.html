@@ -1,250 +1,217 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Royal Burguer</title>
-    <link rel="icon" href="src/assets/svg/logo.svg" />
 
-    <!-- OTIMIZAÇÃO 4.1: Preload de CSS crítico para renderização acima da dobra -->
-    <link rel="preload" href="src/assets/styles/header.css" as="style" />
-    <link rel="preload" href="src/assets/styles/global.css" as="style" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Royal Burguer</title>
+  <link rel="icon" href="src/assets/svg/logo.svg" />
 
-    <!-- CSS crítico (above the fold) -->
-    <link rel="stylesheet" href="src/assets/styles/header.css" />
-    <link rel="stylesheet" href="src/assets/styles/global.css" />
-    <link rel="stylesheet" href="src/assets/styles/inicio.css" />
-    <link rel="stylesheet" href="src/assets/styles/footer.css" />
+  <!-- OTIMIZAÇÃO 4.1: Preload de CSS crítico para renderização acima da dobra -->
+  <link rel="preload" href="src/assets/styles/header.css" as="style" />
+  <link rel="preload" href="src/assets/styles/global.css" as="style" />
 
-    <!-- OTIMIZAÇÃO 4.1: CSS não-crítico carregado de forma assíncrona (below the fold) -->
-    <link
-      rel="preload"
-      href="src/assets/styles/cesta.css"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <link
-      rel="preload"
-      href="src/assets/styles/modais.css"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <link
-      rel="preload"
-      href="src/assets/styles/mensagens.css"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link rel="stylesheet" href="src/assets/styles/cesta.css" />
-      <link rel="stylesheet" href="src/assets/styles/modais.css" />
-      <link rel="stylesheet" href="src/assets/styles/mensagens.css" />
-    </noscript>
-    <!-- Fallback para navegadores que não suportam onload em link rel="preload" -->
-    <script>
-      (function () {
-        var preloadLinks = document.querySelectorAll(
-          'link[rel="preload"][as="style"]'
-        );
-        preloadLinks.forEach(function (link) {
-          var fallback = function () {
-            var newLink = document.createElement("link");
-            newLink.rel = "stylesheet";
-            newLink.href = link.href;
-            document.head.appendChild(newLink);
-          };
-          // Se onload não for suportado, usar fallback após um pequeno delay
-          if (!link.onload || link.sheet === null) {
-            setTimeout(fallback, 0);
-          }
-        });
-      })();
-    </script>
-    <!-- js sistema -->
-    <!-- OTIMIZAÇÃO 1.5: Carregar apenas scripts essenciais, resto via lazy loading -->
-    <script src="src/js/utils.js" type="module" defer></script>
-    <script src="src/js/utils/image-loader.js" type="module" defer></script>
-    <script src="src/js/ui/imports.js" type="module" defer></script>
-    <script src="src/js/ui/header.js" type="module" defer></script>
-    <script src="src/js/ui/alerts.js" type="module" defer></script>
-    <!-- Scripts específicos da página serão carregados via lazy-loader.js -->
-    <!-- js complementares -->
-    <script
-      src="https://kit.fontawesome.com/ac1aaaa398.js"
-      crossorigin="anonymous"
-    ></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  </head>
+  <!-- CSS crítico (above the fold) -->
+  <link rel="stylesheet" href="src/assets/styles/header.css" />
+  <link rel="stylesheet" href="src/assets/styles/global.css" />
+  <link rel="stylesheet" href="src/assets/styles/inicio.css" />
+  <link rel="stylesheet" href="src/assets/styles/footer.css" />
 
-  <body>
-    <!-- importara header -->
-    <div id="header-container"></div>
+  <!-- OTIMIZAÇÃO 4.1: CSS não-crítico carregado de forma assíncrona (below the fold) -->
+  <link rel="preload" href="src/assets/styles/cesta.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" href="src/assets/styles/modais.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" href="src/assets/styles/mensagens.css" as="style"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet" href="src/assets/styles/cesta.css" />
+    <link rel="stylesheet" href="src/assets/styles/modais.css" />
+    <link rel="stylesheet" href="src/assets/styles/mensagens.css" />
+  </noscript>
+  <!-- Fallback para navegadores que não suportam onload em link rel="preload" -->
+  <script>
+    (function () {
+      var preloadLinks = document.querySelectorAll(
+        'link[rel="preload"][as="style"]'
+      );
+      preloadLinks.forEach(function (link) {
+        var fallback = function () {
+          var newLink = document.createElement("link");
+          newLink.rel = "stylesheet";
+          newLink.href = link.href;
+          document.head.appendChild(newLink);
+        };
+        // Se onload não for suportado, usar fallback após um pequeno delay
+        if (!link.onload || link.sheet === null) {
+          setTimeout(fallback, 0);
+        }
+      });
+    })();
+  </script>
+  <!-- js sistema -->
+  <!-- OTIMIZAÇÃO 1.5: Carregar apenas scripts essenciais, resto via lazy loading -->
+  <script src="src/js/utils.js" type="module" defer></script>
+  <script src="src/js/utils/image-loader.js" type="module" defer></script>
+  <script src="src/js/ui/imports.js" type="module" defer></script>
+  <script src="src/js/ui/header.js" type="module" defer></script>
+  <script src="src/js/ui/alerts.js" type="module" defer></script>
+  <!-- Scripts específicos da página serão carregados via lazy-loader.js -->
+  <!-- js complementares -->
+  <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
 
-    <main>
-      <section class="carrossel">
-        <div class="imagens">
-          <!-- OTIMIZAÇÃO 1.5: Primeira imagem carrega imediatamente (above the fold), demais com lazy loading -->
-          <img src="src/assets/img/1.png" alt="Imagem 1" />
-          <img data-src="src/assets/img/2.png" alt="Imagem 2" loading="lazy" />
-          <img data-src="src/assets/img/3.png" alt="Imagem 3" loading="lazy" />
-          <img data-src="src/assets/img/4.png" alt="Imagem 4" loading="lazy" />
-          <img data-src="src/assets/img/5.png" alt="Imagem 5" loading="lazy" />
-          <img data-src="src/assets/img/6.png" alt="Imagem 6" loading="lazy" />
-        </div>
+<body>
+  <!-- importara header -->
+  <div id="header-container"></div>
 
-        <div class="indicadores"></div>
-
-        <script src="src/js/ui/carrossel.js"></script>
-      </section>
-
-      <section class="mostruario-horizontal">
-        <div class="container">
-          <p class="titulo">Os mais pedidos</p>
-          <div class="rolagem">
-            <!-- Produtos serão carregados dinamicamente aqui -->
-          </div>
-        </div>
-
-        <div class="container">
-          <p class="titulo">Promoções especiais</p>
-          <p class="subtitulo" id="subtitulo-promocoes" style="display: none">
-            Essa oferta expira em <span>00</span>:<span>00</span>:<span
-              >00</span
-            >
-          </p>
-          <div class="rolagem">
-            <!-- Produtos em promoção serão carregados dinamicamente aqui -->
-          </div>
-        </div>
-
-        <div class="container">
-          <p class="titulo">Novidades</p>
-          <div class="rolagem">
-            <!-- Novos produtos serão carregados dinamicamente aqui -->
-          </div>
-        </div>
-      </section>
-
-      <section class="mostruario-vertical">
-        <div class="categoias">
-          <i class="fa-solid fa-bars"></i>
-          <!-- Categorias serão carregadas dinamicamente aqui -->
-        </div>
-
-        <div class="rolagem-infinita">
-          <!-- Seções de produtos por categoria serão carregadas dinamicamente aqui -->
-        </div>
-      </section>
-    </main>
-    <!-- importare footer -->
-    <div id="footer-container"></div>
-
-    <!-- Botão Flutuante da Cesta -->
-    <button
-      id="btn-cesta-flutuante"
-      class="btn-cesta-flutuante"
-      style="display: none"
-      data-open-modal="modal-cesta"
-    >
-      <div class="cesta-badge" id="cesta-badge-count">0</div>
-      <i class="fa-solid fa-basket-shopping"></i>
-      <div class="cesta-info">
-        <span class="cesta-label">Ver Cesta</span>
-        <span class="cesta-valor" id="cesta-valor-flutuante">R$ 0,00</span>
+  <main>
+    <section class="carrossel">
+      <div class="imagens">
+        <!-- OTIMIZAÇÃO 1.5: Primeira imagem carrega imediatamente (above the fold), demais com lazy loading -->
+        <img src="src/assets/img/1.png" alt="Imagem 1" />
+        <img data-src="src/assets/img/2.png" alt="Imagem 2" loading="lazy" />
+        <img data-src="src/assets/img/3.png" alt="Imagem 3" loading="lazy" />
+        <img data-src="src/assets/img/4.png" alt="Imagem 4" loading="lazy" />
+        <img data-src="src/assets/img/5.png" alt="Imagem 5" loading="lazy" />
+        <img data-src="src/assets/img/6.png" alt="Imagem 6" loading="lazy" />
       </div>
-    </button>
 
-    <!-- OTIMIZAÇÃO 1.5: Lazy loading de scripts específicos da página -->
-    <script type="module">
-      import { initializeLazyLoading } from "./src/js/utils/lazy-loader.js";
-      // Aguardar DOM estar pronto antes de carregar scripts
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initializeLazyLoading);
-      } else {
-        initializeLazyLoading();
-      }
-    </script>
+      <div class="indicadores"></div>
 
-    <!-- Modal da Cesta -->
-    <div id="modal-cesta" class="modal-cesta" style="display: none">
-      <div class="modal-cesta-content">
-        <div class="modal-cesta-header">
-          <button
-            class="btn-close-modal"
-            data-close-modal="modal-cesta"
-            aria-label="Fechar"
-          >
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-          <h2>
-            <i
-              class="fa-solid fa-crown"
-              style="color: #ffc107; margin-right: 0.5rem; font-size: 1.2rem"
-            ></i>
-            Cesta
-          </h2>
-          <button class="btn-limpar-cesta" id="btn-limpar-cesta">Limpar</button>
+      <script src="src/js/ui/carrossel.js"></script>
+    </section>
+
+    <section class="mostruario-horizontal">
+      <div class="container">
+        <p class="titulo">Os mais pedidos</p>
+        <div class="rolagem">
+          <!-- Produtos serão carregados dinamicamente aqui -->
+        </div>
+      </div>
+
+      <div class="container">
+        <p class="titulo">Promoções especiais</p>
+        <p class="subtitulo" id="subtitulo-promocoes" style="display: none">
+          Essa oferta expira em <span>00</span>:<span>00</span>:<span>00</span>
+        </p>
+        <div class="rolagem">
+          <!-- Produtos em promoção serão carregados dinamicamente aqui -->
+        </div>
+      </div>
+
+      <div class="container">
+        <p class="titulo">Novidades</p>
+        <div class="rolagem">
+          <!-- Novos produtos serão carregados dinamicamente aqui -->
+        </div>
+      </div>
+    </section>
+
+    <section class="mostruario-vertical">
+      <div class="categoias">
+        <i class="fa-solid fa-bars"></i>
+        <!-- Categorias serão carregadas dinamicamente aqui -->
+      </div>
+
+      <div class="rolagem-infinita">
+        <!-- Seções de produtos por categoria serão carregadas dinamicamente aqui -->
+      </div>
+    </section>
+  </main>
+  <!-- importare footer -->
+  <div id="footer-container"></div>
+
+  <!-- Botão Flutuante da Cesta -->
+  <button id="btn-cesta-flutuante" class="btn-cesta-flutuante" style="display: none" data-open-modal="modal-cesta">
+    <div class="cesta-badge" id="cesta-badge-count">0</div>
+    <i class="fa-solid fa-basket-shopping"></i>
+    <div class="cesta-info">
+      <span class="cesta-label">Ver Cesta</span>
+      <span class="cesta-valor" id="cesta-valor-flutuante">R$ 0,00</span>
+    </div>
+  </button>
+
+  <!-- OTIMIZAÇÃO 1.5: Lazy loading de scripts específicos da página -->
+  <script type="module">
+    import { initializeLazyLoading } from "./src/js/utils/lazy-loader.js";
+    // Aguardar DOM estar pronto antes de carregar scripts
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initializeLazyLoading);
+    } else {
+      initializeLazyLoading();
+    }
+  </script>
+
+  <!-- Modal da Cesta -->
+  <div id="modal-cesta" class="modal-cesta" style="display: none">
+    <div class="modal-cesta-content">
+      <div class="modal-cesta-header">
+        <button class="btn-close-modal" data-close-modal="modal-cesta" aria-label="Fechar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <h2>
+          <i class="fa-solid fa-crown" style="color: #ffc107; margin-right: 0.5rem; font-size: 1.2rem"></i>
+          Cesta
+        </h2>
+        <button class="btn-limpar-cesta" id="btn-limpar-cesta">Limpar</button>
+      </div>
+
+      <div class="modal-cesta-body">
+        <!-- Cesta Vazia -->
+        <div id="cesta-vazia-modal" class="cesta-vazia-modal" style="display: none">
+          <i class="fa-solid fa-basket-shopping"></i>
+          <p>Sua cesta está vazia</p>
         </div>
 
-        <div class="modal-cesta-body">
-          <!-- Cesta Vazia -->
-          <div
-            id="cesta-vazia-modal"
-            class="cesta-vazia-modal"
-            style="display: none"
-          >
-            <i class="fa-solid fa-basket-shopping"></i>
-            <p>Sua cesta está vazia</p>
+        <!-- Itens da Cesta -->
+        <div id="cesta-items-container" class="cesta-items-container">
+          <h3>Itens adicionados</h3>
+          <div id="lista-itens-modal" class="lista-itens-modal">
+            <!-- Itens serão renderizados aqui -->
           </div>
+        </div>
 
-          <!-- Itens da Cesta -->
-          <div id="cesta-items-container" class="cesta-items-container">
-            <h3>Itens adicionados</h3>
-            <div id="lista-itens-modal" class="lista-itens-modal">
-              <!-- Itens serão renderizados aqui -->
+        <!-- Resumo de Valores -->
+        <div id="cesta-resumo-container" class="cesta-resumo-container">
+          <h3>Resumo de valores</h3>
+          <div class="resumo-valores">
+            <div class="resumo-linha">
+              <span>Subtotal</span>
+              <span id="modal-subtotal">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span>Taxa de entrega</span>
+              <span id="modal-taxa-entrega">R$ 5,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span>Descontos</span>
+              <span id="modal-descontos">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha total-linha">
+              <div class="total-linha-container">
+                <span>Total</span>
+                <span id="modal-total">R$ 0,00</span>
+              </div>
+              <p class="pontos-info">
+                Nessa compra, você ganhará
+                <strong id="modal-pontos">0</strong> pontos Royal
+              </p>
             </div>
           </div>
-
-          <!-- Resumo de Valores -->
-          <div id="cesta-resumo-container" class="cesta-resumo-container">
-            <h3>Resumo de valores</h3>
-            <div class="resumo-valores">
-              <div class="resumo-linha">
-                <span>Subtotal</span>
-                <span id="modal-subtotal">R$ 0,00</span>
-              </div>
-              <div class="resumo-linha">
-                <span>Taxa de entrega</span>
-                <span id="modal-taxa-entrega">R$ 5,00</span>
-              </div>
-              <div class="resumo-linha">
-                <span>Descontos</span>
-                <span id="modal-descontos">R$ 0,00</span>
-              </div>
-              <div class="resumo-linha total-linha">
-                <div class="total-linha-container">
-                  <span>Total</span>
-                  <span id="modal-total">R$ 0,00</span>
-                </div>
-                <p class="pontos-info">
-                  Nessa compra, você ganhará
-                  <strong id="modal-pontos">0</strong> pontos Royal
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
+      </div>
 
-        <div class="modal-cesta-footer">
-          <div class="footer-total">
-            <span>Total</span>
-            <span id="modal-footer-total">R$ 0,00</span>
-          </div>
-          <button class="btn-continuar" id="btn-continuar-modal">
-            Continuar
-          </button>
+      <div class="modal-cesta-footer">
+        <div class="footer-total">
+          <span>Total</span>
+          <span id="modal-footer-total">R$ 0,00</span>
         </div>
+        <button class="btn-continuar" id="btn-continuar-modal">
+          Continuar
+        </button>
       </div>
     </div>
-  </body>
+  </div>
+</body>
+
 </html>

@@ -22,16 +22,18 @@ const VISIBILITY_DELAY_MS = 500; // Delay para exibição de alerta antes de red
 // Verificar se está em modo de desenvolvimento (browser-safe)
 const isDevelopment = () => {
     try {
-        return window.location.hostname === 'localhost' || 
-               window.location.hostname === '127.0.0.1' ||
-               window.location.hostname.includes('.local');
+        const host = window.location.hostname || '';
+        const isFile = window.location.protocol === 'file:'; // permite logs quando abrindo arquivo local
+        return isFile || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.includes('.local');
     } catch {
         return false;
     }
 };
 
 (function initOrderDetails() {
-    if (!window.location.pathname.includes('info-pedido.html')) return;
+    if (!window.location.pathname.toLowerCase().includes('info-pedido')) {
+        // logs disabled
+    }
 
     const state = {
         order: null,
@@ -82,8 +84,24 @@ const isDevelopment = () => {
         };
     }
 
-    // Logger desativado (no-op)
-    function debugLog() {}
+    // Logger desativado
+    function debugLog(..._args) {}
+
+    // Handler global para erro de imagem usado pelo onerror dos <img>
+    if (typeof window !== 'undefined' && !window._rbImgErr) {
+        window._rbImgErr = function(_imgEl) { /* logs disabled */ };
+    }
+
+    // Helper: caminho da imagem placeholder compatível com páginas em /src/pages/
+    function getPlaceholderImagePath() {
+        try {
+            const p = window.location.pathname || '';
+            const inPages = p.includes('/src/pages/') || p.includes('src/pages');
+            return inPages ? '../assets/img/1.png' : 'src/assets/img/1.png';
+        } catch (_) {
+            return 'src/assets/img/1.png';
+        }
+    }
 
     // Carregar ingredientes e criar mapa de preços
     async function loadIngredientsCache() {
@@ -201,6 +219,7 @@ const isDevelopment = () => {
 
         try {
             const result = await getOrderDetails(orderId);
+            
             if (result.success) {
                 state.order = result.data;
                 // Enriquecer itens com dados do produto (imagem) quando necessário
@@ -243,35 +262,66 @@ const isDevelopment = () => {
                     item?.product?.imagePath,
                     item?.product?.image_path
                 ];
-                const hasImage = candidates.some(Boolean);
-                if (hasImage) return item;
 
-                const productId = item?.product_id || item?.product?.id;
-                if (!productId) {
-                    // Fallback por nome do produto
-                    const name = item?.product_name || item?.product?.name;
-                    if (!name) return item;
-                    debugLog('Sem product_id, buscando por nome', { name });
-                    try {
-                        const resp = await searchProducts({ name });
-                        const list = Array.isArray(resp?.items) ? resp.items : [];
-                        const match = list.find(p => String(p?.name || '').toLowerCase() === String(name).toLowerCase()) || list[0];
-                        if (match) {
-                            return {
-                                ...item,
-                                product: item.product || match,
-                                product_image_url: match.image_url || match.image || item.product_image_url,
-                                product_image_hash: match.image_hash || item.product_image_hash
-                            };
-                        }
-                    } catch (e) {
-                        debugLog('Erro ao buscar produto por nome', { error: e?.message });
-                    }
+                const hasImage = candidates.some(Boolean);
+                if (hasImage) {
                     return item;
                 }
 
-                debugLog('Buscando produto para obter imagem', { productId, productName: item?.product_name || item?.product?.name });
+                const productId = item?.product_id || item?.product?.id;
+
+                if (!productId) {
+                    const name = item?.product_name || item?.product?.name;
+                    if (!name) {
+                        return item;
+                    }
+
+                    // Helper: normalizar nome para comparações robustas (remove acentos, espaços extras e caixa)
+                    const normalizeName = (s) => String(s || '')
+                        .normalize('NFD')
+                        .replace(/\p{Diacritic}/gu, '')
+                        .toLowerCase()
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    const targetNameNorm = normalizeName(name);
+
+                    // ESTRATÉGIA 1: Buscar por nome (inclui inativos)
+                    let resp = await searchProducts({ name, include_inactive: true, page_size: 50 });
+                    let list = Array.isArray(resp?.items) ? resp.items : [];
+
+                    // ESTRATÉGIA 2: Se não encontrou, buscar TODOS os produtos
+                    if (list.length === 0) {
+                        const allProductsResp = await searchProducts({ page_size: 1000, include_inactive: true });
+                        list = Array.isArray(allProductsResp?.items) ? allProductsResp.items : [];
+                    }
+
+                    // Match exato (normalizado)
+                    let match = list.find(p => normalizeName(p?.name) === targetNameNorm);
+
+                    // Se não encontrou match exato, buscar por similaridade
+                    if (!match) {
+                        match = list.find(p => {
+                            const pNameNorm = normalizeName(p?.name);
+                            return pNameNorm.includes(targetNameNorm) || targetNameNorm.includes(pNameNorm);
+                        });
+                    }
+
+                    if (match) {
+                        return {
+                            ...item,
+                            product_id: match.id,
+                            product: item.product || match,
+                            product_image_url: match.image_url || item.product_image_url,
+                            product_image_hash: match.image_hash || item.product_image_hash
+                        };
+                    }
+
+                    return item;
+                }
+
                 const product = await getProductById(productId);
+
                 if (product && (product.image_url || product.image)) {
                     return {
                         ...item,
@@ -280,9 +330,9 @@ const isDevelopment = () => {
                         product_image_hash: product.image_hash || item.product_image_hash
                     };
                 }
+
                 return item;
-            } catch (err) {
-                debugLog('Erro ao buscar produto por ID', { error: err?.message });
+            } catch (_err) {
                 return item;
             }
         }));
@@ -656,7 +706,8 @@ const isDevelopment = () => {
             return;
         }
 
-        const itemsHtml = items.map(item => {
+        const itemsHtml = items.map((item, idx) => {
+            
             const extras = item.extras || item.additional_items || [];
             const baseMods = item.base_modifications || [];
             
@@ -680,12 +731,24 @@ const isDevelopment = () => {
                 item?.image_hash,
                 item?.product?.imageHash
             ];
-            const selectedImagePath = imagePathCandidates.find(Boolean);
+            
+            let selectedImagePath = imagePathCandidates.find(Boolean);
             const selectedImageHash = imageHashCandidates.find(Boolean);
+            
+            // Fallback adicional: se não houver caminho de imagem, tentar pelo productId
+            if (!selectedImagePath) {
+                const prodId = item?.product_id || item?.product?.id || null;
+                if (prodId) {
+                    const fallbackFiles = [`${prodId}.jpeg`, `${prodId}.jpg`];
+                    selectedImagePath = fallbackFiles.find(Boolean);
+                    debugLog('Usando fallback por productId para imagem', { prodId, selectedImagePath });
+                }
+            }
 
             let imageHtml = '';
             if (selectedImagePath) {
                 const builtUrl = buildImageUrl(selectedImagePath, selectedImageHash);
+                
                 debugLog('Imagem do item', {
                     productName: item?.product_name || item?.product?.name,
                     candidates: imagePathCandidates,
@@ -699,14 +762,14 @@ const isDevelopment = () => {
                     imageHtml = `<img src="${escapeHTML(builtUrl)}" alt="${altText}" loading="lazy" onerror="window._rbImgErr && window._rbImgErr(this)">`;
                 } else {
                     debugLog('buildImageUrl retornou vazio, usando placeholder');
-                    imageHtml = `<div class="imagem-placeholder"><i class="fa-solid fa-image"></i><p>Sem imagem</p></div>`;
+                    imageHtml = `<img src="${getPlaceholderImagePath()}" alt="Produto" loading="lazy">`;
                 }
             } else {
                 debugLog('Nenhum caminho de imagem válido encontrado para o item', {
                     productName: item?.product_name || item?.product?.name,
                     candidates: imagePathCandidates
                 });
-                imageHtml = `<div class="imagem-placeholder"><i class="fa-solid fa-image"></i><p>Sem imagem</p></div>`;
+                imageHtml = `<img src="${getPlaceholderImagePath()}" alt="Produto" loading="lazy">`;
             }
 
             // Calcular preço total do item com fallback seguro
@@ -788,18 +851,20 @@ const isDevelopment = () => {
 
     // Função auxiliar para construir URL da imagem
     function buildImageUrl(imagePath, imageHash = null) {
-        if (!imagePath) return null;
+        // Alinhado com cesta.js: quando não houver caminho, usar placeholder local (respeitando /src/pages)
+        if (!imagePath) return getPlaceholderImagePath();
         
         // Validar que imagePath é string antes de processar
-        const pathStr = String(imagePath);
+        let pathStr = String(imagePath).trim();
         
         // SECURITY: Validar que não contém caracteres perigosos
         if (/[<>"']/.test(pathStr)) {
-            if (isDevelopment()) {
-                console.warn('Caminho de imagem contém caracteres inválidos:', pathStr);
-            }
-            return null;
+            // logs disabled
+            return getPlaceholderImagePath();
         }
+        
+        // Normalizar barras e remover duplicadas
+        pathStr = pathStr.replace(/\\/g, '/').replace(/\/+/g, '/');
         
         // Se já é uma URL completa, usar diretamente (após validação)
         if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
@@ -808,34 +873,40 @@ const isDevelopment = () => {
         }
         
         // CORREÇÃO: Usar API_BASE_URL do api.js para garantir funcionamento em qualquer servidor
-        // Isso evita erros quando o código é colocado em outros servidores
         const baseUrl = API_BASE_URL;
-        
-        // Usa hash da imagem se disponível, senão usa timestamp
         const cacheParam = imageHash || new Date().getTime();
         
-        // Se é um caminho do backend (/api/uploads/products/ID.jpeg)
-        if (pathStr.startsWith('/api/uploads/products/')) {
-            const url = `${baseUrl}${pathStr}?v=${cacheParam}`;
-            debugLog('Imagem via /api/uploads/products', { imagePath: pathStr, url });
+        // Aceitar caminhos sem barra inicial: "uploads/products/ID.jpeg"
+        if (pathStr.startsWith('uploads/products/')) {
+            const fixed = '/uploads/products/' + pathStr.substring('uploads/products/'.length);
+            const url = `${baseUrl}${fixed.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
+            debugLog('Imagem via uploads/products sem barra inicial', { imagePath: pathStr, url });
             return url;
         }
         
-        // Se é um caminho antigo (/uploads/products/ID.jpeg)
+        // Caminho antigo com barra
         if (pathStr.startsWith('/uploads/products/')) {
             const url = `${baseUrl}${pathStr.replace('/uploads/', '/api/uploads/')}?v=${cacheParam}`;
             debugLog('Imagem via /uploads/products (ajustada p/ /api/uploads/)', { imagePath: pathStr, url });
             return url;
         }
         
-        // Se é apenas o nome do arquivo (ID.jpeg, ID.jpg, etc.)
-        if (pathStr.match(/^\d+\.(jpg|jpeg|png|gif|webp)$/i)) {
-            const url = `${baseUrl}/api/uploads/products/${pathStr}?v=${cacheParam}`;
-            debugLog('Imagem via nome de arquivo simples', { imagePath: pathStr, url });
+        // Caminho já com prefixo /api/uploads/products
+        if (pathStr.startsWith('/api/uploads/products/')) {
+            const url = `${baseUrl}${pathStr}?v=${cacheParam}`;
+            debugLog('Imagem via /api/uploads/products', { imagePath: pathStr, url });
             return url;
         }
         
-        // Fallback: assumir que é um caminho relativo (após validação básica)
+        // Nome de arquivo simples (ex: 123.jpeg ou tudo.jpeg)
+        if (/\.(jpg|jpeg|png|gif|webp)$/i.test(pathStr)) {
+            const filename = pathStr.split('/').pop();
+            const url = `${baseUrl}/api/uploads/products/${filename}?v=${cacheParam}`;
+            debugLog('Imagem via nome de arquivo', { imagePath: pathStr, url });
+            return url;
+        }
+        
+        // Fallback: tratar como caminho relativo para produtos
         const fallbackUrl = `${baseUrl}/api/uploads/products/${pathStr}?v=${cacheParam}`;
         debugLog('Imagem via fallback relativo', { imagePath: pathStr, fallbackUrl });
         return fallbackUrl;
@@ -1067,13 +1138,13 @@ const isDevelopment = () => {
     // Inicializar
     async function init() {
         debugLog('DOMContentLoaded -> init() chamado');
-        if (!checkUserLogin()) {
+        const logged = checkUserLogin();
+        if (!logged) {
             debugLog('Usuário não logado, abortando init');
             return;
         }
 
         const orderId = getOrderIdFromUrl();
-        debugLog('orderId extraído da URL', { orderId, search: window.location.search });
         if (!orderId) {
             showError('ID do pedido não encontrado na URL.');
             try { debugLog('Redirecionando para histórico de pedidos'); } catch(_) {}
@@ -1091,8 +1162,12 @@ const isDevelopment = () => {
         await loadOrderDetails(orderId);
     }
 
-    // Inicializar quando DOM estiver pronto
-    document.addEventListener('DOMContentLoaded', () => {
+    // Inicializar quando DOM estiver pronto (ou imediatamente se já estiver pronto)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            init();
+        });
+    } else {
         init();
-    });
+    }
 })();

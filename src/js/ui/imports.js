@@ -327,34 +327,39 @@ function fixPaths() {
   const isInSrcFolder =
     currentPath.includes("/src/") || currentPath.includes("src/");
 
-  // Ajustar caminhos baseado na localização atual
+  // REVISÃO: Ajustar caminhos baseado na localização atual
   const logo = document.querySelector(".logo");
+  const logoModal = document.querySelector(".logo-modal");
   const navLinks = document.querySelectorAll(".nav-menu a");
   const loginLinks = document.querySelectorAll("#login-header a");
 
-  if (logo) {
-    let logoPath;
-
+  // REVISÃO: Função auxiliar para obter o caminho correto do logo
+  function getCorrectLogoPath() {
     // Lógica corrigida: priorizar a detecção mais específica
     if (isInPagesFolder && isInSrcFolder) {
       // Página está em src/pages/ - precisa subir 2 níveis para chegar em src/
-      logoPath = "../../src/assets/svg/logo.svg";
+      return "../../src/assets/svg/logo.svg";
     } else if (isInPagesFolder) {
       // Página está em pages/ (não em src/) - subir 2 níveis
-      logoPath = "../../assets/svg/logo.svg";
+      return "../../assets/svg/logo.svg";
     } else if (isInSrcFolder) {
       // Página está em src/ (mas não em pages/) - subir 1 nível
-      logoPath = "../assets/svg/logo.svg";
+      return "../assets/svg/logo.svg";
     } else {
       // Página está na raiz
-      logoPath = "src/assets/svg/logo.svg";
+      return "src/assets/svg/logo.svg";
     }
+  }
 
-    // Sempre definir o caminho correto baseado na localização atual
-    logo.src = logoPath;
-    logo.alt = "Royal Burguer Logo";
+  // REVISÃO: Função auxiliar para definir o logo com fallback
+  function setLogoWithFallback(imgElement) {
+    if (!imgElement) return;
+    
+    const logoPath = getCorrectLogoPath();
+    imgElement.src = logoPath;
+    imgElement.alt = "Royal Burguer Logo";
 
-    logo.onerror = function () {
+    imgElement.onerror = function () {
       // Tentar caminhos alternativos
       const alternativePaths = [
         "../assets/svg/logo.svg",
@@ -367,14 +372,18 @@ function fixPaths() {
       let pathIndex = 0;
       const tryNextPath = () => {
         if (pathIndex < alternativePaths.length) {
-          logo.src = alternativePaths[pathIndex];
+          imgElement.src = alternativePaths[pathIndex];
           pathIndex++;
         }
       };
 
-      logo.onerror = tryNextPath;
+      imgElement.onerror = tryNextPath;
     };
   }
+
+  // REVISÃO: Corrigir logo principal e logo do modal
+  setLogoWithFallback(logo);
+  setLogoWithFallback(logoModal);
 
   // Ajustar links de navegação
   navLinks.forEach((link, index) => {
@@ -545,8 +554,9 @@ async function loadHeader() {
       document.getElementById("header-container").innerHTML = data;
     }
 
-    // Corrigir caminhos baseado na página atual
-    setTimeout(() => {
+    // REVISÃO: Corrigir caminhos baseado na página atual
+    // Usar requestAnimationFrame para garantir que o DOM está pronto
+    requestAnimationFrame(() => {
       fixPaths();
       configureHeader();
 
@@ -616,7 +626,7 @@ async function loadHeader() {
           }
         }
       } catch (_e) {}
-    }, VALIDATION_LIMITS.RETRY_DELAY);
+    });
   } catch (error) {
     // TODO: Implementar logging estruturado em produção
     console.error("Erro ao carregar o header:", error.message);
