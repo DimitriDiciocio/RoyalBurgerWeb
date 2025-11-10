@@ -599,6 +599,10 @@ class ProdutoManager {
       dataCriacao: produto.created_at || new Date().toISOString().split("T")[0],
       ultimaAtualizacao:
         produto.updated_at || new Date().toISOString().split("T")[0],
+      // FASE 2 (Admin): Campo para indicar disponibilidade por estoque
+      isAvailableByStock: produto.is_available_by_stock !== undefined 
+        ? produto.is_available_by_stock 
+        : true, // Por padrão assume disponível se não informado
     };
   }
 
@@ -857,7 +861,15 @@ class ProdutoManager {
 
             <div class="info-produto">
                 <div class="cabecalho-produto">
-                    <h3>${escapeHTML(produto.nome)}</h3>
+                    <div class="produto-nome-wrapper">
+                        <h3>${escapeHTML(produto.nome)}</h3>
+                        ${produto.isAvailableByStock === false ? `
+                            <span class="stock-unavailable-badge" title="Produto indisponível para clientes devido à falta de estoque">
+                                <i class="fa-solid fa-exclamation-triangle"></i>
+                                <span>Indisponível</span>
+                            </span>
+                        ` : ''}
+                    </div>
                     <div class="controles-produto">
                         <label class="toggle">
                             <input type="checkbox" ${

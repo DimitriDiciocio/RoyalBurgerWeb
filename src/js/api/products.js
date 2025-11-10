@@ -25,7 +25,7 @@ export const getProducts = async (options = {}) => {
     if (options.include_inactive !== undefined) params.append('include_inactive', options.include_inactive);
     
     const queryString = params.toString();
-    const url = `/api/products/${queryString ? `?${queryString}` : ''}`;
+    const url = `/api/products${queryString ? `?${queryString}` : ''}`;
     
     try {
         const response = await apiRequest(url, {

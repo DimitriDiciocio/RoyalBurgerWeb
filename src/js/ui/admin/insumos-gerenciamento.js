@@ -54,13 +54,21 @@ class InsumoDataManager {
    */
   async getAllInsumos(options = {}) {
     try {
-      if (this.isCacheValid() && !options.forceRefresh) {
+      // Com paginação, busca, filtros de categoria ou status, não usar cache (sempre buscar dados atualizados)
+      // Cache só seria útil se não houvesse paginação/busca/filtros
+      const hasPaginationOrFilters = options.page || options.name || options.status || options.category;
+      
+      if (!hasPaginationOrFilters && this.isCacheValid() && !options.forceRefresh) {
         return this.cache.data;
       }
 
       const response = await getIngredients(options);
-      this.cache.data = response;
-      this.cache.lastFetch = Date.now();
+      
+      // Só atualizar cache se não houver paginação/busca/filtros
+      if (!hasPaginationOrFilters) {
+        this.cache.data = response;
+        this.cache.lastFetch = Date.now();
+      }
 
       return response;
     } catch (error) {
@@ -229,6 +237,15 @@ class InsumoManager {
     this.mouseDownTimeout = null; // Para distinguir clique simples de segurado
     this.ingredientes = []; // Lista de ingredientes para validação
     this.isSubmitting = false; // Evita envios duplicados
+    // Estado de paginação
+    this.currentPage = 1;
+    this.pageSize = 20; // Itens por página (fixo em 20)
+    this.totalPages = 1;
+    this.totalItems = 0;
+    this.currentSearchTerm = ""; // Termo de busca atual
+    this.currentCategoryFilter = ""; // Filtro de categoria atual
+    this.currentStatusFilter = ""; // Filtro de status atual
+    this.isLoading = false; // Estado de carregamento
   }
 
   /**
@@ -358,14 +375,18 @@ class InsumoManager {
     const statusFilter = document.getElementById("status-estoque");
 
     if (categoriaFilter) {
-      categoriaFilter.addEventListener("change", (e) => {
-        this.applyAllFilters();
+      categoriaFilter.addEventListener("change", async (e) => {
+        this.currentCategoryFilter = categoriaFilter.value || "";
+        this.currentPage = 1; // Resetar para primeira página ao filtrar
+        await this.loadInsumos(); // Reload from API for category filter
       });
     }
 
     if (statusFilter) {
-      statusFilter.addEventListener("change", (e) => {
-        this.applyAllFilters();
+      statusFilter.addEventListener("change", async (e) => {
+        this.currentStatusFilter = statusFilter.value || "";
+        this.currentPage = 1; // Resetar para primeira página ao filtrar
+        await this.loadInsumos();
       });
     }
   }
@@ -376,23 +397,85 @@ class InsumoManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-ingrediente");
     if (searchInput) {
-      const debouncedFilter = debounce(() => {
-        this.applyAllFilters();
-      }, 300);
+      const debouncedSearch = debounce(async () => {
+        this.currentSearchTerm = searchInput.value.trim();
+        this.currentPage = 1; // Resetar para primeira página ao buscar
+        await this.loadInsumos();
+      }, 500); // Aumentar debounce para evitar muitas requisições
 
       searchInput.addEventListener("input", (e) => {
-        debouncedFilter();
+        debouncedSearch();
       });
     }
   }
 
   /**
-   * Carrega insumos
+   * Carrega insumos com paginação e busca
    */
   async loadInsumos() {
+    if (this.isLoading) return; // Evitar múltiplas requisições simultâneas
+    
     try {
-      const response = await this.dataManager.getAllInsumos();
+      this.isLoading = true;
+      this.showLoadingState();
+      
+      // Preparar opções de busca e paginação
+      const options = {
+        page: this.currentPage,
+        page_size: this.pageSize, // Usar pageSize do estado
+      };
+
+      // Adicionar busca se houver termo de busca
+      if (this.currentSearchTerm) {
+        options.name = this.currentSearchTerm;
+      }
+
+      // Adicionar filtro de categoria se houver
+      if (this.currentCategoryFilter && this.currentCategoryFilter !== "") {
+        options.category = this.currentCategoryFilter;
+      }
+
+      // Adicionar filtro de status se houver (mapear valores do frontend para API)
+      if (this.currentStatusFilter && this.currentStatusFilter !== "todos") {
+        const statusMap = {
+          "em-estoque": "in_stock",
+          "estoque-baixo": "low_stock",
+          "sem-estoque": "out_of_stock",
+        };
+        if (statusMap[this.currentStatusFilter]) {
+          options.status = statusMap[this.currentStatusFilter];
+        }
+      }
+
+      console.log('[InsumoManager] Carregando página:', this.currentPage, 'com opções:', options);
+      
+      const response = await this.dataManager.getAllInsumos(options);
       const insumos = response.items || [];
+
+      console.log('[InsumoManager] Resposta recebida:', {
+        itemsCount: insumos.length,
+        pagination: response.pagination
+      });
+
+      // Atualizar informações de paginação (preservar currentPage que foi definido antes da chamada)
+      if (response.pagination) {
+        this.totalPages = response.pagination.total_pages || 1;
+        this.totalItems = response.pagination.total || 0;
+        // NÃO sobrescrever currentPage - manter o valor que foi definido antes da chamada
+        // A API retorna a página que foi solicitada, então não precisamos atualizar
+        const responsePage = response.pagination.page || 1;
+        // Apenas validar se a resposta está correta (para debug)
+        if (responsePage !== this.currentPage) {
+          console.warn('[InsumoManager] API retornou página diferente da solicitada:', responsePage, 'vs', this.currentPage, '- mantendo página solicitada');
+        }
+        // Manter currentPage como está (não sobrescrever)
+      }
+      
+      console.log('[InsumoManager] Estado após carregar:', {
+        currentPage: this.currentPage,
+        totalPages: this.totalPages,
+        totalItems: this.totalItems
+      });
 
       // Mapear dados para o formato esperado pelo createInsumoCard
       const insumosMapeados = insumos.map((insumo) => ({
@@ -420,11 +503,43 @@ class InsumoManager {
       }));
 
       this.renderInsumoCards(insumosMapeados);
-      // Aplicar filtros após carregar os dados
-      this.applyAllFilters();
+      this.renderPagination();
+      // Não precisa mais aplicar filtros locais - tudo é filtrado pela API
     } catch (error) {
       console.error("Erro ao carregar insumos:", error);
       this.showErrorMessage("Erro ao carregar insumos");
+    } finally {
+      this.isLoading = false;
+      this.hideLoadingState();
+    }
+  }
+
+  /**
+   * Mostra estado de carregamento
+   */
+  showLoadingState() {
+    const container = document.querySelector("#secao-estoque .ingredientes");
+    if (!container) return;
+    
+    const loadingOverlay = document.createElement("div");
+    loadingOverlay.className = "loading-overlay";
+    loadingOverlay.id = "ingredientes-loading";
+    loadingOverlay.innerHTML = `
+      <div class="loading-spinner">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Carregando ingredientes...</p>
+      </div>
+    `;
+    container.appendChild(loadingOverlay);
+  }
+
+  /**
+   * Esconde estado de carregamento
+   */
+  hideLoadingState() {
+    const loadingOverlay = document.getElementById("ingredientes-loading");
+    if (loadingOverlay) {
+      loadingOverlay.remove();
     }
   }
 
@@ -882,7 +997,7 @@ class InsumoManager {
       // Atualizar resumo
       await this.loadResumoEstoque();
 
-      // Recarregar insumos para garantir sincronização
+      // Recarregar insumos para garantir sincronização (mantém página atual)
       await this.loadInsumos();
 
       this.showSuccessMessage("Estoque atualizado com sucesso!");
@@ -1500,8 +1615,8 @@ class InsumoManager {
       console.error("Erro ao ajustar estoque:", error);
       this.stopContinuousAdjustment();
 
-      // Reverter mudança visual em caso de erro
-      this.loadInsumos();
+      // Reverter mudança visual em caso de erro (mantém página atual)
+      await this.loadInsumos();
     }
   }
 
@@ -1566,26 +1681,28 @@ class InsumoManager {
   /**
    * Aplica todos os filtros simultaneamente
    */
-  applyAllFilters() {
-    const searchTerm =
-      document.getElementById("busca-ingrediente")?.value?.toLowerCase() || "";
-    const categoriaFilter =
-      document.getElementById("categoria-estoque")?.value || "";
-    const statusFilter =
-      document.getElementById("status-estoque")?.value || "todos";
+  /**
+   * Aplica filtros locais (categoria) - busca e status são feitos na API
+   */
+  applyLocalFilters() {
+    const categoriaFilter = this.currentCategoryFilter || "";
 
     const cards = document.querySelectorAll(".card-ingrediente");
 
     cards.forEach((card) => {
-      const shouldShow =
-        this.checkSearchFilter(card, searchTerm) &&
-        this.checkCategoryFilter(card, categoriaFilter) &&
-        this.checkStatusFilter(card, statusFilter);
-
+      const shouldShow = this.checkCategoryFilter(card, categoriaFilter);
       card.style.display = shouldShow ? "block" : "none";
     });
 
     this.updateVisibleProductsCount();
+  }
+
+  /**
+   * @deprecated - Mantido para compatibilidade, mas não é mais usado
+   * Busca e status agora são feitos na API
+   */
+  applyAllFilters() {
+    this.applyLocalFilters();
   }
 
   /**
@@ -1649,6 +1766,194 @@ class InsumoManager {
     if (counterElement) {
       counterElement.textContent = `${visibleCards.length} de ${totalCards.length} insumos`;
     }
+  }
+
+  /**
+   * Renderiza controles de paginação melhorados
+   */
+  renderPagination() {
+    const container = document.querySelector("#secao-estoque .ingredientes");
+    if (!container) return;
+
+    // Remover paginação existente
+    const existingPagination = container.parentElement.querySelector(".pagination");
+    if (existingPagination) {
+      existingPagination.remove();
+    }
+
+    // Calcular informações de exibição
+    const startItem = this.totalItems === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+    const endItem = Math.min(this.currentPage * this.pageSize, this.totalItems);
+
+    // Sempre renderizar paginação se houver itens (mesmo que seja apenas 1 página)
+    if (this.totalItems === 0) {
+      return;
+    }
+
+    // Criar elemento de paginação melhorado
+    const pagination = document.createElement("div");
+    pagination.className = "pagination";
+    pagination.innerHTML = `
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          <span class="pagination-text">
+            Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${this.totalItems}</strong> ingredientes
+          </span>
+          ${this.totalPages > 1 ? `<span class="pagination-page-info">Página ${this.currentPage} de ${this.totalPages}</span>` : ''}
+        </div>
+        ${this.totalPages > 1 ? `
+        <div class="pagination-controls">
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span>Anterior</span>
+          </button>
+          <div class="pagination-pages">
+            ${this.generatePageNumbers()}
+          </div>
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
+            <span>Próxima</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    // Adicionar event listeners com scroll para topo
+    // Usar event delegation para evitar problemas com listeners duplicados
+    const handlePaginationClick = async (e) => {
+      const target = e.target.closest('.pagination-btn, .page-number');
+      if (!target) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (this.isLoading) {
+        console.log('[InsumoManager] Carregando, ignorando clique');
+        return;
+      }
+      
+      // Verificar se é botão de navegação
+      if (target.classList.contains('pagination-btn')) {
+        if (target.disabled) {
+          console.log('[InsumoManager] Botão desabilitado');
+          return;
+        }
+        
+        const action = target.dataset.page;
+        const oldPage = this.currentPage;
+        
+        if (action === "prev" && this.currentPage > 1) {
+          this.currentPage = Math.max(1, this.currentPage - 1);
+          console.log('[InsumoManager] Navegando para página anterior:', oldPage, '->', this.currentPage);
+        } else if (action === "next" && this.currentPage < this.totalPages) {
+          this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+          console.log('[InsumoManager] Navegando para próxima página:', oldPage, '->', this.currentPage);
+        } else {
+          console.log('[InsumoManager] Navegação bloqueada:', { action, currentPage: this.currentPage, totalPages: this.totalPages });
+          return;
+        }
+      } 
+      // Verificar se é número de página
+      else if (target.classList.contains('page-number')) {
+        const page = parseInt(target.dataset.page);
+        const oldPage = this.currentPage;
+        
+        if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+          console.log('[InsumoManager] Navegação para página bloqueada:', { page, currentPage: this.currentPage, totalPages: this.totalPages });
+          return;
+        }
+        
+        this.currentPage = page;
+        console.log('[InsumoManager] Navegando para página:', oldPage, '->', page);
+      } else {
+        return;
+      }
+      
+      // Garantir que o estado foi atualizado antes de carregar
+      console.log('[InsumoManager] Estado antes de carregar:', {
+        currentPage: this.currentPage,
+        totalPages: this.totalPages,
+        totalItems: this.totalItems
+      });
+      
+      await this.loadInsumos();
+      this.scrollToTop();
+    };
+    
+    // Usar event delegation no elemento de paginação
+    pagination.addEventListener('click', handlePaginationClick);
+
+    // Inserir após o container de ingredientes
+    container.parentElement.appendChild(pagination);
+  }
+
+  /**
+   * Faz scroll suave para o topo da seção
+   */
+  scrollToTop() {
+    const section = document.getElementById("secao-estoque");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  /**
+   * Gera números de página para exibição melhorados
+   */
+  generatePageNumbers() {
+    const pages = [];
+    const maxVisible = 7; // Máximo de números de página visíveis
+    
+    if (this.totalPages <= maxVisible) {
+      // Se houver poucas páginas, mostrar todas
+      for (let i = 1; i <= this.totalPages; i++) {
+        pages.push(
+          `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`
+        );
+      }
+      return pages.join("");
+    }
+
+    // Lógica para muitas páginas
+    let startPage = Math.max(1, this.currentPage - 2);
+    let endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+    // Ajustar início se estiver no final
+    if (endPage - startPage < 4) {
+      if (this.currentPage <= 3) {
+        startPage = 1;
+        endPage = Math.min(5, this.totalPages);
+      } else if (this.currentPage >= this.totalPages - 2) {
+        startPage = Math.max(1, this.totalPages - 4);
+        endPage = this.totalPages;
+      }
+    }
+
+    // Primeira página
+    if (startPage > 1) {
+      pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+      if (startPage > 2) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+      }
+    }
+
+    // Páginas do meio
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+      );
+    }
+
+    // Última página
+    if (endPage < this.totalPages) {
+      if (endPage < this.totalPages - 1) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+      }
+      pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página">${this.totalPages}</button>`);
+    }
+
+    return pages.join("");
   }
 
   /**
@@ -1864,8 +2169,9 @@ class InsumoManager {
 
       // Só executar atualizações da UI se a API retornou sucesso
       if (newInsumo && newInsumo.id) {
-        // Atualização automática otimizada
-        await this.addInsumoToUI(newInsumo);
+        // Com paginação, recarregar a lista para garantir sincronização
+        this.currentPage = 1; // Voltar para primeira página para ver o novo item
+        await this.loadInsumos();
         await this.updateResumoAfterAdd(insumoData);
 
         this.closeInsumoModal();
@@ -1916,8 +2222,9 @@ class InsumoManager {
     try {
       await this.dataManager.updateInsumo(insumoId, insumoData);
 
-      // Atualização automática otimizada
-      await this.updateInsumoInUI(insumoId, insumoData);
+      // Com paginação, recarregar a lista para garantir sincronização
+      // Manter página atual se o item ainda estiver visível
+      await this.loadInsumos();
       await this.updateResumoAfterEdit(insumoData);
 
       this.closeInsumoModal();
@@ -1974,8 +2281,20 @@ class InsumoManager {
 
       await this.dataManager.deleteInsumo(insumoId);
 
-      // Atualização automática otimizada
-      this.removeInsumoFromUI(insumoId);
+      // Com paginação, recarregar a lista para garantir sincronização
+      // Se a página atual ficar vazia, voltar para página anterior
+      const currentPageBeforeDelete = this.currentPage;
+      await this.loadInsumos();
+      
+      // Se a página atual ficou vazia e não é a primeira, voltar uma página
+      if (this.currentPage > 1 && this.totalItems > 0) {
+        const itemsOnCurrentPage = Math.min(20, this.totalItems - (this.currentPage - 1) * 20);
+        if (itemsOnCurrentPage === 0) {
+          this.currentPage = Math.max(1, currentPageBeforeDelete - 1);
+          await this.loadInsumos();
+        }
+      }
+      
       await this.updateResumoAfterDelete(insumoData);
     } catch (error) {
       console.error("Erro ao excluir insumo:", error);

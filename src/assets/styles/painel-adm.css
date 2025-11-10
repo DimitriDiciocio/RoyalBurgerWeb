@@ -962,6 +962,30 @@ main {
                 margin-bottom: 6px;
                 gap: 6px;
 
+                & .produto-nome-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    flex: 1;
+                }
+
+                & .stock-unavailable-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    background-color: #ffebee;
+                    color: #c62828;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    width: fit-content;
+
+                    & i {
+                        font-size: 0.7rem;
+                    }
+                }
+
                 & h3 {
                     color: var(--color-texto-black);
                     font-size: 1rem;
@@ -1528,6 +1552,187 @@ main {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(356px, 1fr));
         gap: 20px;
+        position: relative;
+        min-height: 200px;
+    }
+
+    /* Loading overlay para ingredientes */
+    & .ingredientes .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        border-radius: var(--border-radius);
+
+        & .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+
+            & i {
+                font-size: 32px;
+                color: var(--color-primary);
+            }
+
+            & p {
+                color: var(--color-texto-light);
+                font-size: 14px;
+                font-weight: 500;
+            }
+        }
+    }
+
+    /* Paginação melhorada */
+    & .pagination {
+        margin-top: 30px;
+        padding: 20px;
+        background: var(--cor-div-primary);
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+
+        & .pagination-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+
+            @media (min-width: 768px) {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+
+        & .pagination-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+
+            @media (min-width: 768px) {
+                flex-direction: row;
+                gap: 15px;
+            }
+
+            & .pagination-text {
+                color: var(--color-texto-light);
+                font-size: 14px;
+
+                & strong {
+                    color: var(--color-texto-black);
+                    font-weight: 600;
+                }
+            }
+
+            & .pagination-page-info {
+                color: var(--color-texto-erased);
+                font-size: 13px;
+                padding: 4px 12px;
+                background: var(--color-background);
+                border-radius: 6px;
+            }
+        }
+
+        & .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        & .pagination-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--color-background);
+            border: 2px solid #e0e1e4;
+            border-radius: 8px;
+            color: var(--color-texto-black);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+
+            &:hover:not(:disabled) {
+                background: var(--color-primary);
+                border-color: var(--color-primary);
+                color: var(--color-texto-black);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            &:active:not(:disabled) {
+                transform: translateY(0);
+            }
+
+            &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                background: #f5f5f5;
+            }
+
+            & i {
+                font-size: 12px;
+            }
+        }
+
+        & .pagination-pages {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        & .page-number {
+            min-width: 40px;
+            height: 40px;
+            padding: 0 12px;
+            background: var(--color-background);
+            border: 2px solid #e0e1e4;
+            border-radius: 8px;
+            color: var(--color-texto-black);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &:hover:not(.active) {
+                background: var(--color-primary);
+                border-color: var(--color-primary);
+                transform: translateY(-2px);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+
+            &.active {
+                background: var(--color-tertiary);
+                border-color: var(--color-tertiary);
+                color: var(--color-texto-white);
+                font-weight: 600;
+                cursor: default;
+            }
+
+            &:active:not(.active) {
+                transform: translateY(0);
+            }
+        }
+
+        & .page-ellipsis {
+            padding: 0 8px;
+            color: var(--color-texto-erased);
+            font-size: 14px;
+            user-select: none;
+        }
     }
 
     & button.adicionar-2 {

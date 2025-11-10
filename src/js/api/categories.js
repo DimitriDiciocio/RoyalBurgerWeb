@@ -19,7 +19,9 @@ export async function getCategories(options = {}) {
     if (options.page_size) params.append('page_size', options.page_size);
     
     const queryString = params.toString();
-    const url = queryString ? `${CATEGORY_BASE}?${queryString}` : CATEGORY_BASE;
+    // Remove a barra final quando há query string para evitar /api/categories/?param=value
+    const baseUrl = queryString ? CATEGORY_BASE.slice(0, -1) : CATEGORY_BASE;
+    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
     
     const response = await apiRequest(url, { method: 'GET' });
     return response;

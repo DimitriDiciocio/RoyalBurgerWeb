@@ -19,6 +19,7 @@ const MAX_PAGE_SIZE = 1000; // TODO: Implementar paginação adequada no backend
  * @param {Object} options - Opções de filtro e paginação
  * @param {string} options.name - Filtro por nome
  * @param {string} options.status - Filtro por status (low_stock, out_of_stock, in_stock, unavailable, available, overstock)
+ * @param {string} options.category - Filtro por categoria
  * @param {number} options.page - Página
  * @param {number} options.page_size - Itens por página
  * @returns {Promise<Object>} Lista de ingredientes com paginação
@@ -28,6 +29,7 @@ export const getIngredients = async (options = {}) => {
     
     if (options.name) params.append('name', options.name);
     if (options.status) params.append('status', options.status);
+    if (options.category) params.append('category', options.category);
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
     
