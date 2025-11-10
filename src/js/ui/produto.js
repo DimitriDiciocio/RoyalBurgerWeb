@@ -322,6 +322,9 @@ const VALIDATION_LIMITS = {
           state.quantity -= 1;
           updateTotals();
           toggleQtdMinusState();
+          // AJUSTE: Re-renderizar listas para atualizar limites de estoque
+          renderMonteSeuJeitoList();
+          renderExtrasModal();
         }
       });
     }
@@ -330,6 +333,9 @@ const VALIDATION_LIMITS = {
         state.quantity += 1;
         updateTotals();
         toggleQtdMinusState();
+        // AJUSTE: Re-renderizar listas para atualizar limites de estoque
+        renderMonteSeuJeitoList();
+        renderExtrasModal();
       });
     }
     toggleQtdMinusState();
@@ -394,16 +400,43 @@ const VALIDATION_LIMITS = {
         const extraQty = extra?.quantity || 0;
         const effectiveQty = basePortions + extraQty;
 
+        // AJUSTE: Validar estoque disponível considerando current_stock e porções base
+        const maxAvailable = ing.max_available ?? null;
+        const limitedByStock = ing.limited_by === 'stock' || ing.limited_by === 'both';
+        const currentStock = ing.current_stock ?? 0;
+        const basePortionQuantity = ing.base_portion_quantity ?? 1;
+        
+        let canIncrement = effectiveQty < maxQuantity;
+        
+        // Validar usando current_stock diretamente (mais preciso)
+        if (currentStock > 0 && basePortionQuantity > 0) {
+          const currentExtraQty = extraQty || 0;
+          const wouldBeExtraQty = currentExtraQty + 1;
+          const totalPortionsNeeded = basePortions + wouldBeExtraQty;
+          const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
+          
+          canIncrement = canIncrement && totalQuantityNeeded <= currentStock;
+        } else if (maxAvailable !== null && limitedByStock) {
+          // Fallback: usar max_available se current_stock não estiver disponível
+          const effectiveMaxAvailable = Math.floor(maxAvailable / state.quantity);
+          const currentExtraQty = extraQty || 0;
+          const wouldBeExtraQty = currentExtraQty + 1;
+          canIncrement = canIncrement && wouldBeExtraQty <= effectiveMaxAvailable;
+        }
+
         const showMinus = effectiveQty > minQuantity;
-        const showPlus = effectiveQty < maxQuantity;
+        const showPlus = canIncrement;
+        // AJUSTE: Adicionar classe CSS quando limite de estoque é atingido
+        const stockLimitedClass = !showPlus && (limitedByStock || currentStock > 0) ? ' stock-limited' : '';
 
         return `
-            <div class="item" 
+            <div class="item${stockLimitedClass}" 
                  data-ingrediente-id="${ingId}" 
                  data-preco="${ingPrice}" 
                  data-porcoes="${basePortions}"
                  data-min-qty="${minQuantity}"
-                 data-max-qty="${maxQuantity}">
+                 data-max-qty="${maxQuantity}"
+                 ${!showPlus && (limitedByStock || currentStock > 0) ? 'title="Limite de estoque atingido"' : ''}>
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
@@ -414,7 +447,7 @@ const VALIDATION_LIMITS = {
                   2,
                   "0"
                 )}</p>
-                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : ""}
+                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite de estoque atingido"></i>'}
               </div>
             </div>`;
       })
@@ -456,16 +489,43 @@ const VALIDATION_LIMITS = {
         const extraQty = extra?.quantity || 0;
         const effectiveQty = basePortions + extraQty;
 
+        // AJUSTE: Validar estoque disponível considerando current_stock e porções base
+        const maxAvailable = ing.max_available ?? null;
+        const limitedByStock = ing.limited_by === 'stock' || ing.limited_by === 'both';
+        const currentStock = ing.current_stock ?? 0;
+        const basePortionQuantity = ing.base_portion_quantity ?? 1;
+        
+        let canIncrement = effectiveQty < maxQuantity;
+        
+        // Validar usando current_stock diretamente (mais preciso)
+        if (currentStock > 0 && basePortionQuantity > 0) {
+          const currentExtraQty = extraQty || 0;
+          const wouldBeExtraQty = currentExtraQty + 1;
+          const totalPortionsNeeded = basePortions + wouldBeExtraQty;
+          const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
+          
+          canIncrement = canIncrement && totalQuantityNeeded <= currentStock;
+        } else if (maxAvailable !== null && limitedByStock) {
+          // Fallback: usar max_available se current_stock não estiver disponível
+          const effectiveMaxAvailable = Math.floor(maxAvailable / state.quantity);
+          const currentExtraQty = extraQty || 0;
+          const wouldBeExtraQty = currentExtraQty + 1;
+          canIncrement = canIncrement && wouldBeExtraQty <= effectiveMaxAvailable;
+        }
+
         const showMinus = effectiveQty > minQuantity;
-        const showPlus = effectiveQty < maxQuantity;
+        const showPlus = canIncrement;
+        // AJUSTE: Adicionar classe CSS quando limite de estoque é atingido
+        const stockLimitedClass = !showPlus && limitedByStock ? ' stock-limited' : '';
 
         return `
-            <div class="item" 
+            <div class="item${stockLimitedClass}" 
                  data-ingrediente-id="${ingId}" 
                  data-preco="${ingPrice}" 
                  data-porcoes="${basePortions}"
                  data-min-qty="${minQuantity}"
-                 data-max-qty="${maxQuantity}">
+                 data-max-qty="${maxQuantity}"
+                 ${!showPlus && limitedByStock ? 'title="Limite de estoque atingido"' : ''}>
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
@@ -476,7 +536,7 @@ const VALIDATION_LIMITS = {
                   2,
                   "0"
                 )}</p>
-                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : ""}
+                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite de estoque atingido"></i>'}
               </div>
             </div>`;
       })
@@ -530,6 +590,13 @@ const VALIDATION_LIMITS = {
       const qtdEl = itemEl.querySelector(".qtd-extra");
       const nomeEl = itemEl.querySelector(".nome-adicional");
 
+      // AJUSTE: Buscar informações de estoque do ingrediente
+      const ingredient = state.ingredientes.find(
+        (ing) => (ing.ingredient_id || ing.id) === id
+      );
+      const maxAvailable = ingredient?.max_available ?? null;
+      const limitedByStock = ingredient?.limited_by === 'stock' || ingredient?.limited_by === 'both';
+
       // Garantir que o extra existe no state
       if (!state.extrasById.has(id)) {
         state.extrasById.set(id, {
@@ -540,12 +607,18 @@ const VALIDATION_LIMITS = {
           basePortions,
           minQuantity,
           maxQuantity,
+          maxAvailable: maxAvailable,
+          limitedByStock: limitedByStock,
+          currentStock: currentStock,
+          basePortionQuantity: basePortionQuantity,
+          stockUnit: stockUnit,
         });
       }
 
       const extra = state.extrasById.get(id);
       const effectiveQty = basePortions + extra.quantity;
 
+      // AJUSTE: Validação de estoque antes de incrementar
       if (isMinus && effectiveQty > minQuantity) {
         extra.quantity -= 1;
         const newEffective = basePortions + extra.quantity;
@@ -558,7 +631,71 @@ const VALIDATION_LIMITS = {
           renderExtrasModal();
         }
         if (basePortions === 0) updateExtrasBadge();
-      } else if (!isMinus && effectiveQty < maxQuantity) {
+      } else if (!isMinus) {
+        // AJUSTE: Validar estoque antes de incrementar
+        const wouldBeEffectiveQty = effectiveQty + 1;
+        
+        // Verificar limite de regra (max_quantity)
+        if (wouldBeEffectiveQty > maxQuantity) {
+          showToast(
+            `Quantidade máxima permitida: ${maxQuantity}`,
+            {
+              type: "warning",
+              title: "Limite Atingido",
+              autoClose: 3000,
+            }
+          );
+          return;
+        }
+
+        // AJUSTE: Validar estoque disponível considerando current_stock e porções base
+        // Fórmula: (basePortions + extra.quantity + 1) * basePortionQuantity * state.quantity <= currentStock
+        if (currentStock > 0 && basePortionQuantity > 0) {
+          // Calcular quantidade total que seria necessária
+          const currentExtraQty = extra.quantity || 0;
+          const wouldBeExtraQty = currentExtraQty + 1;
+          
+          // Total de porções (base + extras) que seriam necessárias
+          const totalPortionsNeeded = basePortions + wouldBeExtraQty;
+          
+          // Quantidade total necessária em unidades do estoque
+          const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
+          
+          // Verificar se excede o estoque disponível
+          if (totalQuantityNeeded > currentStock) {
+            // Calcular quantas porções extras são possíveis
+            const maxTotalPortions = Math.floor(currentStock / (basePortionQuantity * state.quantity));
+            const maxExtrasAvailable = Math.max(0, maxTotalPortions - basePortions);
+            
+            showToast(
+              `Estoque insuficiente. Disponível: ${maxExtrasAvailable} porção${maxExtrasAvailable !== 1 ? 'ões' : ''} extra${maxExtrasAvailable !== 1 ? 's' : ''} por item (estoque: ${currentStock.toFixed(2)} ${stockUnit})`,
+              {
+                type: "warning",
+                title: "Estoque Insuficiente",
+                autoClose: 4000,
+              }
+            );
+            return;
+          }
+        } else if (maxAvailable !== null && limitedByStock) {
+          // Fallback: usar max_available se current_stock não estiver disponível
+          const effectiveMaxAvailable = state.quantity === 1 ? maxAvailable : Math.max(0, Math.floor(maxAvailable / state.quantity));
+          const currentExtraQty = extra.quantity || 0;
+          const wouldBeExtraQty = currentExtraQty + 1;
+          
+          if (wouldBeExtraQty > effectiveMaxAvailable) {
+            showToast(
+              `Estoque insuficiente. Disponível: ${effectiveMaxAvailable} porção${effectiveMaxAvailable !== 1 ? 'ões' : ''} extra${effectiveMaxAvailable !== 1 ? 's' : ''} por item`,
+              {
+                type: "warning",
+                title: "Estoque Insuficiente",
+                autoClose: 4000,
+              }
+            );
+            return;
+          }
+        }
+
         extra.quantity += 1;
         const newEffective = basePortions + extra.quantity;
         if (qtdEl) qtdEl.textContent = String(newEffective).padStart(2, "0");
@@ -602,6 +739,13 @@ const VALIDATION_LIMITS = {
       const minus = itemEl.querySelector(".fa-minus");
       const plus = itemEl.querySelector(".fa-plus");
 
+      // AJUSTE: Buscar informações de estoque do ingrediente
+      const ingredient = state.ingredientes.find(
+        (ing) => (ing.ingredient_id || ing.id) === id
+      );
+      const maxAvailable = ingredient?.max_available ?? null;
+      const limitedByStock = ingredient?.limited_by === 'stock' || ingredient?.limited_by === 'both';
+
       // Garantir que o extra existe
       if (!state.extrasById.has(id)) {
         const nomeEl = itemEl.querySelector(".nome-adicional");
@@ -617,18 +761,43 @@ const VALIDATION_LIMITS = {
           basePortions,
           minQuantity,
           maxQuantity,
+          maxAvailable: maxAvailable,
+          limitedByStock: limitedByStock,
+          currentStock: currentStock,
+          basePortionQuantity: basePortionQuantity,
+          stockUnit: stockUnit,
         });
       }
 
       const extra = state.extrasById.get(id);
       const effectiveQty = basePortions + extra.quantity;
 
+      // AJUSTE: Validar estoque disponível considerando current_stock e porções base
+      let canIncrement = effectiveQty < maxQuantity;
+      
+      // Validar usando current_stock diretamente (mais preciso)
+      if (currentStock > 0 && basePortionQuantity > 0) {
+        const currentExtraQty = extra.quantity || 0;
+        const wouldBeExtraQty = currentExtraQty + 1;
+        const totalPortionsNeeded = basePortions + wouldBeExtraQty;
+        const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
+        
+        canIncrement = canIncrement && totalQuantityNeeded <= currentStock;
+      } else if (maxAvailable !== null && limitedByStock) {
+        // Fallback: usar max_available se current_stock não estiver disponível
+        const effectiveMaxAvailable = Math.floor(maxAvailable / state.quantity);
+        const currentExtraQty = extra.quantity || 0;
+        const wouldBeExtraQty = currentExtraQty + 1;
+        canIncrement = canIncrement && wouldBeExtraQty <= effectiveMaxAvailable;
+      }
+
       // Atualizar estados dos botões
       if (minus && !(effectiveQty > minQuantity)) {
         minus.remove();
       }
-      if (plus && !(effectiveQty < maxQuantity)) {
-        plus.remove();
+      if (plus && !canIncrement) {
+        plus.classList.add("dessativo");
+        plus.setAttribute("title", "Limite de estoque atingido");
       }
     });
   }
@@ -897,6 +1066,13 @@ const VALIDATION_LIMITS = {
             toNum(fullIngredient?.additional_price) ??
             resolveAdditionalPrice(fullIngredient) ??
             0,
+          // AJUSTE: Preservar informações de estoque para validação
+          current_stock: productIng.current_stock ?? fullIngredient.current_stock ?? 0,
+          max_available: productIng.max_available ?? null,
+          limited_by: productIng.limited_by ?? 'rule',
+          stock_info: productIng.stock_info ?? null,
+          base_portion_quantity: productIng.base_portion_quantity ?? fullIngredient.base_portion_quantity ?? 1,
+          stock_unit: productIng.stock_unit ?? fullIngredient.stock_unit ?? 'un',
         };
       });
 
