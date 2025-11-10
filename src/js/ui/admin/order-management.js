@@ -719,7 +719,8 @@ const isDevelopment = () => {
       const result = await getAllOrders();
 
       if (result.success) {
-        let ordersList = result.data || [];
+        // A API retorna {items: [...], pagination: {...}}
+        let ordersList = result.data?.items || result.data || [];
 
         const ordersWithDetails = [];
 

@@ -16,8 +16,8 @@
 
 
 main{
-    height: 100vh;
-    padding-bottom: 20px;
+    height: 100%;
+    padding-bottom: 50px;
 
     & section:first-child{
         display: flex;
