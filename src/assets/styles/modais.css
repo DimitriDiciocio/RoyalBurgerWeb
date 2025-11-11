@@ -58,6 +58,13 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  pointer-events: auto;
+
+  /* Quando fechada, não bloquear cliques */
+  &[style*="display: none"],
+  &[style*="display:none"] {
+    pointer-events: none !important;
+  }
 
   & .div-overlay {
     position: absolute;
@@ -71,6 +78,32 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  /* Conteúdo da modal deve ter pointer-events auto para ser clicável */
+  & .modal-content,
+  & .modal-contet,
+  & .modal-content-produto,
+  & .modal-content-ingrediente,
+  & .modal-content-ingrediente-receita,
+  & .modal-content-funcionario,
+  & .modal-content-categorias,
+  & .modal-content-itens,
+  & .modal-content-categoria-form,
+  & .modal-content-produtos,
+  & .modal-content-metricas,
+  & .modal-content-grupos-insumos,
+  & .modal-content-insumos-grupo,
+  & .modal-content-grupo-insumo-form,
+  & .modal-content-selecao-insumos,
+  & .modal-content-configuracao,
+  & .modal-content-horarios,
+  & .modal-content-grupos {
+    pointer-events: auto;
+    position: relative;
+    z-index: 110;
   }
 
   & .modal-contet {

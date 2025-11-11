@@ -131,6 +131,7 @@ export async function apiRequest(
         const isLoginEndpoint =
           path.includes("/login") || path.includes("/users/login");
         const isCartEndpoint = path.includes("/cart");
+        const isProductIngredientEndpoint = path.includes("/products") && path.includes("/ingredients");
         
         if (isLoginEndpoint && data?.error) {
           // É um erro de login - usar a mensagem do backend
@@ -153,9 +154,13 @@ export async function apiRequest(
               data
             });
           }
+        } else if (isProductIngredientEndpoint && data?.error) {
+          // Erro 404 em endpoints de ingredientes de produto - usar mensagem do backend
+          errorMessage = data.error || data.message || "Vínculo produto-ingrediente não encontrado.";
         } else {
           // Endpoint não encontrado
           errorMessage =
+            (data && (data.error || data.message)) ||
             "Serviço não encontrado. Verifique se o servidor está rodando.";
         }
       } else if (response.status === 401) {

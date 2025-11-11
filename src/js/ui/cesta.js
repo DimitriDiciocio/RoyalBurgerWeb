@@ -39,7 +39,6 @@ const VALIDATION_LIMITS = {
 const state = {
   itens: [],
   taxaEntrega: 5.0,
-  taxaServico: 1.0,
   descontos: 0.0,
   subtotal: 0,
   total: 0,
@@ -54,7 +53,6 @@ const el = {
   listaItens: null,
   subtotal: null,
   taxaEntrega: null,
-  taxaServico: null,
   descontos: null,
   total: null,
   footerTotal: null,
@@ -324,7 +322,7 @@ function calcularTotais() {
     state.descontos = 0;
   } else {
     state.total =
-      state.subtotal + state.taxaEntrega + state.taxaServico - state.descontos;
+      state.subtotal + state.taxaEntrega  - state.descontos;
   }
 
   stateManager.setMultiple({
@@ -447,7 +445,6 @@ function renderCesta() {
     // Zerar valores quando a cesta está vazia
     if (el.subtotal) el.subtotal.textContent = formatBRL(0);
     if (el.taxaEntrega) el.taxaEntrega.textContent = formatBRL(0);
-    if (el.taxaServico) el.taxaServico.textContent = formatBRL(0);
     if (el.descontos) el.descontos.textContent = formatBRL(0);
     if (el.total) el.total.textContent = formatBRL(0);
     if (el.footerTotal) el.footerTotal.textContent = formatBRL(0);
@@ -476,7 +473,6 @@ function renderCesta() {
   // Atualizar valores
   if (el.subtotal) el.subtotal.textContent = formatBRL(state.subtotal);
   if (el.taxaEntrega) el.taxaEntrega.textContent = formatBRL(state.taxaEntrega);
-  if (el.taxaServico) el.taxaServico.textContent = formatBRL(state.taxaServico);
   if (el.descontos) el.descontos.textContent = formatBRL(state.descontos);
   if (el.total) el.total.textContent = formatBRL(state.total);
   if (el.footerTotal) el.footerTotal.textContent = formatBRL(state.total);
@@ -749,7 +745,6 @@ function initElements() {
   el.listaItens = $id("lista-itens-modal");
   el.subtotal = $id("modal-subtotal");
   el.taxaEntrega = $id("modal-taxa-entrega");
-  el.taxaServico = $id("modal-taxa-servico");
   el.descontos = $id("modal-descontos");
   el.total = $id("modal-total");
   el.footerTotal = $id("modal-footer-total");

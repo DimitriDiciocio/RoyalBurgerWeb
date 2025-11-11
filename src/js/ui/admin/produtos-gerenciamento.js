@@ -11,6 +11,7 @@ import {
   getProductById,
   reactivateProduct,
   addIngredientToProduct,
+  updateProductIngredient,
   removeIngredientFromProduct,
   getProductIngredients,
   updateProductImage,
@@ -370,15 +371,79 @@ class ProdutoDataManager {
   }
 
   /**
+   * Atualiza ingrediente do produto
+   */
+  async updateIngredienteDoProduto(productId, ingredientId, portions) {
+    try {
+      // ALTERAÇÃO: Validação mais robusta de dados antes de enviar
+      if (!productId || !ingredientId || portions === undefined || portions === null) {
+        throw new Error("Dados inválidos para atualizar ingrediente");
+      }
+
+      // ALTERAÇÃO: Converter para os tipos corretos com validação
+      const productIdNum = this.safeParseInt(productId);
+      const ingredientIdNum = this.safeParseInt(ingredientId);
+      const portionsNum = this.safeParseFloat(portions);
+
+      // ALTERAÇÃO: Validação adicional mais específica
+      if (isNaN(productIdNum) || productIdNum <= 0) {
+        throw new Error("ID do produto deve ser um número válido maior que zero");
+      }
+      if (isNaN(ingredientIdNum) || ingredientIdNum <= 0) {
+        throw new Error("ID do ingrediente deve ser um número válido maior que zero");
+      }
+      if (isNaN(portionsNum) || portionsNum <= 0) {
+        throw new Error("Número de porções deve ser maior que zero");
+      }
+      // ALTERAÇÃO: Validação de valor máximo para evitar valores inválidos
+      if (portionsNum > 999999.99) {
+        throw new Error("Número de porções muito grande (máximo: 999999.99)");
+      }
+
+      await updateProductIngredient(productIdNum, ingredientIdNum, portionsNum);
+      this.clearCache();
+    } catch (error) {
+      // ALTERAÇÃO: Logging condicional apenas em desenvolvimento (evitar exposição de dados sensíveis)
+      if (process?.env?.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        console.error("Erro ao atualizar ingrediente do produto:", error);
+      }
+      // ALTERAÇÃO: Re-lançar erro com mensagem amigável para o usuário
+      const userMessage = error.message || "Erro ao atualizar ingrediente. Verifique os dados e tente novamente.";
+      throw new Error(userMessage);
+    }
+  }
+
+  /**
    * Remove ingrediente do produto
    */
   async removeIngredienteDoProduto(productId, ingredientId) {
     try {
-      await removeIngredientFromProduct(productId, ingredientId);
+      // ALTERAÇÃO: Validação mais robusta
+      if (!productId || !ingredientId) {
+        throw new Error("IDs de produto e ingrediente são obrigatórios");
+      }
+
+      const productIdNum = this.safeParseInt(productId);
+      const ingredientIdNum = this.safeParseInt(ingredientId);
+
+      // ALTERAÇÃO: Validação adicional mais específica
+      if (isNaN(productIdNum) || productIdNum <= 0) {
+        throw new Error("ID do produto deve ser um número válido maior que zero");
+      }
+      if (isNaN(ingredientIdNum) || ingredientIdNum <= 0) {
+        throw new Error("ID do ingrediente deve ser um número válido maior que zero");
+      }
+
+      await removeIngredientFromProduct(productIdNum, ingredientIdNum);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao remover ingrediente do produto:", error);
-      throw error;
+      // ALTERAÇÃO: Logging condicional apenas em desenvolvimento
+      if (process?.env?.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        console.error("Erro ao remover ingrediente do produto:", error);
+      }
+      // ALTERAÇÃO: Re-lançar erro com mensagem amigável
+      const userMessage = error.message || "Erro ao remover ingrediente. Verifique os dados e tente novamente.";
+      throw new Error(userMessage);
     }
   }
 
@@ -442,6 +507,7 @@ class ProdutoManager {
     this.modalClickHandler = null; // Handler para delegação de eventos no modal
     this.imageCache = new Map(); // Cache para imagens
     this.extrasManager = null; // Gerenciador de extras (inicializado quando necessário)
+    this.ingredientesCarregados = new Map(); // Cache dos ingredientes carregados do produto atual
   }
 
   /**
@@ -1393,6 +1459,23 @@ class ProdutoManager {
    * Abre modal de produto
    */
   async openProdutoModal(produtoData = null) {
+    const modal = document.getElementById("modal-produto");
+    if (!modal) {
+      console.error("Modal #modal-produto não encontrado");
+      return;
+    }
+
+    // Verificar se a modal já está visível
+    const computedStyle = window.getComputedStyle(modal);
+    const isCurrentlyVisible = computedStyle.display !== 'none' && 
+                                computedStyle.opacity !== '0' && 
+                                computedStyle.opacity !== '';
+    
+    if (isCurrentlyVisible) {
+      // Se já está aberta e visível, não fazer nada
+      return;
+    }
+
     // Evitar abertura múltipla do modal
     if (this.modalOpening) {
       return;
@@ -1408,6 +1491,11 @@ class ProdutoManager {
       this.newImageFile = null;
       this.imageToRemove = false;
 
+      // Garantir que ingredientes estejam carregados antes de abrir o modal
+      if (this.ingredientesDisponiveis.length === 0) {
+        await this.loadIngredientesDisponiveis();
+      }
+
       // Carregar ingredientes e categorias nos selects
       this.loadIngredientesInSelect();
       this.loadCategoriasInSelect();
@@ -1422,14 +1510,26 @@ class ProdutoManager {
         this.clearProdutoForm();
       }
 
+      // Garantir que a modal está completamente fechada antes de abrir
+      modal.style.display = 'none';
+      modal.style.opacity = '0';
+      modal.style.pointerEvents = 'none';
+
       // Usar sistema centralizado de modais
       abrirModal("modal-produto");
       await this.setupProdutoModalListeners(produtoData);
+    } catch (error) {
+      console.error("Erro ao abrir modal de produto:", error);
+      // Garantir que a modal está fechada em caso de erro
+      if (modal) {
+        modal.style.display = 'none';
+        modal.style.pointerEvents = 'none';
+      }
     } finally {
       // Reset da flag após um pequeno delay
       setTimeout(() => {
         this.modalOpening = false;
-      }, 100);
+      }, 300);
     }
   }
 
@@ -1437,13 +1537,30 @@ class ProdutoManager {
    * Fecha modal de produto
    */
   closeProdutoModal() {
+    const modal = document.getElementById("modal-produto");
+    if (!modal) return;
+
+    // Desabilitar interações imediatamente
+    modal.style.pointerEvents = 'none';
+
     // Usar sistema centralizado de modais
     fecharModal("modal-produto");
+    
+    // Limpar estado
     this.currentEditingId = null;
-
-    // Reset das variáveis de imagem
     this.newImageFile = null;
     this.imageToRemove = false;
+    this.modalOpening = false;
+
+    // Garantir que a modal está completamente fechada
+    setTimeout(() => {
+      if (modal) {
+        modal.style.display = 'none';
+        modal.style.opacity = '0';
+        modal.style.pointerEvents = 'none';
+        document.body.style.overflow = '';
+      }
+    }, 200);
   }
 
   /**
@@ -1455,6 +1572,7 @@ class ProdutoManager {
       this.extrasManager = new ProdutoExtrasManager();
       await this.extrasManager.init();
     }
+    
     document.getElementById("nome-produto").value = produtoData.nome || "";
     document.getElementById("descricao-produto").value =
       produtoData.descricao || "";
@@ -1673,7 +1791,7 @@ class ProdutoManager {
   /**
    * Abre modal para adicionar ingrediente à receita
    */
-  abrirModalIngredienteReceita(ingredienteId = null, quantidade = null) {
+  abrirModalIngredienteReceita(ingredienteId = null, quantidade = null, nomeIngrediente = null) {
     const modal = document.getElementById("modal-ingrediente-receita");
     const titulo = document.getElementById("titulo-modal-ingrediente-receita");
     const textoBotao = document.getElementById("texto-btn-salvar-ingrediente");
@@ -1702,6 +1820,57 @@ class ProdutoManager {
       modal.dataset.mode = "edit";
       modal.dataset.ingredientId = ingredienteId;
 
+      // Verificar se o ingrediente está no select
+      const optionExists = Array.from(selectIngrediente.options).some(
+        (opt) => opt.value === String(ingredienteId)
+      );
+
+      // Se não estiver no select, adicionar
+      if (!optionExists) {
+        // Buscar primeiro em ingredientesDisponiveis
+        let ingrediente = this.ingredientesDisponiveis.find(
+          (ing) => String(ing.id) === String(ingredienteId)
+        );
+
+        // Se não encontrou, buscar nos ingredientes já carregados do produto
+        if (!ingrediente) {
+          ingrediente = this.ingredientesCarregados.get(String(ingredienteId));
+        }
+
+        // Se ainda não encontrou, criar objeto básico com dados mínimos
+        if (!ingrediente && nomeIngrediente) {
+          ingrediente = {
+            id: parseInt(ingredienteId),
+            name: nomeIngrediente,
+            price: 0,
+            base_portion_quantity: 1,
+            base_portion_unit: "un",
+            stock_unit: "un",
+          };
+        }
+
+        if (ingrediente || nomeIngrediente) {
+          const option = document.createElement("option");
+          option.value = ingredienteId;
+          option.textContent = nomeIngrediente || (ingrediente && ingrediente.name) || `Ingrediente ${ingredienteId}`;
+          
+          if (ingrediente) {
+            option.dataset.porcaoQuantidade = ingrediente.base_portion_quantity || 1;
+            option.dataset.porcaoUnidade = ingrediente.base_portion_unit || "un";
+            option.dataset.price = ingrediente.price || 0;
+            option.dataset.stockUnit = ingrediente.stock_unit || "un";
+          } else {
+            // Fallback: valores padrão
+            option.dataset.porcaoQuantidade = "1";
+            option.dataset.porcaoUnidade = "un";
+            option.dataset.price = "0";
+            option.dataset.stockUnit = "un";
+          }
+
+          selectIngrediente.appendChild(option);
+        }
+      }
+
       // Preencher campos
       selectIngrediente.value = ingredienteId;
       selectIngrediente.disabled = true; // Não permitir trocar o ingrediente em edição
@@ -1725,9 +1894,15 @@ class ProdutoManager {
       document.getElementById("custo-total-modal").textContent = "R$ 0,00";
     }
 
-    // Mostrar modal
-    modal.style.display = "flex";
-    selectIngrediente.focus();
+    // Mostrar modal usando sistema centralizado
+    abrirModal("modal-ingrediente-receita");
+    
+    // Focar no select após a modal estar visível
+    setTimeout(() => {
+      if (selectIngrediente) {
+        selectIngrediente.focus();
+      }
+    }, 100);
   }
 
   /**
@@ -1736,7 +1911,18 @@ class ProdutoManager {
   fecharModalIngredienteReceita() {
     const modal = document.getElementById("modal-ingrediente-receita");
     if (modal) {
-      modal.style.display = "none";
+      // Desabilitar interações imediatamente
+      modal.style.pointerEvents = 'none';
+      // Fechar usando o sistema centralizado
+      fecharModal("modal-ingrediente-receita");
+      // Garantir que está completamente fechada
+      setTimeout(() => {
+        if (modal) {
+          modal.style.display = 'none';
+          modal.style.opacity = '0';
+          modal.style.pointerEvents = 'none';
+        }
+      }, 200);
     }
   }
 
@@ -1780,16 +1966,53 @@ class ProdutoManager {
     );
 
     if (!ingredienteId || !quantidadePorcoes || quantidadePorcoes <= 0) {
-      custoPorPorcaoEl.textContent = "R$ 0,00";
-      custoTotalEl.textContent = "R$ 0,00";
+      if (custoPorPorcaoEl) custoPorPorcaoEl.textContent = "R$ 0,00";
+      if (custoTotalEl) custoTotalEl.textContent = "R$ 0,00";
       return;
     }
 
-    // Buscar dados do ingrediente
-    const ingrediente = this.ingredientesDisponiveis.find(
-      (ing) => ing.id == ingredienteId
+    // Buscar dados do ingrediente primeiro em ingredientesDisponiveis
+    let ingrediente = this.ingredientesDisponiveis.find(
+      (ing) => String(ing.id) === String(ingredienteId)
     );
-    if (!ingrediente) return;
+
+    // Se não encontrou, buscar no cache de ingredientes carregados
+    if (!ingrediente) {
+      ingrediente = this.ingredientesCarregados.get(String(ingredienteId));
+    }
+
+    // Se não encontrou, tentar buscar do option selecionado
+    if (!ingrediente) {
+      const selectedOption = selectIngrediente.options[selectIngrediente.selectedIndex];
+      if (selectedOption && selectedOption.value) {
+        // Usar dados do option se disponíveis
+        const precoUnitario = this.dataManager.safeParseFloat(
+          selectedOption.dataset.price || 0
+        );
+        const quantidadePorcaoBase = this.dataManager.safeParseFloat(
+          selectedOption.dataset.porcaoQuantidade || 1
+        );
+        const unidadePorcaoBase = selectedOption.dataset.porcaoUnidade || "un";
+        const stockUnit = selectedOption.dataset.stockUnit || "un";
+
+        const precoPorUnidadeBase = this.convertPriceToRecipeUnit(
+          precoUnitario,
+          stockUnit,
+          unidadePorcaoBase
+        );
+        const custoPorPorcao = precoPorUnidadeBase * quantidadePorcaoBase;
+        const custoTotal = custoPorPorcao * quantidadePorcoes;
+
+        if (custoPorPorcaoEl) custoPorPorcaoEl.textContent = `R$ ${this.formatCurrency(custoPorPorcao)}`;
+        if (custoTotalEl) custoTotalEl.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
+        return;
+      }
+      
+      // Se ainda não encontrou, não pode calcular
+      if (custoPorPorcaoEl) custoPorPorcaoEl.textContent = "R$ 0,00";
+      if (custoTotalEl) custoTotalEl.textContent = "R$ 0,00";
+      return;
+    }
 
     const precoUnitario = this.dataManager.safeParseFloat(ingrediente.price);
     const quantidadePorcaoBase =
@@ -1805,14 +2028,14 @@ class ProdutoManager {
     const custoPorPorcao = precoPorUnidadeBase * quantidadePorcaoBase;
     const custoTotal = custoPorPorcao * quantidadePorcoes;
 
-    custoPorPorcaoEl.textContent = `R$ ${this.formatCurrency(custoPorPorcao)}`;
-    custoTotalEl.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
+    if (custoPorPorcaoEl) custoPorPorcaoEl.textContent = `R$ ${this.formatCurrency(custoPorPorcao)}`;
+    if (custoTotalEl) custoTotalEl.textContent = `R$ ${this.formatCurrency(custoTotal)}`;
   }
 
   /**
    * Salva ingrediente da receita (adicionar ou editar)
    */
-  salvarIngredienteReceita() {
+  async salvarIngredienteReceita() {
     const modal = document.getElementById("modal-ingrediente-receita");
     const selectIngrediente = document.getElementById(
       "ingrediente-select-modal"
@@ -1838,29 +2061,94 @@ class ProdutoManager {
       return;
     }
 
-    // Buscar dados do ingrediente
-    const ingrediente = this.ingredientesDisponiveis.find(
-      (ing) => ing.id == ingredienteId
+    // Buscar dados do ingrediente (primeiro em ingredientesDisponiveis, depois no cache)
+    let ingrediente = this.ingredientesDisponiveis.find(
+      (ing) => String(ing.id) === String(ingredienteId)
     );
+
+    if (!ingrediente) {
+      ingrediente = this.ingredientesCarregados.get(String(ingredienteId));
+    }
+
     if (!ingrediente) {
       this.showErrorMessage("Ingrediente não encontrado");
       return;
     }
 
+    const ingredienteIdNum = parseInt(ingredienteId);
+    const isEditingExistingProduct = this.currentEditingId !== null;
+
     if (mode === "edit") {
-      // Modo edição - remover o antigo e adicionar o novo
+      // Modo edição
       const oldIngredientId = modal.dataset.ingredientId;
+      const oldIngredientIdNum = parseInt(oldIngredientId);
+
+      // Se estamos editando um produto existente, salvar alteração no backend
+      if (isEditingExistingProduct) {
+        try {
+          // Se o ID do ingrediente mudou, remover o antigo e adicionar o novo
+          if (oldIngredientIdNum !== ingredienteIdNum) {
+            // Remover ingrediente antigo do backend
+            await this.dataManager.removeIngredienteDoProduto(
+              this.currentEditingId,
+              oldIngredientIdNum
+            );
+
+            // Adicionar novo ingrediente no backend
+            await this.dataManager.addIngredienteAoProduto(
+              this.currentEditingId,
+              ingredienteIdNum,
+              quantidadePorcoes
+            );
+          } else {
+            // Mesmo ingrediente, apenas atualizar porções
+            await this.dataManager.updateIngredienteDoProduto(
+              this.currentEditingId,
+              ingredienteIdNum,
+              quantidadePorcoes
+            );
+          }
+        } catch (error) {
+          // ALTERAÇÃO: Logging condicional apenas em desenvolvimento
+          if (process?.env?.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+            console.error("Erro ao salvar alteração do ingrediente:", error);
+          }
+          // ALTERAÇÃO: Mensagem de erro mais específica baseada no tipo de erro
+          const errorMessage = error.message || "Erro ao salvar alteração do ingrediente. Tente novamente.";
+          this.showErrorMessage(errorMessage);
+          return;
+        }
+      }
+
+      // Atualizar UI: remover elemento antigo
       const oldElement = document.querySelector(
         `[data-ingrediente-id="${oldIngredientId}"]`
       );
       if (oldElement) {
         // Remover da área de extras também
         if (this.extrasManager) {
-          this.extrasManager.removerIngredienteReceita(
-            parseInt(oldIngredientId)
-          );
+          this.extrasManager.removerIngredienteReceita(oldIngredientIdNum);
         }
         oldElement.remove();
+      }
+
+      // Adicionar à lista com novo valor (persistido se produto existente)
+      this.addIngredientToList(ingrediente, quantidadePorcoes, "porções", isEditingExistingProduct);
+
+      // Atualizar área de extras
+      if (this.extrasManager) {
+        const ingredienteParaExtra = {
+          ingredient_id: ingredienteIdNum,
+          name: ingrediente.name,
+          portions: quantidadePorcoes,
+          min_quantity: 0,
+          max_quantity: 0,
+          additional_price:
+            this.dataManager.safeParseFloat(ingrediente.additional_price) || 0,
+          is_available: ingrediente.is_available !== false,
+        };
+
+        this.extrasManager.adicionarIngredienteReceita(ingredienteParaExtra);
       }
     } else {
       // Modo adicionar - verificar se já existe
@@ -1871,25 +2159,45 @@ class ProdutoManager {
         this.showErrorMessage("Este ingrediente já foi adicionado à receita");
         return;
       }
-    }
 
-    // Adicionar à lista
-    this.addIngredientToList(ingrediente, quantidadePorcoes, "porções");
+      // Se estamos editando um produto existente, adicionar no backend imediatamente
+      if (isEditingExistingProduct) {
+        try {
+          await this.dataManager.addIngredienteAoProduto(
+            this.currentEditingId,
+            ingredienteIdNum,
+            quantidadePorcoes
+          );
+          } catch (error) {
+            // ALTERAÇÃO: Logging condicional apenas em desenvolvimento
+            if (process?.env?.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+              console.error("Erro ao adicionar ingrediente:", error);
+            }
+            // ALTERAÇÃO: Mensagem de erro mais específica
+            const errorMessage = error.message || "Erro ao adicionar ingrediente ao produto. Tente novamente.";
+            this.showErrorMessage(errorMessage);
+            return;
+          }
+      }
 
-    // Adicionar à área de extras automaticamente
-    if (this.extrasManager) {
-      const ingredienteParaExtra = {
-        ingredient_id: parseInt(ingredienteId),
-        name: ingrediente.name,
-        portions: quantidadePorcoes,
-        min_quantity: 0,
-        max_quantity: 0,
-        additional_price:
-          this.dataManager.safeParseFloat(ingrediente.additional_price) || 0,
-        is_available: ingrediente.is_available !== false,
-      };
+      // Adicionar à lista (persistido se produto existente)
+      this.addIngredientToList(ingrediente, quantidadePorcoes, "porções", isEditingExistingProduct);
 
-      this.extrasManager.adicionarIngredienteReceita(ingredienteParaExtra);
+      // Adicionar à área de extras automaticamente
+      if (this.extrasManager) {
+        const ingredienteParaExtra = {
+          ingredient_id: ingredienteIdNum,
+          name: ingrediente.name,
+          portions: quantidadePorcoes,
+          min_quantity: 0,
+          max_quantity: 0,
+          additional_price:
+            this.dataManager.safeParseFloat(ingrediente.additional_price) || 0,
+          is_available: ingrediente.is_available !== false,
+        };
+
+        this.extrasManager.adicionarIngredienteReceita(ingredienteParaExtra);
+      }
     }
 
     // Atualizar custo estimado
@@ -1917,8 +2225,12 @@ class ProdutoManager {
     const quantidadeAtual =
       button.dataset.quantidade || button.getAttribute("data-quantidade");
 
+    // Buscar nome do ingrediente do elemento
+    const nomeElement = ingredienteElement.querySelector(".nome");
+    const nomeIngrediente = nomeElement ? nomeElement.textContent.trim() : null;
+
     if (ingredienteId && quantidadeAtual) {
-      this.abrirModalIngredienteReceita(ingredienteId, quantidadeAtual);
+      this.abrirModalIngredienteReceita(ingredienteId, quantidadeAtual, nomeIngrediente);
     }
   }
 
@@ -2118,10 +2430,11 @@ class ProdutoManager {
       const extrasIngredientes = [];
 
       for (const ingrediente of ingredientes) {
+        // Verificar portions (campo retornado pela API)
         const porcoes = this.dataManager.safeParseFloat(
           ingrediente.portions !== undefined
             ? ingrediente.portions
-            : ingrediente.quantity
+            : ingrediente.quantity || 0
         );
 
         if (porcoes > 0) {
@@ -2133,26 +2446,49 @@ class ProdutoManager {
         }
       }
 
+      // Limpar cache de ingredientes carregados
+      this.ingredientesCarregados.clear();
+
       // Adicionar ingredientes da receita à lista
       for (const ingrediente of receitaIngredientes) {
-        // Buscar dados completos do ingrediente
-        const ingredienteCompleto = this.ingredientesDisponiveis.find(
-          (ing) => ing.id == ingrediente.ingredient_id
+        // Buscar dados completos do ingrediente primeiro em ingredientesDisponiveis
+        let ingredienteCompleto = this.ingredientesDisponiveis.find(
+          (ing) => String(ing.id) === String(ingrediente.ingredient_id)
         );
 
-        if (ingredienteCompleto) {
-          const porcoes = this.dataManager.safeParseFloat(
-            ingrediente.portions !== undefined
-              ? ingrediente.portions
-              : ingrediente.quantity
-          );
-          this.addIngredientToList(
-            ingredienteCompleto,
-            porcoes,
-            "porções",
-            true /* persisted */
-          );
+        // Se não encontrou em ingredientesDisponiveis, usar os dados que já vêm da API
+        // A API já retorna todas as informações necessárias
+        if (!ingredienteCompleto) {
+          ingredienteCompleto = {
+            id: ingrediente.ingredient_id,
+            name: ingrediente.name,
+            price: ingrediente.price || 0,
+            additional_price: 0,
+            base_portion_quantity: ingrediente.base_portion_quantity || 1,
+            base_portion_unit: ingrediente.base_portion_unit || "un",
+            stock_unit: ingrediente.stock_unit || "un",
+            is_available: ingrediente.is_available !== false,
+          };
         }
+
+        // Armazenar no cache para uso na modal de edição
+        this.ingredientesCarregados.set(
+          String(ingrediente.ingredient_id),
+          ingredienteCompleto
+        );
+
+        const porcoes = this.dataManager.safeParseFloat(
+          ingrediente.portions !== undefined
+            ? ingrediente.portions
+            : ingrediente.quantity || 0
+        );
+        
+        this.addIngredientToList(
+          ingredienteCompleto,
+          porcoes,
+          "porções",
+          true /* persisted */
+        );
       }
 
       // Passar ingredientes da receita para o extrasManager (para exibir na área de extras)
@@ -2933,17 +3269,19 @@ class ProdutoManager {
     const ingredienteId = parseInt(ingredienteElement.dataset.ingredienteId);
     const isPersisted = ingredienteElement.dataset.persisted === "true";
 
-    // Se estamos editando um produto existente, remover também no backend
+    // Se estamos editando um produto existente e o ingrediente foi persistido, remover do backend
     if (this.currentEditingId && ingredienteId && isPersisted) {
       try {
         // Evitar cliques repetidos
         button.disabled = true;
+        
+        // Remover do backend
         await this.dataManager.removeIngredienteDoProduto(
           this.currentEditingId,
           ingredienteId
         );
 
-        // Remover da UI e atualizar custo
+        // Remover da UI
         ingredienteElement.remove();
 
         // Remover também da área de extras
@@ -2951,23 +3289,43 @@ class ProdutoManager {
           this.extrasManager.removerIngredienteReceita(ingredienteId);
         }
 
+        // Atualizar custo estimado
         this.updateEstimatedCost();
-        this.showSuccessMessage("Ingrediente removido do produto");
+        
+        this.showSuccessMessage("Ingrediente removido com sucesso");
       } catch (error) {
-        console.error("Erro ao remover ingrediente do produto:", error);
-        this.showErrorMessage("Falha ao remover ingrediente");
+        // ALTERAÇÃO: Logging condicional apenas em desenvolvimento
+        if (process?.env?.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+          console.error("Erro ao remover ingrediente do produto:", error);
+        }
+        // ALTERAÇÃO: Mensagem de erro mais específica
+        const errorMessage = error.message || "Erro ao remover ingrediente. Tente novamente.";
+        this.showErrorMessage(errorMessage);
       } finally {
         button.disabled = false;
       }
     } else {
-      // Caso seja um produto novo (ainda não salvo), apenas remove da UI
-      ingredienteElement.remove();
+      // Caso seja um produto novo (ainda não salvo) ou ingrediente não persistido, apenas remove da UI
+      // Evitar cliques repetidos
+      button.disabled = true;
+      
+      try {
+        // Remover da UI
+        ingredienteElement.remove();
 
-      // Remover também da área de extras
-      if (this.extrasManager) {
-        this.extrasManager.removerIngredienteReceita(ingredienteId);
+        // Remover também da área de extras
+        if (this.extrasManager) {
+          this.extrasManager.removerIngredienteReceita(ingredienteId);
+        }
+
+        // Atualizar custo estimado
+        this.updateEstimatedCost();
+      } catch (error) {
+        console.error("Erro ao remover ingrediente:", error);
+        this.showErrorMessage("Falha ao remover ingrediente");
+      } finally {
+        button.disabled = false;
       }
-      this.updateEstimatedCost();
     }
   }
 
@@ -3124,6 +3482,14 @@ class ProdutoManager {
           // Só adicionar se não for ingrediente da receita
           if (!ingredientesMap.has(extra.ingredient_id)) {
             ingredientesMap.set(extra.ingredient_id, extra);
+          } else {
+            // Se já existe na receita, atualizar min/max se necessário
+            const existing = ingredientesMap.get(extra.ingredient_id);
+            // Manter as regras de min/max dos extras se forem diferentes
+            if (extra.min_quantity !== undefined || extra.max_quantity !== undefined) {
+              existing.min_quantity = extra.min_quantity || existing.min_quantity || 0;
+              existing.max_quantity = extra.max_quantity || existing.max_quantity || 0;
+            }
           }
         }
       }
@@ -3132,19 +3498,20 @@ class ProdutoManager {
       const todosIngredientes = Array.from(ingredientesMap.values());
 
       // Adicionar ingredientes ao payload do produto
+      // A API sincroniza corretamente (remove, adiciona, atualiza)
       produtoData.ingredients = todosIngredientes;
 
-      // Salvar o produto com todos os ingredientes de uma vez
+      // Salvar o produto com todos os ingredientes
       let produtoId;
       if (this.currentEditingId) {
-        // Atualização: usa updateProduto que agora aceita 'ingredients'
+        // Atualização: a API sincroniza os ingredientes automaticamente
         await this.dataManager.updateProduto(
           this.currentEditingId,
           produtoData
         );
         produtoId = this.currentEditingId;
       } else {
-        // Criação: usa addProduto que agora aceita 'ingredients'
+        // Criação: usa addProduto que aceita 'ingredients'
         const response = await this.dataManager.addProduto(produtoData);
         produtoId = response.id;
       }
