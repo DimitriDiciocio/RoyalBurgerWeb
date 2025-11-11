@@ -317,8 +317,15 @@ function calcularTotais() {
   state.subtotal = state.itens.reduce((sum, item) => {
     return sum + (item.precoTotal || 0);
   }, 0);
-  state.total =
-    state.subtotal + state.taxaEntrega + state.taxaServico - state.descontos;
+  
+  // Se não há itens, total deve ser 0 (sem taxas)
+  if (state.itens.length === 0) {
+    state.total = 0;
+    state.descontos = 0;
+  } else {
+    state.total =
+      state.subtotal + state.taxaEntrega + state.taxaServico - state.descontos;
+  }
 
   stateManager.setMultiple({
     [STATE_KEYS.CART_ITEMS]: state.itens,
@@ -436,6 +443,16 @@ function renderCesta() {
     if (el.itemsContainer) el.itemsContainer.style.display = "none";
     if (el.resumoContainer) el.resumoContainer.style.display = "none";
     if (el.btnLimpar) el.btnLimpar.style.display = "none";
+    
+    // Zerar valores quando a cesta está vazia
+    if (el.subtotal) el.subtotal.textContent = formatBRL(0);
+    if (el.taxaEntrega) el.taxaEntrega.textContent = formatBRL(0);
+    if (el.taxaServico) el.taxaServico.textContent = formatBRL(0);
+    if (el.descontos) el.descontos.textContent = formatBRL(0);
+    if (el.total) el.total.textContent = formatBRL(0);
+    if (el.footerTotal) el.footerTotal.textContent = formatBRL(0);
+    if (el.pontos) el.pontos.textContent = 0;
+    
     atualizarHeaderCesta();
     atualizarBotaoFlutuante();
     atualizarPontosHeader();
