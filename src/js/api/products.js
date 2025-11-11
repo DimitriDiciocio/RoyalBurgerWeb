@@ -40,10 +40,17 @@ export const getProducts = async (options = {}) => {
 /**
  * Busca um produto por ID
  * @param {number} productId - ID do produto
+ * @param {number} quantity - Quantidade do produto (opcional, padrão: 1) - usado para calcular max_quantity dos extras
  * @returns {Promise<Object>} Dados do produto
  */
-export const getProductById = async (productId) => {
-    return await apiRequest(`/api/products/${productId}`, {
+export const getProductById = async (productId, quantity = 1) => {
+    const params = new URLSearchParams();
+    if (quantity && quantity > 0) {
+        params.append('quantity', quantity);
+    }
+    const queryString = params.toString();
+    const url = `/api/products/${productId}${queryString ? `?${queryString}` : ''}`;
+    return await apiRequest(url, {
         method: 'GET'
     });
 };

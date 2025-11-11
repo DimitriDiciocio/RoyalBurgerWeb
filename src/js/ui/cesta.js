@@ -173,26 +173,45 @@ async function carregarCesta() {
         throw new Error("Formato de dados do carrinho inválido");
       }
 
-      state.itens = apiItems.map((item) => ({
-        id: item.product.id,
-        nome: item.product.name,
-        descricao: item.product.description,
-        imagem: item.product.image_url,
-        imageHash: item.product.image_hash,
-        precoBase: item.product.price,
-        quantidade: item.quantity,
-        extras: (item.extras || []).map((extra) => ({
-          id: extra.ingredient_id,
-          nome: extra.ingredient_name,
-          preco: extra.ingredient_price,
-          quantidade: extra.quantity,
-        })),
-        observacao: item.notes || "",
-        precoUnitario: item.item_subtotal / item.quantity,
-        precoTotal: item.item_subtotal,
-        cartItemId: item.id, // ID do item no carrinho da API
-        timestamp: Date.now(),
-      }));
+      state.itens = apiItems.map((item) => {
+        // Calcular preço unitário e total, com fallback se item_subtotal for 0 ou inválido
+        const itemSubtotal = parseFloat(item.item_subtotal || 0);
+        const itemQuantity = parseInt(item.quantity || 1, 10);
+
+        // Se item_subtotal for 0 ou inválido, calcular manualmente
+        let precoTotalCalculado = itemSubtotal;
+        if (itemSubtotal <= 0) {
+          const precoBase = parseFloat(item.product?.price || 0);
+          const extrasTotal = (item.extras || []).reduce((sum, extra) => {
+            return sum + (parseFloat(extra.ingredient_price || 0) * parseInt(extra.quantity || 0, 10));
+          }, 0);
+          const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
+            return sum + (parseFloat(mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10)));
+          }, 0);
+          precoTotalCalculado = (precoBase + extrasTotal + baseModsTotal) * itemQuantity;
+        }
+
+        return {
+          id: item.product.id,
+          nome: item.product.name,
+          descricao: item.product.description,
+          imagem: item.product.image_url,
+          imageHash: item.product.image_hash,
+          precoBase: item.product.price,
+          quantidade: itemQuantity,
+          extras: (item.extras || []).map((extra) => ({
+            id: extra.ingredient_id,
+            nome: extra.ingredient_name,
+            preco: extra.ingredient_price,
+            quantidade: extra.quantity,
+          })),
+          observacao: item.notes || "",
+          precoUnitario: precoTotalCalculado / itemQuantity,
+          precoTotal: precoTotalCalculado,
+          cartItemId: item.id, // ID do item no carrinho da API
+          timestamp: Date.now(),
+        };
+      });
       cartLog("carregarCesta:mapped items", state.itens.length);
       // Validar dados mapeados para UI
       if (!isValidCartData(state.itens)) {

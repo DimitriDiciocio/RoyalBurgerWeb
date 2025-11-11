@@ -317,11 +317,23 @@ const VALIDATION_LIMITS = {
 
   function attachQuantityHandlers() {
     if (el.qtdMenos) {
-      el.qtdMenos.addEventListener("click", () => {
+      el.qtdMenos.addEventListener("click", async () => {
         if (state.quantity > 1) {
           state.quantity -= 1;
           updateTotals();
           toggleQtdMinusState();
+          // IMPORTANTE: Recarregar produto da API quando quantity muda para atualizar max_quantity
+          if (state.productId) {
+            try {
+              const produtoData = await getProductById(state.productId, state.quantity);
+              const produto = produtoData?.product || produtoData;
+              if (produto && produto.ingredients) {
+                await loadIngredientes(state.productId, produto.ingredients);
+              }
+            } catch (err) {
+              console.warn('Erro ao recarregar produto:', err);
+            }
+          }
           // AJUSTE: Re-renderizar listas para atualizar limites de estoque
           renderMonteSeuJeitoList();
           renderExtrasModal();
@@ -329,10 +341,22 @@ const VALIDATION_LIMITS = {
       });
     }
     if (el.qtdMais) {
-      el.qtdMais.addEventListener("click", () => {
+      el.qtdMais.addEventListener("click", async () => {
         state.quantity += 1;
         updateTotals();
         toggleQtdMinusState();
+        // IMPORTANTE: Recarregar produto da API quando quantity muda para atualizar max_quantity
+        if (state.productId) {
+          try {
+            const produtoData = await getProductById(state.productId, state.quantity);
+            const produto = produtoData?.product || produtoData;
+            if (produto && produto.ingredients) {
+              await loadIngredientes(state.productId, produto.ingredients);
+            }
+          } catch (err) {
+            console.warn('Erro ao recarregar produto:', err);
+          }
+        }
         // AJUSTE: Re-renderizar listas para atualizar limites de estoque
         renderMonteSeuJeitoList();
         renderExtrasModal();
@@ -392,6 +416,8 @@ const VALIDATION_LIMITS = {
         const minQuantity = Number.isFinite(parseFloat(ing.min_quantity))
           ? parseFloat(ing.min_quantity)
           : basePortions;
+        // CORREÇÃO: max_quantity já vem calculado da API considerando estoque e regras
+        // Não precisa recalcular, apenas usar o valor diretamente
         const maxQuantity = Number.isFinite(parseFloat(ing.max_quantity))
           ? parseFloat(ing.max_quantity)
           : basePortions + 999;
@@ -400,34 +426,14 @@ const VALIDATION_LIMITS = {
         const extraQty = extra?.quantity || 0;
         const effectiveQty = basePortions + extraQty;
 
-        // AJUSTE: Validar estoque disponível considerando current_stock e porções base
-        const maxAvailable = ing.max_available ?? null;
-        const limitedByStock = ing.limited_by === 'stock' || ing.limited_by === 'both';
-        const currentStock = ing.current_stock ?? 0;
-        const basePortionQuantity = ing.base_portion_quantity ?? 1;
-        
+        // CORREÇÃO: Usar diretamente max_quantity da API (já considera estoque e regras)
+        // A API já calcula o menor entre a regra e o estoque disponível
         let canIncrement = effectiveQty < maxQuantity;
-        
-        // Validar usando current_stock diretamente (mais preciso)
-        if (currentStock > 0 && basePortionQuantity > 0) {
-          const currentExtraQty = extraQty || 0;
-          const wouldBeExtraQty = currentExtraQty + 1;
-          const totalPortionsNeeded = basePortions + wouldBeExtraQty;
-          const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
-          
-          canIncrement = canIncrement && totalQuantityNeeded <= currentStock;
-        } else if (maxAvailable !== null && limitedByStock) {
-          // Fallback: usar max_available se current_stock não estiver disponível
-          const effectiveMaxAvailable = Math.floor(maxAvailable / state.quantity);
-          const currentExtraQty = extraQty || 0;
-          const wouldBeExtraQty = currentExtraQty + 1;
-          canIncrement = canIncrement && wouldBeExtraQty <= effectiveMaxAvailable;
-        }
 
         const showMinus = effectiveQty > minQuantity;
         const showPlus = canIncrement;
-        // AJUSTE: Adicionar classe CSS quando limite de estoque é atingido
-        const stockLimitedClass = !showPlus && (limitedByStock || currentStock > 0) ? ' stock-limited' : '';
+        // CORREÇÃO: Adicionar classe CSS quando limite é atingido (max_quantity já considera estoque)
+        const stockLimitedClass = !showPlus ? ' stock-limited' : '';
 
         return `
             <div class="item${stockLimitedClass}" 
@@ -436,7 +442,7 @@ const VALIDATION_LIMITS = {
                  data-porcoes="${basePortions}"
                  data-min-qty="${minQuantity}"
                  data-max-qty="${maxQuantity}"
-                 ${!showPlus && (limitedByStock || currentStock > 0) ? 'title="Limite de estoque atingido"' : ''}>
+                 ${!showPlus ? 'title="Limite atingido"' : ''}>
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
@@ -447,7 +453,7 @@ const VALIDATION_LIMITS = {
                   2,
                   "0"
                 )}</p>
-                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite de estoque atingido"></i>'}
+                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite atingido"></i>'}
               </div>
             </div>`;
       })
@@ -490,33 +496,14 @@ const VALIDATION_LIMITS = {
         const effectiveQty = basePortions + extraQty;
 
         // AJUSTE: Validar estoque disponível considerando current_stock e porções base
-        const maxAvailable = ing.max_available ?? null;
-        const limitedByStock = ing.limited_by === 'stock' || ing.limited_by === 'both';
-        const currentStock = ing.current_stock ?? 0;
-        const basePortionQuantity = ing.base_portion_quantity ?? 1;
-        
+        // CORREÇÃO: Usar diretamente max_quantity da API (já considera estoque e regras)
+        // A API já calcula o menor entre a regra e o estoque disponível
         let canIncrement = effectiveQty < maxQuantity;
-        
-        // Validar usando current_stock diretamente (mais preciso)
-        if (currentStock > 0 && basePortionQuantity > 0) {
-          const currentExtraQty = extraQty || 0;
-          const wouldBeExtraQty = currentExtraQty + 1;
-          const totalPortionsNeeded = basePortions + wouldBeExtraQty;
-          const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
-          
-          canIncrement = canIncrement && totalQuantityNeeded <= currentStock;
-        } else if (maxAvailable !== null && limitedByStock) {
-          // Fallback: usar max_available se current_stock não estiver disponível
-          const effectiveMaxAvailable = Math.floor(maxAvailable / state.quantity);
-          const currentExtraQty = extraQty || 0;
-          const wouldBeExtraQty = currentExtraQty + 1;
-          canIncrement = canIncrement && wouldBeExtraQty <= effectiveMaxAvailable;
-        }
 
         const showMinus = effectiveQty > minQuantity;
         const showPlus = canIncrement;
-        // AJUSTE: Adicionar classe CSS quando limite de estoque é atingido
-        const stockLimitedClass = !showPlus && limitedByStock ? ' stock-limited' : '';
+        // CORREÇÃO: Adicionar classe CSS quando limite é atingido (max_quantity já considera estoque)
+        const stockLimitedClass = !showPlus ? ' stock-limited' : '';
 
         return `
             <div class="item${stockLimitedClass}" 
@@ -525,7 +512,7 @@ const VALIDATION_LIMITS = {
                  data-porcoes="${basePortions}"
                  data-min-qty="${minQuantity}"
                  data-max-qty="${maxQuantity}"
-                 ${!showPlus && limitedByStock ? 'title="Limite de estoque atingido"' : ''}>
+                 ${!showPlus ? 'title="Limite atingido"' : ''}>
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
@@ -536,7 +523,7 @@ const VALIDATION_LIMITS = {
                   2,
                   "0"
                 )}</p>
-                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite de estoque atingido"></i>'}
+                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite atingido"></i>'}
               </div>
             </div>`;
       })
@@ -590,12 +577,8 @@ const VALIDATION_LIMITS = {
       const qtdEl = itemEl.querySelector(".qtd-extra");
       const nomeEl = itemEl.querySelector(".nome-adicional");
 
-      // AJUSTE: Buscar informações de estoque do ingrediente
-      const ingredient = state.ingredientes.find(
-        (ing) => (ing.ingredient_id || ing.id) === id
-      );
-      const maxAvailable = ingredient?.max_available ?? null;
-      const limitedByStock = ingredient?.limited_by === 'stock' || ingredient?.limited_by === 'both';
+      // CORREÇÃO: max_quantity já vem calculado da API considerando estoque e regras
+      // Não precisa buscar informações adicionais de estoque, apenas usar max_quantity
 
       // Garantir que o extra existe no state
       if (!state.extrasById.has(id)) {
@@ -607,18 +590,13 @@ const VALIDATION_LIMITS = {
           basePortions,
           minQuantity,
           maxQuantity,
-          maxAvailable: maxAvailable,
-          limitedByStock: limitedByStock,
-          currentStock: currentStock,
-          basePortionQuantity: basePortionQuantity,
-          stockUnit: stockUnit,
         });
       }
 
       const extra = state.extrasById.get(id);
       const effectiveQty = basePortions + extra.quantity;
 
-      // AJUSTE: Validação de estoque antes de incrementar
+      // CORREÇÃO: Validação simplificada usando apenas max_quantity da API
       if (isMinus && effectiveQty > minQuantity) {
         extra.quantity -= 1;
         const newEffective = basePortions + extra.quantity;
@@ -632,68 +610,12 @@ const VALIDATION_LIMITS = {
         }
         if (basePortions === 0) updateExtrasBadge();
       } else if (!isMinus) {
-        // AJUSTE: Validar estoque antes de incrementar
+        // CORREÇÃO: Validar apenas usando max_quantity (já considera estoque e regras)
         const wouldBeEffectiveQty = effectiveQty + 1;
         
-        // Verificar limite de regra (max_quantity)
+        // Se atingiu o limite, não fazer nada (botão já está desabilitado)
         if (wouldBeEffectiveQty > maxQuantity) {
-          showToast(
-            `Quantidade máxima permitida: ${maxQuantity}`,
-            {
-              type: "warning",
-              title: "Limite Atingido",
-              autoClose: 3000,
-            }
-          );
           return;
-        }
-
-        // AJUSTE: Validar estoque disponível considerando current_stock e porções base
-        // Fórmula: (basePortions + extra.quantity + 1) * basePortionQuantity * state.quantity <= currentStock
-        if (currentStock > 0 && basePortionQuantity > 0) {
-          // Calcular quantidade total que seria necessária
-          const currentExtraQty = extra.quantity || 0;
-          const wouldBeExtraQty = currentExtraQty + 1;
-          
-          // Total de porções (base + extras) que seriam necessárias
-          const totalPortionsNeeded = basePortions + wouldBeExtraQty;
-          
-          // Quantidade total necessária em unidades do estoque
-          const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
-          
-          // Verificar se excede o estoque disponível
-          if (totalQuantityNeeded > currentStock) {
-            // Calcular quantas porções extras são possíveis
-            const maxTotalPortions = Math.floor(currentStock / (basePortionQuantity * state.quantity));
-            const maxExtrasAvailable = Math.max(0, maxTotalPortions - basePortions);
-            
-            showToast(
-              `Estoque insuficiente. Disponível: ${maxExtrasAvailable} porção${maxExtrasAvailable !== 1 ? 'ões' : ''} extra${maxExtrasAvailable !== 1 ? 's' : ''} por item (estoque: ${currentStock.toFixed(2)} ${stockUnit})`,
-              {
-                type: "warning",
-                title: "Estoque Insuficiente",
-                autoClose: 4000,
-              }
-            );
-            return;
-          }
-        } else if (maxAvailable !== null && limitedByStock) {
-          // Fallback: usar max_available se current_stock não estiver disponível
-          const effectiveMaxAvailable = state.quantity === 1 ? maxAvailable : Math.max(0, Math.floor(maxAvailable / state.quantity));
-          const currentExtraQty = extra.quantity || 0;
-          const wouldBeExtraQty = currentExtraQty + 1;
-          
-          if (wouldBeExtraQty > effectiveMaxAvailable) {
-            showToast(
-              `Estoque insuficiente. Disponível: ${effectiveMaxAvailable} porção${effectiveMaxAvailable !== 1 ? 'ões' : ''} extra${effectiveMaxAvailable !== 1 ? 's' : ''} por item`,
-              {
-                type: "warning",
-                title: "Estoque Insuficiente",
-                autoClose: 4000,
-              }
-            );
-            return;
-          }
         }
 
         extra.quantity += 1;
@@ -772,24 +694,9 @@ const VALIDATION_LIMITS = {
       const extra = state.extrasById.get(id);
       const effectiveQty = basePortions + extra.quantity;
 
-      // AJUSTE: Validar estoque disponível considerando current_stock e porções base
+      // CORREÇÃO: Usar diretamente max_quantity da API (já considera estoque e regras)
+      // A API já calcula o menor entre a regra e o estoque disponível
       let canIncrement = effectiveQty < maxQuantity;
-      
-      // Validar usando current_stock diretamente (mais preciso)
-      if (currentStock > 0 && basePortionQuantity > 0) {
-        const currentExtraQty = extra.quantity || 0;
-        const wouldBeExtraQty = currentExtraQty + 1;
-        const totalPortionsNeeded = basePortions + wouldBeExtraQty;
-        const totalQuantityNeeded = totalPortionsNeeded * basePortionQuantity * state.quantity;
-        
-        canIncrement = canIncrement && totalQuantityNeeded <= currentStock;
-      } else if (maxAvailable !== null && limitedByStock) {
-        // Fallback: usar max_available se current_stock não estiver disponível
-        const effectiveMaxAvailable = Math.floor(maxAvailable / state.quantity);
-        const currentExtraQty = extra.quantity || 0;
-        const wouldBeExtraQty = currentExtraQty + 1;
-        canIncrement = canIncrement && wouldBeExtraQty <= effectiveMaxAvailable;
-      }
 
       // Atualizar estados dos botões
       if (minus && !(effectiveQty > minQuantity)) {
@@ -797,7 +704,7 @@ const VALIDATION_LIMITS = {
       }
       if (plus && !canIncrement) {
         plus.classList.add("dessativo");
-        plus.setAttribute("title", "Limite de estoque atingido");
+        plus.setAttribute("title", "Limite atingido");
       }
     });
   }
@@ -1013,35 +920,37 @@ const VALIDATION_LIMITS = {
     });
   }
 
-  async function loadIngredientes(productId) {
+  async function loadIngredientes(productId, ingredientsFromProduct = null) {
     try {
-      const cacheKeyIngredients = CACHE_KEYS.productIngredients(productId);
-      let resp = cacheManager.get(cacheKeyIngredients);
-      if (!resp) {
-        resp = await getProductIngredients(productId);
-        cacheManager.set(cacheKeyIngredients, resp, CACHE_TTL);
-      }
-      const productIngredients = Array.isArray(resp) ? resp : resp?.items || [];
-
-      let allIngredients = [];
-      const cachedAllIngredients = cacheManager.get(CACHE_KEYS.allIngredients);
-      if (cachedAllIngredients) {
-        allIngredients = cachedAllIngredients;
+      let productIngredients = [];
+      
+      // Se ingredientes foram passados (vindo de getProductById), usar eles
+      if (ingredientsFromProduct && Array.isArray(ingredientsFromProduct) && ingredientsFromProduct.length > 0) {
+        productIngredients = ingredientsFromProduct;
       } else {
-        try {
-          const allIngredientsResp = await getIngredients({ page_size: 1000 });
-          allIngredients = Array.isArray(allIngredientsResp)
-            ? allIngredientsResp
-            : allIngredientsResp?.items || [];
-          cacheManager.set(
-            CACHE_KEYS.allIngredients,
-            allIngredients,
-            CACHE_TTL
-          );
-        } catch (err) {
-          // IMPROVEMENT: Silencioso propositalmente - autenticação não obrigatória
-          allIngredients = [];
-        }
+        // IMPORTANTE: Sempre buscar da API, não usar cache
+        // Isso garante que max_quantity está sempre atualizado com o estoque
+        const resp = await getProductIngredients(productId);
+        productIngredients = Array.isArray(resp) ? resp : resp?.items || [];
+      }
+
+      // CORREÇÃO: Sempre buscar TODOS os ingredientes disponíveis (não usar cache)
+      // Isso permite adicionar ingredientes que não estão cadastrados como extras do produto
+      let allIngredients = [];
+      try {
+        const allIngredientsResp = await getIngredients({ page_size: 1000 });
+        allIngredients = Array.isArray(allIngredientsResp)
+          ? allIngredientsResp
+          : allIngredientsResp?.items || [];
+        // Atualizar cache
+        cacheManager.set(
+          CACHE_KEYS.allIngredients,
+          allIngredients,
+          CACHE_TTL
+        );
+      } catch (err) {
+        // IMPROVEMENT: Silencioso propositalmente - autenticação não obrigatória
+        allIngredients = [];
       }
 
       const enrichedIngredients = productIngredients.map((productIng) => {
@@ -1075,6 +984,50 @@ const VALIDATION_LIMITS = {
           stock_unit: productIng.stock_unit ?? fullIngredient.stock_unit ?? 'un',
         };
       });
+      
+      // CORREÇÃO: Adicionar ingredientes disponíveis que NÃO estão no produto como extras possíveis
+      // Isso permite adicionar ingredientes como presunto que não estão cadastrados como extras
+      const productIngredientIds = new Set(
+        productIngredients.map(ing => ing.ingredient_id || ing.id)
+      );
+      
+      const availableExtras = allIngredients
+        .filter(ing => {
+          const ingId = ing.id;
+          // Não incluir ingredientes que já estão na receita base (portions > 0)
+          const isInProduct = productIngredientIds.has(ingId);
+          if (isInProduct) {
+            const productIng = productIngredients.find(p => (p.ingredient_id || p.id) === ingId);
+            const portions = parseFloat(productIng?.portions || 0);
+            // Se está no produto mas com portions = 0, já está em enrichedIngredients
+            // Se está no produto com portions > 0, não pode ser extra
+            return portions === 0;
+          }
+          // Se não está no produto, pode ser adicionado como extra (se disponível)
+          return ing.is_available !== false;
+        })
+        .map(ing => ({
+          ...ing,
+          ingredient_id: ing.id,
+          id: ing.id,
+          portions: 0, // Marca como extra (portions = 0)
+          min_quantity: 0,
+          max_quantity: null, // Sem limite de regra (será limitado apenas por estoque)
+          additional_price: toNum(ing.additional_price) ?? toNum(ing.price) ?? 0,
+          current_stock: toNum(ing.current_stock) ?? 0,
+          max_available: null, // Será calculado quando necessário
+          limited_by: 'stock',
+          base_portion_quantity: toNum(ing.base_portion_quantity) ?? 1,
+          stock_unit: ing.stock_unit || 'un',
+        }));
+      
+      // Adicionar extras disponíveis que não estão em enrichedIngredients
+      availableExtras.forEach(extra => {
+        const ingId = extra.id;
+        if (!enrichedIngredients.find(e => (e.ingredient_id || e.id) === ingId)) {
+          enrichedIngredients.push(extra);
+        }
+      });
 
       state.ingredientes = enrichedIngredients;
 
@@ -1107,37 +1060,41 @@ const VALIDATION_LIMITS = {
     if (!state.productId) return;
 
     try {
-      const cacheKeyProduct = CACHE_KEYS.product(state.productId);
-      let produto = cacheManager.get(cacheKeyProduct);
+      // IMPORTANTE: Sempre buscar da API usando o ID da URL, não usar cache
+      // Passa quantity para calcular max_quantity corretamente baseado no estoque
+      const produtoData = await getProductById(state.productId, state.quantity || 1);
+      
+      // Se a resposta vem com wrapper { product: {...} }, extrair o produto
+      const produto = produtoData?.product || produtoData;
+      
+      // Carregar ingredientes em paralelo
+      await loadIngredientes(state.productId);
 
-      // Carregar produto e ingredientes em paralelo (com cache)
-      const [produtoData] = await Promise.all([
-        produto ? Promise.resolve(produto) : getProductById(state.productId),
-        loadIngredientes(state.productId),
-      ]);
-
-      // Se não estava em cache, salvar agora
-      if (!produto) {
-        produto = produtoData;
-        cacheManager.set(cacheKeyProduct, produto, CACHE_TTL);
+      // IMPORTANTE: Se produto já tem ingredientes (vindo de getProductById), usar eles
+      // pois já têm max_quantity calculado corretamente
+      if (produto && produto.ingredients && Array.isArray(produto.ingredients) && produto.ingredients.length > 0) {
+        console.log('[DEBUG] Usando ingredientes de getProductById (max_quantity calculado)');
+        // Atualizar ingredientes com os dados da API
+        await loadIngredientes(state.productId, produto.ingredients);
       }
 
       state.product = produto;
       updateTitle();
       renderProdutoInfo();
 
-      // Se está editando, carregar dados do item da cesta ANTES de renderizar ingredientes
+      // CORREÇÃO: Se está editando, carregar dados do item da cesta DEPOIS de carregar ingredientes
+      // Isso garante que todos os ingredientes estão disponíveis antes de carregar os extras do item
       if (state.isEditing) {
         if (state.cartItemId) {
           await loadItemFromApiByCartId(state.cartItemId);
         } else {
           loadItemFromCart();
         }
+      } else {
+        // Se não está editando, apenas renderizar
+        renderMonteSeuJeitoList();
+        updateExtrasBadge();
       }
-
-      // Renderizar ingredientes após carregar dados do carrinho (se estiver editando)
-      renderMonteSeuJeitoList();
-      updateExtrasBadge();
     } catch (err) {
       // TODO: Implementar logging estruturado em produção
       if (window.location.hostname === "localhost") {
@@ -1205,6 +1162,18 @@ const VALIDATION_LIMITS = {
         el.obsInput.value = found.notes || "";
       }
 
+      // CORREÇÃO: Buscar TODOS os ingredientes disponíveis para garantir informações completas
+      let allIngredients = [];
+      try {
+        const allIngredientsResp = await getIngredients({ page_size: 1000 });
+        allIngredients = Array.isArray(allIngredientsResp)
+          ? allIngredientsResp
+          : allIngredientsResp?.items || [];
+      } catch (err) {
+        console.warn('Erro ao buscar todos os ingredientes:', err);
+        allIngredients = [];
+      }
+
       // Usar os ingredientes que já foram carregados em state.ingredientes
       const ingredientsMap = new Map();
       const ingredientPriceMap = new Map();
@@ -1218,45 +1187,80 @@ const VALIDATION_LIMITS = {
         ingredientPriceMap.set(ingId, price);
       });
 
-      // extras (ingredientes adicionais, basePortions = 0)
+      // CORREÇÃO: extras (ingredientes adicionais, basePortions = 0)
+      // Buscar informações completas dos ingredientes que estão nos extras
       (found.extras || []).forEach((extra) => {
         const id = extra.ingredient_id || extra.id;
         const qty = parseInt(extra.quantity, 10) || 0;
-        const price = toNum(extra.ingredient_price) ?? 0;
+        
+        // Buscar informações completas do ingrediente
+        const fullIngredient = allIngredients.find(ing => ing.id === id) || {};
+        const productIngredient = state.ingredientes.find(ing => (ing.ingredient_id || ing.id) === id);
+        
+        // Usar preço do extra, do ingrediente completo, ou do produto
+        const price = toNum(extra.ingredient_price) 
+          ?? toNum(fullIngredient.additional_price) 
+          ?? toNum(fullIngredient.price)
+          ?? toNum(productIngredient?.additional_price)
+          ?? 0;
+        
+        // Usar nome do extra, do ingrediente completo, ou padrão
+        const name = extra.ingredient_name 
+          || fullIngredient.name 
+          || productIngredient?.name
+          || "Ingrediente";
+        
+        // Buscar max_quantity do produto ou usar padrão
+        const maxQuantity = productIngredient?.max_quantity 
+          ?? fullIngredient.max_quantity 
+          ?? 999;
+        
         state.extrasById.set(id, {
           id,
-          name: extra.ingredient_name || "Ingrediente",
+          name: name,
           price: validatePrice(price),
           quantity: qty,
           basePortions: 0,
           minQuantity: 0,
-          maxQuantity: 999,
+          maxQuantity: maxQuantity,
         });
       });
 
-      // base_modifications (modificações da receita base, basePortions > 0)
+      // CORREÇÃO: base_modifications (modificações da receita base, basePortions > 0)
+      // Buscar informações completas dos ingredientes que estão nas modificações
       (found.base_modifications || []).forEach((bm) => {
         const id = bm.ingredient_id || bm.id;
         const delta = parseInt(bm.delta, 10) || 0;
-        const basePortions = ingredientsMap.get(id) || 1;
-        const price = ingredientPriceMap.get(id) || 0;
+        
+        // Buscar informações completas do ingrediente
+        const fullIngredient = allIngredients.find(ing => ing.id === id) || {};
+        const productIngredient = state.ingredientes.find(ing => (ing.ingredient_id || ing.id) === id);
+        
+        const basePortions = ingredientsMap.get(id) || parseFloat(fullIngredient.base_portion_quantity) || 1;
+        
+        // Usar preço do ingrediente completo ou do produto
+        const price = ingredientPriceMap.get(id)
+          ?? toNum(fullIngredient.additional_price)
+          ?? toNum(fullIngredient.price)
+          ?? 0;
 
         // Buscar minQuantity e maxQuantity do ingrediente original
-        const fullIng = state.ingredientes.find(
-          (i) => (i.ingredient_id || i.id) === id
-        );
-        const minQuantity =
-          fullIng && Number.isFinite(parseFloat(fullIng.min_quantity))
-            ? parseFloat(fullIng.min_quantity)
-            : basePortions;
-        const maxQuantity =
-          fullIng && Number.isFinite(parseFloat(fullIng.max_quantity))
-            ? parseFloat(fullIng.max_quantity)
-            : basePortions + 999;
+        const minQuantity = productIngredient && Number.isFinite(parseFloat(productIngredient.min_quantity))
+          ? parseFloat(productIngredient.min_quantity)
+          : (fullIngredient.min_quantity ? parseFloat(fullIngredient.min_quantity) : basePortions);
+        const maxQuantity = productIngredient && Number.isFinite(parseFloat(productIngredient.max_quantity))
+          ? parseFloat(productIngredient.max_quantity)
+          : (fullIngredient.max_quantity ? parseFloat(fullIngredient.max_quantity) : basePortions + 999);
+
+        // Usar nome do ingrediente completo ou do produto
+        const name = bm.ingredient_name 
+          || fullIngredient.name 
+          || productIngredient?.name
+          || "Ingrediente";
 
         state.extrasById.set(id, {
           id,
-          name: bm.ingredient_name || fullIng?.name || "Ingrediente",
+          name: name,
           price: validatePrice(price),
           quantity: delta, // Mantém o delta para exibir corretamente na UI
           basePortions: basePortions,
@@ -1264,6 +1268,10 @@ const VALIDATION_LIMITS = {
           maxQuantity: maxQuantity,
         });
       });
+
+      // CORREÇÃO: Recarregar ingredientes após carregar dados do item para garantir que todos os extras apareçam
+      // Isso é importante para ingredientes que não estão cadastrados como extras do produto
+      await loadIngredientes(state.productId);
 
       // Atualizar a UI da quantidade do produto
       if (el.qtdTexto) {
@@ -1273,8 +1281,11 @@ const VALIDATION_LIMITS = {
       // Atualizar estado dos botões de quantidade
       toggleQtdMinusState();
 
-      // Atualizar totais (renderização será feita no loadProduto)
+      // Atualizar totais e renderizar listas
       updateTotals();
+      renderMonteSeuJeitoList();
+      renderExtrasModal();
+      updateExtrasBadge();
     } catch (err) {
       // TODO: Implementar logging estruturado em produção
       console.error("Erro ao carregar item do carrinho:", err);
