@@ -183,11 +183,46 @@ async function carregarCesta() {
           const extrasTotal = (item.extras || []).reduce((sum, extra) => {
             return sum + (parseFloat(extra.ingredient_price || 0) * parseInt(extra.quantity || 0, 10));
           }, 0);
+          // ALTERAÇÃO: Validação mais robusta para prevenir cálculos incorretos
           const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
-            return sum + (parseFloat(mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10)));
+            if (!mod || typeof mod !== 'object') return sum;
+            const price = parseFloat(mod.ingredient_price || mod.price || 0) || 0;
+            const delta = parseInt(mod.delta || 0, 10) || 0;
+            // Validar que ambos são números finitos antes de calcular
+            if (isFinite(price) && isFinite(delta) && price >= 0) {
+              return sum + (price * Math.abs(delta));
+            }
+            return sum;
           }, 0);
           precoTotalCalculado = (precoBase + extrasTotal + baseModsTotal) * itemQuantity;
         }
+
+        // ALTERAÇÃO: Validação mais robusta para prevenir dados inválidos
+        // Mapear BASE_MODIFICATIONS (modificações da receita base)
+        const baseModsMapeados = (item.base_modifications || [])
+          .map((bm) => {
+            if (!bm || typeof bm !== 'object') return null;
+            if (!bm.ingredient_id) return null;
+            
+            // Validar ID como número inteiro positivo
+            const id = parseInt(bm.ingredient_id, 10);
+            if (isNaN(id) || id <= 0 || !isFinite(id)) return null;
+
+            // Sanitizar nome (garantir que é string)
+            const nome = String(bm.ingredient_name || bm.name || "Ingrediente").trim();
+            if (!nome) return null;
+
+            // Validar delta como número inteiro (pode ser negativo)
+            const deltaRaw = parseInt(bm.delta || 0, 10);
+            const delta = isNaN(deltaRaw) || !isFinite(deltaRaw) ? 0 : deltaRaw;
+
+            // Validar preço como número positivo
+            const precoRaw = parseFloat(bm.ingredient_price || bm.price || 0);
+            const preco = isNaN(precoRaw) || !isFinite(precoRaw) || precoRaw < 0 ? 0 : precoRaw;
+
+            return { id, nome, delta, preco };
+          })
+          .filter((bm) => bm !== null); // Remove base_modifications inválidos
 
         return {
           id: item.product.id,
@@ -203,6 +238,7 @@ async function carregarCesta() {
             preco: extra.ingredient_price,
             quantidade: extra.quantity,
           })),
+          base_modifications: baseModsMapeados,
           observacao: item.notes || "",
           precoUnitario: precoTotalCalculado / itemQuantity,
           precoTotal: precoTotalCalculado,
@@ -340,7 +376,7 @@ function calcularPontos() {
 function renderItem(item, index) {
   const imageUrl = buildImageUrl(item.imagem, item.imageHash);
 
-  // Renderizar lista de extras/modificações
+  // Renderizar lista de extras (ingredientes adicionais fora da receita)
   let extrasHtml = "";
   if (item.extras && item.extras.length > 0) {
     const extrasItems = item.extras
@@ -355,6 +391,46 @@ function renderItem(item, index) {
             <div class="item-extras-list">
                 <ul>
                     ${extrasItems}
+                </ul>
+            </div>
+        `;
+  }
+
+  // Renderizar lista de BASE_MODIFICATIONS (modificações da receita base)
+  let baseModsHtml = "";
+  if (item.base_modifications && item.base_modifications.length > 0) {
+    const baseModsItems = item.base_modifications
+      .map((bm) => {
+        const isPositive = bm.delta > 0;
+        const icon = isPositive ? "plus" : "minus";
+        const colorClass = isPositive ? "mod-add" : "mod-remove";
+        const deltaValue = Math.abs(bm.delta);
+
+        // Formatar preço se houver (apenas para adições, remoções não têm custo)
+        const precoFormatado =
+          bm.preco > 0 && isPositive
+            ? ` <span class="base-mod-price">+R$ ${bm.preco
+                .toFixed(2)
+                .replace(".", ",")}</span>`
+            : "";
+
+        return `
+                    <li>
+                        <span class="base-mod-icon ${colorClass}">
+                            <i class="fa-solid fa-circle-${icon}"></i>
+                        </span>
+                        <span class="base-mod-quantity">${deltaValue}</span>
+                        <span class="base-mod-name">${escapeHTML(bm.nome)}</span>${precoFormatado}
+                    </li>
+                `;
+      })
+      .join("");
+    baseModsHtml = `
+            <div class="item-extras-separator"></div>
+            <div class="item-base-mods-list">
+                <strong>Modificações:</strong>
+                <ul>
+                    ${baseModsItems}
                 </ul>
             </div>
         `;
@@ -389,6 +465,7 @@ function renderItem(item, index) {
                 </button>
             </div>
             ${extrasHtml}
+            ${baseModsHtml}
             ${obsHtml}
             <div class="item-extras-separator"></div>
             <div class="item-footer">

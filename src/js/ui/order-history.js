@@ -181,31 +181,53 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
   }
 
   /**
-   * Calcula tempo estimado de entrega baseado nos prazos do sistema
-   * Conforme o guia completo: considera todos os prazos para delivery ou pickup
+   * Calcula tempo estimado de entrega baseado nos prazos do sistema + soma dos tempos de preparo dos produtos
+   * Fórmula: Iniciação + (Soma dos Tempos de Preparo dos Produtos × Quantidade) + Envio + Entrega
    * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
+   * @param {Array} orderItems - Array de itens do pedido com informações do produto
    * @returns {Object} Objeto com minTime e maxTime em minutos
    */
-  function calculateEstimatedDeliveryTime(orderType = "delivery") {
+  function calculateEstimatedDeliveryTime(orderType = "delivery", orderItems = []) {
     // Validar orderType
     const validOrderType =
       orderType === "pickup" || orderType === "delivery"
         ? orderType
         : "delivery";
 
+    // ALTERAÇÃO: Validação mais robusta para prevenir cálculos incorretos
+    // Calcular tempo total de preparo somando todos os produtos (considerando quantidade)
+    let totalProductPrepTime = 0;
+    if (Array.isArray(orderItems) && orderItems.length > 0) {
+      orderItems.forEach((item) => {
+        // Validar e converter valores numéricos de forma segura
+        const prepTime = Math.max(0, parseFloat(item.product?.preparation_time_minutes || 
+                        item.preparation_time_minutes || 0) || 0);
+        const quantity = Math.max(1, parseInt(item.quantity || 1, 10) || 1);
+        // Validar que não há overflow antes de somar
+        const itemPrepTime = prepTime * quantity;
+        if (isFinite(itemPrepTime) && itemPrepTime >= 0) {
+          totalProductPrepTime += itemPrepTime;
+        }
+      });
+    }
+    // Garantir que o tempo total é um número válido
+    totalProductPrepTime = Math.max(0, isFinite(totalProductPrepTime) ? totalProductPrepTime : 0);
+
     if (!estimatedTimesCache) {
       // Fallback se não carregou os tempos
-      // Delivery: 5+20+5+15 = 45, Pickup: 5+20+5+0 = 30
-      const fallbackTotal = validOrderType === "delivery" ? 45 : 30;
+      const systemPrep = 20; // Fallback padrão (usado apenas se não houver produtos)
+      const preparation = totalProductPrepTime > 0 ? totalProductPrepTime : systemPrep;
+      const delivery = validOrderType === "delivery" ? 15 : 0;
+      const total = 5 + preparation + 5 + delivery;
       return {
-        minTime: fallbackTotal,
-        maxTime: fallbackTotal + 15,
+        minTime: total,
+        maxTime: total + 15,
       };
     }
 
     // Extrair prazos do cache (com fallbacks seguros)
     const initiation = Number(estimatedTimesCache.initiation_minutes) || 5;
-    const preparation = Number(estimatedTimesCache.preparation_minutes) || 20;
+    const systemPreparation = Number(estimatedTimesCache.preparation_minutes) || 20;
     const dispatch = Number(estimatedTimesCache.dispatch_minutes) || 5;
     const delivery =
       validOrderType === "delivery"
@@ -214,16 +236,15 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
 
     // Validar que os valores são números positivos
     const safeInitiation = Math.max(0, initiation);
-    const safePreparation = Math.max(0, preparation);
     const safeDispatch = Math.max(0, dispatch);
     const safeDelivery = Math.max(0, delivery);
 
-    // Calcular tempo total conforme fluxo do pedido
-    // Para pedido novo (pending): inclui todos os prazos
-    // Delivery: iniciação + preparo + envio + entrega
-    // Pickup: iniciação + preparo + envio (sem entrega)
+    // Usar a soma dos tempos de preparo dos produtos, ou o padrão do sistema se não houver produtos
+    const preparation = totalProductPrepTime > 0 ? totalProductPrepTime : systemPreparation;
+
+    // Calcular tempo total: Iniciação + (Soma dos Tempos de Preparo) + Envio + Entrega
     const totalMinutes =
-      safeInitiation + safePreparation + safeDispatch + safeDelivery;
+      safeInitiation + preparation + safeDispatch + safeDelivery;
 
     // Tempo mínimo = soma dos prazos
     const minTime = Math.max(0, totalMinutes);
@@ -554,13 +575,14 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
         // Classe CSS do status
         const statusCssClass = getStatusCssClass(order.status);
 
-        // Calcular tempo estimado baseado nos prazos do sistema
+        // Calcular tempo estimado baseado nos prazos do sistema + maior tempo de preparo dos produtos
         // Validar orderType para evitar valores inválidos
         const orderType =
           order.order_type === "pickup" || order.order_type === "delivery"
             ? order.order_type
             : "delivery";
-        const timeEstimate = calculateEstimatedDeliveryTime(orderType);
+        // Passar itens do pedido para calcular usando maior tempo de preparo dos produtos
+        const timeEstimate = calculateEstimatedDeliveryTime(orderType, items);
         const tempoTexto = `${timeEstimate.minTime} - ${timeEstimate.maxTime} min`;
 
         // Renderizar itens (usar valores já calculados da API)
@@ -602,17 +624,22 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
                     const badges = [];
 
                     if (extras.length > 0) {
+                      // ALTERAÇÃO: Escape de números para prevenir XSS (mesmo que seja número, garante segurança)
+                      const extrasCount = parseInt(extras.length, 10) || 0;
                       badges.push(
-                        `<span class="modification-badge extra"><i class="fa-solid fa-plus"></i> ${extras.length} extra(s)</span>`
+                        `<span class="modification-badge extra"><i class="fa-solid fa-plus"></i> ${extrasCount} extra(s)</span>`
                       );
                     }
 
-                    const addCount = baseMods.filter(
-                      (bm) => parseInt(bm.delta || 0, 10) > 0
-                    ).length;
-                    const removeCount = baseMods.filter(
-                      (bm) => parseInt(bm.delta || 0, 10) < 0
-                    ).length;
+                    // ALTERAÇÃO: Validação mais robusta de delta para prevenir erros
+                    const addCount = baseMods.filter((bm) => {
+                      const delta = parseInt(bm?.delta || 0, 10);
+                      return !isNaN(delta) && delta > 0;
+                    }).length;
+                    const removeCount = baseMods.filter((bm) => {
+                      const delta = parseInt(bm?.delta || 0, 10);
+                      return !isNaN(delta) && delta < 0;
+                    }).length;
 
                     if (addCount > 0) {
                       badges.push(
@@ -626,7 +653,6 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
                     }
 
                     modificationsHtml = `
-                        <div class="order-item-modifications">
                             ${
                               badges.length > 0
                                 ? `<div class="order-item-modifications-compact">${badges.join(
@@ -641,20 +667,22 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
                                   )}</div>`
                                 : ""
                             }
-                        </div>
                     `;
                   }
 
+                  // ALTERAÇÃO: Validar itemTotal antes de formatar para prevenir NaN ou Infinity
+                  const safeItemTotal = isFinite(itemTotal) && itemTotal >= 0 ? itemTotal : 0;
+                  
                   return `
                     <div class="order-item">
                         <div class="item-info">
-                            <span class="item-qtd">${itemQuantity}</span>
-                            <span class="item-name">${itemName}</span>
+                            <div>
+                                <span class="item-qtd">${itemQuantity}</span>
+                                <span class="item-name">${itemName}</span>
+                            </div>
+                            <span class="item-price">R$ ${formatCurrency(safeItemTotal)}</span>
                         </div>
-                        <span class="item-price">R$ ${formatCurrency(
-                          itemTotal
-                        )}</span>
-                        ${modificationsHtml}
+                        ${modificationsHtml ? `<div class="order-item-modifications">${modificationsHtml}</div>` : ''}
                     </div>
                 `;
                 })
@@ -663,9 +691,11 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
             : `
                 <div class="order-item">
                     <div class="item-info">
-                        <span class="item-name">Carregando itens...</span>
+                        <div>
+                            <span class="item-name">Carregando itens...</span>
+                        </div>
+                        <span class="item-price">-</span>
                     </div>
-                    <span class="item-price">-</span>
                 </div>
             `;
 

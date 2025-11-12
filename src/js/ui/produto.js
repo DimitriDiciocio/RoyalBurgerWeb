@@ -934,8 +934,8 @@ const VALIDATION_LIMITS = {
         productIngredients = Array.isArray(resp) ? resp : resp?.items || [];
       }
 
-      // CORREÇÃO: Sempre buscar TODOS os ingredientes disponíveis (não usar cache)
-      // Isso permite adicionar ingredientes que não estão cadastrados como extras do produto
+      // Buscar todos os ingredientes disponíveis apenas para enriquecer dados (fallback)
+      // A API já retorna todos os dados necessários, mas usamos como fallback caso algum campo esteja faltando
       let allIngredients = [];
       try {
         const allIngredientsResp = await getIngredients({ page_size: 1000 });
@@ -953,6 +953,8 @@ const VALIDATION_LIMITS = {
         allIngredients = [];
       }
 
+      // CORREÇÃO: Exibir apenas ingredientes vinculados ao produto na tabela PRODUCT_INGREDIENTS
+      // A API já retorna apenas os ingredientes vinculados ao produto, então não precisamos adicionar outros
       const enrichedIngredients = productIngredients.map((productIng) => {
         const fullIngredient =
           allIngredients.find(
@@ -983,50 +985,6 @@ const VALIDATION_LIMITS = {
           base_portion_quantity: productIng.base_portion_quantity ?? fullIngredient.base_portion_quantity ?? 1,
           stock_unit: productIng.stock_unit ?? fullIngredient.stock_unit ?? 'un',
         };
-      });
-      
-      // CORREÇÃO: Adicionar ingredientes disponíveis que NÃO estão no produto como extras possíveis
-      // Isso permite adicionar ingredientes como presunto que não estão cadastrados como extras
-      const productIngredientIds = new Set(
-        productIngredients.map(ing => ing.ingredient_id || ing.id)
-      );
-      
-      const availableExtras = allIngredients
-        .filter(ing => {
-          const ingId = ing.id;
-          // Não incluir ingredientes que já estão na receita base (portions > 0)
-          const isInProduct = productIngredientIds.has(ingId);
-          if (isInProduct) {
-            const productIng = productIngredients.find(p => (p.ingredient_id || p.id) === ingId);
-            const portions = parseFloat(productIng?.portions || 0);
-            // Se está no produto mas com portions = 0, já está em enrichedIngredients
-            // Se está no produto com portions > 0, não pode ser extra
-            return portions === 0;
-          }
-          // Se não está no produto, pode ser adicionado como extra (se disponível)
-          return ing.is_available !== false;
-        })
-        .map(ing => ({
-          ...ing,
-          ingredient_id: ing.id,
-          id: ing.id,
-          portions: 0, // Marca como extra (portions = 0)
-          min_quantity: 0,
-          max_quantity: null, // Sem limite de regra (será limitado apenas por estoque)
-          additional_price: toNum(ing.additional_price) ?? toNum(ing.price) ?? 0,
-          current_stock: toNum(ing.current_stock) ?? 0,
-          max_available: null, // Será calculado quando necessário
-          limited_by: 'stock',
-          base_portion_quantity: toNum(ing.base_portion_quantity) ?? 1,
-          stock_unit: ing.stock_unit || 'un',
-        }));
-      
-      // Adicionar extras disponíveis que não estão em enrichedIngredients
-      availableExtras.forEach(extra => {
-        const ingId = extra.id;
-        if (!enrichedIngredients.find(e => (e.ingredient_id || e.id) === ingId)) {
-          enrichedIngredients.push(extra);
-        }
       });
 
       state.ingredientes = enrichedIngredients;
@@ -1269,8 +1227,8 @@ const VALIDATION_LIMITS = {
         });
       });
 
-      // CORREÇÃO: Recarregar ingredientes após carregar dados do item para garantir que todos os extras apareçam
-      // Isso é importante para ingredientes que não estão cadastrados como extras do produto
+      // Recarregar ingredientes após carregar dados do item para garantir que os dados estejam atualizados
+      // Isso garante que max_quantity está atualizado com o estoque atual
       await loadIngredientes(state.productId);
 
       // Atualizar a UI da quantidade do produto

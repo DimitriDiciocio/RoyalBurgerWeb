@@ -215,8 +215,8 @@ main{
 
                 & .order-item{
                     display: flex;
-                    justify-content: space-between;
-                    align-items: center;
+                    flex-direction: column;
+                    gap: 8px;
                     margin-bottom: 8px;
 
                     &:last-child{
@@ -225,9 +225,16 @@ main{
 
                     & .item-info{
                         display: flex;
+                        justify-content: space-between;
                         align-items: center;
-                        gap: 8px;
-                        flex: 1;
+                        width: 100%;
+
+                        & > div {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            flex: 1;
+                        }
 
                         & .item-qtd{
                             color: var(--color-primary);
@@ -248,18 +255,18 @@ main{
                             font-size: 0.85rem;
                             font-weight: 500;
                         }
-                    }
 
-                    & .item-price{
-                        color: var(--color-texto-erased);
-                        font-size: 0.85rem;
+                        & .item-price{
+                            color: var(--color-texto-erased);
+                            font-size: 0.85rem;
+                        }
                     }
                 }
 
                 & .order-item-modifications {
-                    margin-top: 0.5rem;
-                    padding-top: 0.5rem;
-                    border-top: 1px solid #f0f0f0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem;
                 }
 
                 & .order-item-modifications-compact {

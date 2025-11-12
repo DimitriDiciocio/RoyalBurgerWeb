@@ -14,12 +14,17 @@ import {
   createIncrementalRenderer,
 } from "../utils/virtual-scroll.js";
 import { escapeHTML, escapeAttribute } from "../utils/html-sanitizer.js";
+import { getEstimatedDeliveryTimes } from "../utils/settings-helper.js";
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 const CACHE_KEYS = {
   products: "products_all",
   categories: "categories_all",
+  estimatedTimes: "estimated_times",
 };
+
+// Cache para prazos de entrega
+let estimatedTimesCache = null;
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -169,6 +174,41 @@ function updateImageIfChanged(imgElement, newImagePath, newImageHash) {
 }
 
 /**
+ * Calcula tempo estimado de entrega usando prazos do sistema + tempo de preparo do produto
+ * Versão síncrona que usa cache de prazos
+ */
+function calculateProductDeliveryTime(productPreparationTime = 0) {
+  // Usar cache de prazos se disponível
+  if (!estimatedTimesCache) {
+    // Fallback se não carregou os tempos
+    const systemPrep = 20; // Fallback padrão
+    const prep = productPreparationTime > 0 ? productPreparationTime : systemPrep;
+    const total = 5 + prep + 5 + 15; // Iniciação + Preparo + Envio + Entrega
+    return {
+      minTime: total,
+      maxTime: total + 15,
+    };
+  }
+
+  // Extrair prazos do cache (com fallbacks)
+  const initiation = estimatedTimesCache.initiation_minutes || 5;
+  const systemPreparation = estimatedTimesCache.preparation_minutes || 20;
+  const dispatch = estimatedTimesCache.dispatch_minutes || 5;
+  const delivery = estimatedTimesCache.delivery_minutes || 15;
+
+  // Usar tempo de preparo do produto se fornecido, senão usar o padrão do sistema
+  const preparation = productPreparationTime > 0 ? productPreparationTime : systemPreparation;
+
+  // Calcular tempo total: Iniciação + Preparo do Produto + Envio + Entrega
+  const totalMinutes = initiation + preparation + dispatch + delivery;
+
+  return {
+    minTime: totalMinutes,
+    maxTime: totalMinutes + 15,
+  };
+}
+
+/**
  * Cria o HTML de um produto (mantendo formatação original)
  */
 function createProductHTML(product) {
@@ -181,11 +221,12 @@ function createProductHTML(product) {
   const price = product.price
     ? `R$ ${parseFloat(product.price).toFixed(2).replace(".", ",")}`
     : "R$ 0,00";
-  const prepTime = product.preparation_time_minutes
-    ? `${product.preparation_time_minutes} - ${
-        product.preparation_time_minutes + 10
-      } min`
-    : "40 - 50 min";
+  
+  // Calcular tempo usando prazos do sistema + tempo de preparo do produto
+  const productPrepTime = product.preparation_time_minutes || 0;
+  const timeEstimate = calculateProductDeliveryTime(productPrepTime);
+  const prepTime = `${timeEstimate.minTime} - ${timeEstimate.maxTime} min`;
+  
   const deliveryFee = "R$ 5,00";
 
   // Sanitizar dados para evitar XSS
@@ -239,10 +280,40 @@ function updateExistingProductImages(products) {
 }
 
 /**
+ * Carrega prazos de entrega estimados das configurações públicas
+ */
+async function loadEstimatedTimes() {
+  try {
+    estimatedTimesCache = await getEstimatedDeliveryTimes();
+    
+    // Se não conseguiu carregar, usar valores padrão
+    if (!estimatedTimesCache) {
+      estimatedTimesCache = {
+        initiation_minutes: 5,
+        preparation_minutes: 20,
+        dispatch_minutes: 5,
+        delivery_minutes: 15,
+      };
+    }
+  } catch (error) {
+    // Fallback para valores padrão
+    estimatedTimesCache = {
+      initiation_minutes: 5,
+      preparation_minutes: 20,
+      dispatch_minutes: 5,
+      delivery_minutes: 15,
+    };
+  }
+}
+
+/**
  * Atualiza as seções de produtos na home (versão simplificada)
  */
 async function updateProductSections() {
   try {
+    // Carregar prazos de entrega antes de renderizar produtos
+    await loadEstimatedTimes();
+    
     const [products, categories] = await Promise.all([
       loadProducts(),
       loadCategories(),

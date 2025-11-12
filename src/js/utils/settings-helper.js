@@ -153,6 +153,79 @@ export async function calculateEstimatedTime(status, orderType = 'delivery') {
 }
 
 /**
+ * Calcula o tempo estimado de entrega considerando o tempo de preparo específico do produto
+ * Fórmula: Iniciação + Preparo do Produto + Envio + Entrega
+ * @param {number} productPreparationTime - Tempo de preparo do produto em minutos (0 = usa padrão do sistema)
+ * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
+ * @returns {Promise<Object>} Objeto com minTime e maxTime em minutos
+ */
+export async function calculateEstimatedDeliveryTimeWithProduct(productPreparationTime = 0, orderType = 'delivery') {
+    const times = await getEstimatedDeliveryTimes();
+    
+    // Extrair prazos do sistema (com fallbacks)
+    const initiation = times.initiation_minutes || 5;
+    const systemPreparation = times.preparation_minutes || 20; // Fallback se produto não tiver tempo
+    const dispatch = times.dispatch_minutes || 5;
+    const delivery = orderType === 'delivery' ? (times.delivery_minutes || 15) : 0;
+    
+    // Usar tempo de preparo do produto se fornecido, senão usar o padrão do sistema
+    const preparation = productPreparationTime > 0 ? productPreparationTime : systemPreparation;
+    
+    // Calcular tempo total: Iniciação + Preparo do Produto + Envio + Entrega
+    const totalMinutes = initiation + preparation + dispatch + delivery;
+    
+    // Tempo mínimo = soma dos prazos
+    const minTime = totalMinutes;
+    
+    // Tempo máximo = soma dos prazos + 15 minutos (margem de segurança)
+    const maxTime = totalMinutes + 15;
+    
+    return { minTime, maxTime };
+}
+
+/**
+ * Calcula o tempo estimado de entrega considerando o maior tempo de preparo entre múltiplos produtos
+ * Fórmula: Iniciação + Maior Preparo dos Produtos + Envio + Entrega
+ * @param {Array<Object>} products - Array de produtos com preparation_time_minutes
+ * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
+ * @returns {Promise<Object>} Objeto com minTime e maxTime em minutos
+ */
+export async function calculateEstimatedDeliveryTimeWithProducts(products = [], orderType = 'delivery') {
+    const times = await getEstimatedDeliveryTimes();
+    
+    // Extrair prazos do sistema (com fallbacks)
+    const initiation = times.initiation_minutes || 5;
+    const systemPreparation = times.preparation_minutes || 20; // Fallback padrão
+    const dispatch = times.dispatch_minutes || 5;
+    const delivery = orderType === 'delivery' ? (times.delivery_minutes || 15) : 0;
+    
+    // Encontrar o maior tempo de preparo entre os produtos
+    let maxProductPreparation = 0;
+    if (Array.isArray(products) && products.length > 0) {
+        products.forEach(product => {
+            const prepTime = product.preparation_time_minutes || product.preparationTime || 0;
+            if (prepTime > maxProductPreparation) {
+                maxProductPreparation = prepTime;
+            }
+        });
+    }
+    
+    // Usar o maior tempo de preparo dos produtos, ou o padrão do sistema se não houver produtos
+    const preparation = maxProductPreparation > 0 ? maxProductPreparation : systemPreparation;
+    
+    // Calcular tempo total: Iniciação + Maior Preparo + Envio + Entrega
+    const totalMinutes = initiation + preparation + dispatch + delivery;
+    
+    // Tempo mínimo = soma dos prazos
+    const minTime = totalMinutes;
+    
+    // Tempo máximo = soma dos prazos + 15 minutos (margem de segurança)
+    const maxTime = totalMinutes + 15;
+    
+    return { minTime, maxTime };
+}
+
+/**
  * Calcula pontos que o cliente vai ganhar em uma compra
  * @param {number} orderTotal - Total do pedido em reais
  * @returns {Promise<number>} Pontos a serem ganhos

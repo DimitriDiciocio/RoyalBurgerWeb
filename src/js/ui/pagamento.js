@@ -428,6 +428,8 @@ const VALIDATION_LIMITS = {
               observacao: item.notes || "",
               imagem: item.product?.image_url || "tudo.jpeg",
               imageHash: item.product?.image_hash,
+              // Preservar tempo de preparo do produto
+              preparation_time_minutes: item.product?.preparation_time_minutes || 0,
             };
           })
           .filter((item) => item !== null && item.quantidade >= 1); // Remove itens inválidos e garante quantidade válida
@@ -451,8 +453,13 @@ const VALIDATION_LIMITS = {
           state.total =
             Number.isFinite(totalRaw) && totalRaw >= 0 ? totalRaw : 0;
         }
+        
+        // Atualizar tempo estimado após carregar cesta (usa maior tempo de preparo dos produtos)
+        atualizarExibicaoTempo();
       } else {
         state.cesta = [];
+        // Atualizar tempo mesmo com cesta vazia (usa padrão do sistema)
+        atualizarExibicaoTempo();
       }
     } catch (err) {
       // Log apenas em desenvolvimento
@@ -463,6 +470,8 @@ const VALIDATION_LIMITS = {
         console.error("Erro ao carregar cesta:", err.message);
       }
       state.cesta = [];
+      // Atualizar tempo mesmo em caso de erro (usa padrão do sistema)
+      atualizarExibicaoTempo();
     }
   }
 
@@ -801,6 +810,8 @@ const VALIDATION_LIMITS = {
   // Renderizar resumo de valores
   async function renderResumo() {
     calcularTotais();
+    // Atualizar tempo estimado quando o resumo for renderizado (pode ter mudado produtos)
+    atualizarExibicaoTempo();
 
     if (el.subtotal) el.subtotal.textContent = formatBRL(state.subtotal);
     if (el.taxaEntrega)
@@ -895,32 +906,38 @@ const VALIDATION_LIMITS = {
   }
 
   /**
-   * Calcula tempo estimado de entrega baseado nos prazos do sistema
-   * Conforme o guia completo: considera todos os prazos para delivery ou pickup
+   * Calcula tempo estimado de entrega baseado nos prazos do sistema + soma dos tempos de preparo dos produtos
+   * Fórmula: Iniciação + (Soma dos Tempos de Preparo dos Produtos × Quantidade) + Envio + Entrega
    * @param {string} orderType - Tipo do pedido ('delivery' ou 'pickup'). Padrão: 'delivery'
    * @returns {Object} Objeto com minTime e maxTime em minutos
    */
   function calculateEstimatedDeliveryTime(orderType = "delivery") {
+    // Calcular tempo total de preparo somando todos os produtos (considerando quantidade)
+    const totalProductPrepTime = getTotalProductPreparationTime();
+
     if (!estimatedTimesCache) {
       // Fallback se não carregou os tempos
-      const fallbackTotal = orderType === "delivery" ? 45 : 30; // Delivery: 5+20+5+15, Pickup: 5+20+5+0
+      const systemPrep = 20; // Fallback padrão (usado apenas se não houver produtos)
+      const preparation = totalProductPrepTime > 0 ? totalProductPrepTime : systemPrep;
+      const delivery = orderType === "delivery" ? 15 : 0;
+      const total = 5 + preparation + 5 + delivery;
       return {
-        minTime: fallbackTotal,
-        maxTime: fallbackTotal + 15,
+        minTime: total,
+        maxTime: total + 15,
       };
     }
 
-    // Extrair prazos do cache (com fallbacks)
+    // Extrair prazos do sistema (com fallbacks)
     const initiation = estimatedTimesCache.initiation_minutes || 5;
-    const preparation = estimatedTimesCache.preparation_minutes || 20;
+    const systemPreparation = estimatedTimesCache.preparation_minutes || 20;
     const dispatch = estimatedTimesCache.dispatch_minutes || 5;
     const delivery =
       orderType === "delivery" ? estimatedTimesCache.delivery_minutes || 15 : 0;
 
-    // Calcular tempo total conforme fluxo do pedido
-    // Para pedido novo (pending): inclui todos os prazos
-    // Delivery: iniciação + preparo + envio + entrega
-    // Pickup: iniciação + preparo + envio (sem entrega)
+    // Usar a soma dos tempos de preparo dos produtos, ou o padrão do sistema se não houver produtos
+    const preparation = totalProductPrepTime > 0 ? totalProductPrepTime : systemPreparation;
+
+    // Calcular tempo total: Iniciação + (Soma dos Tempos de Preparo) + Envio + Entrega
     const totalMinutes = initiation + preparation + dispatch + delivery;
 
     // Tempo mínimo = soma dos prazos
@@ -930,6 +947,36 @@ const VALIDATION_LIMITS = {
     const maxTime = totalMinutes + 15;
 
     return { minTime, maxTime };
+  }
+
+  /**
+   * Calcula o tempo total de preparo somando todos os tempos de preparo dos produtos
+   * Considera a quantidade de cada produto (tempo × quantidade)
+   * @returns {number} Tempo total de preparo em minutos, ou 0 se não houver produtos
+   */
+  function getTotalProductPreparationTime() {
+    if (!state.cesta || !Array.isArray(state.cesta) || state.cesta.length === 0) {
+      return 0;
+    }
+
+    // ALTERAÇÃO: Validação mais robusta para prevenir cálculos incorretos
+    let totalPrepTime = 0;
+    state.cesta.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      
+      // Validar e converter valores numéricos de forma segura
+      const prepTime = Math.max(0, parseFloat(item.preparation_time_minutes || 0) || 0);
+      const quantity = Math.max(1, parseInt(item.quantidade || 1, 10) || 1);
+      
+      // Validar que não há overflow antes de somar
+      const itemPrepTime = prepTime * quantity;
+      if (isFinite(itemPrepTime) && itemPrepTime >= 0) {
+        totalPrepTime += itemPrepTime;
+      }
+    });
+    
+    // Garantir que o tempo total é um número válido e finito
+    return Math.max(0, isFinite(totalPrepTime) ? totalPrepTime : 0);
   }
 
   /**
