@@ -13,6 +13,7 @@ import { apiRequest } from './api.js';
  * @param {number} options.page - Página
  * @param {number} options.page_size - Itens por página
  * @param {boolean} options.include_inactive - Incluir produtos inativos
+ * @param {boolean} options.filter_unavailable - Filtrar produtos indisponíveis (padrão: false para admin, true para frontend)
  * @returns {Promise<Object>} Lista de produtos com paginação
  */
 export const getProducts = async (options = {}) => {
@@ -23,6 +24,10 @@ export const getProducts = async (options = {}) => {
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
     if (options.include_inactive !== undefined) params.append('include_inactive', options.include_inactive);
+    // NOVO: Adiciona parâmetro filter_unavailable para filtrar produtos sem estoque
+    if (options.filter_unavailable !== undefined) {
+        params.append('filter_unavailable', options.filter_unavailable.toString());
+    }
     
     const queryString = params.toString();
     const url = `/api/products${queryString ? `?${queryString}` : ''}`;
@@ -428,4 +433,141 @@ export const permanentDeleteProduct = async (productId) => {
     return await apiRequest(`/api/products/${productId}/permanent-delete`, {
         method: 'DELETE'
     });
+};
+
+/**
+ * Simula capacidade máxima de um produto com extras
+ * @param {number} productId - ID do produto
+ * @param {Array} extras - Lista de extras [{ingredient_id: number, quantity: number}]
+ * @param {number} quantity - Quantidade desejada (opcional, padrão: 1)
+ * @returns {Promise<Object>} Dados de capacidade
+ * 
+ * Resposta esperada:
+ * {
+ *   "product_id": number,
+ *   "max_quantity": number,
+ *   "capacity": number,
+ *   "availability_status": "available" | "limited" | "unavailable" | "low_stock",
+ *   "is_available": boolean,
+ *   "limiting_ingredient": {
+ *     "name": string,
+ *     "available": number,
+ *     "unit": string,
+ *     "message": string
+ *   } | null,
+ *   "message": string
+ * }
+ */
+export const simulateProductCapacity = async (productId, extras = [], quantity = 1) => {
+    try {
+        // Validação de parâmetros
+        if (!productId || isNaN(productId) || productId <= 0) {
+            throw new Error('ID do produto é obrigatório e deve ser um número positivo');
+        }
+        
+        if (!Array.isArray(extras)) {
+            throw new Error('extras deve ser uma lista');
+        }
+        
+        // Validação de extras
+        const validatedExtras = extras.map(extra => {
+            if (!extra || typeof extra !== 'object') {
+                throw new Error('Cada extra deve ser um objeto');
+            }
+            
+            const ingId = parseInt(extra.ingredient_id, 10);
+            const qty = parseInt(extra.quantity, 10) || 1;
+            
+            if (!ingId || isNaN(ingId) || ingId <= 0) {
+                throw new Error('ingredient_id é obrigatório e deve ser um número positivo');
+            }
+            
+            if (isNaN(qty) || qty <= 0) {
+                throw new Error('quantity deve ser um número positivo');
+            }
+            
+            return {
+                ingredient_id: ingId,
+                quantity: qty
+            };
+        });
+        
+        const response = await apiRequest('/api/products/simular_capacidade', {
+            method: 'POST',
+            body: JSON.stringify({
+                product_id: productId,
+                extras: validatedExtras,
+                quantity: quantity
+            })
+        });
+        
+        return response;
+    } catch (error) {
+        console.error('Erro ao simular capacidade:', error);
+        throw error;
+    }
+};
+
+/**
+ * Obtém capacidade de um produto
+ * @param {number} productId - ID do produto
+ * @param {Array} extras - Lista de extras (opcional) [{ingredient_id: number, quantity: number}]
+ * @returns {Promise<Object>} Dados de capacidade
+ * 
+ * Resposta esperada:
+ * {
+ *   "capacity": number,
+ *   "limiting_ingredient": object | null,
+ *   "ingredients": array,
+ *   "is_available": boolean,
+ *   "message": string
+ * }
+ */
+export const getProductCapacity = async (productId, extras = []) => {
+    try {
+        // Validação de parâmetros
+        if (!productId || isNaN(productId) || productId <= 0) {
+            throw new Error('ID do produto é obrigatório e deve ser um número positivo');
+        }
+        
+        const params = new URLSearchParams();
+        
+        // Se houver extras, adiciona como parâmetro JSON
+        if (extras && Array.isArray(extras) && extras.length > 0) {
+            // Validação de extras
+            const validatedExtras = extras.map(extra => {
+                if (!extra || typeof extra !== 'object') {
+                    throw new Error('Cada extra deve ser um objeto');
+                }
+                
+                const ingId = parseInt(extra.ingredient_id, 10);
+                const qty = parseInt(extra.quantity, 10) || 1;
+                
+                if (!ingId || isNaN(ingId) || ingId <= 0) {
+                    throw new Error('ingredient_id é obrigatório e deve ser um número positivo');
+                }
+                
+                if (isNaN(qty) || qty <= 0) {
+                    throw new Error('quantity deve ser um número positivo');
+                }
+                
+                return {
+                    ingredient_id: ingId,
+                    quantity: qty
+                };
+            });
+            
+            params.append('extras', JSON.stringify(validatedExtras));
+        }
+        
+        const queryString = params.toString();
+        const url = `/api/products/${productId}/capacity${queryString ? `?${queryString}` : ''}`;
+        
+        return await apiRequest(url, {
+            method: 'GET'
+        });
+    } catch (error) {
+        console.error('Erro ao obter capacidade:', error);
+        throw error;
+    }
 };

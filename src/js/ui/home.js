@@ -16,7 +16,9 @@ import {
 import { escapeHTML, escapeAttribute } from "../utils/html-sanitizer.js";
 import { getEstimatedDeliveryTimes } from "../utils/settings-helper.js";
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+// NOVO: TTL reduzido para refletir mudanças de estoque mais rapidamente
+// Cache curto (60 segundos) para garantir que produtos indisponíveis sejam atualizados rapidamente
+const CACHE_TTL = 60 * 1000; // 60 segundos (reduzido de 5 minutos)
 const CACHE_KEYS = {
   products: "products_all",
   categories: "categories_all",
@@ -44,6 +46,7 @@ function clearProductsCache() {
 
 /**
  * Carrega todos os produtos da API
+ * NOVO: Filtra produtos com estoque suficiente (capacidade >= 1)
  */
 async function loadProducts() {
   try {
@@ -55,27 +58,35 @@ async function loadProducts() {
     const response = await getProducts({
       page_size: VALIDATION_LIMITS.MAX_PRODUCTS,
       include_inactive: false,
+      filter_unavailable: true,
     });
 
-    // Filtrar apenas produtos ativos (dupla verificação)
     const allProducts = response?.items || [];
-    const activeProducts = allProducts.filter((product) => {
-      // Verificar se o produto está ativo (is_active deve ser true ou undefined/null)
+    
+    // Filtrar apenas produtos ativos E com capacidade >= 1
+    const availableProducts = allProducts.filter((product) => {
+      // Verificar se o produto está ativo
       const isActive =
         product.is_active !== false &&
         product.is_active !== 0 &&
         product.is_active !== "false";
-      return isActive;
+      
+      // Verificar capacidade (se disponível na resposta)
+      // Backend já filtra com filter_unavailable=true, mas esta é uma verificação de segurança extra
+      // ALTERAÇÃO: Lógica mais explícita - se capacidade não estiver definida, verifica outros indicadores
+      const hasCapacity = (product.capacity !== undefined && product.capacity >= 1) ||
+                         product.is_available === true ||
+                         (product.availability_status !== undefined && 
+                          product.availability_status !== 'unavailable');
+      
+      return isActive && hasCapacity;
     });
 
-    cacheManager.set(CACHE_KEYS.products, activeProducts, CACHE_TTL);
+    cacheManager.set(CACHE_KEYS.products, availableProducts, CACHE_TTL);
 
-    return activeProducts;
+    return availableProducts;
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao carregar produtos:", error.message);
-
-    // Retornar cache anterior se disponível, senão array vazio
+    console.error('[HOME] Erro ao carregar produtos:', error.message);
     const cached = cacheManager.get(CACHE_KEYS.products);
     return cached || [];
   }
@@ -210,6 +221,7 @@ function calculateProductDeliveryTime(productPreparationTime = 0) {
 
 /**
  * Cria o HTML de um produto (mantendo formatação original)
+ * NOVO: Adiciona badges de estoque limitado/baixo
  */
 function createProductHTML(product) {
   // Validar dados do produto
@@ -241,10 +253,28 @@ function createProductHTML(product) {
   );
   const safeId = String(product.id).replace(/[^0-9]/g, "");
 
+  // NOVO: Adicionar badge de estoque limitado/baixo
+  // ALTERAÇÃO: Sanitização de availabilityStatus para prevenir XSS
+  let stockBadge = '';
+  const availabilityStatus = String(product.availability_status || '').toLowerCase();
+  if (availabilityStatus === 'limited') {
+    stockBadge = '<span class="stock-badge limited">Últimas unidades</span>';
+  } else if (availabilityStatus === 'low_stock') {
+    stockBadge = '<span class="stock-badge low">Estoque baixo</span>';
+  }
+
+  // NOVO: Container para imagem e badge (permite posicionamento absoluto do badge)
+  const imageContainer = stockBadge 
+    ? `<div class="product-image-container">
+        <img src="${imageUrl}" alt="${safeName}" id="foto">
+        ${stockBadge}
+      </div>`
+    : `<img src="${imageUrl}" alt="${safeName}" id="foto">`;
+
   return `
         <a href="src/pages/produto.html?id=${safeId}">
             <div id="ficha-produto">
-                <img src="${imageUrl}" alt="${safeName}" id="foto">
+                ${imageContainer}
                 <div class="informa">
                     <div>
                         <p id="nome">${safeName}</p>

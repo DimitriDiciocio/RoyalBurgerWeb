@@ -1031,7 +1031,6 @@ const VALIDATION_LIMITS = {
       // IMPORTANTE: Se produto já tem ingredientes (vindo de getProductById), usar eles
       // pois já têm max_quantity calculado corretamente
       if (produto && produto.ingredients && Array.isArray(produto.ingredients) && produto.ingredients.length > 0) {
-        console.log('[DEBUG] Usando ingredientes de getProductById (max_quantity calculado)');
         // Atualizar ingredientes com os dados da API
         await loadIngredientes(state.productId, produto.ingredients);
       }

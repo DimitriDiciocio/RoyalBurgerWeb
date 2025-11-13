@@ -117,6 +117,15 @@
       height: 310px;
       display: flex;
       flex-direction: column;
+      position: relative; /* NOVO: Permite posicionamento absoluto dos badges */
+
+      /* NOVO: Container para imagem e badge (quando há badge) */
+      & .product-image-container {
+        position: relative;
+        width: 250px;
+        height: 140px;
+        flex-shrink: 0;
+      }
 
       & #foto {
         width: 250px;
@@ -127,6 +136,33 @@
         background-position: bottom center;
         border-radius: 5px 5px 0px 0px;
         flex-shrink: 0;
+        display: block;
+      }
+
+      /* NOVO: Badge de estoque limitado/baixo - posicionado sobre a imagem */
+      & .stock-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        z-index: 10;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+        pointer-events: none; /* Permite clicar no produto mesmo com o badge */
+      }
+
+      & .stock-badge.limited {
+        background-color: #ffc107;
+        color: #000;
+      }
+
+      & .stock-badge.low {
+        background-color: #ff9800;
+        color: #fff;
       }
 
       & .informa {
@@ -234,6 +270,15 @@
         width: 560px;
         height: 170px;
         box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.15);
+        position: relative; /* NOVO: Permite posicionamento absoluto dos badges */
+
+        /* NOVO: Container para imagem e badge (quando há badge) - layout vertical */
+        & .product-image-container {
+          position: relative;
+          width: 170px;
+          height: 170px;
+          flex-shrink: 0;
+        }
 
         & #foto {
           width: 170px;
@@ -244,6 +289,33 @@
           background-position: bottom center;
           border-radius: 5px 0px 0px 5px;
           flex-shrink: 0;
+          display: block;
+        }
+
+        /* NOVO: Badge de estoque limitado/baixo para layout vertical - posicionado sobre a imagem */
+        & .stock-badge {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          display: inline-block;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          z-index: 10;
+          box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+          pointer-events: none; /* Permite clicar no produto mesmo com o badge */
+        }
+
+        & .stock-badge.limited {
+          background-color: #ffc107;
+          color: #000;
+        }
+
+        & .stock-badge.low {
+          background-color: #ff9800;
+          color: #fff;
         }
 
         & .informa {
@@ -382,10 +454,44 @@
         width: 250px;
         height: 280px;
 
+        /* NOVO: Container para imagem e badge no layout responsivo */
+        & .product-image-container {
+          position: relative;
+          width: 250px;
+          height: 140px;
+          flex-shrink: 0;
+        }
+
         & #foto {
           width: 250px;
           height: 140px;
           border-radius: 5px 5px 0px 0px;
+        }
+
+        /* NOVO: Badge de estoque no layout responsivo */
+        & .stock-badge {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          display: inline-block;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          z-index: 10;
+          box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+          pointer-events: none;
+        }
+
+        & .stock-badge.limited {
+          background-color: #ffc107;
+          color: #000;
+        }
+
+        & .stock-badge.low {
+          background-color: #ff9800;
+          color: #fff;
         }
 
         & .informa {
@@ -451,10 +557,27 @@
           width: 42vw;
           min-width: 100%;
 
+          /* NOVO: Container para imagem e badge no layout 1280px */
+          & .product-image-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            flex-shrink: 0;
+          }
+
           & #foto {
             border-radius: 5px 0px 0px 5px;
             width: 150px;
             height: 150px;
+          }
+
+          /* NOVO: Badge de estoque no layout 1280px */
+          & .stock-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.65rem;
           }
 
           & .informa {
@@ -568,10 +691,27 @@
         width: 202px;
         height: 250px;
 
+        /* NOVO: Container para imagem e badge no layout 1024px horizontal */
+        & .product-image-container {
+          position: relative;
+          width: 202px;
+          height: 126px;
+          flex-shrink: 0;
+        }
+
         & #foto {
           width: 202px;
           height: 126px;
           border-radius: 5px;
+        }
+
+        /* NOVO: Badge de estoque no layout 1024px horizontal */
+        & .stock-badge {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          padding: 0.2rem 0.4rem;
+          font-size: 0.65rem;
         }
 
         & .informa {
@@ -637,10 +777,27 @@
           width: 42vw;
           min-width: 100%;
 
+          /* NOVO: Container para imagem e badge no layout 1024px */
+          & .product-image-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            flex-shrink: 0;
+          }
+
           & #foto {
             border-radius: 5px 0px 0px 5px;
             width: 120px;
             height: 120px;
+          }
+
+          /* NOVO: Badge de estoque no layout 1024px */
+          & .stock-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.6rem;
           }
 
           & .informa {
@@ -754,10 +911,27 @@
       gap: 25px;
 
       & #ficha-produto {
+        /* NOVO: Container para imagem e badge no layout 768px horizontal */
+        & .product-image-container {
+          position: relative;
+          width: 202px;
+          height: 126px;
+          flex-shrink: 0;
+        }
+
         & #foto {
           width: 202px;
           height: 126px;
           border-radius: 5px;
+        }
+
+        /* NOVO: Badge de estoque no layout 768px horizontal */
+        & .stock-badge {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          padding: 0.2rem 0.4rem;
+          font-size: 0.65rem;
         }
 
         & .informa {
@@ -820,10 +994,27 @@
           width: 80vw;
           min-width: 100%;
 
+          /* NOVO: Container para imagem e badge no layout 768px vertical */
+          & .product-image-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            flex-shrink: 0;
+          }
+
           & #foto {
             border-radius: 5px 0px 0px 5px;
             width: 120px;
             height: 120px;
+          }
+
+          /* NOVO: Badge de estoque no layout 768px vertical */
+          & .stock-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.6rem;
           }
 
           & .informa {
@@ -939,10 +1130,27 @@
         width: 152px;
         height: 200px;
 
+        /* NOVO: Container para imagem e badge no layout 480px horizontal */
+        & .product-image-container {
+          position: relative;
+          width: 152px;
+          height: 95px;
+          flex-shrink: 0;
+        }
+
         & #foto {
           width: 152px;
           height: 95px;
           border-radius: 5px;
+        }
+
+        /* NOVO: Badge de estoque no layout 480px horizontal - menor para telas pequenas */
+        & .stock-badge {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          padding: 0.15rem 0.3rem;
+          font-size: 0.6rem;
         }
 
         & .informa {
@@ -1013,10 +1221,27 @@
           width: 100vw;
           min-width: 100%;
 
+          /* NOVO: Container para imagem e badge no layout 320px */
+          & .product-image-container {
+            position: relative;
+            width: 90px;
+            height: 90px;
+            flex-shrink: 0;
+          }
+
           & #foto {
             border-radius: 0px;
             width: 90px;
             height: 90px;
+          }
+
+          /* NOVO: Badge de estoque no layout 320px - menor para telas pequenas */
+          & .stock-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            padding: 0.15rem 0.3rem;
+            font-size: 0.55rem;
           }
 
           & .informa {

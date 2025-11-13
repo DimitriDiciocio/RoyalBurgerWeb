@@ -20,13 +20,6 @@ import {
   STATE_EVENTS,
 } from "../utils/state-manager.js";
 
-// Debug helper
-const CART_UI_DEBUG = true;
-function cartLog(...args) {
-  if (CART_UI_DEBUG) {
-    try { console.debug("[CESTA]", ...args); } catch (_) {}
-  }
-}
 
 // Constantes para validação e limites
 const VALIDATION_LIMITS = {
@@ -152,22 +145,13 @@ function buildImageUrl(imagePath, imageHash = null) {
 // Carregar cesta da API
 async function carregarCesta() {
   try {
-    cartLog("carregarCesta:start");
     const result = await getCart();
-    cartLog("carregarCesta:getCart result", {
-      success: result?.success,
-      hasData: !!result?.data,
-      dataKeys: result?.data ? Object.keys(result.data) : [],
-      isAuthenticated: result?.isAuthenticated,
-    });
     if (result.success) {
       // Converter dados da API para formato local
       const apiItems = result.data.cart?.items || result.data.items || [];
-      cartLog("carregarCesta:apiItems length", apiItems?.length || 0);
 
       // Validar formato básico vindo da API (lista)
       if (!Array.isArray(apiItems)) {
-        cartLog("carregarCesta:apiItems formato inválido", apiItems);
         throw new Error("Formato de dados do carrinho inválido");
       }
 
@@ -246,10 +230,8 @@ async function carregarCesta() {
           timestamp: Date.now(),
         };
       });
-      cartLog("carregarCesta:mapped items", state.itens.length);
       // Validar dados mapeados para UI
       if (!isValidCartData(state.itens)) {
-        cartLog("carregarCesta:itens mapeados inválidos", state.itens);
         throw new Error("Dados do carrinho inválidos (mapeados)");
       }
     } else {
@@ -264,7 +246,6 @@ async function carregarCesta() {
   }
 
   calcularTotais();
-  cartLog("carregarCesta:totals", { subtotal: state.subtotal, total: state.total });
   stateManager.getEventBus().emit(STATE_EVENTS.CART_UPDATED, {
     items: state.itens,
     total: state.total,
@@ -509,11 +490,9 @@ function renderCesta() {
   if (!el.listaItens) return;
 
   calcularTotais();
-  cartLog("renderCesta", { items: state.itens.length, subtotal: state.subtotal, total: state.total });
 
   // Verificar se está vazia
   if (state.itens.length === 0) {
-    cartLog("renderCesta:empty");
     if (el.cestaVazia) el.cestaVazia.style.display = "flex";
     if (el.itemsContainer) el.itemsContainer.style.display = "none";
     if (el.resumoContainer) el.resumoContainer.style.display = "none";
@@ -534,7 +513,6 @@ function renderCesta() {
   }
 
   // Mostrar conteúdo
-  cartLog("renderCesta:show");
   if (el.cestaVazia) el.cestaVazia.style.display = "none";
   if (el.itemsContainer) el.itemsContainer.style.display = "block";
   if (el.resumoContainer) el.resumoContainer.style.display = "block";
@@ -887,7 +865,6 @@ function attachGlobalHandlers() {
   // Clique no ícone da cesta no header abre a modal
   if (el.headerCesta) {
     el.headerCesta.addEventListener("click", () => {
-      cartLog("header click: abrir modal cesta");
       carregarCesta();
       renderCesta();
       if (window.abrirModal) {
@@ -899,7 +876,6 @@ function attachGlobalHandlers() {
   // Clique no botão flutuante da cesta
   if (el.btnCestaFlutuante) {
     el.btnCestaFlutuante.addEventListener("click", () => {
-      cartLog("btn flutuante: abrir modal cesta");
       carregarCesta();
       renderCesta();
       if (window.abrirModal) {
@@ -934,15 +910,7 @@ window.atualizarCesta = async function () {
 };
 
 async function bootstrapCesta() {
-  cartLog("bootstrap:start");
   initElements();
-  try {
-    const stored = localStorage.getItem("royal_burger_cart");
-    cartLog("localStorage:royal_burger_cart", stored ? JSON.parse(stored) : null);
-  } catch (_) {
-    cartLog("localStorage:royal_burger_cart parse error");
-  }
-  cartLog("localStorage:royal_abrir_modal_cesta", localStorage.getItem("royal_abrir_modal_cesta"));
   await carregarCesta();
 
   // Verificar se há backup da cesta para restaurar após login
@@ -965,7 +933,6 @@ async function bootstrapCesta() {
 
     // Abrir modal após um pequeno delay para garantir que tudo está carregado
     setTimeout(() => {
-      cartLog("abrir modal via flag");
       if (window.abrirModal && el.modal) {
         window.abrirModal("modal-cesta");
       }
@@ -973,7 +940,6 @@ async function bootstrapCesta() {
   } else if (backupRestaurado) {
     // Se restaurou backup, abrir modal da cesta automaticamente
     setTimeout(() => {
-      cartLog("abrir modal via backupRestaurado");
       if (window.abrirModal && el.modal) {
         window.abrirModal("modal-cesta");
       }

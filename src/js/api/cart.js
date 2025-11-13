@@ -136,10 +136,6 @@ function getCartIdFromStorage() {
         
         return cartIdStr;
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao parsear dados do carrinho:', error.message);
-        }
         return null;
     }
 }
@@ -174,15 +170,13 @@ function saveCartToStorage(cartId, items = []) {
         };
         
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(dataToSave));
-        // Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.debug('[CART] saveCartToStorage', { cartId: cartIdStr, itemsCount: items.length });
-        }
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao salvar carrinho no localStorage:', error.message);
+        // ALTERAÇÃO: Log apenas erros críticos de armazenamento (quota excedida)
+        // Erros de parsing normal são silenciados, mas problemas de armazenamento devem ser registrados
+        if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            console.warn('[CART] LocalStorage quota excedida:', error.message);
         }
+        // Outros erros (JSON inválido, etc) são silenciados intencionalmente
     }
 }
 
@@ -219,10 +213,6 @@ async function validateGuestCartId(cartId) {
     if (cached) {
         const now = Date.now();
         if (now - cached.timestamp < GUEST_CART_VALIDATION_CACHE_TTL) {
-            // REVISÃO: Log apenas em desenvolvimento
-            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                console.debug('[CART] Usando cache de validação de guest_cart_id');
-            }
             return cached.isValid;
         }
         // Cache expirado, remover
@@ -256,10 +246,6 @@ async function validateGuestCartId(cartId) {
             
             // Se inválido, limpar cart_id do localStorage
             if (!isValid && (response.status === 404 || response.status === 400)) {
-                // REVISÃO: Log apenas em desenvolvimento
-                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                    console.debug('[CART] guest_cart_id inválido, limpando localStorage');
-                }
                 clearCartFromStorage();
             }
             
@@ -267,28 +253,13 @@ async function validateGuestCartId(cartId) {
         } catch (fetchError) {
             clearTimeout(timeoutId);
             
-            // REVISÃO: Timeout - retornar false para forçar nova validação na próxima tentativa
-            // Ao invés de assumir válido (que pode mascarar problemas)
             if (fetchError.name === 'AbortError') {
-                // REVISÃO: Log apenas em desenvolvimento
-                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                    console.warn('[CART] Timeout ao validar guest_cart_id');
-                }
-                return false; // REVISÃO: Retornar false para forçar nova validação
+                return false;
             }
             
-            // Outros erros: assumir inválido
-            // REVISÃO: Log apenas em desenvolvimento
-            if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                console.error('[CART] Erro ao validar guest_cart_id:', fetchError.message);
-            }
             return false;
         }
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro inesperado ao validar guest_cart_id:', error.message);
-        }
         return false;
     }
 }
@@ -419,25 +390,6 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             payload.guest_cart_id = cartId;
         }
 
-        // REVISÃO: Log apenas em desenvolvimento para não expor dados em produção
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            if (normalizedExtras.length > 0 || normalizedBaseMods.length > 0) {
-                console.debug('[CART] Adicionando item ao carrinho com conversão de unidades');
-            }
-        }
-
-        // REVISÃO: Log de debug em desenvolvimento para identificar problemas de endpoint
-        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-        if (isDev) {
-            console.debug('[CART] Tentando adicionar item ao carrinho:', {
-                endpoint: '/api/cart/items',
-                method: 'POST',
-                isAuth,
-                hasGuestCartId: !!payload.guest_cart_id,
-                productId: payload.product_id
-            });
-        }
-
         const data = await apiRequest('/api/cart/items', {
             method: 'POST',
             body: payload,
@@ -518,12 +470,6 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
                     retryPayload.base_modifications = retryNormalizedBaseMods;
                 }
                 
-                // REVISÃO: Log apenas em desenvolvimento
-                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-                if (isDev) {
-                    console.debug('[CART] Carrinho inválido detectado, tentando criar novo carrinho');
-                }
-                
                 const retryData = await apiRequest('/api/cart/items', {
                     method: 'POST',
                     body: retryPayload,
@@ -545,35 +491,30 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
                 };
             } catch (retryError) {
                 // Se a segunda tentativa também falhar, retornar erro original
-                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                    console.error('[CART] Erro ao tentar criar novo carrinho:', retryError.message);
-                }
             }
         }
         
-        // REVISÃO: Log detalhado em desenvolvimento para debug de 404
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao adicionar ao carrinho:', {
-                message: errorMessage,
-                status: error.status,
-                endpoint: '/api/cart/items',
-                method: 'POST',
-                isAuth,
-                payload: error.status === 404 ? {
-                    product_id: payload.product_id,
-                    quantity: payload.quantity,
-                    hasExtras: !!(payload.extras && payload.extras.length > 0),
-                    hasGuestCartId: !!payload.guest_cart_id
-                } : undefined
-            });
-            
-            // REVISÃO: Mensagem específica para erro 404
-            if (error.status === 404) {
-                console.error('[CART] ⚠️ Endpoint /api/cart/items não encontrado (404). Verifique:');
-                console.error('  1. A API Flask está rodando?');
-                console.error('  2. O endpoint está registrado no blueprint?');
-                console.error('  3. A URL base está correta?', API_BASE_URL);
-            }
+        // NOVO: Detectar erros de estoque e formatar mensagem
+        // O backend retorna INSUFFICIENT_STOCK com mensagem detalhada
+        // Status pode ser 400, 422 ou 500 dependendo do endpoint
+        const isStockError = error.status === 400 || 
+                             error.status === 422 ||
+                             (error.status === 500 && (
+                                 errorMessage.includes('Estoque insuficiente') ||
+                                 errorMessage.includes('insuficiente') ||
+                                 errorMessage.includes('INSUFFICIENT_STOCK') ||
+                                 errorMessage.toLowerCase().includes('estoque')
+                             ));
+        
+        if (isStockError) {
+            // Mensagem já vem formatada do backend com detalhes
+            // Ex: "Ingrediente 'Queijo Mussarela' insuficiente. Necessário: 0.150 kg, Disponível: 0.100 kg"
+            return {
+                success: false,
+                error: errorMessage,
+                errorType: 'INSUFFICIENT_STOCK',
+                errorCode: 'INSUFFICIENT_STOCK'
+            };
         }
         
         // Mensagens de erro de estoque do backend já incluem informações detalhadas
@@ -595,21 +536,10 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
 export async function getCart() {
     try {
         const isAuth = isAuthenticated();
-        const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-        if (isDev) {
-            console.debug('[CART] getCart:start', { isAuth });
-        }
         
         if (isAuth) {
             // Busca carrinho do usuário logado
             const data = await apiRequest('/api/cart/me', { method: 'GET' });
-            if (isDev) {
-                console.debug('[CART] getCart:me response', {
-                    hasCart: !!data?.cart,
-                    itemsLen: data?.cart?.items?.length ?? data?.items?.length ?? 0,
-                    keys: data ? Object.keys(data) : []
-                });
-            }
             return {
                 success: true,
                 data: data,
@@ -618,9 +548,6 @@ export async function getCart() {
         } else {
             // Busca carrinho de convidado
             const cartId = getCartIdFromStorage();
-            if (isDev) {
-                console.debug('[CART] getCart:guest cartId', cartId);
-            }
             
             // Se é um ID de fallback antigo, limpar e retornar carrinho vazio
             if (cartId && typeof cartId === 'string' && cartId.startsWith('fallback_')) {
@@ -638,20 +565,13 @@ export async function getCart() {
                         method: 'GET',
                         skipAuth: true
                     });
-                    if (isDev) {
-                        console.debug('[CART] getCart:guest response', {
-                            hasCart: !!data?.cart,
-                            itemsLen: data?.cart?.items?.length ?? data?.items?.length ?? 0,
-                            keys: data ? Object.keys(data) : []
-                        });
-                    }
                     return {
                         success: true,
                         data: data,
                         isAuthenticated: false
                     };
                 } catch (error) {
-                    // REVISÃO: Se cart não existe (404), limpar localStorage e retornar vazio
+                    // Se cart não existe (404), limpar localStorage e retornar vazio
                     if (error.status === 404 || error.status === 400) {
                         clearCartFromStorage();
                         return {
@@ -672,10 +592,6 @@ export async function getCart() {
             isAuthenticated: isAuth
         };
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao buscar carrinho:', error.message);
-        }
         return {
             success: false,
             error: error.message
@@ -776,13 +692,6 @@ export async function updateCartItem(itemId, updates) {
             payload.guest_cart_id = cartId;
         }
 
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            if (payload.quantity !== undefined || (payload.extras && payload.extras.length > 0) || (payload.base_modifications && payload.base_modifications.length > 0)) {
-                console.debug('[CART] Atualizando item do carrinho');
-            }
-        }
-
         const data = await apiRequest(`/api/cart/items/${itemId}`, {
             method: 'PUT',
             body: payload,
@@ -815,13 +724,23 @@ export async function updateCartItem(itemId, updates) {
             }
         }
         
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao atualizar item:', {
-                itemId,
-                message: errorMessage,
-                status: error.status
-            });
+        // NOVO: Detectar erros de estoque
+        const isStockError = error.status === 400 || 
+                             error.status === 422 ||
+                             (error.status === 500 && (
+                                 errorMessage.includes('Estoque insuficiente') ||
+                                 errorMessage.includes('insuficiente') ||
+                                 errorMessage.includes('INSUFFICIENT_STOCK') ||
+                                 errorMessage.toLowerCase().includes('estoque')
+                             ));
+        
+        if (isStockError) {
+            return {
+                success: false,
+                error: errorMessage,
+                errorType: 'INSUFFICIENT_STOCK',
+                errorCode: 'INSUFFICIENT_STOCK'
+            };
         }
         
         return {
@@ -881,10 +800,6 @@ export async function removeCartItem(itemId) {
             data: data
         };
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao remover item:', error.message);
-        }
         return {
             success: false,
             error: error.message
@@ -919,10 +834,6 @@ export async function claimGuestCart() {
             message: data.message
         };
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao reivindicar carrinho:', error.message);
-        }
         return {
             success: false,
             error: error.message
@@ -969,10 +880,6 @@ export async function syncCart() {
             message: data.message
         };
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao sincronizar carrinho:', error.message);
-        }
         return {
             success: false,
             error: error.message
@@ -1007,24 +914,16 @@ export async function clearCart() {
                     const cartData = await getCart();
                     const items = cartData?.data?.items || cartData?.data?.cart?.items || [];
                     
-                    // REVISÃO: Remover itens em paralelo ao invés de sequencial
                     if (items.length > 0) {
                         const removePromises = items.map(item => 
-                            removeCartItem(item.id).catch(err => {
-                                // REVISÃO: Log erro individual mas continua com outros
-                                if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                                    console.warn('[CART] Erro ao remover item individual:', err.message);
-                                }
-                                return { success: false, error: err.message };
+                            removeCartItem(item.id).catch(() => {
+                                return { success: false };
                             })
                         );
                         await Promise.all(removePromises);
                     }
                 } catch (error) {
-                    // REVISÃO: Se falhar ao buscar carrinho, apenas limpar localStorage
-                    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-                        console.warn('[CART] Erro ao buscar carrinho para limpeza:', error.message);
-                    }
+                    // Se falhar ao buscar carrinho, apenas limpar localStorage
                 }
             }
             
@@ -1037,10 +936,6 @@ export async function clearCart() {
             };
         }
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao limpar carrinho:', error.message);
-        }
         return {
             success: false,
             error: error.message
@@ -1069,10 +964,7 @@ function clearOldFallbackData() {
             localStorage.removeItem('royal_cesta_backup');
         }
     } catch (error) {
-        // REVISÃO: Log apenas em desenvolvimento
-        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-            console.error('[CART] Erro ao limpar dados antigos:', error.message);
-        }
+        // Erro ao limpar dados antigos é silencioso
     }
 }
 
