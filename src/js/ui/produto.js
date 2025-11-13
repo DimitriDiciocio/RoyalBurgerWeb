@@ -4,6 +4,7 @@ import {
   getProductById,
   getProductIngredients,
   getProductImageUrl,
+  simulateProductCapacity,
 } from "../api/products.js";
 import { getIngredients } from "../api/ingredients.js";
 import { addToCart, updateCartItem, getCart } from "../api/cart.js";
@@ -315,6 +316,194 @@ const VALIDATION_LIMITS = {
     }
   }
 
+  // =====================================================
+  // 🔄 Integração de Validação de Estoque (Etapa 2)
+  // =====================================================
+
+  /**
+   * Atualiza a capacidade do produto ao alterar extras ou quantidade
+   * Consulta a API e atualiza os limites dinamicamente
+   */
+  /**
+   * Atualiza a capacidade do produto baseada no estoque
+   * @param {boolean} showMessage - Se true, exibe mensagem de limite quando houver restrição (padrão: false)
+   * @returns {Promise<Object|null>} Dados da capacidade ou null em caso de erro
+   */
+  // TODO: REVISAR - Considerar implementar debounce para evitar muitas requisições simultâneas em interações rápidas
+  async function updateProductCapacity(showMessage = false) {
+    if (!state.productId) return null;
+
+    try {
+      // Preparar extras para a API (apenas extras adicionais, não modificações de base)
+      const extras = Array.from(state.extrasById.values())
+        .filter((extra) => (extra?.basePortions ?? 0) === 0)
+        .filter((extra) => Number.isFinite(extra.quantity) && extra.quantity > 0)
+        .map((extra) => {
+          // ALTERAÇÃO: Validação mais robusta de parseInt
+          const ingId = parseInt(extra.id || extra.ingredient_id, 10);
+          const qty = parseInt(extra.quantity, 10);
+          // ALTERAÇÃO: Validar se parseInt retornou NaN
+          if (isNaN(ingId) || ingId <= 0 || ingId > 2147483647) {
+            console.warn(`Ingredient ID inválido ignorado: ${extra.id || extra.ingredient_id}`);
+            return null;
+          }
+          if (isNaN(qty) || qty <= 0 || qty > 999) {
+            console.warn(`Quantity inválida ignorada: ${extra.quantity}`);
+            return null;
+          }
+          return {
+            ingredient_id: ingId,
+            quantity: qty,
+          };
+        })
+        .filter((extra) => extra !== null); // ALTERAÇÃO: Remove entradas inválidas
+
+      // CORREÇÃO: Preparar modificações da receita base (base_modifications)
+      // O backend agora suporta base_modifications com deltas positivos e negativos
+      // - Delta positivo (+2 queijo): adiciona à receita base
+      // - Delta negativo (-1 queijo): remove da receita base (reduz consumo)
+      const baseModifications = Array.from(state.extrasById.values())
+        .filter((extra) => (extra?.basePortions ?? 0) > 0)
+        .filter((extra) => Number.isFinite(extra.quantity) && extra.quantity !== 0)
+        .map((extra) => {
+          // ALTERAÇÃO: Validação mais robusta de parseInt
+          const ingId = parseInt(extra.id || extra.ingredient_id, 10);
+          const delta = parseInt(extra.quantity, 10); // Pode ser positivo ou negativo
+          // ALTERAÇÃO: Validar se parseInt retornou NaN
+          if (isNaN(ingId) || ingId <= 0 || ingId > 2147483647) {
+            console.warn(`Ingredient ID inválido ignorado em base_modification: ${extra.id || extra.ingredient_id}`);
+            return null;
+          }
+          if (isNaN(delta) || delta === 0 || Math.abs(delta) > 999) {
+            console.warn(`Delta inválido ignorado: ${extra.quantity}`);
+            return null;
+          }
+          return {
+            ingredient_id: ingId,
+            delta: delta,
+          };
+        })
+        .filter((bm) => bm !== null); // ALTERAÇÃO: Remove entradas inválidas
+
+      // Enviar extras e base_modifications separadamente para o backend
+      // O backend agora trata base_modifications corretamente (deltas negativos reduzem consumo)
+      const capacityData = await simulateProductCapacity(
+        state.productId,
+        extras,
+        state.quantity,
+        baseModifications
+      );
+
+      const maxQuantity = capacityData?.max_quantity ?? 99;
+
+      // Atualizar limites na UI
+      updateQuantityLimits(maxQuantity, capacityData);
+
+      // CORREÇÃO: Exibir mensagem apenas quando realmente estiver impedindo uma adição
+      // - showMessage = true: indica que houve interação do usuário
+      // - state.quantity >= maxQuantity: quantidade atual está no limite (impede futuras adições)
+      // - maxQuantity < 99: há um limite real de estoque (não é apenas regra de negócio)
+      // Isso evita exibir mensagem em todas as interações, apenas quando realmente bloqueia algo
+      if (showMessage && capacityData?.limiting_ingredient && maxQuantity < 99 && state.quantity >= maxQuantity) {
+        showStockLimitMessage(capacityData.limiting_ingredient, maxQuantity);
+      }
+
+      return capacityData;
+    } catch (error) {
+      console.error("Erro ao atualizar capacidade:", error);
+      // Em caso de erro, não bloquear a interface
+      return null;
+    }
+  }
+
+  /**
+   * Atualiza os limites de quantidade na interface
+   * @param {number} maxQuantity - Quantidade máxima permitida
+   * @param {Object} capacityData - Dados completos da capacidade
+   */
+  function updateQuantityLimits(maxQuantity, capacityData) {
+    // CORREÇÃO: Habilitar/desabilitar botão de aumentar quantidade em vez de apenas adicionar classes
+    if (el.qtdMais) {
+      if (state.quantity >= maxQuantity) {
+        el.qtdMais.disabled = true;
+        el.qtdMais.classList.add("disabled");
+        el.qtdMais.style.pointerEvents = "none";
+        el.qtdMais.style.opacity = "0.5";
+        el.qtdMais.setAttribute("title", "Limite de estoque atingido");
+      } else {
+        el.qtdMais.disabled = false;
+        el.qtdMais.classList.remove("disabled");
+        el.qtdMais.style.pointerEvents = "auto";
+        el.qtdMais.style.opacity = "1";
+        el.qtdMais.removeAttribute("title");
+      }
+    }
+
+    // Atualizar input de quantidade com max
+    if (el.qtdTexto) {
+      el.qtdTexto.setAttribute("max", maxQuantity);
+    }
+
+    // Exibir aviso se quantidade atual excede o limite
+    if (state.quantity > maxQuantity) {
+      state.quantity = maxQuantity;
+      if (el.qtdTexto) {
+        el.qtdTexto.textContent = String(maxQuantity).padStart(2, "0");
+      }
+      updateTotals();
+      showToast("Quantidade ajustada para o máximo disponível", {
+        type: "warning",
+        autoClose: 3000,
+        noButtons: true
+      });
+    }
+  }
+
+  /**
+   * Exibe mensagem de limite de estoque usando o sistema de alertas
+   * Separa informações do produto das informações do insumo
+   * @param {Object} limitingIngredient - Dados do ingrediente limitante
+   * @param {number} maxQuantity - Quantidade máxima do produto
+   */
+  function showStockLimitMessage(limitingIngredient, maxQuantity) {
+    if (!limitingIngredient) return;
+    
+    const ingredientName = limitingIngredient.name || "Ingrediente desconhecido";
+    const availableStock = limitingIngredient.available ?? limitingIngredient.available_stock ?? 0;
+    const stockUnit = limitingIngredient.unit || limitingIngredient.stock_unit || "un";
+    
+    // Formatar mensagem separando informações do produto e do insumo
+    let productInfo = "";
+    if (maxQuantity === 1) {
+      productInfo = `Limite de ${maxQuantity} unidade do produto`;
+    } else if (maxQuantity > 1) {
+      productInfo = `Limite de ${maxQuantity} unidades do produto`;
+    } else {
+      productInfo = "Produto indisponível";
+    }
+    
+    // Informações do insumo formatadas separadamente
+    const ingredientInfo = `Insumo limitante: ${ingredientName}\nEstoque disponível: ${availableStock.toFixed(2)} ${stockUnit}`;
+    
+    // Mensagem formatada com informações claramente separadas
+    const message = `${productInfo}\n\n${ingredientInfo}`;
+    
+    // Usar o sistema de alertas do projeto
+    showToast(message, {
+      type: "warning",
+      title: "Limite de Estoque Atingido",
+      autoClose: 6000,
+      noButtons: true
+    });
+  }
+
+  /**
+   * Oculta mensagem de limite de estoque (não necessário com sistema de alertas)
+   */
+  function hideStockLimitMessage() {
+    // Não é necessário fazer nada, pois o sistema de alertas gerencia o fechamento automaticamente
+  }
+
   function attachQuantityHandlers() {
     if (el.qtdMenos) {
       el.qtdMenos.addEventListener("click", async () => {
@@ -322,6 +511,8 @@ const VALIDATION_LIMITS = {
           state.quantity -= 1;
           updateTotals();
           toggleQtdMinusState();
+          // Atualizar capacidade silenciosamente (não exibir mensagem ao diminuir)
+          await updateProductCapacity(false);
           // IMPORTANTE: Recarregar produto da API quando quantity muda para atualizar max_quantity
           if (state.productId) {
             try {
@@ -342,9 +533,23 @@ const VALIDATION_LIMITS = {
     }
     if (el.qtdMais) {
       el.qtdMais.addEventListener("click", async () => {
+        // Verificar se pode aumentar antes de incrementar
+        const currentCapacity = await updateProductCapacity(false);
+        const currentMax = currentCapacity?.max_quantity ?? 99;
+        
+        if (state.quantity >= currentMax) {
+          // Limite atingido - exibir mensagem
+          if (currentCapacity?.limiting_ingredient) {
+            showStockLimitMessage(currentCapacity.limiting_ingredient, currentMax);
+          }
+          return;
+        }
+        
         state.quantity += 1;
         updateTotals();
         toggleQtdMinusState();
+        // Atualizar capacidade e exibir mensagem apenas se estiver no limite após o aumento
+        await updateProductCapacity(true);
         // IMPORTANTE: Recarregar produto da API quando quantity muda para atualizar max_quantity
         if (state.productId) {
           try {
@@ -368,9 +573,15 @@ const VALIDATION_LIMITS = {
   function toggleQtdMinusState() {
     if (!el.qtdMenos) return;
     if (state.quantity <= 1) {
-      el.qtdMenos.classList.add("dessativo");
+      el.qtdMenos.disabled = true;
+      el.qtdMenos.classList.add("dessativo", "disabled");
+      el.qtdMenos.style.pointerEvents = "none";
+      el.qtdMenos.style.opacity = "0.5";
     } else {
-      el.qtdMenos.classList.remove("dessativo");
+      el.qtdMenos.disabled = false;
+      el.qtdMenos.classList.remove("dessativo", "disabled");
+      el.qtdMenos.style.pointerEvents = "auto";
+      el.qtdMenos.style.opacity = "1";
     }
   }
 
@@ -448,12 +659,12 @@ const VALIDATION_LIMITS = {
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
               </div>
               <div class="quantidade">
-                ${showMinus ? '<i class="fa-solid fa-minus"></i>' : ""}
+                <i class="fa-solid fa-minus${!showMinus ? ' dessativo disabled' : ''}" ${!showMinus ? 'style="opacity: 0.5; pointer-events: none;"' : ''}></i>
                 <p class="qtd-extra">${String(effectiveQty).padStart(
                   2,
                   "0"
                 )}</p>
-                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite atingido"></i>'}
+                <i class="fa-solid fa-plus${!showPlus ? ' dessativo disabled' : ''}" ${!showPlus ? 'style="opacity: 0.5; pointer-events: none;" title="Limite atingido"' : ''}></i>
               </div>
             </div>`;
       })
@@ -518,12 +729,12 @@ const VALIDATION_LIMITS = {
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
               </div>
               <div class="quantidade">
-                ${showMinus ? '<i class="fa-solid fa-minus"></i>' : ""}
+                <i class="fa-solid fa-minus${!showMinus ? ' dessativo disabled' : ''}" ${!showMinus ? 'style="opacity: 0.5; pointer-events: none;"' : ''}></i>
                 <p class="qtd-extra">${String(effectiveQty).padStart(
                   2,
                   "0"
                 )}</p>
-                ${showPlus ? '<i class="fa-solid fa-plus"></i>' : '<i class="fa-solid fa-plus dessativo" title="Limite atingido"></i>'}
+                <i class="fa-solid fa-plus${!showPlus ? ' dessativo disabled' : ''}" ${!showPlus ? 'style="opacity: 0.5; pointer-events: none;" title="Limite atingido"' : ''}></i>
               </div>
             </div>`;
       })
@@ -544,11 +755,12 @@ const VALIDATION_LIMITS = {
     const containerCleanups = [];
 
     // Helper para processar clique em botão de ingrediente
-    function handleIngredientButtonClick(e, isMinus) {
+    async function handleIngredientButtonClick(e, isMinus) {
       const button = e.target.closest(".fa-minus, .fa-plus");
       if (!button) return;
 
-      if (button.classList.contains("dessativo")) {
+      // Bloquear clique se botão estiver desabilitado
+      if (button.classList.contains("dessativo") || button.classList.contains("disabled")) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -609,12 +821,20 @@ const VALIDATION_LIMITS = {
           renderExtrasModal();
         }
         if (basePortions === 0) updateExtrasBadge();
+        
+        // Atualizar capacidade silenciosamente ao remover ingrediente (não exibir mensagem)
+        await updateProductCapacity(false);
       } else if (!isMinus) {
         // CORREÇÃO: Validar apenas usando max_quantity (já considera estoque e regras)
         const wouldBeEffectiveQty = effectiveQty + 1;
         
-        // Se atingiu o limite, não fazer nada (botão já está desabilitado)
+        // Se atingiu o limite, exibir mensagem e não fazer nada (botão já está desabilitado)
         if (wouldBeEffectiveQty > maxQuantity) {
+          // Buscar dados de capacidade para exibir mensagem de limite
+          const capacityData = await updateProductCapacity(false);
+          if (capacityData?.limiting_ingredient && capacityData.max_quantity < 99) {
+            showStockLimitMessage(capacityData.limiting_ingredient, capacityData.max_quantity);
+          }
           return;
         }
 
@@ -629,6 +849,9 @@ const VALIDATION_LIMITS = {
           renderExtrasModal();
         }
         if (basePortions === 0) updateExtrasBadge();
+        
+        // Atualizar capacidade e exibir mensagem apenas se estiver no limite após adicionar
+        await updateProductCapacity(true);
       }
     }
 
@@ -667,6 +890,9 @@ const VALIDATION_LIMITS = {
       );
       const maxAvailable = ingredient?.max_available ?? null;
       const limitedByStock = ingredient?.limited_by === 'stock' || ingredient?.limited_by === 'both';
+      const currentStock = ingredient?.current_stock ?? ingredient?.available_stock ?? null;
+      const basePortionQuantity = ingredient?.base_portion_quantity ?? parseFloat(itemEl.getAttribute("data-base-portion-qty")) ?? null;
+      const stockUnit = ingredient?.stock_unit ?? itemEl.getAttribute("data-stock-unit") ?? 'un';
 
       // Garantir que o extra existe
       if (!state.extrasById.has(id)) {
@@ -698,13 +924,34 @@ const VALIDATION_LIMITS = {
       // A API já calcula o menor entre a regra e o estoque disponível
       let canIncrement = effectiveQty < maxQuantity;
 
-      // Atualizar estados dos botões
-      if (minus && !(effectiveQty > minQuantity)) {
-        minus.remove();
+      // CORREÇÃO: Habilitar/desabilitar botões em vez de removê-los
+      if (minus) {
+        if (effectiveQty > minQuantity) {
+          minus.disabled = false;
+          minus.classList.remove("disabled", "dessativo");
+          minus.style.pointerEvents = "auto";
+          minus.style.opacity = "1";
+        } else {
+          minus.disabled = true;
+          minus.classList.add("disabled", "dessativo");
+          minus.style.pointerEvents = "none";
+          minus.style.opacity = "0.5";
+        }
       }
-      if (plus && !canIncrement) {
-        plus.classList.add("dessativo");
-        plus.setAttribute("title", "Limite atingido");
+      if (plus) {
+        if (canIncrement) {
+          plus.disabled = false;
+          plus.classList.remove("disabled", "dessativo");
+          plus.style.pointerEvents = "auto";
+          plus.style.opacity = "1";
+          plus.removeAttribute("title");
+        } else {
+          plus.disabled = true;
+          plus.classList.add("disabled", "dessativo");
+          plus.style.pointerEvents = "none";
+          plus.style.opacity = "0.5";
+          plus.setAttribute("title", "Limite atingido");
+        }
       }
     });
   }
@@ -783,6 +1030,44 @@ const VALIDATION_LIMITS = {
         el.btnAdicionarCesta.textContent = state.isEditing
           ? "Atualizando..."
           : "Adicionando...";
+
+        // NOVO: Validar capacidade antes de adicionar ao carrinho
+        const capacityData = await updateProductCapacity();
+
+        if (capacityData && capacityData.max_quantity < state.quantity) {
+          showToast(
+            `Quantidade solicitada (${state.quantity}) excede o disponível (${capacityData.max_quantity}). Ajuste a quantidade ou remova alguns extras.`,
+            {
+              type: "error",
+              title: "Estoque Insuficiente",
+              autoClose: 5000,
+            }
+          );
+          // Reabilitar botão
+          el.btnAdicionarCesta.disabled = false;
+          el.btnAdicionarCesta.textContent = state.isEditing
+            ? "Atualizar na cesta"
+            : "Adicionar à cesta";
+          return;
+        }
+
+        if (capacityData && !capacityData.is_available) {
+          showToast(
+            capacityData.limiting_ingredient?.message ||
+              "Produto temporariamente indisponível. Tente novamente mais tarde.",
+            {
+              type: "error",
+              title: "Produto Indisponível",
+              autoClose: 5000,
+            }
+          );
+          // Reabilitar botão
+          el.btnAdicionarCesta.disabled = false;
+          el.btnAdicionarCesta.textContent = state.isEditing
+            ? "Atualizar na cesta"
+            : "Adicionar à cesta";
+          return;
+        }
 
         // Preparar dados para a API
         const productId = state.product.id;
@@ -906,10 +1191,9 @@ const VALIDATION_LIMITS = {
           title: "Não foi possível adicionar",
           autoClose: 5000,
         });
-        // Em caso de estoque insuficiente, opcionalmente abrir a modal de extras
-        if (err?.message && err.message.includes("Estoque insuficiente")) {
-          openExtrasModal();
-        }
+        // ALTERAÇÃO: Removida abertura automática da modal de extras em caso de estoque insuficiente
+        // A modal de extras é para adicionar ingredientes, não para resolver falta de estoque
+        // O usuário já recebeu uma mensagem de erro explicando o problema
       } finally {
         // Reabilitar botão
         el.btnAdicionarCesta.disabled = false;
@@ -1045,13 +1329,16 @@ const VALIDATION_LIMITS = {
         if (state.cartItemId) {
           await loadItemFromApiByCartId(state.cartItemId);
         } else {
-          loadItemFromCart();
+          await loadItemFromCart();
         }
       } else {
         // Se não está editando, apenas renderizar
         renderMonteSeuJeitoList();
         updateExtrasBadge();
       }
+
+      // NOVO: Atualizar capacidade inicial do produto
+      await updateProductCapacity();
     } catch (err) {
       // TODO: Implementar logging estruturado em produção
       if (window.location.hostname === "localhost") {
@@ -1061,7 +1348,7 @@ const VALIDATION_LIMITS = {
     }
   }
 
-  function loadItemFromCart() {
+  async function loadItemFromCart() {
     try {
       const cestaStr = localStorage.getItem("royal_cesta");
       if (!cestaStr) return;
@@ -1097,6 +1384,9 @@ const VALIDATION_LIMITS = {
         updateTotals();
         renderMonteSeuJeitoList();
         updateExtrasBadge();
+        
+        // NOVO: Atualizar capacidade após carregar item da cesta
+        await updateProductCapacity();
       }
     } catch (err) {
       // TODO: Implementar logging estruturado em produção
@@ -1243,6 +1533,9 @@ const VALIDATION_LIMITS = {
       renderMonteSeuJeitoList();
       renderExtrasModal();
       updateExtrasBadge();
+      
+      // NOVO: Atualizar capacidade após carregar item do carrinho
+      await updateProductCapacity();
     } catch (err) {
       // TODO: Implementar logging estruturado em produção
       console.error("Erro ao carregar item do carrinho:", err);

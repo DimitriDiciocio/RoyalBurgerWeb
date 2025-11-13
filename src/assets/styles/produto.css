@@ -976,6 +976,18 @@
     }
 }
 
+/* =====================================================
+   🔄 Estilos para Validação de Estoque (Etapa 2)
+   ===================================================== */
+
+/* Removido: stock-limit-message - Agora usa o sistema de alertas (alerts.js) */
+
+.area-adicionar .quadro .quantidade .fa-plus.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 @media (max-width: 320px){
     .informa {
         padding: 0px 0vh 0px 0vh;

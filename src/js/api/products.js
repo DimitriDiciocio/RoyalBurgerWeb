@@ -436,10 +436,13 @@ export const permanentDeleteProduct = async (productId) => {
 };
 
 /**
- * Simula capacidade máxima de um produto com extras
+ * Simula capacidade máxima de um produto com extras e modificações da receita base
  * @param {number} productId - ID do produto
  * @param {Array} extras - Lista de extras [{ingredient_id: number, quantity: number}]
  * @param {number} quantity - Quantidade desejada (opcional, padrão: 1)
+ * @param {Array} baseModifications - Modificações da receita base [{ingredient_id: number, delta: number}]
+ *                                   delta positivo = adiciona à receita base
+ *                                   delta negativo = remove da receita base
  * @returns {Promise<Object>} Dados de capacidade
  * 
  * Resposta esperada:
@@ -458,11 +461,30 @@ export const permanentDeleteProduct = async (productId) => {
  *   "message": string
  * }
  */
-export const simulateProductCapacity = async (productId, extras = [], quantity = 1) => {
+export const simulateProductCapacity = async (productId, extras = [], quantity = 1, baseModifications = []) => {
     try {
-        // Validação de parâmetros
+        // ALTERAÇÃO: Validação de parâmetros mais robusta
         if (!productId || isNaN(productId) || productId <= 0) {
             throw new Error('ID do produto é obrigatório e deve ser um número positivo');
+        }
+        // ALTERAÇÃO: Limite máximo para evitar valores absurdos
+        if (productId > 2147483647) {
+            throw new Error('ID do produto excede o limite máximo permitido');
+        }
+        
+        // ALTERAÇÃO: Validação de quantity
+        if (quantity !== undefined && quantity !== null) {
+            const qtyNum = parseInt(quantity, 10);
+            if (isNaN(qtyNum) || qtyNum <= 0) {
+                throw new Error('quantity deve ser um número positivo');
+            }
+            // ALTERAÇÃO: Limite máximo para evitar valores absurdos
+            if (qtyNum > 999) {
+                throw new Error('quantity excede o limite máximo permitido (999)');
+            }
+            quantity = qtyNum;
+        } else {
+            quantity = 1; // Padrão
         }
         
         if (!Array.isArray(extras)) {
@@ -481,9 +503,17 @@ export const simulateProductCapacity = async (productId, extras = [], quantity =
             if (!ingId || isNaN(ingId) || ingId <= 0) {
                 throw new Error('ingredient_id é obrigatório e deve ser um número positivo');
             }
+            // ALTERAÇÃO: Limite máximo para evitar valores absurdos
+            if (ingId > 2147483647) {
+                throw new Error('ingredient_id excede o limite máximo permitido');
+            }
             
             if (isNaN(qty) || qty <= 0) {
                 throw new Error('quantity deve ser um número positivo');
+            }
+            // ALTERAÇÃO: Limite máximo para evitar valores absurdos
+            if (qty > 999) {
+                throw new Error('quantity do extra excede o limite máximo permitido (999)');
             }
             
             return {
@@ -492,13 +522,54 @@ export const simulateProductCapacity = async (productId, extras = [], quantity =
             };
         });
         
+        // Validação de base_modifications (opcional)
+        let validatedBaseModifications = [];
+        if (baseModifications && Array.isArray(baseModifications) && baseModifications.length > 0) {
+            validatedBaseModifications = baseModifications.map(bm => {
+                if (!bm || typeof bm !== 'object') {
+                    throw new Error('Cada base_modification deve ser um objeto');
+                }
+                
+                const ingId = parseInt(bm.ingredient_id, 10);
+                const delta = parseInt(bm.delta, 10);
+                
+                if (!ingId || isNaN(ingId) || ingId <= 0) {
+                    throw new Error('ingredient_id é obrigatório e deve ser um número positivo');
+                }
+                // ALTERAÇÃO: Limite máximo para evitar valores absurdos
+                if (ingId > 2147483647) {
+                    throw new Error('ingredient_id excede o limite máximo permitido');
+                }
+                
+                if (isNaN(delta) || delta === 0) {
+                    throw new Error('delta deve ser um número diferente de zero');
+                }
+                // ALTERAÇÃO: Limite máximo para evitar valores absurdos (positivo ou negativo)
+                if (Math.abs(delta) > 999) {
+                    throw new Error('delta excede o limite máximo permitido (999)');
+                }
+                
+                return {
+                    ingredient_id: ingId,
+                    delta: delta
+                };
+            });
+        }
+        
+        const requestBody = {
+            product_id: productId,
+            extras: validatedExtras,
+            quantity: quantity
+        };
+        
+        // Adiciona base_modifications apenas se houver
+        if (validatedBaseModifications.length > 0) {
+            requestBody.base_modifications = validatedBaseModifications;
+        }
+        
         const response = await apiRequest('/api/products/simular_capacidade', {
             method: 'POST',
-            body: JSON.stringify({
-                product_id: productId,
-                extras: validatedExtras,
-                quantity: quantity
-            })
+            body: JSON.stringify(requestBody)
         });
         
         return response;
