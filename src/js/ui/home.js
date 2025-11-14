@@ -63,7 +63,9 @@ async function loadProducts() {
 
     const allProducts = response?.items || [];
     
-    // Filtrar apenas produtos ativos E com capacidade >= 1
+    // CORREÇÃO: Backend já filtra produtos indisponíveis com filter_unavailable=true
+    // Simplificar: apenas verificar se o produto está ativo
+    // A validação de estoque acontece no momento de adicionar/atualizar na cesta
     const availableProducts = allProducts.filter((product) => {
       // Verificar se o produto está ativo
       const isActive =
@@ -71,15 +73,7 @@ async function loadProducts() {
         product.is_active !== 0 &&
         product.is_active !== "false";
       
-      // Verificar capacidade (se disponível na resposta)
-      // Backend já filtra com filter_unavailable=true, mas esta é uma verificação de segurança extra
-      // ALTERAÇÃO: Lógica mais explícita - se capacidade não estiver definida, verifica outros indicadores
-      const hasCapacity = (product.capacity !== undefined && product.capacity >= 1) ||
-                         product.is_available === true ||
-                         (product.availability_status !== undefined && 
-                          product.availability_status !== 'unavailable');
-      
-      return isActive && hasCapacity;
+      return isActive;
     });
 
     cacheManager.set(CACHE_KEYS.products, availableProducts, CACHE_TTL);

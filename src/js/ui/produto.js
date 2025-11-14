@@ -1271,8 +1271,9 @@ const VALIDATION_LIMITS = {
         const quantity = Math.max(1, parseInt(state.quantity, 10) || 1);
 
         // EXTRAS: ingredientes fora da receita base (basePortions === 0) com quantity > 0
-        // IMPORTANTE: quantity nos extras representa PORÇÕES extras por unidade do produto
-        // O backend multiplica: quantity_extra × BASE_PORTION_QUANTITY × quantity_produto
+        // CORREÇÃO: quantity nos extras deve ser TOTAL (não por unidade do produto)
+        // O frontend armazena quantity como "por unidade", mas o backend espera TOTAL
+        // Então multiplicamos pela quantidade do produto para obter o total
         const extras = Array.from(state.extrasById.values())
           .filter((extra) => (extra?.basePortions ?? 0) === 0)
           .filter(
@@ -1280,11 +1281,14 @@ const VALIDATION_LIMITS = {
           )
           .map((extra) => {
             const id = parseInt(extra.id, 10);
-            const qty = parseInt(extra.quantity, 10);
+            const qtyPorUnidade = parseInt(extra.quantity, 10);
+            // CORREÇÃO: Multiplicar pela quantidade do produto para obter quantidade total
+            // Exemplo: 5 extras por unidade × 5 produtos = 25 extras totais
+            const qtyTotal = qtyPorUnidade * quantity;
             return {
               ingredient_id: Number.isInteger(id) && id > 0 ? id : null,
               quantity:
-                Number.isInteger(qty) && qty > 0 ? Math.min(qty, 999) : null,
+                Number.isInteger(qtyTotal) && qtyTotal > 0 ? Math.min(qtyTotal, 999) : null,
             };
           })
           .filter((e) => e.ingredient_id !== null && e.quantity !== null)
@@ -1705,7 +1709,10 @@ const VALIDATION_LIMITS = {
       // Buscar informações completas dos ingredientes que estão nos extras
       (found.extras || []).forEach((extra) => {
         const id = extra.ingredient_id || extra.id;
-        const qty = parseInt(extra.quantity, 10) || 0;
+        const qtyTotal = parseInt(extra.quantity, 10) || 0;
+        // CORREÇÃO: quantity do extra é TOTAL, converter para quantidade por unidade
+        // O backend retorna quantity como total, mas o frontend armazena como "por unidade"
+        const qtyPorUnidade = itemQuantity > 0 ? qtyTotal / itemQuantity : qtyTotal;
         
         // Buscar informações completas do ingrediente
         const fullIngredient = allIngredients.find(ing => ing.id === id) || {};
@@ -1733,7 +1740,7 @@ const VALIDATION_LIMITS = {
           id,
           name: name,
           price: validatePrice(price),
-          quantity: qty,
+          quantity: qtyPorUnidade, // CORREÇÃO: Armazenar quantidade por unidade
           basePortions: 0,
           minQuantity: 0,
           maxQuantity: maxQuantity,

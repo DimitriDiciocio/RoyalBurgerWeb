@@ -156,17 +156,32 @@ async function carregarCesta() {
       }
 
       state.itens = apiItems.map((item) => {
-        // Calcular preço unitário e total, com fallback se item_subtotal for 0 ou inválido
+        // ALTERAÇÃO: Sempre usar item_subtotal do backend quando disponível
+        // O backend já calcula corretamente considerando quantidade do produto e extras
+        // CORREÇÃO: Não calcular manualmente para evitar multiplicação incorreta
         const itemSubtotal = parseFloat(item.item_subtotal || 0);
         const itemQuantity = parseInt(item.quantity || 1, 10);
 
-        // Se item_subtotal for 0 ou inválido, calcular manualmente
+        // ALTERAÇÃO: Usar item_subtotal do backend sempre que disponível e válido
+        // Se item_subtotal for 0 ou inválido, calcular manualmente apenas como último recurso
         let precoTotalCalculado = itemSubtotal;
-        if (itemSubtotal <= 0) {
+        if (itemSubtotal <= 0 || !isFinite(itemSubtotal)) {
+          // CORREÇÃO: Cálculo manual corrigido - extras já são por unidade do produto
+          // O backend multiplica: (preco_base + extras_por_unidade) * quantidade_produto
           const precoBase = parseFloat(item.product?.price || 0);
+          
+          // CORREÇÃO: extras.quantity já é por unidade do produto, então somar preço * quantidade do extra
           const extrasTotal = (item.extras || []).reduce((sum, extra) => {
-            return sum + (parseFloat(extra.ingredient_price || 0) * parseInt(extra.quantity || 0, 10));
+            const extraPrice = parseFloat(extra.ingredient_price || 0) || 0;
+            const extraQty = parseInt(extra.quantity || 0, 10) || 0;
+            // Validar que são números finitos antes de calcular
+            if (isFinite(extraPrice) && isFinite(extraQty) && extraPrice >= 0 && extraQty >= 0) {
+              const extraTotal = extraPrice * extraQty;
+              return sum + extraTotal;
+            }
+            return sum;
           }, 0);
+          
           // ALTERAÇÃO: Validação mais robusta para prevenir cálculos incorretos
           const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
             if (!mod || typeof mod !== 'object') return sum;
@@ -174,11 +189,15 @@ async function carregarCesta() {
             const delta = parseInt(mod.delta || 0, 10) || 0;
             // Validar que ambos são números finitos antes de calcular
             if (isFinite(price) && isFinite(delta) && price >= 0) {
-              return sum + (price * Math.abs(delta));
+              const modTotal = price * Math.abs(delta);
+              return sum + modTotal;
             }
             return sum;
           }, 0);
-          precoTotalCalculado = (precoBase + extrasTotal + baseModsTotal) * itemQuantity;
+          
+          // CORREÇÃO: Calcular preço unitário primeiro, depois multiplicar pela quantidade
+          const precoUnitario = precoBase + extrasTotal + baseModsTotal;
+          precoTotalCalculado = precoUnitario * itemQuantity;
         }
 
         // ALTERAÇÃO: Validação mais robusta para prevenir dados inválidos
@@ -208,6 +227,22 @@ async function carregarCesta() {
           })
           .filter((bm) => bm !== null); // Remove base_modifications inválidos
 
+        const precoUnitarioCalculado = precoTotalCalculado / itemQuantity;
+        
+        // CORREÇÃO: Mapear extras convertendo quantidade total para quantidade por unidade
+        const extrasMapeados = (item.extras || []).map((extra) => {
+          const quantidadeTotal = parseInt(extra.quantity || 0, 10) || 0;
+          // CORREÇÃO: quantity do extra é TOTAL, calcular quantidade por unidade para exibição
+          const quantidadePorUnidade = itemQuantity > 0 ? quantidadeTotal / itemQuantity : quantidadeTotal;
+          return {
+            id: extra.ingredient_id,
+            nome: extra.ingredient_name,
+            preco: extra.ingredient_price,
+            quantidade: quantidadePorUnidade, // Exibir quantidade por unidade para o usuário
+            quantidadeTotal: quantidadeTotal, // Manter total para referência
+          };
+        });
+
         return {
           id: item.product.id,
           nome: item.product.name,
@@ -216,15 +251,10 @@ async function carregarCesta() {
           imageHash: item.product.image_hash,
           precoBase: item.product.price,
           quantidade: itemQuantity,
-          extras: (item.extras || []).map((extra) => ({
-            id: extra.ingredient_id,
-            nome: extra.ingredient_name,
-            preco: extra.ingredient_price,
-            quantidade: extra.quantity,
-          })),
+          extras: extrasMapeados,
           base_modifications: baseModsMapeados,
           observacao: item.notes || "",
-          precoUnitario: precoTotalCalculado / itemQuantity,
+          precoUnitario: precoUnitarioCalculado,
           precoTotal: precoTotalCalculado,
           cartItemId: item.id, // ID do item no carrinho da API
           timestamp: Date.now(),
@@ -342,7 +372,8 @@ function salvarCesta() {
 // Calcular totais
 function calcularTotais() {
   state.subtotal = state.itens.reduce((sum, item) => {
-    return sum + (item.precoTotal || 0);
+    const itemTotal = item.precoTotal || 0;
+    return sum + itemTotal;
   }, 0);
   
   // Se não há itens, total deve ser 0 (sem taxas)
@@ -370,18 +401,29 @@ function renderItem(item, index) {
   const imageUrl = buildImageUrl(item.imagem, item.imageHash);
 
   // Renderizar lista de extras (ingredientes adicionais fora da receita)
+  // ALTERAÇÃO: Padronizar design com pagamento.js - adicionar label "Extras:" e exibir preço
   let extrasHtml = "";
   if (item.extras && item.extras.length > 0) {
     const extrasItems = item.extras
       .map((extra) => {
+        // ALTERAÇÃO: Buscar e exibir preço do extra
+        const preco = parseFloat(extra.preco || 0) || 0;
+        // CORREÇÃO: quantidade já é por unidade (convertida no mapeamento)
+        const quantidade = extra.quantidade || 0;
+        // Calcular preço total do extra (preço unitário × quantidade por unidade)
+        const precoTotalExtra = preco * quantidade;
+        const precoFormatado = precoTotalExtra > 0
+          ? ` <span class="extra-price">+R$ ${precoTotalExtra.toFixed(2).replace(".", ",")}</span>`
+          : "";
         return `<li><span class="extra-quantity-badge">${
-          extra.quantidade
-        }</span> ${escapeHTML(extra.nome)}</li>`;
+          Math.round(quantidade * 10) / 10 // Arredondar para 1 casa decimal
+        }</span> <span class="extra-name">${escapeHTML(extra.nome)}</span>${precoFormatado}</li>`;
       })
       .join("");
     extrasHtml = `
             <div class="item-extras-separator"></div>
             <div class="item-extras-list">
+                <strong>Extras:</strong>
                 <ul>
                     ${extrasItems}
                 </ul>
@@ -624,16 +666,16 @@ async function alterarQuantidade(index, delta) {
   try {
     const result = await updateCartItem(item.cartItemId, { quantity: novaQtd });
     if (result.success) {
-      item.quantidade = novaQtd;
-      item.precoTotal = item.precoUnitario * item.quantidade;
-
-      calcularTotais();
+      // ALTERAÇÃO: Recarregar cesta da API após atualizar quantidade
+      // Isso garante que preços e totais estão corretos (backend calcula corretamente)
+      // CORREÇÃO: Não calcular manualmente para evitar multiplicação incorreta
+      await carregarCesta();
+      // carregarCesta já chama calcularTotais() e renderCesta()
       stateManager.getEventBus().emit(STATE_EVENTS.CART_ITEM_UPDATED, {
         item: item,
         index: index,
       });
-
-      renderCesta();
+      return;
     } else {
       // Tratamento específico para erro de estoque
       if (result.errorType === 'INSUFFICIENT_STOCK') {
