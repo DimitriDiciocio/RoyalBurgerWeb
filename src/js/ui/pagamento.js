@@ -20,7 +20,8 @@ import {
   updateAddress,
 } from "../api/address.js";
 import { createOrder, calculateOrderTotal } from "../api/orders.js";
-import { getCart } from "../api/cart.js";
+import { getCart, removeCartItem } from "../api/cart.js";
+import { simulateProductCapacity } from "../api/products.js";
 import { showError, showSuccess, showToast, showConfirm } from "./alerts.js";
 import { getIngredients } from "../api/ingredients.js";
 import { API_BASE_URL } from "../api/api.js";
@@ -406,7 +407,8 @@ const VALIDATION_LIMITS = {
             const quantidade = validateQuantity(item.quantity);
 
             return {
-              id: productId,
+              id: productId, // ID do produto
+              cartItemId: item.id || item.cart_item_id || null, // ID do item no carrinho (para remoção)
               nome: item.product?.name || "Produto",
               descricao: item.product?.description || "",
               // CORREÇÃO: Validar que preços são números válidos (evita NaN/Infinity)
@@ -2102,10 +2104,12 @@ const VALIDATION_LIMITS = {
     showError(
       "Método obsoleto. Use criarPedidoAPI() para criar pedidos via API."
     );
-    if (
+    // ALTERAÇÃO: Removido console.warn em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    const isDev =
       typeof process !== "undefined" &&
-      process.env?.NODE_ENV === "development"
-    ) {
+      process.env?.NODE_ENV === "development";
+    if (isDev) {
       console.warn(
         "salvarPedido() está obsoleta. Pedidos devem ser criados via API (criarPedidoAPI)."
       );
@@ -2267,7 +2271,14 @@ const VALIDATION_LIMITS = {
       try {
         state.taxaEntrega = await settingsHelper.getDeliveryFee();
       } catch (error) {
-        console.warn("Usando taxa de entrega padrão:", error.message);
+        // ALTERAÇÃO: Removido console.warn em produção
+        // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+        const isDev =
+          typeof process !== "undefined" &&
+          process.env?.NODE_ENV === "development";
+        if (isDev) {
+          console.warn("Usando taxa de entrega padrão:", error.message);
+        }
       }
     }
 
@@ -2456,6 +2467,93 @@ const VALIDATION_LIMITS = {
     }
   }
 
+  /**
+   * Revalida estoque antes de finalizar pedido
+   * ALTERAÇÃO: Validação preventiva de estoque no frontend antes do checkout
+   * @returns {Promise<Object>} Resultado da validação { valid: boolean, items?: Array }
+   */
+  async function validateStockBeforeCheckout() {
+    try {
+      // Usar state.cesta que já está carregada
+      const items = state.cesta || [];
+      
+      if (items.length === 0) {
+        return { valid: true };
+      }
+      
+      // Validar estoque de cada item
+      const validationPromises = items.map(async (item) => {
+        try {
+          // Preparar extras no formato esperado pela API
+          const extras = (item.extras || []).map(extra => ({
+            ingredient_id: extra.id || extra.ingredient_id,
+            quantity: extra.quantidade || extra.quantity || 1
+          })).filter(extra => extra.ingredient_id && extra.quantity > 0);
+          
+          // Preparar base_modifications no formato esperado pela API
+          const baseModifications = (item.base_modifications || []).map(bm => ({
+            ingredient_id: bm.id || bm.ingredient_id,
+            delta: bm.delta || 0
+          })).filter(bm => bm.ingredient_id && bm.delta !== 0);
+          
+          const capacityData = await simulateProductCapacity(
+            item.id, // product_id
+            extras,
+            item.quantidade, // quantity
+            baseModifications
+          );
+          
+          if (!capacityData.is_available || capacityData.max_quantity < item.quantidade) {
+            return {
+              valid: false,
+              cartItemId: item.cartItemId,
+              product: item.nome || `Produto #${item.id}`,
+              message: capacityData.limiting_ingredient?.message || 
+                      'Estoque insuficiente',
+              maxQuantity: capacityData.max_quantity || 0
+            };
+          }
+          
+          return { valid: true };
+        } catch (error) {
+          // ALTERAÇÃO: Removido console.error em produção
+          // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+          const isDev =
+            typeof process !== "undefined" &&
+            process.env?.NODE_ENV === "development";
+          if (isDev) {
+            console.error('Erro ao validar estoque do item:', error);
+          }
+          // Em caso de erro, permitir (backend validará)
+          return { valid: true };
+        }
+      });
+      
+      const results = await Promise.all(validationPromises);
+      const invalidItems = results.filter(r => !r.valid);
+      
+      if (invalidItems.length > 0) {
+        return {
+          valid: false,
+          items: invalidItems
+        };
+      }
+      
+      return { valid: true };
+    } catch (error) {
+      // ALTERAÇÃO: Removido console.error em produção
+      // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+      const isDev =
+        typeof process !== "undefined" &&
+        process.env?.NODE_ENV === "development";
+      if (isDev) {
+        console.error('Erro ao validar estoque:', error);
+      }
+      // Em caso de erro, permitir (backend validará no checkout)
+      return { valid: true };
+    }
+  }
+
   async function confirmarPedido() {
     try {
       // Usar função centralizada para verificar pickup
@@ -2507,6 +2605,87 @@ const VALIDATION_LIMITS = {
           return;
         }
       }
+
+      // ALTERAÇÃO: Revalidar estoque antes de finalizar pedido
+      // Mostrar loading no botão durante validação
+      if (el.btnConfirmarPedido) {
+        el.btnConfirmarPedido.disabled = true;
+        el.btnConfirmarPedido.textContent = "Validando estoque...";
+      }
+
+      const stockValidation = await validateStockBeforeCheckout();
+      
+      if (!stockValidation.valid) {
+        const messages = stockValidation.items.map(item => 
+          `${item.product}: ${item.message}`
+        ).join('\n');
+        
+        // Reabilitar botão antes de mostrar confirmação
+        reabilitarBotaoConfirmar();
+        
+        const confirmed = await showConfirm({
+          title: 'Estoque Insuficiente',
+          message: `Os seguintes itens não têm estoque suficiente:\n\n${messages}\n\nDeseja remover esses itens e continuar?`,
+          confirmText: 'Remover e Continuar',
+          cancelText: 'Cancelar',
+          type: 'warning'
+        });
+        
+        if (confirmed) {
+          // Remover itens sem estoque do carrinho
+          let removedCount = 0;
+          for (const invalidItem of stockValidation.items) {
+            if (invalidItem.cartItemId) {
+              try {
+                const removeResult = await removeCartItem(invalidItem.cartItemId);
+                if (removeResult.success) {
+                  removedCount++;
+                }
+              } catch (error) {
+                // ALTERAÇÃO: Removido console.error em produção
+                // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+                const isDev =
+                  typeof process !== "undefined" &&
+                  process.env?.NODE_ENV === "development";
+                if (isDev) {
+                  console.error('Erro ao remover item do carrinho:', error);
+                }
+              }
+            }
+          }
+          
+          if (removedCount > 0) {
+            // Recarregar cesta e atualizar interface
+            await carregarCesta();
+            renderItens();
+            calcularTotais();
+            renderResumo();
+            
+            showToast(
+              `${removedCount} ${removedCount === 1 ? 'item foi removido' : 'itens foram removidos'} da sua cesta.`,
+              { type: 'info', autoClose: 3000 }
+            );
+            
+            // Verificar se ainda há itens na cesta
+            if (state.cesta.length === 0) {
+              showError("Sua cesta está vazia após remover itens sem estoque.");
+              return;
+            }
+            
+            // Tentar novamente após remover itens
+            // Usar setTimeout para dar tempo da UI atualizar
+            setTimeout(() => {
+              confirmarPedido();
+            }, 500);
+          } else {
+            showError("Não foi possível remover os itens. Por favor, remova manualmente e tente novamente.");
+          }
+        }
+        return;
+      }
+
+      // Reabilitar botão após validação bem-sucedida
+      reabilitarBotaoConfirmar();
 
       // Verificar se o pedido está completamente pago com pontos
       const isFullyPaidWithPoints =

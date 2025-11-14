@@ -11,7 +11,7 @@ import { addToCart, updateCartItem, getCart } from "../api/cart.js";
 import { showToast } from "./alerts.js";
 import { API_BASE_URL } from "../api/api.js";
 import { cacheManager } from "../utils/cache-manager.js";
-import { delegate } from "../utils/performance-utils.js";
+import { delegate, debounce } from "../utils/performance-utils.js";
 import { $id, $q } from "../utils/dom-cache.js";
 import {
   escapeHTML,
@@ -53,6 +53,7 @@ const VALIDATION_LIMITS = {
     isEditing: false,
     cartItemId: null,
     productMaxQuantity: 99, // Capacidade máxima do produto (atualizada por updateProductCapacity)
+    isUpdatingCapacity: false, // Flag para indicar se está validando capacidade (loading state)
   };
 
   const cleanupDelegates = new Map();
@@ -351,13 +352,41 @@ const VALIDATION_LIMITS = {
    * - Backend calcula: receita (1 pão × 2) + extras (2 porções × 30g × 2 unidades) = 2 pães + 120g bacon
    * 
    * @param {boolean} showMessage - Se true, exibe mensagem de limite quando houver restrição (padrão: false)
+   * @param {boolean} immediate - Se true, executa imediatamente sem debounce (padrão: false)
    * @returns {Promise<Object|null>} Dados da capacidade ou null em caso de erro
    */
-  // TODO: REVISAR - Considerar implementar debounce para evitar muitas requisições simultâneas em interações rápidas
-  async function updateProductCapacity(showMessage = false) {
+  async function updateProductCapacity(showMessage = false, immediate = false) {
     if (!state.productId) return null;
 
+    // ALTERAÇÃO: Se já está atualizando e não é imediato, aguardar debounce
+    if (state.isUpdatingCapacity && !immediate) {
+      return null;
+    }
+
     try {
+      // ALTERAÇÃO: Ativar loading state
+      state.isUpdatingCapacity = true;
+      
+      // ALTERAÇÃO: Mostrar indicador visual de loading (spinner sutil)
+      if (el.qtdMais && !immediate) {
+        // Criar ou atualizar indicador de loading
+        let loadingIndicator = document.querySelector('.capacity-loading-indicator');
+        if (!loadingIndicator) {
+          loadingIndicator = document.createElement('div');
+          loadingIndicator.className = 'capacity-loading-indicator';
+          loadingIndicator.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size: 0.75rem; color: #666;"></i>';
+          loadingIndicator.style.cssText = 'position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); pointer-events: none;';
+          
+          // Inserir próximo ao botão de quantidade
+          const qtdContainer = el.qtdMais?.closest('.quantidade');
+          if (qtdContainer) {
+            qtdContainer.style.position = 'relative';
+            qtdContainer.appendChild(loadingIndicator);
+          }
+        }
+        loadingIndicator.style.display = 'block';
+      }
+      
       // Preparar extras para a API (apenas extras adicionais, não modificações de base)
       const extras = Array.from(state.extrasById.values())
         .filter((extra) => (extra?.basePortions ?? 0) === 0)
@@ -463,8 +492,30 @@ const VALIDATION_LIMITS = {
       }
       // Em caso de erro, não bloquear a interface
       return null;
+    } finally {
+      // ALTERAÇÃO: Desativar loading state
+      state.isUpdatingCapacity = false;
     }
   }
+
+  /**
+   * Versão com debounce de updateProductCapacity para chamadas não críticas
+   * ALTERAÇÃO: Evita muitas requisições simultâneas durante interações rápidas do usuário
+   * Usar para: mudanças de quantidade, adição/remoção de extras
+   * NÃO usar para: validação antes de adicionar ao carrinho (usar updateProductCapacity com immediate=true)
+   * 
+   * NOTA: O debounce é aplicado na chamada da função, não no retorno da Promise.
+   * Isso significa que múltiplas chamadas rápidas resultarão em apenas uma execução após 500ms.
+   */
+  const debouncedUpdateProductCapacity = debounce(
+    (showMessage = false) => {
+      // Chamar sem await para não bloquear, o debounce já controla a execução
+      updateProductCapacity(showMessage, false).catch(() => {
+        // Erros já são tratados dentro de updateProductCapacity
+      });
+    },
+    500 // Aguardar 500ms após última mudança antes de validar
+  );
 
   /**
    * Atualiza os limites de quantidade na interface
@@ -473,6 +524,12 @@ const VALIDATION_LIMITS = {
    */
   function updateQuantityLimits(maxQuantity, capacityData) {
     try {
+      // ALTERAÇÃO: Remover indicador de loading se estiver visível
+      const loadingIndicator = document.querySelector('.capacity-loading-indicator');
+      if (loadingIndicator) {
+        loadingIndicator.remove();
+      }
+
       // CORREÇÃO: Habilitar/desabilitar botão de aumentar quantidade
       // IMPORTANTE: Permitir aumentar quantidade mesmo quando está no limite para permitir alternar
       // A validação final será feita no momento de adicionar/atualizar no carrinho
@@ -574,7 +631,8 @@ const VALIDATION_LIMITS = {
           toggleQtdMinusState();
           
           // Atualizar capacidade silenciosamente (não exibir mensagem ao diminuir)
-          await updateProductCapacity(false);
+          // ALTERAÇÃO: Usar debounce para evitar muitas requisições durante interações rápidas
+          debouncedUpdateProductCapacity(false);
           
           // IMPORTANTE: Recarregar ingredientes da API quando quantity muda para atualizar max_quantity
           // CORREÇÃO: Sempre chamar loadIngredientes diretamente (não usar ingredients do produto)
@@ -605,7 +663,8 @@ const VALIDATION_LIMITS = {
         updateTotals();
         toggleQtdMinusState();
         // Atualizar capacidade e exibir mensagem apenas se estiver no limite após o aumento
-        await updateProductCapacity(true);
+        // ALTERAÇÃO: Usar debounce para evitar muitas requisições durante interações rápidas
+        debouncedUpdateProductCapacity(true);
         // IMPORTANTE: Recarregar ingredientes da API quando quantity muda para atualizar max_quantity
         // CORREÇÃO: Sempre chamar loadIngredientes diretamente (não usar ingredients do produto)
         // loadIngredientes já busca da API com quantity atual e calcula max_quantity corretamente
@@ -949,7 +1008,8 @@ const VALIDATION_LIMITS = {
         if (basePortions === 0) updateExtrasBadge();
         
         // Atualizar capacidade silenciosamente ao remover ingrediente (não exibir mensagem)
-        await updateProductCapacity(false);
+        // ALTERAÇÃO: Usar debounce para evitar muitas requisições durante interações rápidas
+        debouncedUpdateProductCapacity(false);
       } else if (!isMinus) {
         // CORREÇÃO: Validar usando max_quantity atualizado de state.ingredientes
         // (já considera quantity do produto e consumo acumulado)
@@ -1003,7 +1063,8 @@ const VALIDATION_LIMITS = {
         if (basePortions === 0) updateExtrasBadge();
         
         // Atualizar capacidade silenciosamente após adicionar
-        await updateProductCapacity(false);
+        // ALTERAÇÃO: Usar debounce para evitar muitas requisições durante interações rápidas
+        debouncedUpdateProductCapacity(false);
       }
     }
 
@@ -1225,7 +1286,8 @@ const VALIDATION_LIMITS = {
         // CORREÇÃO: Validar capacidade tanto ao adicionar quanto ao editar
         // Ao editar, também precisa validar capacidade pois o usuário pode ter alterado quantidade/extras
         // O backend vai validar a atualização considerando o estoque disponível
-        const capacityData = await updateProductCapacity();
+        // ALTERAÇÃO: Usar immediate=true para validação crítica antes de adicionar ao carrinho
+        const capacityData = await updateProductCapacity(false, true);
 
         if (capacityData && capacityData.max_quantity < state.quantity) {
           showToast(
@@ -1377,7 +1439,8 @@ const VALIDATION_LIMITS = {
               autoClose: 5000,
             });
             // Atualizar capacidade para refletir mudanças
-            await updateProductCapacity();
+            // ALTERAÇÃO: Usar immediate=true para validação crítica após erro de estoque
+            await updateProductCapacity(false, true);
           } else {
             throw new Error(result.error || "Erro ao adicionar item à cesta");
           }
@@ -1591,7 +1654,8 @@ const VALIDATION_LIMITS = {
       // Isso garante que a interface está completamente carregada antes de aplicar limites
       // E evita problemas quando há estoque limitado (ex: max_quantity = 1)
       try {
-        await updateProductCapacity();
+        // ALTERAÇÃO: Usar debounce para atualização não crítica
+        debouncedUpdateProductCapacity(false);
       } catch (err) {
         // ALTERAÇÃO: Removido console.warn em produção
         // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
@@ -1648,7 +1712,8 @@ const VALIDATION_LIMITS = {
         updateExtrasBadge();
         
         // NOVO: Atualizar capacidade após carregar item da cesta
-        await updateProductCapacity();
+        // ALTERAÇÃO: Usar debounce para atualização não crítica
+        debouncedUpdateProductCapacity(false);
       }
     } catch (err) {
       // ALTERAÇÃO: Removido console.error em produção
@@ -1815,7 +1880,8 @@ const VALIDATION_LIMITS = {
       // CORREÇÃO: Atualizar capacidade após carregar item do carrinho
       // Mas não impedir a edição se houver erro ou estoque limitado
       try {
-        await updateProductCapacity();
+        // ALTERAÇÃO: Usar debounce para atualização não crítica
+        debouncedUpdateProductCapacity(false);
       } catch (err) {
         // ALTERAÇÃO: Removido console.warn em produção
         // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
