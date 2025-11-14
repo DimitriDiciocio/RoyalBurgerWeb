@@ -235,13 +235,19 @@ async function carregarCesta() {
         throw new Error("Dados do carrinho inválidos (mapeados)");
       }
     } else {
-      // TODO: Implementar logging estruturado em produção
-      console.error("Erro ao carregar cesta:", result.error);
+      // ALTERAÇÃO: Removido console.error em produção
+      // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar cesta:", result.error);
+      }
       state.itens = [];
     }
   } catch (err) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao carregar cesta:", err.message);
+    // ALTERAÇÃO: Removido console.error em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao carregar cesta:", err.message);
+    }
     state.itens = [];
   }
 
@@ -304,8 +310,11 @@ async function verificarBackupCesta() {
       }
     }
   } catch (err) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao restaurar backup da cesta:", err.message);
+    // ALTERAÇÃO: Removido console.error em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao restaurar backup da cesta:", err.message);
+    }
     // Limpar backup corrompido
     localStorage.removeItem("royal_cesta_backup");
   }
@@ -322,8 +331,11 @@ function salvarCesta() {
 
     localStorage.setItem("royal_cesta", JSON.stringify(state.itens));
   } catch (err) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao salvar cesta:", err.message);
+    // ALTERAÇÃO: Removido console.error em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao salvar cesta:", err.message);
+    }
   }
 }
 
@@ -623,19 +635,38 @@ async function alterarQuantidade(index, delta) {
 
       renderCesta();
     } else {
-      showToast("Erro ao atualizar quantidade. Tente novamente.", {
-        type: "error",
-        title: "Erro",
-        autoClose: 3000,
-      });
+      // Tratamento específico para erro de estoque
+      if (result.errorType === 'INSUFFICIENT_STOCK') {
+        showToast(result.error || 'Estoque insuficiente para a quantidade solicitada', {
+          type: "error",
+          title: "Estoque Insuficiente",
+          autoClose: 5000,
+        });
+        // Recarregar carrinho para atualizar quantidades disponíveis
+        await carregarCesta();
+      } else {
+        // Usar mensagem específica do backend quando disponível
+        const errorMessage = result.error || "Erro ao atualizar quantidade. Tente novamente.";
+        showToast(errorMessage, {
+          type: "error",
+          title: "Erro",
+          autoClose: 5000,
+        });
+      }
     }
   } catch (err) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao alterar quantidade:", err.message);
-    showToast("Erro ao atualizar quantidade. Tente novamente.", {
+    // ALTERAÇÃO: Removido console.error em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao alterar quantidade:", err.message);
+    }
+    
+    // Extrair mensagem de erro específica quando disponível
+    const errorMessage = err?.message || err?.error || "Erro ao atualizar quantidade. Tente novamente.";
+    showToast(errorMessage, {
       type: "error",
       title: "Erro",
-      autoClose: 3000,
+      autoClose: 5000,
     });
   }
 }
@@ -666,8 +697,11 @@ async function removerItem(index) {
       });
     }
   } catch (err) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao remover item:", err.message);
+    // ALTERAÇÃO: Removido console.error em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao remover item:", err.message);
+    }
     showToast("Erro ao remover item. Tente novamente.", {
       type: "error",
       title: "Erro",
@@ -712,8 +746,11 @@ async function limparCesta() {
       });
     }
   } catch (err) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao limpar cesta:", err.message);
+    // ALTERAÇÃO: Removido console.error em produção
+    // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao limpar cesta:", err.message);
+    }
     showToast("Erro ao limpar cesta. Tente novamente.", {
       type: "error",
       title: "Erro",
@@ -727,8 +764,23 @@ function editarItem(index) {
   if (index < 0 || index >= state.itens.length) return;
 
   const item = state.itens[index];
-  // Redirecionar para página do produto com índice de edição
-  window.location.href = `src/pages/produto.html?id=${item.id}&editIndex=${index}`;
+  
+  // CORREÇÃO: Usar cartItemId quando disponível (items vindos da API)
+  // Caso contrário, usar editIndex (items do localStorage antigo)
+  // item.id = ID do produto (product.id)
+  // item.cartItemId = ID do item no carrinho (cart item id)
+  const productId = item.id || item.product_id;
+  let url = `src/pages/produto.html?id=${productId}`;
+  
+  // Se tem cartItemId, usar ele (items vindos da API)
+  if (item.cartItemId) {
+    url += `&cartItemId=${item.cartItemId}`;
+  } else {
+    // Fallback para localStorage antigo - usar editIndex
+    url += `&editIndex=${index}`;
+  }
+  
+  window.location.href = url;
 }
 
 function setupEventDelegation() {

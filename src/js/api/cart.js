@@ -494,32 +494,26 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
             }
         }
         
-        // NOVO: Detectar erros de estoque e formatar mensagem
+        // Detectar erros de estoque e formatar mensagem
         // O backend retorna INSUFFICIENT_STOCK com mensagem detalhada
-        // Status pode ser 400, 422 ou 500 dependendo do endpoint
-        const isStockError = error.status === 400 || 
-                             error.status === 422 ||
-                             (error.status === 500 && (
-                                 errorMessage.includes('Estoque insuficiente') ||
-                                 errorMessage.includes('insuficiente') ||
-                                 errorMessage.includes('INSUFFICIENT_STOCK') ||
-                                 errorMessage.toLowerCase().includes('estoque')
-                             ));
-        
-        if (isStockError) {
-            // Mensagem já vem formatada do backend com detalhes
-            // Ex: "Ingrediente 'Queijo Mussarela' insuficiente. Necessário: 0.150 kg, Disponível: 0.100 kg"
-            return {
-                success: false,
-                error: errorMessage,
-                errorType: 'INSUFFICIENT_STOCK',
-                errorCode: 'INSUFFICIENT_STOCK'
-            };
+        if (error.status === 400 || error.status === 422) {
+            // ALTERAÇÃO: Removido console.log em produção
+            // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+            
+            const isStockError = errorMessage.includes('Estoque insuficiente') ||
+                                errorMessage.includes('insuficiente') ||
+                                errorMessage.includes('INSUFFICIENT_STOCK');
+            
+            if (isStockError) {
+                // Mensagem já vem formatada do backend com detalhes
+                // ALTERAÇÃO: Removido console.log em produção
+                return {
+                    success: false,
+                    error: errorMessage,
+                    errorType: 'INSUFFICIENT_STOCK'
+                };
+            }
         }
-        
-        // Mensagens de erro de estoque do backend já incluem informações detalhadas
-        // sobre conversão de unidades (ex: "Necessário: 0.150 kg, Disponível: 2.000 kg")
-        // Apenas logamos para debug, mas retornamos a mensagem original do backend
         
         return {
             success: false,
@@ -724,23 +718,19 @@ export async function updateCartItem(itemId, updates) {
             }
         }
         
-        // NOVO: Detectar erros de estoque
-        const isStockError = error.status === 400 || 
-                             error.status === 422 ||
-                             (error.status === 500 && (
-                                 errorMessage.includes('Estoque insuficiente') ||
-                                 errorMessage.includes('insuficiente') ||
-                                 errorMessage.includes('INSUFFICIENT_STOCK') ||
-                                 errorMessage.toLowerCase().includes('estoque')
-                             ));
-        
-        if (isStockError) {
-            return {
-                success: false,
-                error: errorMessage,
-                errorType: 'INSUFFICIENT_STOCK',
-                errorCode: 'INSUFFICIENT_STOCK'
-            };
+        // Detectar erros de estoque
+        if (error.status === 400 || error.status === 422) {
+            const isStockError = errorMessage.includes('Estoque insuficiente') ||
+                                errorMessage.includes('insuficiente') ||
+                                errorMessage.includes('INSUFFICIENT_STOCK');
+            
+            if (isStockError) {
+                return {
+                    success: false,
+                    error: errorMessage,
+                    errorType: 'INSUFFICIENT_STOCK'
+                };
+            }
         }
         
         return {

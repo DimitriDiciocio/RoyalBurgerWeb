@@ -172,10 +172,17 @@ export const reactivateProduct = async (productId) => {
 /**
  * Obtém ingredientes de um produto
  * @param {number} productId - ID do produto
- * @returns {Promise<Object>} Lista de ingredientes com custo estimado
+ * @param {number} quantity - Quantidade do produto (opcional, padrão: 1) - usado para calcular max_quantity dos ingredientes considerando consumo proporcional
+ * @returns {Promise<Object>} Lista de ingredientes com custo estimado e max_quantity calculado
  */
-export const getProductIngredients = async (productId) => {
-    return await apiRequest(`/api/products/${productId}/ingredients`, {
+export const getProductIngredients = async (productId, quantity = 1) => {
+    const params = new URLSearchParams();
+    if (quantity && quantity > 0) {
+        params.append('quantity', quantity);
+    }
+    const queryString = params.toString();
+    const url = `/api/products/${productId}/ingredients${queryString ? `?${queryString}` : ''}`;
+    return await apiRequest(url, {
         method: 'GET'
     });
 };
@@ -356,7 +363,8 @@ export const updateProductImage = async (productId, imageFile = null, removeImag
         throw new Error('Deve fornecer um arquivo de imagem ou marcar removeImage=true');
         
     } catch (error) {
-        console.error('Erro ao atualizar imagem do produto:', error);
+        // ALTERAÇÃO: Removido console.error em produção
+        // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
         throw error;
     }
 };
@@ -403,7 +411,8 @@ export const updateProductWithImage = async (productId, productData, imageFile =
         });
         
     } catch (error) {
-        console.error('Erro ao atualizar produto com imagem:', error);
+        // ALTERAÇÃO: Removido console.error em produção
+        // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
         throw error;
     }
 };
@@ -574,7 +583,8 @@ export const simulateProductCapacity = async (productId, extras = [], quantity =
         
         return response;
     } catch (error) {
-        console.error('Erro ao simular capacidade:', error);
+        // ALTERAÇÃO: Removido console.error em produção
+        // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
         throw error;
     }
 };
@@ -638,7 +648,8 @@ export const getProductCapacity = async (productId, extras = []) => {
             method: 'GET'
         });
     } catch (error) {
-        console.error('Erro ao obter capacidade:', error);
+        // ALTERAÇÃO: Removido console.error em produção
+        // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
         throw error;
     }
 };
