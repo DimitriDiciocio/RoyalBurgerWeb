@@ -22,6 +22,11 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
 // NOVO: TTL reduzido para refletir mudanças de estoque mais rapidamente
 // Cache curto (60 segundos) para garantir que produtos indisponíveis sejam atualizados rapidamente
 const CACHE_TTL = 60 * 1000; // 60 segundos (reduzido de 5 minutos)
+
+// ALTERAÇÃO: Período em dias para considerar produtos como novidades (padrão: 30 dias)
+// Produtos criados nos últimos N dias serão exibidos na seção de novidades
+const RECENTLY_ADDED_DAYS = 30;
+
 const CACHE_KEYS = {
   products: "products_all",
   categories: "categories_all",
@@ -50,7 +55,8 @@ function clearProductsCache() {
   cacheManager.invalidate(CACHE_KEYS.products);
   cacheManager.invalidate(CACHE_KEYS.categories);
   cacheManager.invalidate(CACHE_KEYS.mostOrdered);
-  cacheManager.invalidate(CACHE_KEYS.recentlyAdded);
+  // ALTERAÇÃO: Invalidar cache de novidades usando chave específica por período
+  cacheManager.invalidate(`${CACHE_KEYS.recentlyAdded}_${RECENTLY_ADDED_DAYS}`);
   cacheManager.invalidate(CACHE_KEYS.promotions);
 }
 
@@ -498,20 +504,30 @@ async function loadMostOrderedProducts() {
 /**
  * Carrega produtos recentemente adicionados (novidades) da API
  * ALTERAÇÃO: Melhor tratamento de erros conforme roteiro
+ * ALTERAÇÃO: Usa validação de tempo baseada em CREATED_AT (produtos criados nos últimos N dias)
  */
 async function loadRecentlyAddedProducts() {
   try {
-    const cached = cacheManager.get(CACHE_KEYS.recentlyAdded);
+    // ALTERAÇÃO: Cache específico por período para evitar produtos expirados do cache
+    // Incluir days no cache key para invalidar quando período mudar
+    const cacheKey = `${CACHE_KEYS.recentlyAdded}_${RECENTLY_ADDED_DAYS}`;
+    const cached = cacheManager.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const response = await apiRequest('/api/products/recently-added?page_size=10', {
-      method: 'GET'
-    });
+    // ALTERAÇÃO: Passa parâmetro days para API filtrar produtos criados no período
+    // API agora retorna apenas produtos criados nos últimos N dias (padrão: 30 dias)
+    const response = await apiRequest(
+      `/api/products/recently-added?page_size=10&days=${RECENTLY_ADDED_DAYS}`,
+      {
+        method: 'GET'
+      }
+    );
 
     const products = response?.items || [];
-    cacheManager.set(CACHE_KEYS.recentlyAdded, products, CACHE_TTL);
+    // ALTERAÇÃO: Usar cache key específico por período
+    cacheManager.set(cacheKey, products, CACHE_TTL);
     return products;
   } catch (error) {
     // ALTERAÇÃO: Logging condicional apenas em modo debug
@@ -519,7 +535,8 @@ async function loadRecentlyAddedProducts() {
       console.error('[HOME] Erro ao carregar novidades:', error);
     }
     // Retornar array vazio para não quebrar a UI
-    const cached = cacheManager.get(CACHE_KEYS.recentlyAdded);
+    const cacheKey = `${CACHE_KEYS.recentlyAdded}_${RECENTLY_ADDED_DAYS}`;
+    const cached = cacheManager.get(cacheKey);
     return cached || [];
   }
 }
