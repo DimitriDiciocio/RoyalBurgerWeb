@@ -1729,17 +1729,27 @@ class UsuarioManager {
         return data;
       }
 
-      // Se está no formato YYYY-MM-DD ou ISO
+      // ALTERAÇÃO: Tratar data como string local para evitar problemas de timezone
+      // Extrai apenas a parte da data (YYYY-MM-DD) ignorando hora/timezone
+      const dateStr = String(data).split('T')[0];
+      const [ano, mes, dia] = dateStr.split('-');
+      
+      // Valida se tem os 3 componentes (ano, mês, dia) no formato YYYY-MM-DD
+      if (ano && mes && dia && ano.length === 4 && mes.length === 2 && dia.length === 2) {
+        return `${dia}/${mes}/${ano}`;
+      }
+
+      // Fallback: tentar com Date se o formato não for YYYY-MM-DD
       const dataObj = new Date(data);
       if (isNaN(dataObj.getTime())) {
         return "Data inválida";
       }
 
-      const dia = String(dataObj.getDate()).padStart(2, "0");
-      const mes = String(dataObj.getMonth() + 1).padStart(2, "0");
-      const ano = dataObj.getFullYear();
+      const diaFormatado = String(dataObj.getDate()).padStart(2, "0");
+      const mesFormatado = String(dataObj.getMonth() + 1).padStart(2, "0");
+      const anoFormatado = dataObj.getFullYear();
 
-      return `${dia}/${mes}/${ano}`;
+      return `${diaFormatado}/${mesFormatado}/${anoFormatado}`;
     } catch (error) {
       console.error("Erro ao formatar data:", error);
       return "Não informado";

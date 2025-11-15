@@ -1,7 +1,8 @@
 import { logout, fetchMe, toggle2FA, confirm2FAEnable, get2FAStatus } from "../api/auth.js";
-import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress, changePassword, changePasswordWithLogout } from "../api/user.js";
+import { deleteMyCustomer, updateMyCustomer, addAddress, listAddresses, updateAddress, deleteAddress, changePassword, changePasswordWithLogout, getNotificationPreferences, updateNotificationPreferences } from "../api/user.js";
 import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage, showToast } from "./alerts.js";
+import { getLoyaltyBalance } from "../api/loyalty.js";
 
 $(document).ready(function () {
     // ====== Guarda de rota: qualquer usuário logado pode acessar esta página ======
@@ -206,17 +207,26 @@ $(document).ready(function () {
     function formatarDataBR(isoDate) {
         if (!isoDate) return '';
         try {
-            // aceita 'YYYY-MM-DD' ou ISO completo
-            const d = new Date(isoDate);
-            if (Number.isNaN(d.getTime())) {
-                const [yyyy, mm, dd] = String(isoDate).split('T')[0].split('-');
-                if (yyyy && mm && dd) return `${dd}/${mm}/${yyyy}`;
-                return '';
+            // ALTERAÇÃO: Tratar data como string local para evitar problemas de timezone
+            // Extrai apenas a parte da data (YYYY-MM-DD) ignorando hora/timezone
+            const dateStr = String(isoDate).split('T')[0];
+            const [yyyy, mm, dd] = dateStr.split('-');
+            
+            // Valida se tem os 3 componentes (ano, mês, dia)
+            if (yyyy && mm && dd && yyyy.length === 4 && mm.length === 2 && dd.length === 2) {
+                return `${dd}/${mm}/${yyyy}`;
             }
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const yyyy = d.getFullYear();
-            return `${dd}/${mm}/${yyyy}`;
+            
+            // Fallback: tentar com Date se o formato não for YYYY-MM-DD
+            const d = new Date(isoDate);
+            if (!Number.isNaN(d.getTime())) {
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}/${month}/${year}`;
+            }
+            
+            return '';
         } catch (_e) { return ''; }
     }
 
@@ -276,6 +286,92 @@ $(document).ready(function () {
         } catch (_e) { }
     }
 
+    // ALTERAÇÃO: Função para calcular dias restantes até expiração dos pontos
+    function calcularDiasRestantes(dataExpiracao) {
+        if (!dataExpiracao) return null;
+        try {
+            const dataExp = new Date(dataExpiracao);
+            if (isNaN(dataExp.getTime())) return null;
+            
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            dataExp.setHours(0, 0, 0, 0);
+            
+            const diffTime = dataExp - hoje;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return diffDays > 0 ? diffDays : 0;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    // ALTERAÇÃO: Função para carregar e exibir pontos no quadro
+    async function carregarPontosRoyal() {
+        try {
+            const userId = await resolveUserId();
+            if (!userId) {
+                // Se não tiver userId, exibir 0 pontos
+                atualizarExibicaoPontos(0, null);
+                return;
+            }
+
+            const balanceData = await getLoyaltyBalance(userId);
+            
+            if (!balanceData || typeof balanceData !== "object") {
+                atualizarExibicaoPontos(0, null);
+                return;
+            }
+
+            const pontos = Number(balanceData?.current_balance) || 0;
+            const dataExpiracao = balanceData?.expiration_date || null;
+            const diasRestantes = calcularDiasRestantes(dataExpiracao);
+
+            atualizarExibicaoPontos(pontos, diasRestantes);
+        } catch (err) {
+            // Em caso de erro, exibir 0 pontos
+            atualizarExibicaoPontos(0, null);
+            // Não exibir erro para o usuário, apenas logar em desenvolvimento
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao carregar pontos:', err);
+            }
+        }
+    }
+
+    // ALTERAÇÃO: Função para atualizar a exibição dos pontos no quadro
+    function atualizarExibicaoPontos(pontos, diasRestantes) {
+        const pontosEl = document.querySelector('.quadro-pontos-royal .pontos p');
+        const diasEl = document.querySelector('.quadro-pontos-royal .txt2 span');
+        
+        // Atualizar valor dos pontos
+        if (pontosEl) {
+            pontosEl.textContent = Math.max(0, Math.floor(pontos));
+        }
+        
+        // Atualizar dias restantes
+        if (diasEl) {
+            if (diasRestantes !== null && diasRestantes > 0) {
+                diasEl.textContent = diasRestantes;
+                // Mostrar a mensagem de expiração
+                const txt2El = document.querySelector('.quadro-pontos-royal .txt2');
+                if (txt2El) {
+                    txt2El.style.display = 'block';
+                }
+            } else {
+                // Se não houver data de expiração ou já expirou, ocultar ou mostrar mensagem alternativa
+                const txt2El = document.querySelector('.quadro-pontos-royal .txt2');
+                if (txt2El) {
+                    if (diasRestantes === 0) {
+                        diasEl.textContent = '0';
+                        txt2El.textContent = 'Seus pontos expiraram. Faça uma compra para renová-los!';
+                    } else {
+                        txt2El.textContent = 'Seus pontos não expiram enquanto você continuar comprando!';
+                    }
+                }
+            }
+        }
+    }
+
     async function carregarPerfil() {
         try {
             const me = await fetchMe();
@@ -283,6 +379,8 @@ $(document).ready(function () {
             currentUserId = (me && (me.id || me.user_id || me.customer_id || me.pk)) || currentUserId;
             renderPerfil(me || {});
             await carregarEnderecos();
+            // ALTERAÇÃO: Carregar pontos do Clube Royal
+            await carregarPontosRoyal();
             // sucesso
             // noop
         } catch (err) {
@@ -556,7 +654,10 @@ $(document).ready(function () {
                     <p class="descricao">${(end.neighborhood || '')}${end.neighborhood && (end.city || end.state) ? ' - ' : ''}${(end.city || '')}${end.city && end.state ? ' - ' : ''}${(end.state || '')}</p>
                 </div>
             </div>
-            <p class="edita" data-action="edit-address">Editar endereço</p>
+            <div style="display: flex; align-items: center; gap: 15px">
+                <p class="edita" data-action="edit-address">Editar endereço</p>
+                <i class="fa-solid fa-trash" data-action="delete-address" style="cursor: pointer; color: var(--color-secondary, #FF0000); font-size: 18px;" title="Excluir endereço"></i>
+            </div>
         `;
         return div;
     }
@@ -583,6 +684,49 @@ $(document).ready(function () {
         }
     }
 
+    // ====== Máscaras de input ======
+    // ALTERAÇÃO: Aplicar máscara de CPF em tempo real
+    function aplicarMascaraCPF(input) {
+        let valor = input.value.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.slice(0, 11);
+        if (valor.length <= 11) {
+            valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+            valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+            valor = valor.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        }
+        input.value = valor;
+    }
+
+    // ALTERAÇÃO: Aplicar máscara de telefone em tempo real
+    function aplicarMascaraTelefone(input) {
+        let valor = input.value.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.slice(0, 11);
+        if (valor.length <= 10) {
+            valor = valor.replace(/(\d{2})(\d)/, '($1)$2');
+            valor = valor.replace(/(\d{4})(\d)/, '$1-$2');
+        } else {
+            valor = valor.replace(/(\d{2})(\d)/, '($1)$2');
+            valor = valor.replace(/(\d{5})(\d)/, '$1-$2');
+        }
+        input.value = valor;
+    }
+
+    // ALTERAÇÃO: Configurar máscaras nos inputs quando a página carregar
+    // Nota: Este código já está dentro de $(document).ready, então não precisa de outro
+    const cpfInput = document.getElementById('cpf');
+    if (cpfInput) {
+        cpfInput.addEventListener('input', function() {
+            aplicarMascaraCPF(this);
+        });
+    }
+
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function() {
+            aplicarMascaraTelefone(this);
+        });
+    }
+
     // ====== Preenchimento dos modais ao abrir ======
     const btnEditPerfil = document.querySelector("#dados-user .quadro-info .tema .edita");
     const btnEditContato = document.querySelectorAll("#dados-user .quadro-info .tema .edita")[1];
@@ -597,7 +741,12 @@ $(document).ready(function () {
             const cpf = currentUser.cpf || '';
             const dob = currentUser.date_of_birth || currentUser.birth_date || '';
             if (nomeInput) nomeInput.value = fullName || '';
-            if (cpfInput) cpfInput.value = String(cpf || '').replace(/\D/g, '');
+            // ALTERAÇÃO: Aplicar formatação ao preencher CPF
+            if (cpfInput) {
+                const cpfLimpo = String(cpf || '').replace(/\D/g, '');
+                cpfInput.value = cpfLimpo;
+                aplicarMascaraCPF(cpfInput);
+            }
             if (nascInput) {
                 const d = currentUser.date_of_birth || '';
                 // manter em formato YYYY-MM-DD se possível
@@ -616,29 +765,220 @@ $(document).ready(function () {
             const telInput = document.getElementById('telefone');
             if (!currentUser) return;
             if (emailInput) emailInput.value = currentUser.email || '';
-            if (telInput) telInput.value = String(currentUser.phone || currentUser.telefone || '');
+            // ALTERAÇÃO: Aplicar formatação ao preencher telefone
+            if (telInput) {
+                const telLimpo = String(currentUser.phone || currentUser.telefone || '').replace(/\D/g, '');
+                telInput.value = telLimpo;
+                aplicarMascaraTelefone(telInput);
+            }
         });
     }
 
     // ====== Salvar edições dos modais ======
+    // ALTERAÇÃO: Função para converter data de YYYY-MM-DD (formato do input date) para DD-MM-YYYY (formato esperado pela API)
+    function converterDataISOparaBR(isoDate) {
+        if (!isoDate) return null;
+        try {
+            // Se já está no formato DD-MM-YYYY, retorna como está
+            if (/^\d{2}-\d{2}-\d{4}$/.test(isoDate)) {
+                return isoDate;
+            }
+            // Converte de YYYY-MM-DD para DD-MM-YYYY
+            const [yyyy, mm, dd] = String(isoDate).split('T')[0].split('-');
+            if (yyyy && mm && dd && yyyy.length === 4 && mm.length === 2 && dd.length === 2) {
+                return `${dd}-${mm}-${yyyy}`;
+            }
+            return null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    // ALTERAÇÃO: Função para validar CPF no frontend
+    function validarCPF(cpf) {
+        const cpfLimpo = String(cpf || '').replace(/\D/g, '');
+        if (cpfLimpo.length === 0) return { valido: true, mensagem: '' }; // CPF é opcional
+        if (cpfLimpo.length !== 11) {
+            return { valido: false, mensagem: 'CPF deve conter 11 dígitos. Verifique se digitou corretamente.' };
+        }
+        // Validação básica de CPF (todos os dígitos iguais)
+        if (/^(\d)\1{10}$/.test(cpfLimpo)) {
+            return { valido: false, mensagem: 'CPF inválido. Não é permitido usar números repetidos (ex: 111.111.111-11).' };
+        }
+        return { valido: true, mensagem: '' };
+    }
+
+    // ALTERAÇÃO: Função para validar nome completo
+    function validarNomeCompleto(nome) {
+        if (!nome || nome.trim().length === 0) {
+            return { valido: false, mensagem: 'O nome completo é obrigatório. Por favor, preencha este campo.' };
+        }
+        if (nome.trim().length < 3) {
+            return { valido: false, mensagem: 'O nome completo deve ter pelo menos 3 caracteres.' };
+        }
+        if (nome.trim().length > 100) {
+            return { valido: false, mensagem: 'O nome completo deve ter no máximo 100 caracteres.' };
+        }
+        // Verifica se tem pelo menos um espaço (nome completo)
+        const partes = nome.trim().split(/\s+/).filter(p => p.length > 0);
+        if (partes.length < 2) {
+            return { valido: false, mensagem: 'Por favor, informe seu nome completo (nome e sobrenome).' };
+        }
+        return { valido: true, mensagem: '' };
+    }
+
+    // ALTERAÇÃO: Função para validar data de nascimento
+    function validarDataNascimento(dataISO) {
+        if (!dataISO || dataISO.trim() === '') {
+            return { valido: false, mensagem: 'A data de nascimento é obrigatória. Por favor, selecione uma data.' };
+        }
+        const data = new Date(dataISO);
+        if (isNaN(data.getTime())) {
+            return { valido: false, mensagem: 'Data de nascimento inválida. Por favor, selecione uma data válida.' };
+        }
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        if (data > hoje) {
+            return { valido: false, mensagem: 'A data de nascimento não pode ser uma data futura.' };
+        }
+        // Verifica se a pessoa tem pelo menos 18 anos
+        const idade = hoje.getFullYear() - data.getFullYear();
+        const mesAniversario = hoje.getMonth() - data.getMonth();
+        const diaAniversario = hoje.getDate() - data.getDate();
+        const idadeReal = mesAniversario < 0 || (mesAniversario === 0 && diaAniversario < 0) ? idade - 1 : idade;
+        if (idadeReal < 18) {
+            return { valido: false, mensagem: 'Você deve ter pelo menos 18 anos para usar este serviço.' };
+        }
+        return { valido: true, mensagem: '' };
+    }
+
     async function salvarPerfilBasico() {
         const userId = await resolveUserId();
         if (!userId) return;
         const nome = document.getElementById('nome')?.value?.trim();
         const cpf = document.getElementById('cpf')?.value;
-        const nasc = document.getElementById('nascimento')?.value; // YYYY-MM-DD
+        const nasc = document.getElementById('nascimento')?.value; // YYYY-MM-DD do input type="date"
         const payload = {};
-        if (nome) payload.full_name = nome;
-        if (cpf !== undefined) payload.cpf = String(cpf || '').replace(/\D/g, '') || null;
-        if (nasc) payload.date_of_birth = nasc;
+        
+        // ALTERAÇÃO: Validações específicas antes de enviar
+        const erros = [];
+        
+        // Validação do nome
+        if (nome && nome.length > 0) {
+            const validacaoNome = validarNomeCompleto(nome);
+            if (!validacaoNome.valido) {
+                erros.push(validacaoNome.mensagem);
+            } else {
+                payload.full_name = nome;
+            }
+        }
+        
+        // Validação do CPF
+        if (cpf !== undefined && cpf !== null && cpf !== '') {
+            const cpfLimpo = String(cpf).replace(/\D/g, '');
+            if (cpfLimpo.length > 0) {
+                const validacaoCPF = validarCPF(cpf);
+                if (!validacaoCPF.valido) {
+                    erros.push(validacaoCPF.mensagem);
+                } else {
+                    payload.cpf = cpfLimpo;
+                }
+            }
+        }
+        
+        // Validação da data de nascimento
+        if (nasc && nasc.trim() !== '') {
+            const validacaoData = validarDataNascimento(nasc);
+            if (!validacaoData.valido) {
+                erros.push(validacaoData.mensagem);
+            } else {
+                const dataConvertida = converterDataISOparaBR(nasc);
+                if (dataConvertida) {
+                    payload.date_of_birth = dataConvertida;
+                } else {
+                    erros.push('Erro ao processar a data de nascimento. Por favor, tente novamente.');
+                }
+            }
+        }
+        
+        // ALTERAÇÃO: Exibir erros de validação se houver
+        if (erros.length > 0) {
+            const mensagemErro = erros.length === 1 
+                ? erros[0] 
+                : 'Por favor, corrija os seguintes erros:\n\n• ' + erros.join('\n• ');
+            showToast && showToast(mensagemErro, { type: 'error', title: 'Erro de Validação' });
+            return;
+        }
+        
+        // ALTERAÇÃO: Valida se há pelo menos um campo para atualizar
+        if (Object.keys(payload).length === 0) {
+            showToast && showToast('Por favor, preencha pelo menos um campo para atualizar seus dados.', { 
+                type: 'error', 
+                title: 'Nenhum Campo Preenchido' 
+            });
+            return;
+        }
+        
         try {
             const resp = await updateMyCustomer(userId, payload);
-            toastFromApiSuccess && toastFromApiSuccess(resp, 'Dados atualizados.');
+            toastFromApiSuccess && toastFromApiSuccess(resp, 'Dados atualizados com sucesso!');
             fecharModal && fecharModal('editar-info-user');
             await carregarPerfil();
         } catch (err) {
-            toastFromApiError && toastFromApiError(err, 'Falha ao atualizar seus dados.');
+            // ALTERAÇÃO: Tratamento específico de erros da API
+            tratarErroAtualizacaoPerfil(err);
         }
+    }
+
+    // ALTERAÇÃO: Função para tratar erros específicos da atualização de perfil
+    function tratarErroAtualizacaoPerfil(err) {
+        const mensagemErro = err?.payload?.error || err?.message || '';
+        const mensagemLower = mensagemErro.toLowerCase();
+        
+        // Erros específicos do backend
+        if (mensagemLower.includes('cpf') && mensagemLower.includes('inválido')) {
+            showToast && showToast('O CPF informado é inválido. Verifique se digitou corretamente (11 dígitos).', { 
+                type: 'error', 
+                title: 'CPF Inválido' 
+            });
+        } else if (mensagemLower.includes('data') && (mensagemLower.includes('inválida') || mensagemLower.includes('formato'))) {
+            showToast && showToast('A data de nascimento informada é inválida. Por favor, selecione uma data válida.', { 
+                type: 'error', 
+                title: 'Data Inválida' 
+            });
+        } else if (mensagemLower.includes('nome') || mensagemLower.includes('full_name')) {
+            showToast && showToast('O nome informado é inválido. Por favor, verifique se preencheu corretamente.', { 
+                type: 'error', 
+                title: 'Nome Inválido' 
+            });
+        } else if (mensagemLower.includes('nenhum campo válido') || mensagemLower.includes('no_valid_fields')) {
+            showToast && showToast('Nenhum campo válido foi preenchido. Por favor, preencha pelo menos um campo para atualizar.', { 
+                type: 'error', 
+                title: 'Nenhum Campo Válido' 
+            });
+        } else {
+            // Usar o tratamento padrão de erro da API
+            toastFromApiError && toastFromApiError(err, 'Não foi possível atualizar seus dados. Verifique as informações e tente novamente.');
+        }
+    }
+
+    // ALTERAÇÃO: Função para validar telefone
+    function validarTelefone(telefone) {
+        if (!telefone || telefone.trim() === '') {
+            return { valido: false, mensagem: 'O telefone é obrigatório. Por favor, preencha este campo.' };
+        }
+        const telLimpo = String(telefone).replace(/\D/g, '');
+        if (telLimpo.length < 10) {
+            return { valido: false, mensagem: 'O telefone deve conter pelo menos 10 dígitos (DDD + número).' };
+        }
+        if (telLimpo.length > 11) {
+            return { valido: false, mensagem: 'O telefone deve conter no máximo 11 dígitos (DDD + número com 9º dígito).' };
+        }
+        // Validação básica: não pode ser todos zeros
+        if (/^0+$/.test(telLimpo)) {
+            return { valido: false, mensagem: 'O telefone informado é inválido. Verifique se digitou corretamente.' };
+        }
+        return { valido: true, mensagem: '' };
     }
 
     async function salvarContato() {
@@ -647,15 +987,79 @@ $(document).ready(function () {
         const email = document.getElementById('email')?.value?.trim();
         const tel = document.getElementById('telefone')?.value;
         const payload = {};
-        if (email) payload.email = email;
-        if (tel !== undefined) payload.phone = String(tel || '').replace(/\D/g, '') || null;
+        
+        // ALTERAÇÃO: Email não pode ser alterado diretamente (requer verificação)
+        // A API retorna erro se tentar alterar email sem ser admin
+        // Por enquanto, não enviamos email no payload para evitar erro
+        // TODO: REVISAR implementar fluxo de verificação de email se necessário
+        
+        // ALTERAÇÃO: Validação do telefone
+        const erros = [];
+        if (tel !== undefined && tel !== null && tel !== '') {
+            const validacaoTel = validarTelefone(tel);
+            if (!validacaoTel.valido) {
+                erros.push(validacaoTel.mensagem);
+            } else {
+                const telLimpo = String(tel).replace(/\D/g, '');
+                payload.phone = telLimpo;
+            }
+        } else {
+            erros.push('O telefone é obrigatório. Por favor, preencha este campo.');
+        }
+        
+        // ALTERAÇÃO: Exibir erros de validação se houver
+        if (erros.length > 0) {
+            const mensagemErro = erros.length === 1 
+                ? erros[0] 
+                : 'Por favor, corrija os seguintes erros:\n\n• ' + erros.join('\n• ');
+            showToast && showToast(mensagemErro, { type: 'error', title: 'Erro de Validação' });
+            return;
+        }
+        
+        // ALTERAÇÃO: Valida se há pelo menos um campo para atualizar
+        if (Object.keys(payload).length === 0) {
+            showToast && showToast('Por favor, preencha o telefone para atualizar seus dados de contato.', { 
+                type: 'error', 
+                title: 'Campo Obrigatório' 
+            });
+            return;
+        }
+        
         try {
             const resp = await updateMyCustomer(userId, payload);
-            toastFromApiSuccess && toastFromApiSuccess(resp, 'Contato atualizado.');
+            toastFromApiSuccess && toastFromApiSuccess(resp, 'Contato atualizado com sucesso!');
             fecharModal && fecharModal('editar-info-contato');
             await carregarPerfil();
         } catch (err) {
-            toastFromApiError && toastFromApiError(err, 'Falha ao atualizar contato.');
+            // ALTERAÇÃO: Tratamento específico de erros da API
+            tratarErroAtualizacaoContato(err);
+        }
+    }
+
+    // ALTERAÇÃO: Função para tratar erros específicos da atualização de contato
+    function tratarErroAtualizacaoContato(err) {
+        const mensagemErro = err?.payload?.error || err?.message || '';
+        const mensagemLower = mensagemErro.toLowerCase();
+        
+        // Erros específicos do backend
+        if (mensagemLower.includes('telefone') && mensagemLower.includes('inválido')) {
+            showToast && showToast('O telefone informado é inválido. Verifique se digitou corretamente (DDD + número).', { 
+                type: 'error', 
+                title: 'Telefone Inválido' 
+            });
+        } else if (mensagemLower.includes('phone') && mensagemLower.includes('invalid')) {
+            showToast && showToast('O formato do telefone está incorreto. Use o formato (DDD) Número, por exemplo: (11) 98765-4321.', { 
+                type: 'error', 
+                title: 'Formato de Telefone Inválido' 
+            });
+        } else if (mensagemLower.includes('email') && (mensagemLower.includes('verificação') || mensagemLower.includes('verification'))) {
+            showToast && showToast('Para alterar o e-mail, é necessário verificar o novo endereço. Esta funcionalidade estará disponível em breve.', { 
+                type: 'error', 
+                title: 'Alteração de E-mail' 
+            });
+        } else {
+            // Usar o tratamento padrão de erro da API
+            toastFromApiError && toastFromApiError(err, 'Não foi possível atualizar seus dados de contato. Verifique as informações e tente novamente.');
         }
     }
 
@@ -703,6 +1107,42 @@ $(document).ready(function () {
     const controlesAdd = configurarCheckboxesEnderecoPorModal('adicionar-endereco') || {};
     const controlesEdit = configurarCheckboxesEnderecoPorModal('editar-endereco') || {};
 
+    // ALTERAÇÃO: Função para normalizar e comparar endereços
+    function normalizarEnderecoParaComparacao(endereco) {
+        return {
+            zip_code: String(endereco.zip_code || '').replace(/\D/g, '').toLowerCase().trim(),
+            state: String(endereco.state || '').toLowerCase().trim(),
+            city: String(endereco.city || '').toLowerCase().trim(),
+            street: String(endereco.street || '').toLowerCase().trim(),
+            neighborhood: String(endereco.neighborhood || '').toLowerCase().trim(),
+            number: String(endereco.number || '').toLowerCase().trim(),
+            complement: String(endereco.complement || '').toLowerCase().trim() || null
+        };
+    }
+
+    // ALTERAÇÃO: Função para verificar se um endereço já existe
+    function enderecoJaExiste(novoEndereco, enderecosExistentes) {
+        const novoNormalizado = normalizarEnderecoParaComparacao(novoEndereco);
+        
+        return enderecosExistentes.some(end => {
+            // Ignora endereços inativos
+            if (end.is_active === false) return false;
+            
+            const existenteNormalizado = normalizarEnderecoParaComparacao(end);
+            
+            // Compara todos os campos principais
+            return (
+                novoNormalizado.zip_code === existenteNormalizado.zip_code &&
+                novoNormalizado.state === existenteNormalizado.state &&
+                novoNormalizado.city === existenteNormalizado.city &&
+                novoNormalizado.street === existenteNormalizado.street &&
+                novoNormalizado.neighborhood === existenteNormalizado.neighborhood &&
+                novoNormalizado.number === existenteNormalizado.number &&
+                novoNormalizado.complement === existenteNormalizado.complement
+            );
+        });
+    }
+
     async function salvarEnderecoAdicionar() {
         const userId = await resolveUserId();
         if (!userId) return;
@@ -715,28 +1155,64 @@ $(document).ready(function () {
         const complemento = document.getElementById('complemento-add')?.value;
         const semNumeroMarcado = controlesAdd.checaSemNumero && controlesAdd.checaSemNumero.checked;
         const semComplementoMarcado = controlesAdd.checaSemComplemento && controlesAdd.checaSemComplemento.checked;
+        
+        // ALTERAÇÃO: Normalizar valores antes de criar payload
+        const zipNormalizado = normalizarOpcional(zip && String(zip).replace(/\D/g, ''));
+        const numeroNormalizado = semNumeroMarcado ? 'S/N' : normalizarOpcional(numero);
+        const complementoNormalizado = semComplementoMarcado ? null : normalizarOpcional(complemento);
+        
         const payload = {
-            zip_code: normalizarOpcional(zip && String(zip).replace(/\D/g, '')),
+            zip_code: zipNormalizado,
             state: uf,
             city: cidade,
             street: rua,
             neighborhood: bairro,
-            // Backend exige 'number'. Se marcado sem número, enviar 'S/N'
-            number: semNumeroMarcado ? 'S/N' : normalizarOpcional(numero),
-            complement: semComplementoMarcado ? null : normalizarOpcional(complemento)
+            number: numeroNormalizado,
+            complement: complementoNormalizado
         };
+
+        // ALTERAÇÃO: Verificar se o endereço já existe antes de adicionar
+        try {
+            const enderecosExistentes = await listAddresses(userId);
+            if (enderecoJaExiste(payload, enderecosExistentes || [])) {
+                const enderecoFormatado = `${rua || ''}${numeroNormalizado ? ', ' + numeroNormalizado : ''}${bairro ? ' - ' + bairro : ''}${cidade ? ', ' + cidade : ''}${uf ? ' - ' + uf : ''}`;
+                showToast && showToast(
+                    `Este endereço já está cadastrado: ${enderecoFormatado}. Por favor, verifique os dados ou edite o endereço existente.`,
+                    { type: 'error', title: 'Endereço Duplicado' }
+                );
+                return;
+            }
+        } catch (err) {
+            // Se não conseguir carregar endereços, continua tentando adicionar
+            // O backend também pode validar duplicatas
+            console.warn('Não foi possível verificar endereços existentes:', err);
+        }
+
         try {
             const resp = await addAddress(userId, payload);
-            toastFromApiSuccess && toastFromApiSuccess(resp, 'Endereço adicionado.');
+            toastFromApiSuccess && toastFromApiSuccess(resp, 'Endereço adicionado com sucesso!');
             fecharModal && fecharModal('adicionar-endereco');
             await carregarEnderecos();
         } catch (err) {
-            toastFromApiError && toastFromApiError(err, 'Falha ao adicionar endereço.');
+            // ALTERAÇÃO: Tratamento específico para erro de endereço duplicado
+            const mensagemErro = err?.payload?.error || err?.message || '';
+            const mensagemLower = mensagemErro.toLowerCase();
+            
+            if (mensagemLower.includes('duplicado') || mensagemLower.includes('já existe') || mensagemLower.includes('already exists')) {
+                showToast && showToast(
+                    'Este endereço já está cadastrado. Por favor, verifique os dados ou edite o endereço existente.',
+                    { type: 'error', title: 'Endereço Duplicado' }
+                );
+            } else {
+                toastFromApiError && toastFromApiError(err, 'Falha ao adicionar endereço. Verifique os dados e tente novamente.');
+            }
         }
     }
 
     async function salvarEnderecoEditar() {
         if (!editingAddressId) return;
+        const userId = await resolveUserId();
+        if (!userId) return;
         const zip = document.getElementById('cep-edit')?.value;
         const ufv = document.getElementById('estado-edit')?.value;
         const cidadev = document.getElementById('cidade-edit')?.value;
@@ -746,22 +1222,63 @@ $(document).ready(function () {
         const complemento = document.getElementById('complemento-edit')?.value;
         const semNumeroMarcado = controlesEdit.checaSemNumero && controlesEdit.checaSemNumero.checked;
         const semComplementoMarcado = controlesEdit.checaSemComplemento && controlesEdit.checaSemComplemento.checked;
+        
+        // ALTERAÇÃO: Normalizar valores antes de criar payload
+        const zipNormalizado = normalizarOpcional(zip && String(zip).replace(/\D/g, ''));
+        const numeroNormalizado = semNumeroMarcado ? 'S/N' : normalizarOpcional(numero);
+        const complementoNormalizado = semComplementoMarcado ? null : normalizarOpcional(complemento);
+        
         const payload = {
-            zip_code: normalizarOpcional(zip && String(zip).replace(/\D/g, '')),
+            zip_code: zipNormalizado,
             state: ufv,
             city: cidadev,
             street: rua,
             neighborhood: bairro,
-            number: semNumeroMarcado ? 'S/N' : normalizarOpcional(numero),
-            complement: semComplementoMarcado ? null : normalizarOpcional(complemento)
+            number: numeroNormalizado,
+            complement: complementoNormalizado
         };
+
+        // ALTERAÇÃO: Verificar se o endereço editado já existe em outro endereço (exceto o atual)
+        try {
+            const enderecosExistentes = await listAddresses(userId);
+            // Filtra o endereço atual da lista para não comparar com ele mesmo
+            const outrosEnderecos = (enderecosExistentes || []).filter(end => {
+                const endId = end.id || end.address_id;
+                return Number(endId) !== Number(editingAddressId);
+            });
+            
+            if (enderecoJaExiste(payload, outrosEnderecos)) {
+                const enderecoFormatado = `${rua || ''}${numeroNormalizado ? ', ' + numeroNormalizado : ''}${bairro ? ' - ' + bairro : ''}${cidadev ? ', ' + cidadev : ''}${ufv ? ' - ' + ufv : ''}`;
+                showToast && showToast(
+                    `Este endereço já está cadastrado em outro registro: ${enderecoFormatado}. Por favor, verifique os dados.`,
+                    { type: 'error', title: 'Endereço Duplicado' }
+                );
+                return;
+            }
+        } catch (err) {
+            // Se não conseguir carregar endereços, continua tentando atualizar
+            // O backend também pode validar duplicatas
+            console.warn('Não foi possível verificar endereços existentes:', err);
+        }
+
         try {
             const resp = await updateAddress(editingAddressId, payload);
-            toastFromApiSuccess && toastFromApiSuccess(resp, 'Endereço atualizado.');
+            toastFromApiSuccess && toastFromApiSuccess(resp, 'Endereço atualizado com sucesso!');
             fecharModal && fecharModal('editar-endereco');
             await carregarEnderecos();
         } catch (err) {
-            toastFromApiError && toastFromApiError(err, 'Falha ao atualizar endereço.');
+            // ALTERAÇÃO: Tratamento específico para erro de endereço duplicado
+            const mensagemErro = err?.payload?.error || err?.message || '';
+            const mensagemLower = mensagemErro.toLowerCase();
+            
+            if (mensagemLower.includes('duplicado') || mensagemLower.includes('já existe') || mensagemLower.includes('already exists')) {
+                showToast && showToast(
+                    'Este endereço já está cadastrado em outro registro. Por favor, verifique os dados.',
+                    { type: 'error', title: 'Endereço Duplicado' }
+                );
+            } else {
+                toastFromApiError && toastFromApiError(err, 'Falha ao atualizar endereço. Verifique os dados e tente novamente.');
+            }
         }
     }
 
@@ -771,43 +1288,248 @@ $(document).ready(function () {
     const btnConfirmaEdit = document.querySelector('#editar-endereco .footer button');
     if (btnConfirmaEdit) btnConfirmaEdit.addEventListener('click', salvarEnderecoEditar);
 
+    // ALTERAÇÃO: Função para excluir endereço
+    async function excluirEndereco(addressId) {
+        try {
+            const userId = await resolveUserId();
+            if (!userId) {
+                toastFromApiError && toastFromApiError({ message: 'Usuário não identificado.' }, 'Não foi possível identificar o usuário. Faça login novamente.');
+                return;
+            }
+            const resp = await deleteAddress(userId, addressId);
+            toastFromApiSuccess && toastFromApiSuccess(resp, 'Endereço excluído com sucesso!');
+            await carregarEnderecos();
+        } catch (err) {
+            toastFromApiError && toastFromApiError(err, 'Não foi possível excluir o endereço. Tente novamente.');
+        }
+    }
+
     // Abrir modal de editar endereço a partir do card
     document.addEventListener('click', async (e) => {
-        const el = e.target.closest('[data-action="edit-address"]');
-        if (!el) return;
-        const card = el.closest('.quadro-endereco');
-        const addrId = card && (card.dataset.addressId ? Number(card.dataset.addressId) : null);
-        if (!addrId) return;
-        editingAddressId = addrId;
-        try {
-            // Encontrar dados no DOM já carregado
-            const userId = await resolveUserId();
-            const lista = await listAddresses(userId);
-            const a = (lista || []).find(x => Number(x.id || x.address_id) === addrId);
-            if (!a) return abrirModal && abrirModal('editar-endereco');
-            // Preenche os campos
-            const cepEl = document.getElementById('cep-edit');
-            const ufEl = document.getElementById('estado-edit');
-            const cidadeEl = document.getElementById('cidade-edit');
-            const ruaEl = document.getElementById('rua-edit');
-            const bairroEl = document.getElementById('bairro-edit');
-            const numeroEl = document.getElementById('numero-edit');
-            const complEl = document.getElementById('complemento-edit');
-            if (cepEl) cepEl.value = a.zip_code ? String(a.zip_code).replace(/\D/g, '').replace(/(\d{5})(\d{1,3})/, '$1-$2') : '';
-            if (ruaEl) ruaEl.value = a.street || '';
-            if (bairroEl) bairroEl.value = a.neighborhood || '';
-            if (numeroEl) numeroEl.value = a.number || '';
-            if (complEl) complEl.value = a.complement || '';
-            if (ufEl) {
-                ufEl.value = a.state || '';
-                await fetchCitiesByUF(a.state || '', cidadeEl);
-                if (cidadeEl) cidadeEl.value = a.city || '';
+        // ALTERAÇÃO: Tratar clique no botão de editar endereço
+        const elEdit = e.target.closest('[data-action="edit-address"]');
+        if (elEdit) {
+            const card = elEdit.closest('.quadro-endereco');
+            const addrId = card && (card.dataset.addressId ? Number(card.dataset.addressId) : null);
+            if (!addrId) return;
+            editingAddressId = addrId;
+            try {
+                // Encontrar dados no DOM já carregado
+                const userId = await resolveUserId();
+                const lista = await listAddresses(userId);
+                const a = (lista || []).find(x => Number(x.id || x.address_id) === addrId);
+                if (!a) return abrirModal && abrirModal('editar-endereco');
+                // Preenche os campos
+                const cepEl = document.getElementById('cep-edit');
+                const ufEl = document.getElementById('estado-edit');
+                const cidadeEl = document.getElementById('cidade-edit');
+                const ruaEl = document.getElementById('rua-edit');
+                const bairroEl = document.getElementById('bairro-edit');
+                const numeroEl = document.getElementById('numero-edit');
+                const complEl = document.getElementById('complemento-edit');
+                if (cepEl) cepEl.value = a.zip_code ? String(a.zip_code).replace(/\D/g, '').replace(/(\d{5})(\d{1,3})/, '$1-$2') : '';
+                if (ruaEl) ruaEl.value = a.street || '';
+                if (bairroEl) bairroEl.value = a.neighborhood || '';
+                if (numeroEl) numeroEl.value = a.number || '';
+                if (complEl) complEl.value = a.complement || '';
+                if (ufEl) {
+                    ufEl.value = a.state || '';
+                    await fetchCitiesByUF(a.state || '', cidadeEl);
+                    if (cidadeEl) cidadeEl.value = a.city || '';
+                }
+                abrirModal && abrirModal('editar-endereco');
+            } catch (_e) {
+                abrirModal && abrirModal('editar-endereco');
             }
-            abrirModal && abrirModal('editar-endereco');
-        } catch (_e) {
-            abrirModal && abrirModal('editar-endereco');
+            return;
+        }
+
+        // ALTERAÇÃO: Tratar clique no botão de excluir endereço
+        const elDelete = e.target.closest('[data-action="delete-address"]');
+        if (elDelete) {
+            e.preventDefault();
+            e.stopPropagation();
+            const card = elDelete.closest('.quadro-endereco');
+            const addrId = card && (card.dataset.addressId ? Number(card.dataset.addressId) : null);
+            if (!addrId) return;
+
+            // Obter informações do endereço para exibir na confirmação
+            let enderecoInfo = 'este endereço';
+            try {
+                const userId = await resolveUserId();
+                const lista = await listAddresses(userId);
+                const end = (lista || []).find(x => Number(x.id || x.address_id) === addrId);
+                if (end) {
+                    const rua = end.street || '';
+                    const numero = end.number || '';
+                    const bairro = end.neighborhood || '';
+                    enderecoInfo = `${rua}${numero ? ', ' + numero : ''}${bairro ? ' - ' + bairro : ''}`;
+                }
+            } catch (_e) {
+                // Se não conseguir obter informações, usa a mensagem padrão
+            }
+
+            // Confirmar exclusão
+            const confirmed = await showConfirm({
+                title: 'Excluir Endereço',
+                message: `Tem certeza que deseja excluir o endereço "${enderecoInfo}"? Esta ação não pode ser desfeita.`,
+                confirmText: 'Excluir',
+                cancelText: 'Cancelar',
+                type: 'delete'
+            });
+
+            if (confirmed) {
+                await excluirEndereco(addrId);
+            }
+            return;
         }
     });
+
+    // ====== Gerenciamento de Preferências de Notificação ======
+    // ALTERAÇÃO: Função para carregar preferências de notificação
+    async function carregarPreferenciasNotificacao() {
+        try {
+            const userId = await resolveUserId();
+            if (!userId) return;
+
+            const preferences = await getNotificationPreferences(userId);
+            if (preferences) {
+                atualizarCheckboxesNotificacao(preferences);
+            } else {
+                // Se não houver preferências, usar valores padrão (true)
+                atualizarCheckboxesNotificacao({
+                    notify_order_updates: true,
+                    notify_promotions: true
+                });
+            }
+        } catch (err) {
+            // Em caso de erro, usar valores padrão
+            atualizarCheckboxesNotificacao({
+                notify_order_updates: true,
+                notify_promotions: true
+            });
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao carregar preferências de notificação:', err);
+            }
+        }
+    }
+
+    // ALTERAÇÃO: Função auxiliar para converter valor do banco para boolean
+    function converterParaBoolean(value) {
+        // Se for boolean, retornar direto
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        // Se for string, verificar se é 'true' ou 'false'
+        if (typeof value === 'string') {
+            return value.toLowerCase() === 'true' || value === '1';
+        }
+        // Se for número, verificar se é 1 (true) ou 0 (false)
+        if (typeof value === 'number') {
+            return value === 1;
+        }
+        // Se for null ou undefined, retornar true (padrão)
+        if (value === null || value === undefined) {
+            return true;
+        }
+        // Para qualquer outro valor, retornar true (padrão)
+        return true;
+    }
+
+    // ALTERAÇÃO: Função para atualizar os checkboxes com as preferências
+    function atualizarCheckboxesNotificacao(preferences) {
+        // ALTERAÇÃO: Usar IDs específicos dos checkboxes em vez de seletores genéricos
+        const checkboxPedidos = document.getElementById('notify-order-updates');
+        const checkboxPromocoes = document.getElementById('notify-promotions');
+
+        if (checkboxPedidos) {
+            // ALTERAÇÃO: Converter explicitamente para boolean usando função auxiliar
+            const value = converterParaBoolean(preferences.notify_order_updates);
+            checkboxPedidos.checked = value;
+            atualizarVisualToggle(checkboxPedidos);
+        }
+
+        if (checkboxPromocoes) {
+            // ALTERAÇÃO: Converter explicitamente para boolean usando função auxiliar
+            const value = converterParaBoolean(preferences.notify_promotions);
+            checkboxPromocoes.checked = value;
+            atualizarVisualToggle(checkboxPromocoes);
+        }
+    }
+
+    // ALTERAÇÃO: Função para atualizar o visual do toggle
+    function atualizarVisualToggle(checkbox) {
+        const bolinha = checkbox.nextElementSibling;
+        if (bolinha && bolinha.classList.contains('bolinha')) {
+            if (checkbox.checked) {
+                bolinha.style.backgroundColor = 'var(--color-primary)';
+            } else {
+                bolinha.style.backgroundColor = '#ccc';
+            }
+        }
+    }
+
+    // ALTERAÇÃO: Função para salvar preferências de notificação
+    async function salvarPreferenciasNotificacao(notifyOrderUpdates, notifyPromotions) {
+        try {
+            const userId = await resolveUserId();
+            if (!userId) {
+                showToast && showToast('Não foi possível identificar o usuário.', { type: 'error', title: 'Erro' });
+                return;
+            }
+
+            const preferences = {
+                notify_order_updates: notifyOrderUpdates,
+                notify_promotions: notifyPromotions
+            };
+
+            await updateNotificationPreferences(userId, preferences);
+            // Não exibir toast de sucesso para não poluir a interface, já que é uma ação em tempo real
+        } catch (err) {
+            toastFromApiError && toastFromApiError(err, 'Não foi possível salvar as preferências de notificação.');
+            // Reverter o checkbox em caso de erro
+            await carregarPreferenciasNotificacao();
+        }
+    }
+
+    // ALTERAÇÃO: Configurar eventos nos checkboxes de notificação
+    function configurarCheckboxesNotificacao() {
+        // ALTERAÇÃO: Usar IDs específicos dos checkboxes em vez de seletores genéricos
+        const checkboxPedidos = document.getElementById('notify-order-updates');
+        const checkboxPromocoes = document.getElementById('notify-promotions');
+        
+        // Checkbox de comunicações de pedidos
+        if (checkboxPedidos) {
+            // Remover listener anterior se existir (usando cloneNode para remover todos os event listeners)
+            const newCheckboxPedidos = checkboxPedidos.cloneNode(true);
+            checkboxPedidos.parentNode.replaceChild(newCheckboxPedidos, checkboxPedidos);
+            
+            newCheckboxPedidos.addEventListener('change', async function() {
+                atualizarVisualToggle(this);
+                const checkboxPromocoes = document.getElementById('notify-promotions');
+                await salvarPreferenciasNotificacao(
+                    this.checked,
+                    checkboxPromocoes ? checkboxPromocoes.checked : true
+                );
+            });
+        }
+
+        // Checkbox de comunicações de promoções
+        if (checkboxPromocoes) {
+            // Remover listener anterior se existir (usando cloneNode para remover todos os event listeners)
+            const newCheckboxPromocoes = checkboxPromocoes.cloneNode(true);
+            checkboxPromocoes.parentNode.replaceChild(newCheckboxPromocoes, checkboxPromocoes);
+            
+            newCheckboxPromocoes.addEventListener('change', async function() {
+                atualizarVisualToggle(this);
+                const checkboxPedidos = document.getElementById('notify-order-updates');
+                await salvarPreferenciasNotificacao(
+                    checkboxPedidos ? checkboxPedidos.checked : true,
+                    this.checked
+                );
+            });
+        }
+    }
 
     // Carrega perfil e endereços na entrada
     carregarPerfil();
@@ -816,14 +1538,21 @@ $(document).ready(function () {
     configurarToggle2FA();
     configurarConfirmacao2FA();
     
+    // ALTERAÇÃO: Carregar e configurar preferências de notificação
+    setTimeout(async () => {
+        await carregarPreferenciasNotificacao();
+        configurarCheckboxesNotificacao();
+    }, 500);
+    
     // Carregar status 2FA após um pequeno delay para garantir que o DOM esteja pronto
     setTimeout(async () => {
         await carregarStatus2FA();
     }, 500);
 
-    // Recarregar status 2FA quando a seção de configurações for exibida
+    // ALTERAÇÃO: Recarregar preferências de notificação quando a seção de configurações for exibida
     $(document).on('click', '.navega div:contains("Configurações")', async function() {
         setTimeout(async () => {
+            await carregarPreferenciasNotificacao();
             await carregarStatus2FA();
         }, 100);
     });

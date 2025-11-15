@@ -243,9 +243,37 @@ export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
     } else {
         // Fallback para tratamento antigo (compatibilidade)
         msg = (err && (err.payload?.error || err.payload?.message || err.message)) || fallback;
+        const msgLower = msg.toLowerCase();
         
+        // ALTERAÇÃO: Tratamento específico para erros de validação (400)
+        if (err?.status === 400) {
+            title = 'Erro de Validação';
+            
+            // Mensagens específicas para erros comuns
+            if (msgLower.includes('cpf') && msgLower.includes('inválido')) {
+                msg = 'O CPF informado é inválido. Verifique se digitou corretamente (11 dígitos).';
+            } else if (msgLower.includes('telefone') && msgLower.includes('inválido')) {
+                msg = 'O telefone informado é inválido. Verifique se digitou corretamente (DDD + número).';
+            } else if (msgLower.includes('email') && msgLower.includes('inválido')) {
+                msg = 'O e-mail informado é inválido. Verifique se digitou corretamente (exemplo: seuemail@exemplo.com).';
+            } else if (msgLower.includes('data') && (msgLower.includes('inválida') || msgLower.includes('formato'))) {
+                msg = 'A data informada é inválida. Por favor, verifique o formato e tente novamente.';
+            } else if (msgLower.includes('senha') && (msgLower.includes('fraca') || msgLower.includes('weak'))) {
+                msg = 'A senha não atende aos requisitos de segurança. Use pelo menos 8 caracteres, incluindo letras maiúsculas, números e caracteres especiais.';
+            } else if (msgLower.includes('nome') || msgLower.includes('full_name')) {
+                msg = 'O nome informado é inválido. Por favor, verifique se preencheu corretamente.';
+            } else if (msgLower.includes('nenhum campo válido') || msgLower.includes('no_valid_fields')) {
+                msg = 'Nenhum campo válido foi preenchido. Por favor, preencha pelo menos um campo para atualizar.';
+            } else if (msgLower.includes('email já está em uso') || msgLower.includes('email already exists')) {
+                msg = 'Este e-mail já está cadastrado em outra conta. Use um e-mail diferente ou faça login com a conta existente.';
+            } else if (msgLower.includes('corpo da requisição') || msgLower.includes('request body')) {
+                msg = 'Os dados enviados estão incorretos. Verifique todos os campos e tente novamente.';
+            } else if (!msg || msg === fallback) {
+                msg = 'Os dados informados são inválidos. Verifique todos os campos e tente novamente.';
+            }
+        }
         // Tratamento específico para erros de conexão
-        if (err?.isConnectionError || err?.status === 0) {
+        else if (err?.isConnectionError || err?.status === 0) {
             title = 'Problema de Conexão';
             msg = 'Não foi possível conectar ao servidor. Verifique se a API está rodando e sua conexão com a internet.';
         } else if (err?.status >= 500) {
@@ -270,7 +298,6 @@ export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
             }
         } else if (err?.status === 403) {
             // Verificar se é erro de conta inativa
-            const msgLower = msg.toLowerCase();
             if (msgLower.includes('conta inativa') || 
                 msgLower.includes('conta desativada') ||
                 msgLower.includes('usuário inativo') ||
@@ -289,6 +316,13 @@ export function toastFromApiError(err, fallback = 'Ocorreu um erro.') {
             } else {
                 title = 'Acesso Negado';
                 // Manter a mensagem original do backend
+            }
+        } else if (err?.status === 409) {
+            title = 'Conflito';
+            if (msgLower.includes('email') && (msgLower.includes('já está em uso') || msgLower.includes('already exists'))) {
+                msg = 'Este e-mail já está cadastrado em outra conta. Use um e-mail diferente ou faça login com a conta existente.';
+            } else if (!msg || msg === fallback) {
+                msg = 'Os dados informados já estão em uso. Verifique e tente novamente.';
             }
         }
     }

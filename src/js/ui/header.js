@@ -8,6 +8,12 @@ import { getDefaultAddress, getAddresses, setDefaultAddress } from '../api/addre
 // Importar sistema de alertas customizado
 import { showError, showSuccess } from './alerts.js';
 
+// ALTERAÇÃO: Importar escapeHTML para sanitização segura
+import { escapeHTML } from '../utils/html-sanitizer.js';
+
+// ALTERAÇÃO: Importar sistema de modais
+import { abrirModal, fecharModal } from './modais.js';
+
 // Chaves usadas na aplicação
 const RB_STORAGE_KEYS = {
   token: 'rb.token',
@@ -450,13 +456,37 @@ function initPontos() {
   if (userHeader && userHeader.style.display !== 'none') {
     tentarInitPontos();
     
-    // Adicionar evento de clique para ir para o Clube Royal
+    // ALTERAÇÃO: Adicionar evento de clique para ir para o Clube Royal
     const pontosElement = document.querySelector('.pontos-royal');
     if (pontosElement) {
-      pontosElement.addEventListener('click', () => {
-        window.location.href = 'clube-royal.html';
+      // Remover listener anterior se existir (usando cloneNode para remover todos os event listeners)
+      const newPontosElement = pontosElement.cloneNode(true);
+      pontosElement.parentNode.replaceChild(newPontosElement, pontosElement);
+      
+      newPontosElement.addEventListener('click', () => {
+        // Obter caminho correto baseado na página atual
+        const getClubeRoyalPath = window.getClubeRoyalPath || (() => {
+          // Fallback se a função não estiver disponível
+          const currentPath = window.location.pathname;
+          const isInPagesFolder = currentPath.includes("/pages/") || currentPath.includes("pages/");
+          const isInSrcFolder = currentPath.includes("/src/") || currentPath.includes("src/");
+          
+          if (isInPagesFolder) {
+            return "clube-royal.html";
+          } else if (isInSrcFolder) {
+            return "pages/clube-royal.html";
+          } else {
+            return "src/pages/clube-royal.html";
+          }
+        });
+        
+        const path = getClubeRoyalPath();
+        const isAlreadyOnClube = /clube-royal\.html(\?.*)?(#.*)?$/.test(window.location.pathname);
+        if (!isAlreadyOnClube) {
+          window.location.href = path;
+        }
       });
-      pontosElement.style.cursor = 'pointer';
+      newPontosElement.style.cursor = 'pointer';
     }
   } else {
     setTimeout(initPontos, 1000);
@@ -593,41 +623,56 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
       };
     }
     
-    // Criar modal dinamicamente com sanitização
+    // ALTERAÇÃO: Criar modal seguindo o mesmo padrão da modal de pagamento
     const enderecosSanitizados = enderecos.map(endereco => {
       const sanitized = sanitizeAddressData(endereco);
       const addressId = Number(endereco.id) || 0;
       const isCurrent = addressId === Number(currentAddressId);
       
+      // ALTERAÇÃO: Usar escapeHTML para sanitização segura dos dados
+      const street = escapeHTML(sanitized.street);
+      const number = escapeHTML(sanitized.number);
+      const neighborhood = escapeHTML(sanitized.neighborhood);
+      const city = escapeHTML(sanitized.city);
+      const state = escapeHTML(sanitized.state);
+      
       return `
-        <div class="endereco-item" data-address-id="${addressId}" 
-             style="padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 5px; cursor: pointer; ${isCurrent ? 'background-color: #f0f0f0;' : ''}"
+        <div class="endereco-item ${isCurrent ? 'selecionado' : ''}" 
+             data-address-id="${addressId}"
              data-action="select-address">
-          <strong>${sanitized.street}, ${sanitized.number}</strong>
-          ${sanitized.complement ? `<br><small>${sanitized.complement}</small>` : ''}
-          <br>
-          <small>${sanitized.neighborhood} - ${sanitized.city}/${sanitized.state}</small>
-          <br>
-          <small>CEP: ${sanitized.zip_code}</small>
-          ${isCurrent ? '<br><span style="color: green; font-weight: bold;">✓ Endereço Atual</span>' : ''}
+          <div class="endereco-info">
+            <i class="fa-solid fa-location-dot"></i>
+            <div class="endereco-info-content">
+              <p class="titulo">${street}, ${number}</p>
+              <p class="descricao">${neighborhood} - ${city}/${state}</p>
+            </div>
+          </div>
+          <div class="endereco-actions">
+            ${isCurrent ? '<div class="endereco-check"><i class="fa-solid fa-check"></i></div>' : ''}
+          </div>
         </div>
       `;
     }).join('');
     
+    // ALTERAÇÃO: Estrutura da modal seguindo o padrão da modal de pagamento
     const modalHtml = `
-      <div id="modal-alterar-endereco" class="modal" style="display: block;">
-        <div class="div-overlay" data-action="close-modal"></div>
-        <div class="modal-content-metricas">
-          <div class="header-modal">
-            <i class="fa-solid fa-xmark fechar-modal" data-action="close-modal"></i>
-            <h2>Alterar Endereço Principal</h2>
+      <div id="modal-alterar-endereco" class="modal" style="display: none;" data-reset-on-close="true">
+        <div class="div-overlay"></div>
+        <div class="modal-contet">
+          <div class="header">
+            <i class="fa-solid fa-xmark" data-close-modal="modal-alterar-endereco"></i>
+            <p class="titulo">Selecionar endereço</p>
+            <p class="descricao">Escolha um endereço para definir como principal</p>
           </div>
           
-          <div class="conteudo-modal">
-            <p>Selecione um endereço para definir como principal:</p>
-            <div id="lista-enderecos-alteracao">
+          <div class="main">
+            <div id="lista-enderecos-alteracao" class="lista-enderecos-modal">
               ${enderecosSanitizados}
             </div>
+          </div>
+          
+          <div class="footer">
+            <button data-close-modal="modal-alterar-endereco">Cancelar</button>
           </div>
         </div>
       </div>
@@ -642,22 +687,16 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     // Adicionar modal ao DOM
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Adicionar eventos de clique usando delegation (substitui onclick inline)
+    // ALTERAÇÃO: Abrir modal usando o sistema padrão
+    abrirModal('modal-alterar-endereco');
+    
+    // ALTERAÇÃO: Adicionar evento de clique para seleção de endereço
     document.getElementById('modal-alterar-endereco')?.addEventListener('click', async (e) => {
-      const target = e.target.closest('[data-action]');
-      if (!target) return;
-      
-      const action = target.dataset.action;
-      
-      if (action === 'close-modal') {
-        fecharModalEndereco();
-      } else if (action === 'select-address') {
-        const addressItem = e.target.closest('.endereco-item');
-        if (addressItem) {
-          const addressId = parseInt(String(addressItem.dataset.addressId || ''), 10);
-          if (!isNaN(addressId) && addressId > 0 && addressId !== Number(currentAddressId)) {
-            await alterarEnderecoPrincipal(addressId);
-          }
+      const addressItem = e.target.closest('.endereco-item[data-action="select-address"]');
+      if (addressItem) {
+        const addressId = parseInt(String(addressItem.dataset.addressId || ''), 10);
+        if (!isNaN(addressId) && addressId > 0 && addressId !== Number(currentAddressId)) {
+          await alterarEnderecoPrincipal(addressId);
         }
       }
     });
@@ -699,13 +738,10 @@ async function alterarEnderecoPrincipal(addressId) {
 }
 
 /**
- * Fechar modal de endereço
+ * ALTERAÇÃO: Fechar modal de endereço usando o sistema padrão
  */
 function fecharModalEndereco() {
-  const modal = document.getElementById('modal-alterar-endereco');
-  if (modal) {
-    modal.remove();
-  }
+  fecharModal('modal-alterar-endereco');
 }
 
 // Expor função globalmente

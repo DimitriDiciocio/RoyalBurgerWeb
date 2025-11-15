@@ -24,6 +24,18 @@ export async function deleteMyCustomer(userId) {
     return apiRequest(`${CUSTOMER_BASE}/${userId}`, { method: 'DELETE' });
 }
 
+// Preferências de Notificação
+export async function getNotificationPreferences(userId) {
+    return apiRequest(`${CUSTOMER_BASE}/${userId}/notification-preferences`, { method: 'GET' });
+}
+
+export async function updateNotificationPreferences(userId, preferences) {
+    return apiRequest(`${CUSTOMER_BASE}/${userId}/notification-preferences`, { 
+        method: 'PUT', 
+        body: preferences 
+    });
+}
+
 export async function deleteAccountPermanent() {
     return apiRequest(`${CUSTOMER_BASE}/delete-account`, { method: 'DELETE' });
 }
@@ -49,8 +61,8 @@ export async function updateAddress(addressId, payload) {
     return apiRequest(`${CUSTOMER_BASE}/addresses/${addressId}`, { method: 'PUT', body: payload });
 }
 
-export async function deleteAddress(addressId) {
-    return apiRequest(`${CUSTOMER_BASE}/addresses/${addressId}`, { method: 'DELETE' });
+export async function deleteAddress(userId, addressId) {
+    return apiRequest(`${CUSTOMER_BASE}/${userId}/addresses/${addressId}`, { method: 'DELETE' });
 }
 
 // ============================================================================

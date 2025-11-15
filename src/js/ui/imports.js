@@ -72,6 +72,9 @@ async function loadFooter() {
 
     // Corrigir caminhos após carregar o footer
     fixFooterPaths();
+    
+    // ALTERAÇÃO: Carregar configurações do sistema e atualizar footer
+    await loadFooterSettings();
   } catch (error) {
     // TODO: Implementar logging estruturado em produção
     console.error("Erro ao carregar o footer:", error.message);
@@ -84,6 +87,140 @@ async function loadFooter() {
         </footer>
       `;
   }
+}
+
+/**
+ * ALTERAÇÃO: Carrega configurações do sistema e atualiza o footer
+ */
+async function loadFooterSettings() {
+  try {
+    // Importar função de configurações dinamicamente
+    const { getCompanyInfo } = await import("../utils/settings-helper.js");
+    const companyInfo = await getCompanyInfo();
+
+    if (!companyInfo) {
+      return; // Se não houver configurações, manter valores padrão do HTML
+    }
+
+    // Atualizar ano atual
+    const yearElement = document.querySelector('[data-footer-field="year"]');
+    if (yearElement) {
+      yearElement.textContent = new Date().getFullYear();
+    }
+
+    // Atualizar nome fantasia
+    if (companyInfo.nome_fantasia) {
+      const nomeFantasiaElement = document.querySelector('[data-footer-field="nome-fantasia"]');
+      if (nomeFantasiaElement) {
+        nomeFantasiaElement.textContent = companyInfo.nome_fantasia;
+      }
+    }
+
+    // Atualizar CNPJ (formatado)
+    if (companyInfo.cnpj) {
+      const cnpjElement = document.querySelector('[data-footer-field="cnpj"]');
+      if (cnpjElement) {
+        const cnpjFormatted = formatCNPJ(companyInfo.cnpj);
+        cnpjElement.textContent = cnpjFormatted;
+      }
+    }
+
+    // Atualizar endereço
+    if (companyInfo.endereco) {
+      const enderecoElement = document.querySelector('[data-footer-field="endereco"]');
+      if (enderecoElement) {
+        enderecoElement.textContent = companyInfo.endereco;
+      }
+    }
+
+    // Atualizar email
+    if (companyInfo.email) {
+      const emailElement = document.querySelector('[data-footer-field="email"]');
+      if (emailElement) {
+        emailElement.textContent = companyInfo.email;
+      }
+    }
+
+    // ALTERAÇÃO: Atualizar telefone (WhatsApp)
+    if (companyInfo.telefone) {
+      const telefoneElement = document.querySelector('[data-footer-field="telefone"]');
+      if (telefoneElement) {
+        const telefoneFormatted = formatPhone(companyInfo.telefone);
+        telefoneElement.textContent = telefoneFormatted;
+        
+        // Tornar clicável para abrir WhatsApp
+        const telefoneContainer = telefoneElement.closest('div');
+        if (telefoneContainer) {
+          telefoneContainer.style.cursor = 'pointer';
+          telefoneContainer.setAttribute('title', 'Abrir WhatsApp');
+          
+          // Remover listeners anteriores (usando cloneNode para remover todos os event listeners)
+          const newContainer = telefoneContainer.cloneNode(true);
+          telefoneContainer.parentNode.replaceChild(newContainer, telefoneContainer);
+          
+          // Buscar o elemento de telefone dentro do novo container
+          const newTelefoneElement = newContainer.querySelector('[data-footer-field="telefone"]');
+          if (newTelefoneElement) {
+            newTelefoneElement.textContent = telefoneFormatted;
+          }
+          
+          // Adicionar evento de clique no container
+          newContainer.addEventListener('click', () => {
+            const phoneNumber = companyInfo.telefone.replace(/\D/g, ''); // Remove formatação
+            const whatsappUrl = `https://wa.me/55${phoneNumber}`;
+            window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+          });
+        }
+      }
+    }
+
+  } catch (error) {
+    // Log apenas em desenvolvimento para evitar exposição de erros em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      console.warn("Erro ao carregar configurações do footer:", error.message);
+    }
+    // Em caso de erro, manter valores padrão do HTML
+  }
+}
+
+/**
+ * ALTERAÇÃO: Formata CNPJ para exibição (00.000.000/0000-00)
+ * @param {string} cnpj - CNPJ sem formatação
+ * @returns {string} CNPJ formatado
+ */
+function formatCNPJ(cnpj) {
+  if (!cnpj) return "";
+  // Remove caracteres não numéricos
+  const cleaned = cnpj.replace(/\D/g, "");
+  // Aplica formatação se tiver 14 dígitos
+  if (cleaned.length === 14) {
+    return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  }
+  // Retorna sem formatação se não tiver 14 dígitos
+  return cnpj;
+}
+
+/**
+ * ALTERAÇÃO: Formata telefone para exibição ((00) 00000-0000 ou (00) 0000-0000)
+ * @param {string} phone - Telefone sem formatação
+ * @returns {string} Telefone formatado
+ */
+function formatPhone(phone) {
+  if (!phone) return "";
+  // Remove caracteres não numéricos
+  const cleaned = phone.replace(/\D/g, "");
+  
+  // Formatação para celular (11 dígitos: DDD + 9 dígitos)
+  if (cleaned.length === 11) {
+    return cleaned.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  }
+  // Formatação para telefone fixo (10 dígitos: DDD + 8 dígitos)
+  else if (cleaned.length === 10) {
+    return cleaned.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
+  }
+  // Retorna sem formatação se não tiver 10 ou 11 dígitos
+  return phone;
 }
 
 /**
@@ -144,7 +281,32 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof window.loadHeader === "function") window.loadHeader();
     }, VALIDATION_LIMITS.RETRY_DELAY);
   }
+  
+  // ALTERAÇÃO: Adicionar scroll suave para links de âncora (#contato)
+  setupSmoothScroll();
 });
+
+/**
+ * ALTERAÇÃO: Configura scroll suave para links de âncora
+ */
+function setupSmoothScroll() {
+  // Adicionar scroll suave para todos os links que começam com #
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href^="#"]');
+    if (link && link.getAttribute('href') !== '#') {
+      const targetId = link.getAttribute('href').substring(1);
+      const targetElement = document.getElementById(targetId);
+      
+      if (targetElement) {
+        e.preventDefault();
+        targetElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }
+  });
+}
 
 // Função para verificar se é página de login
 function isLoginPage() {
@@ -331,6 +493,7 @@ function fixPaths() {
   const logo = document.querySelector(".logo");
   const logoModal = document.querySelector(".logo-modal");
   const navLinks = document.querySelectorAll(".nav-menu a");
+  const navModalLinks = document.querySelectorAll(".nav-modal-links a"); // ALTERAÇÃO: Links do modal de navegação
   const loginLinks = document.querySelectorAll("#login-header a");
 
   // REVISÃO: Função auxiliar para obter o caminho correto do logo
@@ -429,6 +592,62 @@ function fixPaths() {
     }
   });
 
+  // ALTERAÇÃO: Ajustar links do modal de navegação (hambúrguer)
+  navModalLinks.forEach((link) => {
+    const href = link.getAttribute("href");
+    if (href && !href.startsWith("#") && !href.startsWith("http")) {
+      let newHref = href;
+
+      if (isInPagesFolder) {
+        if (href.includes("index.html")) {
+          newHref = "../../index.html";
+        } else if (href.includes("clube-royal.html")) {
+          newHref = "clube-royal.html";
+        } else if (href.includes("hist-pedidos.html")) {
+          newHref = "hist-pedidos.html";
+        } else if (href.includes("painel-adm.html")) {
+          newHref = "painel-adm.html";
+        } else if (href.includes("login.html")) {
+          newHref = "login.html";
+        } else if (href.includes("cadastro.html")) {
+          newHref = "cadastro.html";
+        }
+      } else if (isInSrcFolder) {
+        if (href.includes("index.html")) {
+          newHref = "../index.html";
+        } else if (href.includes("clube-royal.html")) {
+          newHref = "pages/clube-royal.html";
+        } else if (href.includes("hist-pedidos.html")) {
+          newHref = "pages/hist-pedidos.html";
+        } else if (href.includes("painel-adm.html")) {
+          newHref = "pages/painel-adm.html";
+        } else if (href.includes("login.html")) {
+          newHref = "pages/login.html";
+        } else if (href.includes("cadastro.html")) {
+          newHref = "pages/cadastro.html";
+        }
+      } else {
+        if (href.includes("index.html")) {
+          newHref = "index.html";
+        } else if (href.includes("clube-royal.html")) {
+          newHref = "src/pages/clube-royal.html";
+        } else if (href.includes("hist-pedidos.html")) {
+          newHref = "src/pages/hist-pedidos.html";
+        } else if (href.includes("painel-adm.html")) {
+          newHref = "src/pages/painel-adm.html";
+        } else if (href.includes("login.html")) {
+          newHref = "src/pages/login.html";
+        } else if (href.includes("cadastro.html")) {
+          newHref = "src/pages/cadastro.html";
+        }
+      }
+
+      if (newHref !== href) {
+        link.href = newHref;
+      }
+    }
+  });
+
   // Ajustar links de login/cadastro
   loginLinks.forEach((link, index) => {
     const href = link.getAttribute("href");
@@ -476,6 +695,26 @@ function getDadosContaPath() {
     return "pages/usuario-perfil.html";
   } else {
     return "src/pages/usuario-perfil.html";
+  }
+}
+
+/**
+ * ALTERAÇÃO: Retorna o caminho correto para a página do Clube Royal, baseado na página atual
+ * @returns {string} Caminho correto para clube-royal.html
+ */
+function getClubeRoyalPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder =
+    currentPath.includes("/pages/") || currentPath.includes("pages/");
+  const isInSrcFolder =
+    currentPath.includes("/src/") || currentPath.includes("src/");
+
+  if (isInPagesFolder) {
+    return "clube-royal.html";
+  } else if (isInSrcFolder) {
+    return "pages/clube-royal.html";
+  } else {
+    return "src/pages/clube-royal.html";
   }
 }
 
@@ -666,6 +905,7 @@ function getPainelAdmPath() {
 // Expor funções do header/footer para outros módulos
 window.configureHeader = configureHeader;
 window.getDadosContaPath = getDadosContaPath;
+window.getClubeRoyalPath = getClubeRoyalPath;
 window.getPainelAdmPath = getPainelAdmPath;
 window.loadHeader = loadHeader;
 window.getLogoSvgPath = getLogoSvgPath;

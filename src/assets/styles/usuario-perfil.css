@@ -313,6 +313,26 @@ main{
         position: relative;
         padding: 15px 40px;
 
+        /* ALTERAÇÃO: Estilos para o ícone de exclusão */
+        & [data-action="delete-address"] {
+            cursor: pointer;
+            color: var(--color-secondary, #FF0000);
+            font-size: 18px;
+            transition: all 0.2s ease;
+            padding: 5px;
+            border-radius: 4px;
+
+            &:hover {
+                color: #cc0000;
+                background-color: rgba(255, 0, 0, 0.1);
+                transform: scale(1.1);
+            }
+
+            &:active {
+                transform: scale(0.95);
+            }
+        }
+
         & i {
             color: var(--color-texto-black);
             font-size: 30px;
@@ -682,6 +702,26 @@ main{
                 }
             }
 
+            /* ALTERAÇÃO: Estilos para o ícone de exclusão (versão responsiva) */
+            & [data-action="delete-address"] {
+                cursor: pointer;
+                color: var(--color-secondary, #FF0000);
+                font-size: 18px;
+                transition: all 0.2s ease;
+                padding: 5px;
+                border-radius: 4px;
+
+                &:hover {
+                    color: #cc0000;
+                    background-color: rgba(255, 0, 0, 0.1);
+                    transform: scale(1.1);
+                }
+
+                &:active {
+                    transform: scale(0.95);
+                }
+            }
+
         }
 
         & .adiciona-ende {
@@ -897,6 +937,26 @@ main{
                 }
             }
 
+            /* ALTERAÇÃO: Estilos para o ícone de exclusão (versão responsiva) */
+            & [data-action="delete-address"] {
+                cursor: pointer;
+                color: var(--color-secondary, #FF0000);
+                font-size: 18px;
+                transition: all 0.2s ease;
+                padding: 5px;
+                border-radius: 4px;
+
+                &:hover {
+                    color: #cc0000;
+                    background-color: rgba(255, 0, 0, 0.1);
+                    transform: scale(1.1);
+                }
+
+                &:active {
+                    transform: scale(0.95);
+                }
+            }
+
         }
 
         & .adiciona-ende {
@@ -1073,6 +1133,26 @@ main{
 
                 &:active {
                     color: #d2a400;
+                }
+            }
+
+            /* ALTERAÇÃO: Estilos para o ícone de exclusão (versão responsiva) */
+            & [data-action="delete-address"] {
+                cursor: pointer;
+                color: var(--color-secondary, #FF0000);
+                font-size: 18px;
+                transition: all 0.2s ease;
+                padding: 5px;
+                border-radius: 4px;
+
+                &:hover {
+                    color: #cc0000;
+                    background-color: rgba(255, 0, 0, 0.1);
+                    transform: scale(1.1);
+                }
+
+                &:active {
+                    transform: scale(0.95);
                 }
             }
 
