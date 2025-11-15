@@ -50,7 +50,12 @@ export function throttle(func, limit = 300) {
  */
 export function delegate(container, eventType, selector, handler) {
   if (!container || !selector || !handler) {
-    console.warn("delegate: parâmetros inválidos");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("delegate: parâmetros inválidos");
+    }
     return () => {};
   }
 
@@ -92,7 +97,12 @@ export function delegate(container, eventType, selector, handler) {
  */
 export function observeElement(element, callback, options = {}) {
   if (!element || !callback) {
-    console.warn("observeElement: parâmetros inválidos");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("observeElement: parâmetros inválidos");
+    }
     return () => {};
   }
 

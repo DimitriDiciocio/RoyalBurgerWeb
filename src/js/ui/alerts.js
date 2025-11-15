@@ -1,5 +1,8 @@
 // src/js/ui/alerts.js
 
+// ALTERAÇÃO: Importar sanitização para prevenir XSS
+import { setSafeHTML } from '../utils/html-sanitizer.js';
+
 const DEFAULT_AUTO_CLOSE_MS = 4000;
 
 // ====== MODELOS (HTML) ======
@@ -11,13 +14,15 @@ function ensureMessageModels() {
         errorBar = document.createElement('div');
         errorBar.className = 'modelo-erro-modal';
         errorBar.style.display = 'none';
-        errorBar.innerHTML = `
+        // ALTERAÇÃO: HTML estático é seguro, mas usando setSafeHTML para consistência
+        const errorBarHTML = `
             <i class="fa-solid fa-x"></i>
             <div>
                 <p class="errao">Erro</p>
                 <p class="motivo">Ocorreu um erro.</p>
             </div>
         `;
+        setSafeHTML(errorBar, errorBarHTML, false); // false pois é HTML estático seguro
         document.body.appendChild(errorBar);
     }
 
@@ -25,7 +30,8 @@ function ensureMessageModels() {
         alertModal = document.createElement('div');
         alertModal.className = 'modelo-alert-modal';
         alertModal.style.display = 'none';
-        alertModal.innerHTML = `
+        // ALTERAÇÃO: HTML estático é seguro, mas usando setSafeHTML para consistência
+        const alertModalHTML = `
             <div class="modal-o"></div>
             <div class="modelo-msg-body">
                 <div class="icon-msg">
@@ -53,6 +59,7 @@ function ensureMessageModels() {
                 </div>
             </div>
         `;
+        setSafeHTML(alertModal, alertModalHTML, false); // false pois é HTML estático seguro
         document.body.appendChild(alertModal);
     }
 

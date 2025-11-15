@@ -768,7 +768,11 @@ const VALIDATION_LIMITS = {
     }
 
     if (state.cesta.length === 0) {
-      el.itensContainer.innerHTML = "<p>Nenhum item na cesta</p>";
+      // ALTERAÇÃO: HTML estático seguro, mas usando textContent para consistência
+      el.itensContainer.textContent = "";
+      const p = document.createElement("p");
+      p.textContent = "Nenhum item na cesta";
+      el.itensContainer.appendChild(p);
       return;
     }
 
@@ -913,6 +917,10 @@ const VALIDATION_LIMITS = {
       })
       .join("");
 
+    // TODO: REVISAR - innerHTML com dados dinâmicos
+    // O HTML já está sendo sanitizado com escapeHTML nos dados (nome, descricao, observacao),
+    // mas considerar usar setSafeHTML para sanitização adicional e consistência.
+    // Alternativa: usar createElementsFromHTML do dom-renderer.js com sanitização.
     el.itensContainer.innerHTML = itensHtml;
   }
 
@@ -2239,12 +2247,18 @@ const VALIDATION_LIMITS = {
       const data = await resp.json();
       const populaUF = (selectEl) => {
         if (!selectEl) return;
-        selectEl.innerHTML =
-          '<option value="" disabled selected>Selecione o estado</option>';
+        // ALTERAÇÃO: Usar createElement ao invés de innerHTML para opções estáticas
+        selectEl.textContent = "";
+        const defaultOpt = document.createElement("option");
+        defaultOpt.value = "";
+        defaultOpt.disabled = true;
+        defaultOpt.selected = true;
+        defaultOpt.textContent = "Selecione o estado";
+        selectEl.appendChild(defaultOpt);
         data.forEach((uf) => {
           const opt = document.createElement("option");
           opt.value = uf.sigla;
-          opt.textContent = `${uf.sigla} - ${uf.nome}`;
+          opt.textContent = `${uf.sigla} - ${escapeHTML(uf.nome)}`;
           opt.dataset.ufId = uf.id;
           selectEl.appendChild(opt);
         });
@@ -2253,34 +2267,60 @@ const VALIDATION_LIMITS = {
         populaUF(ufSelectForm);
       }
     } catch (e) {
-      if (ufSelectForm)
-        ufSelectForm.innerHTML =
-          '<option value="" disabled selected>UF</option>';
+      // ALTERAÇÃO: Usar createElement ao invés de innerHTML
+      if (ufSelectForm) {
+        ufSelectForm.textContent = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.disabled = true;
+        opt.selected = true;
+        opt.textContent = "UF";
+        ufSelectForm.appendChild(opt);
+      }
     }
   }
 
   async function fetchCitiesByUF(ufSigla, targetCitySelect) {
     if (!ufSigla || !targetCitySelect) return;
     try {
-      targetCitySelect.innerHTML =
-        '<option value="" disabled selected>Carregando...</option>';
+      // ALTERAÇÃO: Usar createElement ao invés de innerHTML
+      targetCitySelect.textContent = "";
+      const loadingOpt = document.createElement("option");
+      loadingOpt.value = "";
+      loadingOpt.disabled = true;
+      loadingOpt.selected = true;
+      loadingOpt.textContent = "Carregando...";
+      targetCitySelect.appendChild(loadingOpt);
+      
       const resp = await fetch(
         `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufSigla}/municipios`
       );
       const data = await resp.json();
-      targetCitySelect.innerHTML =
-        '<option value="" disabled selected>Selecione a cidade</option>';
+      targetCitySelect.textContent = "";
+      const defaultOpt = document.createElement("option");
+      defaultOpt.value = "";
+      defaultOpt.disabled = true;
+      defaultOpt.selected = true;
+      defaultOpt.textContent = "Selecione a cidade";
+      targetCitySelect.appendChild(defaultOpt);
+      
       if (Array.isArray(data)) {
         data.forEach((c) => {
           const opt = document.createElement("option");
-          opt.value = c.nome;
+          opt.value = escapeHTML(c.nome);
           opt.textContent = c.nome;
           targetCitySelect.appendChild(opt);
         });
       }
     } catch (e) {
-      targetCitySelect.innerHTML =
-        '<option value="" disabled selected>Erro ao carregar</option>';
+      // ALTERAÇÃO: Usar createElement ao invés de innerHTML
+      targetCitySelect.textContent = "";
+      const errorOpt = document.createElement("option");
+      errorOpt.value = "";
+      errorOpt.disabled = true;
+      errorOpt.selected = true;
+      errorOpt.textContent = "Erro ao carregar";
+      targetCitySelect.appendChild(errorOpt);
     }
   }
 

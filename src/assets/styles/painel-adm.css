@@ -1571,19 +1571,21 @@ main {
         min-height: 200px;
     }
 
-    /* Loading overlay para ingredientes */
-    & .ingredientes .loading-overlay {
+    /* Loading overlay genérico para todas as seções */
+    /* ALTERAÇÃO: Estilos generalizados para reutilização */
+    .loading-overlay {
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.95);
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 100;
         border-radius: var(--border-radius);
+        backdrop-filter: blur(2px);
 
         & .loading-spinner {
             display: flex;
@@ -1594,14 +1596,66 @@ main {
             & i {
                 font-size: 32px;
                 color: var(--color-primary);
+                animation: spin 1s linear infinite;
             }
 
             & p {
                 color: var(--color-texto-light);
                 font-size: 14px;
                 font-weight: 500;
+                margin: 0;
             }
         }
+    }
+
+    /* Loading inline (sem overlay) */
+    .loading-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--color-texto-light);
+        font-size: 14px;
+        padding: 10px 15px;
+
+        & i {
+            font-size: 16px;
+            color: var(--color-primary);
+            animation: spin 1s linear infinite;
+        }
+    }
+
+    /* Estado de loading para containers */
+    .is-loading {
+        opacity: 0.6;
+        pointer-events: none;
+        position: relative;
+
+        &::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--color-border);
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            z-index: 10;
+        }
+    }
+
+    /* Animação de spin */
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Loading overlay para ingredientes (mantido para compatibilidade) */
+    & .ingredientes .loading-overlay {
+        /* Herda estilos do .loading-overlay genérico */
     }
 
     /* Paginação melhorada */
@@ -4928,4 +4982,162 @@ main {
 .detalhe-item i {
     color: var(--color-texto-erased);
     font-size: 0.85rem;
+}
+
+/* ============================================================================
+   PAGINAÇÃO GLOBAL (fora do contexto main para garantir funcionamento)
+   ALTERAÇÃO: Adicionado CSS global para garantir que a paginação funcione
+   ============================================================================ */
+
+.pagination {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--cor-div-primary);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.pagination .pagination-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+@media (min-width: 768px) {
+    .pagination .pagination-wrapper {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+}
+
+.pagination .pagination-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+@media (min-width: 768px) {
+    .pagination .pagination-info {
+        flex-direction: row;
+        gap: 15px;
+    }
+}
+
+.pagination .pagination-text {
+    color: var(--color-texto-light);
+    font-size: 14px;
+}
+
+.pagination .pagination-text strong {
+    color: var(--color-texto-black);
+    font-weight: 600;
+}
+
+.pagination .pagination-page-info {
+    color: var(--color-texto-erased);
+    font-size: 13px;
+    padding: 4px 12px;
+    background: var(--color-background);
+    border-radius: 6px;
+}
+
+.pagination .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.pagination .pagination-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--color-background);
+    border: 2px solid #e0e1e4;
+    border-radius: 8px;
+    color: var(--color-texto-black);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pagination .pagination-btn:hover:not(:disabled) {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-texto-black);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pagination .pagination-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.pagination .pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f5f5f5;
+}
+
+.pagination .pagination-btn i {
+    font-size: 12px;
+}
+
+.pagination .pagination-btn span {
+    font-size: 14px;
+}
+
+.pagination .pagination-pages {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pagination .page-number {
+    min-width: 40px;
+    height: 40px;
+    padding: 0 12px;
+    background: var(--color-background);
+    border: 2px solid #e0e1e4;
+    border-radius: 8px;
+    color: var(--color-texto-black);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pagination .page-number:hover:not(.active) {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination .page-number.active {
+    background: var(--color-tertiary);
+    border-color: var(--color-tertiary);
+    color: var(--color-texto-white);
+    font-weight: 600;
+    cursor: default;
+}
+
+.pagination .page-number:active:not(.active) {
+    transform: translateY(0);
+}
+
+.pagination .page-ellipsis {
+    padding: 0 8px;
+    color: var(--color-texto-erased);
+    font-size: 14px;
+    user-select: none;
 }

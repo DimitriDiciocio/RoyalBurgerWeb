@@ -18,6 +18,7 @@ import { showToast, showConfirm, toastFromApiError } from "../alerts.js";
 
 import { debounce } from "../../utils/performance-utils.js";
 import { escapeHTML } from "../../utils/html-sanitizer.js";
+import { getStockDashboardMetrics } from "../../api/dashboard.js";
 
 /**
  * Gerenciador de dados de insumos
@@ -72,7 +73,10 @@ class InsumoDataManager {
 
       return response;
     } catch (error) {
-      console.error("Erro ao buscar insumos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar insumos:", error);
+      }
       throw error;
     }
   }
@@ -102,7 +106,10 @@ class InsumoDataManager {
         ultimaAtualizacao: null,
       };
     } catch (error) {
-      console.error("Erro ao buscar insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar insumo:", error);
+      }
       throw error;
     }
   }
@@ -130,14 +137,20 @@ class InsumoDataManager {
 
       // Validar se a resposta contém dados válidos
       if (!result || !result.id) {
-        console.error("Resposta inválida da API ao criar insumo:", result);
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error("Resposta inválida da API ao criar insumo:", result);
+        }
         throw new Error("Resposta inválida da API ao criar insumo");
       }
 
       this.clearCache();
       return result;
     } catch (error) {
-      console.error("Erro ao adicionar insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar insumo:", error);
+      }
       throw error;
     }
   }
@@ -165,7 +178,10 @@ class InsumoDataManager {
       await updateIngredient(id, apiData);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao atualizar insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar insumo:", error);
+      }
       throw error;
     }
   }
@@ -179,7 +195,10 @@ class InsumoDataManager {
       await updateIngredient(id, { is_available: novoStatus });
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao alterar disponibilidade do insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao alterar disponibilidade do insumo:", error);
+      }
       throw error;
     }
   }
@@ -192,7 +211,10 @@ class InsumoDataManager {
       await adjustIngredientStock(id, changeAmount);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao ajustar estoque do insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao ajustar estoque do insumo:", error);
+      }
       throw error;
     }
   }
@@ -205,7 +227,10 @@ class InsumoDataManager {
       await deleteIngredient(id);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao excluir insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao excluir insumo:", error);
+      }
       throw error;
     }
   }
@@ -218,7 +243,10 @@ class InsumoDataManager {
       const response = await getStockSummary();
       return response;
     } catch (error) {
-      console.error("Erro ao buscar resumo do estoque:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar resumo do estoque:", error);
+      }
       throw error;
     }
   }
@@ -284,7 +312,10 @@ class InsumoManager {
       await this.loadResumoEstoque();
       this.setupEventListeners();
     } catch (error) {
-      console.error("Erro ao inicializar módulo de insumos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao inicializar módulo de insumos:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados dos insumos");
     }
   }
@@ -447,15 +478,8 @@ class InsumoManager {
         }
       }
 
-      console.log('[InsumoManager] Carregando página:', this.currentPage, 'com opções:', options);
-      
       const response = await this.dataManager.getAllInsumos(options);
       const insumos = response.items || [];
-
-      console.log('[InsumoManager] Resposta recebida:', {
-        itemsCount: insumos.length,
-        pagination: response.pagination
-      });
 
       // Atualizar informações de paginação (preservar currentPage que foi definido antes da chamada)
       if (response.pagination) {
@@ -463,19 +487,7 @@ class InsumoManager {
         this.totalItems = response.pagination.total || 0;
         // NÃO sobrescrever currentPage - manter o valor que foi definido antes da chamada
         // A API retorna a página que foi solicitada, então não precisamos atualizar
-        const responsePage = response.pagination.page || 1;
-        // Apenas validar se a resposta está correta (para debug)
-        if (responsePage !== this.currentPage) {
-          console.warn('[InsumoManager] API retornou página diferente da solicitada:', responsePage, 'vs', this.currentPage, '- mantendo página solicitada');
-        }
-        // Manter currentPage como está (não sobrescrever)
       }
-      
-      console.log('[InsumoManager] Estado após carregar:', {
-        currentPage: this.currentPage,
-        totalPages: this.totalPages,
-        totalItems: this.totalItems
-      });
 
       // Mapear dados para o formato esperado pelo createInsumoCard
       const insumosMapeados = insumos.map((insumo) => ({
@@ -506,7 +518,10 @@ class InsumoManager {
       this.renderPagination();
       // Não precisa mais aplicar filtros locais - tudo é filtrado pela API
     } catch (error) {
-      console.error("Erro ao carregar insumos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar insumos:", error);
+      }
       this.showErrorMessage("Erro ao carregar insumos");
     } finally {
       this.isLoading = false;
@@ -524,12 +539,16 @@ class InsumoManager {
     const loadingOverlay = document.createElement("div");
     loadingOverlay.className = "loading-overlay";
     loadingOverlay.id = "ingredientes-loading";
-    loadingOverlay.innerHTML = `
-      <div class="loading-spinner">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Carregando ingredientes...</p>
-      </div>
-    `;
+    // ALTERAÇÃO: Criar elementos manualmente para prevenir XSS
+    const spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    const icon = document.createElement('i');
+    icon.className = 'fa-solid fa-spinner fa-spin';
+    const message = document.createElement('p');
+    message.textContent = 'Carregando ingredientes...';
+    spinner.appendChild(icon);
+    spinner.appendChild(message);
+    loadingOverlay.appendChild(spinner);
     container.appendChild(loadingOverlay);
   }
 
@@ -563,7 +582,10 @@ class InsumoManager {
 
       // Ingredientes carregados para validação
     } catch (error) {
-      console.error("Erro ao carregar ingredientes para validação:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar ingredientes para validação:", error);
+      }
       // Em caso de erro, usar lista vazia para não bloquear a operação
       this.ingredientes = [];
       throw error;
@@ -583,20 +605,54 @@ class InsumoManager {
       const response = await checkIngredientNameExists(name);
       return response.exists || false;
     } catch (error) {
-      console.warn("Erro ao verificar nome via API:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn("Erro ao verificar nome via API:", error);
+      }
       return false; // Em caso de erro, permitir tentativa
     }
   }
 
   /**
    * Carrega resumo do estoque
+   * ALTERAÇÃO: Agora usa API SQL em vez de calcular no frontend
    */
   async loadResumoEstoque() {
     try {
-      const resumo = await this.dataManager.getResumoEstoque();
+      // ALTERAÇÃO: Buscar métricas via API SQL em vez de calcular no frontend
+      const response = await getStockDashboardMetrics();
+      
+      if (!response.success) {
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error("Erro ao buscar métricas do dashboard de estoque:", response.error);
+        }
+        // Usar valores padrão em caso de erro
+        this.updateResumoCards({
+          total_stock_value: 0,
+          total_items: 0,
+          out_of_stock_count: 0,
+          low_stock_count: 0,
+          in_stock_count: 0
+        });
+        return;
+      }
+      
+      const resumo = response.data;
       this.updateResumoCards(resumo);
     } catch (error) {
-      console.error("Erro ao carregar resumo do estoque:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar resumo do estoque:", error);
+      }
+      // Usar valores padrão em caso de erro
+      this.updateResumoCards({
+        total_stock_value: 0,
+        total_items: 0,
+        out_of_stock_count: 0,
+        low_stock_count: 0,
+        in_stock_count: 0
+      });
     }
   }
 
@@ -611,9 +667,9 @@ class InsumoManager {
 
     if (!insumos || insumos.length === 0) {
       container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-box-open"></i>
-                    <p>Nenhum insumo encontrado</p>
+                <div style="text-align: center; padding: 48px; color: #666;">
+                    <i class="fa-solid fa-box-open" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
+                    <p style="font-size: 16px;">Nenhum insumo encontrado</p>
                 </div>
             `;
       return;
@@ -810,7 +866,10 @@ class InsumoManager {
         this.openInsumoModal(insumo);
       }
     } catch (error) {
-      console.error("Erro ao buscar insumo para edição:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar insumo para edição:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados do insumo");
     }
   }
@@ -828,7 +887,10 @@ class InsumoManager {
         this.openEditarEstoqueModal(insumo);
       }
     } catch (error) {
-      console.error("Erro ao buscar insumo para edição de estoque:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar insumo para edição de estoque:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados do insumo");
     }
   }
@@ -1003,7 +1065,10 @@ class InsumoManager {
       this.showSuccessMessage("Estoque atualizado com sucesso!");
       this.closeEditarEstoqueModal();
     } catch (error) {
-      console.error("Erro ao salvar estoque:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao salvar estoque:", error);
+      }
       this.handleApiError(error, "atualizar estoque do insumo");
     } finally {
       // Reabilitar botão
@@ -1199,10 +1264,13 @@ class InsumoManager {
     try {
       //Validar parâmetros de entrada
       if (!insumoId || isNaN(newValue)) {
-        console.warn("Parâmetros inválidos para updateLocalCache:", {
-          insumoId,
-          newValue,
-        });
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn("Parâmetros inválidos para updateLocalCache:", {
+            insumoId,
+            newValue,
+          });
+        }
         return;
       }
 
@@ -1216,11 +1284,17 @@ class InsumoManager {
           this.dataManager.cache.lastFetch =
             Date.now() - this.dataManager.cacheTimeout;
         } else {
-          console.warn(`Insumo com ID ${insumoId} não encontrado no cache`);
+          // ALTERAÇÃO: Log condicional apenas em modo debug
+          if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.warn(`Insumo com ID ${insumoId} não encontrado no cache`);
+          }
         }
       }
     } catch (error) {
-      console.error("Erro ao atualizar cache local:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar cache local:", error);
+      }
     }
   }
 
@@ -1254,7 +1328,10 @@ class InsumoManager {
         }
       }
     } catch (error) {
-      console.error("Erro ao atualizar resumo local:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar resumo local:", error);
+      }
       // Em caso de erro, recarregar dados completos
       await this.loadResumoEstoque();
     }
@@ -1274,10 +1351,13 @@ class InsumoManager {
 
     // Validar se currentValue é um número válido
     if (isNaN(currentValue)) {
-      console.error(
-        "Valor de estoque inválido:",
-        quantidadeElement.textContent
-      );
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error(
+          "Valor de estoque inválido:",
+          quantidadeElement.textContent
+        );
+      }
       return false;
     }
 
@@ -1512,7 +1592,10 @@ class InsumoManager {
           // Resetar contador
           this.continuousAdjustment.pendingChanges = 0;
         } catch (error) {
-          console.error("Erro no ajuste contínuo em lote:", error);
+          // ALTERAÇÃO: Log condicional apenas em modo debug
+          if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error("Erro no ajuste contínuo em lote:", error);
+          }
           this.stopContinuousAdjustment();
         }
       }
@@ -1556,7 +1639,10 @@ class InsumoManager {
             currentValue
           );
         } catch (error) {
-          console.error("Erro ao processar mudanças pendentes:", error);
+          // ALTERAÇÃO: Log condicional apenas em modo debug
+          if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error("Erro ao processar mudanças pendentes:", error);
+          }
         }
       }
 
@@ -1589,7 +1675,10 @@ class InsumoManager {
       try {
         await this.loadResumoEstoque();
       } catch (error) {
-        console.error("Erro ao recarregar resumo após ajuste contínuo:", error);
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error("Erro ao recarregar resumo após ajuste contínuo:", error);
+        }
       }
     }
   }
@@ -1612,7 +1701,10 @@ class InsumoManager {
       // Fazer chamada à API
       await this.dataManager.adjustInsumoStock(insumoId, changeAmount);
     } catch (error) {
-      console.error("Erro ao ajustar estoque:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao ajustar estoque:", error);
+      }
       this.stopContinuousAdjustment();
 
       // Reverter mudança visual em caso de erro (mantém página atual)
@@ -1829,53 +1921,37 @@ class InsumoManager {
       e.stopPropagation();
       
       if (this.isLoading) {
-        console.log('[InsumoManager] Carregando, ignorando clique');
         return;
       }
       
       // Verificar se é botão de navegação
       if (target.classList.contains('pagination-btn')) {
         if (target.disabled) {
-          console.log('[InsumoManager] Botão desabilitado');
           return;
         }
         
         const action = target.dataset.page;
-        const oldPage = this.currentPage;
         
         if (action === "prev" && this.currentPage > 1) {
           this.currentPage = Math.max(1, this.currentPage - 1);
-          console.log('[InsumoManager] Navegando para página anterior:', oldPage, '->', this.currentPage);
         } else if (action === "next" && this.currentPage < this.totalPages) {
           this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
-          console.log('[InsumoManager] Navegando para próxima página:', oldPage, '->', this.currentPage);
         } else {
-          console.log('[InsumoManager] Navegação bloqueada:', { action, currentPage: this.currentPage, totalPages: this.totalPages });
           return;
         }
       } 
       // Verificar se é número de página
       else if (target.classList.contains('page-number')) {
         const page = parseInt(target.dataset.page);
-        const oldPage = this.currentPage;
         
         if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
-          console.log('[InsumoManager] Navegação para página bloqueada:', { page, currentPage: this.currentPage, totalPages: this.totalPages });
           return;
         }
         
         this.currentPage = page;
-        console.log('[InsumoManager] Navegando para página:', oldPage, '->', page);
       } else {
         return;
       }
-      
-      // Garantir que o estado foi atualizado antes de carregar
-      console.log('[InsumoManager] Estado antes de carregar:', {
-        currentPage: this.currentPage,
-        totalPages: this.totalPages,
-        totalItems: this.totalItems
-      });
       
       await this.loadInsumos();
       this.scrollToTop();
@@ -2121,7 +2197,10 @@ class InsumoManager {
   async handleAddInsumo() {
     // Evitar envios simultâneos
     if (this.isSubmitting) {
-      console.warn("Envio já em andamento.");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn("Envio já em andamento.");
+      }
       return;
     }
     if (!(await this.validateInsumoForm())) {
@@ -2181,7 +2260,10 @@ class InsumoManager {
       }
     } catch (error) {
       // Em caso de erro, NÃO executar nenhuma atualização da UI
-      console.error("Erro ao adicionar insumo - não atualizando UI:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar insumo - não atualizando UI:", error);
+      }
 
       // Se for erro 409 (conflito), não mostrar erro genérico, apenas a mensagem específica
       if (error.status === 409) {
@@ -2215,7 +2297,10 @@ class InsumoManager {
     const insumoId = this.currentEditingId;
 
     if (!insumoId) {
-      console.error("ID do insumo não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("ID do insumo não encontrado");
+      }
       return;
     }
 
@@ -2297,13 +2382,19 @@ class InsumoManager {
       
       await this.updateResumoAfterDelete(insumoData);
     } catch (error) {
-      console.error("Erro ao excluir insumo:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao excluir insumo:", error);
+      }
 
       // Se o erro for 404, remover o card da UI mesmo assim
       if (error.status === 404) {
-        console.warn(
-          "Insumo não encontrado no servidor, removendo da interface..."
-        );
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn(
+            "Insumo não encontrado no servidor, removendo da interface..."
+          );
+        }
         this.removeInsumoFromUI(insumoId);
         return; // Não re-throw o erro para não mostrar mensagem de erro
       }
@@ -2384,10 +2475,13 @@ class InsumoManager {
       try {
         await this.loadIngredientesForValidation();
       } catch (error) {
-        console.warn(
-          "Não foi possível carregar ingredientes para validação:",
-          error
-        );
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn(
+            "Não foi possível carregar ingredientes para validação:",
+            error
+          );
+        }
         // Continuar sem validação frontend se não conseguir carregar
       }
 
@@ -2427,10 +2521,13 @@ class InsumoManager {
           }
         }
       } catch (error) {
-        console.warn(
-          "Não foi possível validar nome duplicado na edição:",
-          error
-        );
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn(
+            "Não foi possível validar nome duplicado na edição:",
+            error
+          );
+        }
       }
     }
 
@@ -2655,7 +2752,10 @@ class InsumoManager {
    * Trata erros da API de forma inteligente
    */
   handleApiError(error, operation = "") {
-    console.error(`Erro na operação ${operation}:`, error);
+    // ALTERAÇÃO: Log condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error(`Erro na operação ${operation}:`, error);
+    }
 
     // Se o erro já tem uma mensagem tratada pelo sistema de alerts
     if (error.status && error.payload) {
@@ -2756,13 +2856,19 @@ class InsumoManager {
   async addInsumoToUI(insumoData) {
     const container = document.querySelector("#secao-estoque .ingredientes");
     if (!container) {
-      console.error("Container de ingredientes não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Container de ingredientes não encontrado");
+      }
       return;
     }
 
     // Validar se os dados são válidos antes de criar o card
     if (!insumoData || !insumoData.id) {
-      console.error("Dados do insumo inválidos:", insumoData);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Dados do insumo inválidos:", insumoData);
+      }
       throw new Error("Dados do insumo inválidos para criar card");
     }
 
@@ -2771,9 +2877,12 @@ class InsumoManager {
       `[data-ingredient-id="${insumoData.id}"]`
     );
     if (existingCard) {
-      console.warn(
-        `Card para insumo ID ${insumoData.id} já existe, não criando duplicata`
-      );
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn(
+          `Card para insumo ID ${insumoData.id} já existe, não criando duplicata`
+        );
+      }
       return;
     }
 
@@ -2917,9 +3026,9 @@ class InsumoManager {
 
     if (remainingCards.length === 0) {
       container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-box-open"></i>
-                    <p>Nenhum insumo encontrado</p>
+                <div style="text-align: center; padding: 48px; color: #666;">
+                    <i class="fa-solid fa-box-open" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
+                    <p style="font-size: 16px;">Nenhum insumo encontrado</p>
                 </div>
             `;
     }
@@ -3025,7 +3134,10 @@ class InsumoManager {
         custo: custo,
       };
     } catch (error) {
-      console.error("Erro ao extrair dados do card:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao extrair dados do card:", error);
+      }
       return null;
     }
   }
@@ -3056,7 +3168,10 @@ class InsumoManager {
         inStockElement.textContent = currentCount + 1;
       }
     } catch (error) {
-      console.error("Erro ao atualizar resumo após adicionar:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar resumo após adicionar:", error);
+      }
       // Fallback: recarregar resumo completo
       await this.loadResumoEstoque();
     }
@@ -3071,7 +3186,10 @@ class InsumoManager {
       // Apenas o valor total se o custo mudou
       // Esta função pode ser expandida conforme necessário
     } catch (error) {
-      console.error("Erro ao atualizar resumo após editar:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar resumo após editar:", error);
+      }
       await this.loadResumoEstoque();
     }
   }
@@ -3135,7 +3253,10 @@ class InsumoManager {
         }
       }
     } catch (error) {
-      console.error("Erro ao atualizar resumo após excluir:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar resumo após excluir:", error);
+      }
       await this.loadResumoEstoque();
     }
   }
@@ -3149,7 +3270,10 @@ class InsumoManager {
       // Pois o insumo continua existindo, apenas muda o status
       // Esta função pode ser expandida conforme necessário
     } catch (error) {
-      console.error("Erro ao atualizar resumo após toggle:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar resumo após toggle:", error);
+      }
       await this.loadResumoEstoque();
     }
   }

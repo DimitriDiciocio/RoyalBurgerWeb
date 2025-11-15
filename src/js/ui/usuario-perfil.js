@@ -265,6 +265,47 @@ $(document).ready(function () {
         } catch (_e) { return null; }
     }
 
+    // ALTERAÇÃO: Função para verificar se o usuário é cliente
+    function isCliente(user) {
+        if (!user) return false;
+        // Verifica diferentes campos possíveis para o tipo/role do usuário
+        const userType = (user.role || user.profile || user.type || user.user_type || 'customer').toLowerCase();
+        // Retorna true apenas se for cliente/customer
+        return userType === 'cliente' || userType === 'customer';
+    }
+
+    // ALTERAÇÃO: Função para ajustar navegação baseada no tipo de usuário
+    function ajustarNavegacaoPorTipoUsuario(user) {
+        const isUserCliente = isCliente(user);
+        
+        if (!isUserCliente) {
+            // Para usuários não-clientes, ocultar itens específicos de cliente
+            const navegaDivs = document.querySelectorAll('.navega > div, .navega > a');
+            
+            navegaDivs.forEach(item => {
+                const texto = item.textContent.trim().toLowerCase();
+                // Oculta: Ver pedidos, Endereços, Ver pontos
+                if (texto.includes('ver pedidos') || 
+                    texto.includes('endereços') || 
+                    texto.includes('ver pontos')) {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Ocultar seção de endereços completamente
+            const enderecosSection = document.getElementById('enderecos');
+            if (enderecosSection) {
+                enderecosSection.style.display = 'none';
+            }
+            
+            // Ocultar quadro de pontos Royal
+            const quadroPontos = document.querySelector('.quadro-pontos-royal');
+            if (quadroPontos) {
+                quadroPontos.style.display = 'none';
+            }
+        }
+    }
+
     function renderPerfil(user) {
         try {
             const fullName = user.full_name || user.name || user.nome || '';
@@ -283,6 +324,9 @@ $(document).ready(function () {
             setInfo('Data de nascimento', formatarDataBR(dob));
             setInfo('E-mail', email);
             setInfo('Telefone', formatarTelefone(phone));
+            
+            // ALTERAÇÃO: Ajustar navegação baseado no tipo de usuário
+            ajustarNavegacaoPorTipoUsuario(user);
         } catch (_e) { }
     }
 
@@ -378,9 +422,13 @@ $(document).ready(function () {
             currentUser = me || null;
             currentUserId = (me && (me.id || me.user_id || me.customer_id || me.pk)) || currentUserId;
             renderPerfil(me || {});
-            await carregarEnderecos();
-            // ALTERAÇÃO: Carregar pontos do Clube Royal
-            await carregarPontosRoyal();
+            
+            // ALTERAÇÃO: Carregar endereços apenas se for cliente
+            if (isCliente(me)) {
+                await carregarEnderecos();
+                // ALTERAÇÃO: Carregar pontos do Clube Royal apenas se for cliente
+                await carregarPontosRoyal();
+            }
             // sucesso
             // noop
         } catch (err) {
@@ -424,7 +472,10 @@ $(document).ready(function () {
                 }
             }
         } catch (error) {
-            console.error('Erro ao carregar status do 2FA:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao carregar status do 2FA:', error);
+            }
             // Em caso de erro, definir como desabilitado
             const infoChecaElements = document.querySelectorAll('#config .info-checa');
             infoChecaElements.forEach(element => {
@@ -463,7 +514,10 @@ $(document).ready(function () {
             toggleElement.addEventListener('change', async function() {
                 // Evitar múltiplas solicitações simultâneas
                 if (isProcessing2FA) {
-                    console.log('Já está processando uma solicitação 2FA, ignorando...');
+                    // ALTERAÇÃO: Log condicional apenas em modo debug
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.log('Já está processando uma solicitação 2FA, ignorando...');
+                    }
                     return;
                 }
                 
@@ -519,7 +573,10 @@ $(document).ready(function () {
                         }
                     }
                 } catch (error) {
-                    console.error('Erro ao alterar 2FA:', error);
+                    // ALTERAÇÃO: Log condicional apenas em modo debug
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.error('Erro ao alterar 2FA:', error);
+                    }
                     toastFromApiError(error);
                     // Reverter o toggle em caso de erro
                     this.checked = !isEnabled;
@@ -596,7 +653,10 @@ $(document).ready(function () {
                     isProcessing2FA = false;
                     
                 } catch (error) {
-                    console.error('Erro ao confirmar 2FA:', error);
+                    // ALTERAÇÃO: Log condicional apenas em modo debug
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.error('Erro ao confirmar 2FA:', error);
+                    }
                     toastFromApiError(error);
                     this.disabled = false;
                     this.textContent = 'Confirmar e Ativar';
@@ -1185,7 +1245,10 @@ $(document).ready(function () {
         } catch (err) {
             // Se não conseguir carregar endereços, continua tentando adicionar
             // O backend também pode validar duplicatas
-            console.warn('Não foi possível verificar endereços existentes:', err);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.warn('Não foi possível verificar endereços existentes:', err);
+            }
         }
 
         try {
@@ -1258,7 +1321,10 @@ $(document).ready(function () {
         } catch (err) {
             // Se não conseguir carregar endereços, continua tentando atualizar
             // O backend também pode validar duplicatas
-            console.warn('Não foi possível verificar endereços existentes:', err);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.warn('Não foi possível verificar endereços existentes:', err);
+            }
         }
 
         try {
@@ -1408,6 +1474,7 @@ $(document).ready(function () {
                 notify_order_updates: true,
                 notify_promotions: true
             });
+            // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao carregar preferências de notificação:', err);
             }
@@ -1559,8 +1626,11 @@ $(document).ready(function () {
 
     // Função de teste para debug (remover em produção)
     window.testarToggle2FA = function() {
-        console.log('=== TESTE TOGGLE 2FA ===');
-        console.log('Flag isProcessing2FA:', isProcessing2FA);
+        // ALTERAÇÃO: Log condicional apenas em modo debug (função de teste)
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.log('=== TESTE TOGGLE 2FA ===');
+            console.log('Flag isProcessing2FA:', isProcessing2FA);
+        }
         
         // Encontrar o toggle específico da "Verificação em duas etapas"
         const infoChecaElements = document.querySelectorAll('#config .info-checa');
@@ -1573,25 +1643,32 @@ $(document).ready(function () {
             }
         });
         
-        console.log('Toggle 2FA encontrado:', toggle);
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.log('Toggle 2FA encontrado:', toggle);
+        }
         
         if (toggle) {
-            console.log('Toggle checked:', toggle.checked);
-            console.log('Toggle disabled:', toggle.disabled);
-            
-            // Testar clique manual
-            console.log('Testando clique manual...');
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.log('Toggle checked:', toggle.checked);
+                console.log('Toggle disabled:', toggle.disabled);
+                console.log('Testando clique manual...');
+            }
             toggle.checked = !toggle.checked;
             toggle.dispatchEvent(new Event('change'));
         } else {
-            console.log('Toggle 2FA não encontrado! Verificando todos os toggles...');
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.log('Toggle 2FA não encontrado! Verificando todos os toggles...');
+            }
             
             // Listar todos os toggles disponíveis
             const allToggles = document.querySelectorAll('#config input[type="checkbox"]');
             allToggles.forEach((toggle, index) => {
                 const parent = toggle.closest('.info-checa');
                 const titulo = parent ? parent.querySelector('.titulo') : null;
-                console.log(`Toggle ${index + 1}:`, toggle, 'Título:', titulo ? titulo.textContent : 'N/A');
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.log(`Toggle ${index + 1}:`, toggle, 'Título:', titulo ? titulo.textContent : 'N/A');
+                }
             });
         }
     };
@@ -1599,7 +1676,10 @@ $(document).ready(function () {
     // Função para resetar flag de processamento (para debug)
     window.resetarFlag2FA = function() {
         isProcessing2FA = false;
-        console.log('Flag isProcessing2FA resetada para false');
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.log('Flag isProcessing2FA resetada para false');
+        }
     };
 
     // ====== FUNCIONALIDADES DA MODAL DE ALTERAR SENHA ======
@@ -1861,7 +1941,10 @@ $(document).ready(function () {
             }, 2000);
             
         } catch (error) {
-            console.error('Erro ao alterar senha:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao alterar senha:', error);
+            }
             
             // Tratar erros específicos da API
             const errorMessage = error?.payload?.error || error?.message || 'Falha ao alterar senha.';
@@ -1977,6 +2060,10 @@ $(document).ready(function () {
 
     // clique nos botões
     $(".navega div").click(function () {
+        // ALTERAÇÃO: Verificar se o item não está oculto (pode ser oculto para não-clientes)
+        if ($(this).css('display') === 'none') {
+            return; // Não fazer nada se o item estiver oculto
+        }
 
         let texto = $(this).find("p").text().trim();
 
@@ -1987,11 +2074,16 @@ $(document).ready(function () {
         // esconde tudo
         $("#dados-user, #enderecos, #config").hide();
 
+        // ALTERAÇÃO: Verificar tipo de usuário antes de exibir seções
+        const u = currentUser || getStoredUser();
+        const isUserCliente = isCliente(u);
+
         // verifica qual botão foi clicado
         if (texto === "Dados da conta") {
             $("#dados-user").show();
         }
-        else if (texto === "Endereços") {
+        else if (texto === "Endereços" && isUserCliente) {
+            // ALTERAÇÃO: Só exibir endereços se for cliente
             $("#enderecos").show();
         }
         else if (texto === "Configurações") {

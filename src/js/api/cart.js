@@ -21,7 +21,7 @@
  * As mensagens de erro do backend já incluem valores convertidos corretamente.
  */
 
-import { apiRequest, getStoredToken, API_BASE_URL } from './api.js';
+import { apiRequest, getStoredToken, getStoredUser, API_BASE_URL } from './api.js';
 
 // Chave para armazenar dados do carrinho no localStorage
 const CART_STORAGE_KEY = 'royal_burger_cart';
@@ -72,6 +72,45 @@ function cleanupValidationCache() {
 function isAuthenticated() {
     const token = getStoredToken();
     return !!token;
+}
+
+/**
+ * ALTERAÇÃO: Verifica se o usuário pode adicionar itens ao carrinho
+ * Apenas clientes e atendentes podem adicionar itens ao carrinho
+ * @returns {Object} { allowed: boolean, message?: string }
+ */
+function canUserAddToCart() {
+    const isAuth = isAuthenticated();
+    
+    // Se não estiver logado, permite (usuário convidado pode adicionar)
+    if (!isAuth) {
+        return { allowed: true };
+    }
+    
+    // Se estiver logado, verifica o role
+    const user = getStoredUser();
+    if (!user) {
+        return { 
+            allowed: false, 
+            message: 'Não foi possível verificar suas permissões. Faça login novamente.' 
+        };
+    }
+    
+    // Verifica diferentes campos possíveis para o tipo/role do usuário
+    const userRole = (user.role || user.profile || user.type || user.user_type || 'customer').toLowerCase();
+    
+    // Permite apenas clientes e atendentes
+    const allowedRoles = ['cliente', 'customer', 'atendente', 'attendant'];
+    const isAllowed = allowedRoles.includes(userRole);
+    
+    if (!isAllowed) {
+        return { 
+            allowed: false, 
+            message: 'Apenas clientes e atendentes podem adicionar itens à cesta.' 
+        };
+    }
+    
+    return { allowed: true };
 }
 
 /**
@@ -171,10 +210,16 @@ function saveCartToStorage(cartId, items = []) {
         
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(dataToSave));
     } catch (error) {
-        // ALTERAÇÃO: Log apenas erros críticos de armazenamento (quota excedida)
+        // ALTERAÇÃO: Log apenas erros críticos de armazenamento (quota excedida) em modo debug
         // Erros de parsing normal são silenciados, mas problemas de armazenamento devem ser registrados
-        if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-            console.warn('[CART] LocalStorage quota excedida:', error.message);
+        if ((error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
+            typeof window !== 'undefined' && window.DEBUG_MODE) {
+            // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+            const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+            if (isDev) {
+              // eslint-disable-next-line no-console
+              console.warn('[CART] LocalStorage quota excedida:', error.message);
+            }
         }
         // Outros erros (JSON inválido, etc) são silenciados intencionalmente
     }
@@ -278,6 +323,12 @@ export async function addToCart(productId, quantity = 1, extras = [], notes = ''
     let cartId = getCartIdFromStorage();
     
     try {
+        // ALTERAÇÃO: Validar se o usuário pode adicionar itens ao carrinho
+        const permissionCheck = canUserAddToCart();
+        if (!permissionCheck.allowed) {
+            throw new Error(permissionCheck.message || 'Você não tem permissão para adicionar itens à cesta.');
+        }
+        
         // Validar parâmetros de entrada
         if (!isValidProductId(productId)) {
             throw new Error('ID do produto inválido');
@@ -618,6 +669,12 @@ export async function getCart() {
  */
 export async function updateCartItem(itemId, updates) {
     try {
+        // ALTERAÇÃO: Validar se o usuário pode atualizar itens no carrinho
+        const permissionCheck = canUserAddToCart();
+        if (!permissionCheck.allowed) {
+            throw new Error(permissionCheck.message || 'Você não tem permissão para atualizar itens na cesta.');
+        }
+        
         // Validar ID do item
         if (!isValidProductId(itemId)) {
             throw new Error('ID do item inválido');

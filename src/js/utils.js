@@ -115,6 +115,12 @@ export function gerenciarEstadoInputs() {
 
       // Armazenar observer no elemento para cleanup posterior se necessário
       input._valueObserver = observer;
+      
+      // TODO: REVISAR - Cleanup de MutationObserver
+      // Os observers criados não são desconectados automaticamente quando
+      // os inputs são removidos do DOM. Considerar implementar cleanup
+      // quando elementos são removidos (usar MutationObserver no container pai
+      // ou WeakMap para rastrear observers).
     } catch (_e) {
       // Fallback silencioso se MutationObserver não estiver disponível
     }

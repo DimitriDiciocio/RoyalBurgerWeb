@@ -118,7 +118,12 @@ export function sanitizeURL(url, fallback = "") {
  */
 export function safeHTML(template, data = {}) {
   if (typeof template !== "string") {
-    console.warn("safeHTML: template deve ser uma string");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("safeHTML: template deve ser uma string");
+    }
     return "";
   }
 
@@ -166,7 +171,12 @@ export function safeHTML(template, data = {}) {
  */
 export function setSafeHTML(element, html, sanitize = true) {
   if (!element || !(element instanceof HTMLElement)) {
-    console.warn("setSafeHTML: element deve ser um HTMLElement");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("setSafeHTML: element deve ser um HTMLElement");
+    }
     return;
   }
 

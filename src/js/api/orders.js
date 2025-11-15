@@ -195,9 +195,14 @@ export async function calculateOrderTotal(items, points_to_redeem = 0, order_typ
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao calcular total:', error.message);
+          // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.error em produção
+          const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+          if (isDev) {
+            // eslint-disable-next-line no-console
+            console.error('Erro ao calcular total:', error.message);
+          }
         }
         return {
             success: false,
@@ -219,9 +224,14 @@ export async function getMyOrders() {
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao buscar pedidos:', error.message);
+          // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.error em produção
+          const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+          if (isDev) {
+            // eslint-disable-next-line no-console
+            console.error('Erro ao buscar pedidos:', error.message);
+          }
         }
         return {
             success: false,
@@ -232,11 +242,30 @@ export async function getMyOrders() {
 
 /**
  * Busca todos os pedidos (admin/manager)
- * @returns {Promise<Object>} Lista de todos os pedidos
+ * @param {Object} options - Opções de paginação e filtros
+ * @param {number} options.page - Página atual (padrão: 1)
+ * @param {number} options.page_size - Itens por página (padrão: 20)
+ * @param {string} options.search - Termo de busca (ID, cliente, itens)
+ * @param {string} options.status - Filtro por status
+ * @param {string} options.channel - Filtro por canal (delivery, pickup, dine_in)
+ * @param {string} options.period - Filtro por período (today, week, month, all)
+ * @returns {Promise<Object>} Lista de todos os pedidos com paginação
  */
-export async function getAllOrders() {
+export async function getAllOrders(options = {}) {
+    const params = new URLSearchParams();
+    
+    if (options.page) params.append('page', options.page);
+    if (options.page_size) params.append('page_size', options.page_size);
+    if (options.search) params.append('search', options.search);
+    if (options.status) params.append('status', options.status);
+    if (options.channel) params.append('channel', options.channel);
+    if (options.period && options.period !== 'all') params.append('period', options.period);
+    
+    const queryString = params.toString();
+    const url = `/api/orders/all${queryString ? `?${queryString}` : ''}`;
+    
     try {
-        const data = await apiRequest('/api/orders/all', {
+        const data = await apiRequest(url, {
             method: 'GET'
         });
 
@@ -245,10 +274,6 @@ export async function getAllOrders() {
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
-        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao buscar todos os pedidos:', error.message);
-        }
         return {
             success: false,
             error: error.message
@@ -271,9 +296,14 @@ export async function getTodayOrders() {
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao buscar pedidos do dia:', error.message);
+          // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.error em produção
+          const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+          if (isDev) {
+            // eslint-disable-next-line no-console
+            console.error('Erro ao buscar pedidos do dia:', error.message);
+          }
         }
         return {
             success: false,
@@ -308,9 +338,14 @@ export async function updateOrderStatus(orderId, status) {
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao atualizar status:', error.message);
+          // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.error em produção
+          const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+          if (isDev) {
+            // eslint-disable-next-line no-console
+            console.error('Erro ao atualizar status:', error.message);
+          }
         }
         return {
             success: false,
@@ -339,9 +374,14 @@ export async function getOrderDetails(orderId) {
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao buscar detalhes do pedido:', error.message);
+          // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.error em produção
+          const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+          if (isDev) {
+            // eslint-disable-next-line no-console
+            console.error('Erro ao buscar detalhes do pedido:', error.message);
+          }
         }
         return {
             success: false,
@@ -370,9 +410,14 @@ export async function cancelOrder(orderId) {
             data: data
         };
     } catch (error) {
-        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-          console.error('Erro ao cancelar pedido:', error.message);
+          // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.error em produção
+          const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+          if (isDev) {
+            // eslint-disable-next-line no-console
+            console.error('Erro ao cancelar pedido:', error.message);
+          }
         }
         return {
             success: false,

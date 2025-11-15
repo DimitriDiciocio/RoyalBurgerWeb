@@ -16,6 +16,8 @@ import { showToast } from "../alerts.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { renderListInChunks } from "../../utils/virtual-scroll.js";
 import { escapeHTML } from "../../utils/html-sanitizer.js";
+import { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } from "../../utils/pagination-utils.js";
+import { showLoadingOverlay, hideLoadingOverlay } from "../../utils/loading-indicator.js";
 import {
   validateEmail,
   validatePhone,
@@ -62,32 +64,55 @@ class UsuarioDataManager {
 
   /**
    * Busca todos os usuários
+   * ALTERAÇÃO: Agora retorna resposta completa com paginação ao invés de apenas array de usuários
    */
   async getAllUsuarios(options = {}) {
     try {
-      if (this.isCacheValid() && !options.forceRefresh) {
+      // ALTERAÇÃO: Não usar cache quando há filtros/paginação ativos
+      if (this.isCacheValid() && !options.forceRefresh && !options.page && !options.search && !options.role && options.status === undefined) {
         return this.cache.data;
       }
 
       const response = await getUsers(options);
 
-      // A API retorna um objeto com paginação, extrair apenas os usuários
-      let usuarios;
-      if (response && response.users && Array.isArray(response.users)) {
-        usuarios = response.users;
+      // ALTERAÇÃO: Retornar resposta completa com paginação
+      // A API pode retornar {users: [...], pagination: {...}} ou formato legado
+      let result;
+      if (response && (response.users || response.items)) {
+        // Formato com paginação
+        result = {
+          users: response.users || response.items || [],
+          pagination: response.pagination || null
+        };
       } else if (Array.isArray(response)) {
-        usuarios = response;
+        // Formato legado: array direto
+        result = {
+          users: response,
+          pagination: null
+        };
       } else {
-        console.warn("Formato de resposta inesperado da API:", response);
-        usuarios = [];
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn("Formato de resposta inesperado da API:", response);
+        }
+        result = {
+          users: [],
+          pagination: null
+        };
       }
 
-      this.cache.data = usuarios;
-      this.cache.lastFetch = Date.now();
+      // ALTERAÇÃO: Só cachear se não houver filtros/paginação
+      if (!options.page && !options.search && !options.role && options.status === undefined) {
+        this.cache.data = result;
+        this.cache.lastFetch = Date.now();
+      }
 
-      return usuarios;
+      return result;
     } catch (error) {
-      console.error("Erro ao buscar usuários:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar usuários:", error);
+      }
       throw error;
     }
   }
@@ -134,7 +159,10 @@ class UsuarioDataManager {
 
       return usuarioMapeado;
     } catch (error) {
-      console.error(`Erro ao buscar usuário (ID: ${id}):`, error.message);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error(`Erro ao buscar usuário (ID: ${id}):`, error.message);
+      }
       throw new Error(`Falha ao carregar dados do usuário: ${error.message}`);
     }
   }
@@ -187,7 +215,10 @@ class UsuarioDataManager {
       await createUser(apiData);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao adicionar usuário:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar usuário:", error);
+      }
       throw error;
     }
   }
@@ -238,7 +269,10 @@ class UsuarioDataManager {
       await updateUser(id, apiData);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao atualizar usuário:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar usuário:", error);
+      }
       throw error;
     }
   }
@@ -251,7 +285,10 @@ class UsuarioDataManager {
       await updateUserStatus(id, novoStatus);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao alterar status do usuário:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao alterar status do usuário:", error);
+      }
       throw error;
     }
   }
@@ -297,6 +334,15 @@ class UsuarioManager {
     this.domCache = new Map();
     this.lastOperation = 0;
     this.minOperationInterval = 1000; // 1 segundo entre operações
+    // ALTERAÇÃO: Estado de paginação adicionado
+    this.currentPage = 1;
+    this.pageSize = 20;
+    this.totalPages = 1;
+    this.totalItems = 0;
+    this.currentSearchTerm = "";
+    this.currentCargoFilter = "";
+    this.currentStatusFilter = "";
+    this.isLoading = false;
   }
 
   /**
@@ -329,11 +375,14 @@ class UsuarioManager {
     const timeSinceLastOp = now - this.lastOperation;
 
     if (timeSinceLastOp < this.minOperationInterval) {
-      console.warn(
-        `Rate limit: ${operation} bloqueada. Aguarde ${Math.ceil(
-          (this.minOperationInterval - timeSinceLastOp) / 1000
-        )}s`
-      );
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn(
+          `Rate limit: ${operation} bloqueada. Aguarde ${Math.ceil(
+            (this.minOperationInterval - timeSinceLastOp) / 1000
+          )}s`
+        );
+      }
       return false;
     }
 
@@ -360,7 +409,10 @@ class UsuarioManager {
       await this.loadUsuarios();
       this.setupEventListeners();
     } catch (error) {
-      console.error("Erro ao inicializar módulo de usuários:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao inicializar módulo de usuários:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados dos usuários");
     }
   }
@@ -381,7 +433,10 @@ class UsuarioManager {
     const section = document.getElementById("secao-funcionarios");
 
     if (!section) {
-      console.error("Seção de funcionários não encontrada!");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Seção de funcionários não encontrada!");
+      }
       return;
     }
 
@@ -456,52 +511,119 @@ class UsuarioManager {
 
   /**
    * Configura handlers de filtros
+   * ALTERAÇÃO: Agora recarrega da API ao invés de filtrar localmente
    */
   setupFilterHandlers() {
     const cargoFilter = document.getElementById("cargo-filtro");
     const statusFilter = document.getElementById("status-funcionario");
 
     if (cargoFilter) {
-      cargoFilter.addEventListener("change", (e) => {
-        this.applyAllFilters();
+      cargoFilter.addEventListener("change", async (e) => {
+        this.currentCargoFilter = cargoFilter.value || "";
+        this.currentPage = 1; // Resetar para primeira página ao filtrar
+        await this.loadUsuarios(); // Recarregar da API
       });
     }
 
     if (statusFilter) {
-      statusFilter.addEventListener("change", (e) => {
-        this.applyAllFilters();
+      statusFilter.addEventListener("change", async (e) => {
+        this.currentStatusFilter = statusFilter.value || "";
+        this.currentPage = 1; // Resetar para primeira página ao filtrar
+        await this.loadUsuarios(); // Recarregar da API
       });
     }
   }
 
   /**
    * Configura handlers de busca
+   * ALTERAÇÃO: Agora recarrega da API ao invés de filtrar localmente
    */
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-funcionario");
     if (searchInput) {
-      const debouncedFilter = debounce(() => {
-        this.applyAllFilters();
-      }, 300);
+      const debouncedSearch = debounce(async () => {
+        this.currentSearchTerm = searchInput.value.trim();
+        this.currentPage = 1; // Resetar para primeira página ao buscar
+        await this.loadUsuarios(); // Recarregar da API
+      }, 500);
 
       searchInput.addEventListener("input", (e) => {
-        debouncedFilter();
+        debouncedSearch();
       });
     }
   }
 
   /**
    * Carrega usuários
+   * ALTERAÇÃO: Agora usa paginação e filtros na API ao invés de filtragem local
    */
   async loadUsuarios() {
+    if (this.isLoading) return; // Evitar múltiplas requisições simultâneas
+    
     try {
-      const usuarios = await this.dataManager.getAllUsuarios();
+      this.isLoading = true;
+      
+      // ALTERAÇÃO: Mostrar indicador de carregamento
+      showLoadingOverlay('#secao-funcionarios .funcionarios', 'usuarios-loading', 'Carregando usuários...');
+      
+      // ALTERAÇÃO: Preparar opções de paginação e filtros para enviar à API
+      const options = {
+        page: this.currentPage,
+        limit: this.pageSize, // API usa 'limit' ao invés de 'page_size'
+      };
+
+      // Adicionar busca se houver termo de busca
+      if (this.currentSearchTerm) {
+        options.search = this.currentSearchTerm;
+      }
+
+      // Adicionar filtro de cargo se houver
+      if (this.currentCargoFilter && this.currentCargoFilter !== "") {
+        // Mapear cargo do frontend para role da API
+        const cargoMap = {
+          'atendente': 'attendant',
+          'gerente': 'manager',
+          'entregador': 'delivery',
+          'admin': 'admin',
+          'cliente': 'customer'
+        };
+        const role = cargoMap[this.currentCargoFilter] || this.currentCargoFilter;
+        if (role) {
+          options.role = role;
+        }
+      }
+
+      // Adicionar filtro de status se houver
+      if (this.currentStatusFilter && this.currentStatusFilter !== "") {
+        options.status = this.currentStatusFilter === "ativo";
+      }
+
+      const response = await this.dataManager.getAllUsuarios(options);
+      
+      // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
+      // O dataManager retorna { users: [...], pagination: {...} } ou formato legado
+      const normalizedResponse = normalizePaginationResponse(response, 'users');
+      let usuarios = getItemsFromResponse(normalizedResponse);
+      const paginationInfo = getPaginationFromResponse(normalizedResponse);
+      
+      // ALTERAÇÃO: Atualizar informações de paginação usando dados normalizados
+      this.totalPages = paginationInfo.total_pages || 1;
+      this.totalItems = paginationInfo.total || 0;
+
       await this.renderUsuarioCards(usuarios);
-      // Aplicar filtros após carregar os dados
-      this.applyAllFilters();
+      this.renderPagination(); // ALTERAÇÃO: Renderizar paginação
+      this.updateVisibleUsersCount(); // ALTERAÇÃO: Atualizar contador com totalItems
+      // Não precisa mais aplicar filtros locais - tudo é filtrado pela API
     } catch (error) {
-      console.error("Erro ao carregar usuários:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar usuários:", error);
+      }
       this.showErrorMessage("Erro ao carregar usuários");
+    } finally {
+      this.isLoading = false;
+      // ALTERAÇÃO: Esconder indicador de carregamento
+      hideLoadingOverlay('usuarios-loading');
     }
   }
 
@@ -518,9 +640,9 @@ class UsuarioManager {
 
     if (!usuarios || usuarios.length === 0) {
       container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-users"></i>
-                    <p>Nenhum usuário encontrado</p>
+                <div style="text-align: center; padding: 48px; color: #666;">
+                    <i class="fa-solid fa-users" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
+                    <p style="font-size: 16px;">Nenhum usuário encontrado</p>
                 </div>
             `;
       return;
@@ -630,7 +752,10 @@ class UsuarioManager {
     const card = button.closest(".card-funcionario");
 
     if (!card) {
-      console.error("Card não encontrado!");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Card não encontrado!");
+      }
       return;
     }
 
@@ -643,10 +768,16 @@ class UsuarioManager {
         this.currentEditingId = usuarioId;
         this.openUsuarioModal(usuario);
       } else {
-        console.error("Usuário não encontrado!");
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error("Usuário não encontrado!");
+        }
       }
     } catch (error) {
-      console.error("Erro ao buscar usuário para edição:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar usuário para edição:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados do usuário");
     }
   }
@@ -692,7 +823,10 @@ class UsuarioManager {
         `Usuário ${novoStatus ? "ativado" : "desativado"} com sucesso!`
       );
     } catch (error) {
-      console.error("Erro ao alterar status do usuário:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao alterar status do usuário:", error);
+      }
       this.showErrorMessage("Erro ao alterar status do usuário");
 
       // Reverter toggle
@@ -711,33 +845,23 @@ class UsuarioManager {
       const usuario = await this.dataManager.getUsuarioById(usuarioId);
       this.openMetricasModal(usuario);
     } catch (error) {
-      console.error("Erro ao abrir métricas:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao abrir métricas:", error);
+      }
       this.showErrorMessage("Erro ao carregar métricas do usuário");
     }
   }
 
   /**
    * Aplica todos os filtros simultaneamente
+   * ALTERAÇÃO: Agora apenas reseta a página e recarrega da API (filtros são feitos no backend)
    */
   applyAllFilters() {
-    const searchTerm =
-      document.getElementById("busca-funcionario")?.value?.toLowerCase() || "";
-    const cargoFilter = document.getElementById("cargo-filtro")?.value || "";
-    const statusFilter =
-      document.getElementById("status-funcionario")?.value || "todos";
-
-    const cards = document.querySelectorAll(".card-funcionario");
-
-    cards.forEach((card) => {
-      const shouldShow =
-        this.checkSearchFilter(card, searchTerm) &&
-        this.checkCargoFilter(card, cargoFilter) &&
-        this.checkStatusFilter(card, statusFilter);
-
-      card.style.display = shouldShow ? "block" : "none";
-    });
-
-    this.updateVisibleUsersCount();
+    // ALTERAÇÃO: Resetar para primeira página ao aplicar filtros
+    this.currentPage = 1;
+    // Recarregar usuários da API com os novos filtros
+    this.loadUsuarios();
   }
 
   /**
@@ -783,19 +907,21 @@ class UsuarioManager {
 
   /**
    * Atualiza contador de usuários visíveis
+   * ALTERAÇÃO: Agora usa totalItems da paginação ao invés de contar cards visíveis
    */
   updateVisibleUsersCount() {
-    const visibleCards = document.querySelectorAll(
-      '.card-funcionario[style*="block"], .card-funcionario:not([style*="none"])'
-    );
-    const totalCards = document.querySelectorAll(".card-funcionario");
-
-    // Atualizar contador se existir elemento para isso
+    const count = this.totalItems;
     const counterElement = document.getElementById(
       "contador-usuarios-visiveis"
     );
     if (counterElement) {
-      counterElement.textContent = `${visibleCards.length} de ${totalCards.length} usuários`;
+      counterElement.textContent = `${count} usuário${count !== 1 ? "s" : ""}`;
+    }
+    
+    // Atualizar contador de funcionários também
+    const countElement = document.querySelector("#contador-funcionarios");
+    if (countElement) {
+      countElement.textContent = `${count} funcionário${count !== 1 ? "s" : ""}`;
     }
   }
 
@@ -808,7 +934,10 @@ class UsuarioManager {
     const btnSalvar = document.getElementById("salvar-funcionario");
 
     if (!modal) {
-      console.error("Modal não encontrada!");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Modal não encontrada!");
+      }
       return;
     }
 
@@ -1336,7 +1465,10 @@ class UsuarioManager {
     // Prevenir cliques múltiplos
     // Verificação atômica para evitar race conditions
     if (this.isSubmitting) {
-      console.warn("Operação já em andamento, ignorando requisição duplicada");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn("Operação já em andamento, ignorando requisição duplicada");
+      }
       return;
     }
 
@@ -1361,7 +1493,10 @@ class UsuarioManager {
       this.closeUsuarioModal();
       this.showSuccessMessage("Usuário adicionado com sucesso!");
     } catch (error) {
-      console.error("Erro ao adicionar usuário:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar usuário:", error);
+      }
       this.showErrorMessage("Erro ao adicionar usuário. Tente novamente.");
     } finally {
       this.isSubmitting = false;
@@ -1390,7 +1525,10 @@ class UsuarioManager {
     const usuarioId = this.currentEditingId;
 
     if (!usuarioId) {
-      console.error("ID do usuário não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("ID do usuário não encontrado");
+      }
       return;
     }
 
@@ -1408,7 +1546,10 @@ class UsuarioManager {
       this.closeUsuarioModal();
       this.showSuccessMessage("Usuário atualizado com sucesso!");
     } catch (error) {
-      console.error("Erro ao atualizar usuário:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar usuário:", error);
+      }
       this.showErrorMessage("Erro ao atualizar usuário. Tente novamente.");
     } finally {
       this.isSubmitting = false;
@@ -1546,7 +1687,10 @@ class UsuarioManager {
   openMetricasModal(usuario) {
     const modal = document.getElementById("modal-metricas");
     if (!modal) {
-      console.error("Modal de métricas não encontrada!");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Modal de métricas não encontrada!");
+      }
       return;
     }
 
@@ -1695,7 +1839,10 @@ class UsuarioManager {
         }`;
       }
     } catch (error) {
-      console.error("Erro ao calcular tempo de atividade:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao calcular tempo de atividade:", error);
+      }
       return "Não informado";
     }
   }
@@ -1751,7 +1898,10 @@ class UsuarioManager {
 
       return `${diaFormatado}/${mesFormatado}/${anoFormatado}`;
     } catch (error) {
-      console.error("Erro ao formatar data:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao formatar data:", error);
+      }
       return "Não informado";
     }
   }
@@ -1836,6 +1986,142 @@ class UsuarioManager {
    */
   showErrorMessage(message) {
     showToast(message, { type: "error", title: "Erro" });
+  }
+
+  /**
+   * Renderiza controles de paginação
+   * ALTERAÇÃO: Função adicionada para paginação similar à seção de estoque
+   */
+  renderPagination() {
+    const container = document.querySelector("#secao-funcionarios .funcionarios");
+    if (!container) return;
+
+    // Remover paginação existente
+    const existingPagination = container.parentElement.querySelector(".pagination");
+    if (existingPagination) {
+      existingPagination.remove();
+    }
+
+    const startItem = this.totalItems === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+    const endItem = Math.min(this.currentPage * this.pageSize, this.totalItems);
+
+    // Sempre renderizar paginação se houver itens (mesmo que seja apenas 1 página)
+    if (this.totalItems === 0) {
+      return;
+    }
+
+    // Criar elemento de paginação melhorado
+    const pagination = document.createElement("div");
+    pagination.className = "pagination";
+    pagination.innerHTML = `
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          <span class="pagination-text">
+            Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${this.totalItems}</strong> usuários
+          </span>
+          ${this.totalPages > 1 ? `<span class="pagination-page-info">Página ${this.currentPage} de ${this.totalPages}</span>` : ''}
+        </div>
+        ${this.totalPages > 1 ? `
+        <div class="pagination-controls">
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior" aria-label="Página anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span>Anterior</span>
+          </button>
+          <div class="pagination-pages">
+            ${this.generatePageNumbers()}
+          </div>
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página" aria-label="Próxima página">
+            <span>Próxima</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    const handlePaginationClick = async (e) => {
+      const target = e.target.closest('.pagination-btn, .page-number');
+      if (!target || target.disabled) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (target.classList.contains('pagination-btn')) {
+        const action = target.getAttribute('data-page');
+        if (action === "prev" && this.currentPage > 1) {
+          this.currentPage = Math.max(1, this.currentPage - 1);
+        } else if (action === "next" && this.currentPage < this.totalPages) {
+          this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+        }
+      } else if (target.classList.contains('page-number')) {
+        const page = parseInt(target.getAttribute('data-page'), 10);
+        if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+          return;
+        }
+        this.currentPage = page;
+      }
+
+      // Recarregar usuários e rolar para o topo
+      await this.loadUsuarios();
+      this.scrollToTop();
+    };
+
+    // Usar event delegation no elemento de paginação
+    pagination.addEventListener('click', handlePaginationClick);
+
+    container.parentElement.appendChild(pagination);
+    this.updateVisibleUsersCount();
+  }
+
+  /**
+   * Gera números de página para paginação
+   * ALTERAÇÃO: Função adicionada para paginação
+   */
+  generatePageNumbers() {
+    const pages = [];
+    const maxVisible = 5;
+    let startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(this.totalPages, startPage + maxVisible - 1);
+
+    if (endPage - startPage < maxVisible - 1) {
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    if (startPage > 1) {
+      // ALTERAÇÃO: Adicionar aria-label para acessibilidade
+      pages.push(`<button class="page-number" data-page="1" title="Primeira página" aria-label="Ir para primeira página">1</button>`);
+      if (startPage > 2) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas" aria-label="Mais páginas">...</span>`);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      const isActive = i === this.currentPage ? 'active' : '';
+      // ALTERAÇÃO: Adicionar aria-label para acessibilidade
+      const ariaLabel = i === this.currentPage ? `Página atual, página ${i}` : `Ir para página ${i}`;
+      pages.push(`<button class="page-number ${isActive}" data-page="${i}" title="Página ${i}" aria-label="${ariaLabel}">${i}</button>`);
+    }
+
+    if (endPage < this.totalPages) {
+      if (endPage < this.totalPages - 1) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas" aria-label="Mais páginas">...</span>`);
+      }
+      // ALTERAÇÃO: Adicionar aria-label para acessibilidade
+      pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página" aria-label="Ir para última página">${this.totalPages}</button>`);
+    }
+
+    return pages;
+  }
+
+  /**
+   * Rola suavemente para o topo da seção
+   * ALTERAÇÃO: Função adicionada para paginação
+   */
+  scrollToTop() {
+    const section = document.querySelector("#secao-funcionarios");
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 }
 

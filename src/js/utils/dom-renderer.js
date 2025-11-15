@@ -17,12 +17,22 @@ export function renderList(
   keyFn = (item, index) => index
 ) {
   if (!container) {
-    console.warn("renderList: container é null ou undefined");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("renderList: container é null ou undefined");
+    }
     return;
   }
 
   if (!Array.isArray(items)) {
-    console.warn("renderList: items não é um array");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("renderList: items não é um array");
+    }
     return;
   }
 
@@ -60,8 +70,12 @@ export function renderList(
     // Renderizar novo HTML
     const newHTML = templateFn(item, index);
 
+    // ALTERAÇÃO: Usar setSafeHTML para prevenir XSS
     // Atualizar apenas se o HTML mudou (evita reflow desnecessário)
     if (element.innerHTML !== newHTML) {
+      // TODO: REVISAR - templateFn deve retornar HTML sanitizado
+      // Considerar usar setSafeHTML aqui, mas requer mudança na assinatura da função
+      // Por enquanto, assumindo que templateFn já sanitiza o HTML
       element.innerHTML = newHTML;
     }
   });
@@ -77,12 +91,22 @@ export function renderList(
  */
 export function renderListBatch(container, items, templateFn) {
   if (!container) {
-    console.warn("renderListBatch: container é null ou undefined");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("renderListBatch: container é null ou undefined");
+    }
     return;
   }
 
   if (!Array.isArray(items)) {
-    console.warn("renderListBatch: items não é um array");
+    // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.warn em produção
+    const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      // eslint-disable-next-line no-console
+      console.warn("renderListBatch: items não é um array");
+    }
     return;
   }
 
@@ -91,6 +115,8 @@ export function renderListBatch(container, items, templateFn) {
   const tempDiv = document.createElement("div");
 
   items.forEach((item, index) => {
+    // TODO: REVISAR - templateFn deve retornar HTML sanitizado
+    // Considerar usar createSafeElement aqui para sanitização automática
     tempDiv.innerHTML = templateFn(item, index);
     while (tempDiv.firstChild) {
       fragment.appendChild(tempDiv.firstChild);

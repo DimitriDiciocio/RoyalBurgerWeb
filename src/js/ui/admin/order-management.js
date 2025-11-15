@@ -19,6 +19,7 @@ import { getUserById } from "../../api/user.js";
 import { showSuccess, showError, showConfirm } from "../alerts.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { escapeHTML as escapeHTMLCentralized } from "../../utils/html-sanitizer.js";
+import { showLoadingOverlay, hideLoadingOverlay } from "../../utils/loading-indicator.js";
 
 // Constantes
 const MAX_CONCURRENT_REQUESTS = 10;
@@ -52,7 +53,8 @@ const isDevelopment = () => {
 
   // Verificar se estamos no painel administrativo (não no histórico)
   if (!document.getElementById("nav-pedidos")) {
-    if (isDevelopment()) {
+    // ALTERAÇÃO: Log condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.warn(
         "order-management.js: Seção de pedidos do painel administrativo não encontrada"
       );
@@ -70,6 +72,13 @@ const isDevelopment = () => {
       status: "",
       channel: "",
       period: "today",
+    },
+    // ALTERAÇÃO: Estado de paginação adicionado
+    pagination: {
+      currentPage: 1,
+      pageSize: 20,
+      totalPages: 1,
+      totalItems: 0,
     },
     loading: false,
     error: null,
@@ -605,7 +614,10 @@ const isDevelopment = () => {
         } catch (e) {
           // Ignorar erros de parsing
           if (isDevelopment()) {
-            console.warn("Erro ao calcular tempo de ciclo do pedido:", e);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+              console.warn("Erro ao calcular tempo de ciclo do pedido:", e);
+            }
           }
         }
       });
@@ -706,6 +718,7 @@ const isDevelopment = () => {
 
   /**
    * Carregar pedidos para gerenciamento (todas as ordens, não apenas do usuário)
+   * ALTERAÇÃO: Agora usa paginação e filtros na API ao invés de filtragem local
    * @returns {Promise<void>}
    */
   async function loadOrders() {
@@ -715,14 +728,55 @@ const isDevelopment = () => {
     state.loading = true;
     state.error = null;
 
+    // ALTERAÇÃO: Mostrar indicador de carregamento
+    showLoadingOverlay('#secao-pedidos .pedidos-container', 'pedidos-loading', 'Carregando pedidos...');
+
     try {
-      const result = await getAllOrders();
+      // ALTERAÇÃO: Preparar opções de paginação e filtros para enviar à API
+      const options = {
+        page: state.pagination.currentPage,
+        page_size: state.pagination.pageSize,
+      };
+
+      // ALTERAÇÃO: Adicionar filtros se houver - garantir que valores vazios/null não sejam enviados
+      if (state.filters.search && state.filters.search.trim() !== "") {
+        options.search = state.filters.search.trim();
+      }
+      if (state.filters.status && state.filters.status !== "" && state.filters.status !== "todos") {
+        options.status = state.filters.status;
+      }
+      if (state.filters.channel && state.filters.channel !== "" && state.filters.channel !== "todos") {
+        options.channel = state.filters.channel;
+      }
+      if (state.filters.period && state.filters.period !== "" && state.filters.period !== "todos" && state.filters.period !== "all") {
+        options.period = state.filters.period;
+      }
+
+      const result = await getAllOrders(options);
 
       if (result.success) {
-        // A API retorna {items: [...], pagination: {...}}
-        let ordersList = result.data?.items || result.data || [];
+        // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
+        const { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } = await import('../../utils/pagination-utils.js');
+        const normalizedResponse = normalizePaginationResponse(result.data || result, 'items');
+        const ordersList = getItemsFromResponse(normalizedResponse);
+        const paginationInfo = getPaginationFromResponse(normalizedResponse);
 
+        // ALTERAÇÃO: Atualizar informações de paginação usando dados normalizados
+        state.pagination.totalPages = paginationInfo.total_pages || 1;
+        state.pagination.totalItems = paginationInfo.total || 0;
+
+        // ALTERAÇÃO: Garantir que os arrays sejam limpos se não houver resultados
         const ordersWithDetails = [];
+
+        // ALTERAÇÃO: Se não houver pedidos na resposta da API, limpar arrays e renderizar estado vazio imediatamente
+        if (!ordersList || ordersList.length === 0) {
+          state.orders = [];
+          state.filteredOrders = [];
+          renderOrders();
+          renderPagination();
+          updateMetricsDisplay(null);
+          return;
+        }
 
         // Processar em lotes para evitar sobrecarga de requisições
         for (let i = 0; i < ordersList.length; i += MAX_CONCURRENT_REQUESTS) {
@@ -766,7 +820,9 @@ const isDevelopment = () => {
               } catch (err) {
                 // Log apenas em desenvolvimento, sem expor dados sensíveis
                 if (isDevelopment()) {
-                  console.warn(
+                  // ALTERAÇÃO: Log condicional apenas em modo debug
+                  if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.warn(
                     `Erro ao buscar detalhes do pedido ${orderId}:`,
                     err.message
                   );
@@ -786,6 +842,7 @@ const isDevelopment = () => {
         }
 
         state.orders = ordersWithDetails;
+        state.filteredOrders = ordersWithDetails; // ALTERAÇÃO: Usar diretamente, já filtrado pela API
 
         // Buscar métricas do dashboard
         let dashboardMetrics = null;
@@ -795,16 +852,19 @@ const isDevelopment = () => {
             dashboardMetrics = metricsResult.data;
           }
         } catch (err) {
-          if (isDevelopment()) {
+          // ALTERAÇÃO: Log condicional apenas em modo debug
+          if (typeof window !== 'undefined' && window.DEBUG_MODE) {
             console.warn("Erro ao buscar métricas do dashboard:", err.message);
           }
         }
 
-        // Enriquecer pedidos com telefones antes de aplicar filtros
+        // Enriquecer pedidos com telefones
         const enrichedOrders = await enrichOrdersWithPhones(state.orders);
         state.orders = enrichedOrders;
+        state.filteredOrders = enrichedOrders;
 
-        applyFilters();
+        renderOrders();
+        renderPagination(); // ALTERAÇÃO: Renderizar paginação
         updateMetricsDisplay(dashboardMetrics);
       } else {
         state.error = result.error;
@@ -813,10 +873,16 @@ const isDevelopment = () => {
         );
       }
     } catch (error) {
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar pedidos:", error);
+      }
       state.error = error.message;
       showError("Erro ao carregar pedidos: " + error.message);
     } finally {
       state.loading = false;
+      // ALTERAÇÃO: Esconder indicador de carregamento
+      hideLoadingOverlay('pedidos-loading');
     }
   }
 
@@ -869,100 +935,13 @@ const isDevelopment = () => {
 
   /**
    * Aplicar filtros nos pedidos
+   * ALTERAÇÃO: Agora apenas reseta a página e recarrega da API (filtros são feitos no backend)
    */
   function applyFilters() {
-    let filtered = [...state.orders];
-
-    // Filtro por busca (ID, cliente ou itens)
-    if (state.filters.search) {
-      const searchLower = state.filters.search.trim().toLowerCase();
-      filtered = filtered.filter((order) => {
-        const orderId = String(order.order_id || order.id || "");
-        const customerName = (
-          order.customer_name ||
-          order.customer?.name ||
-          ""
-        ).toLowerCase();
-        const itemsText = (Array.isArray(order.items) ? order.items : [])
-          .map((item) => {
-            if (!item || typeof item !== "object") return "";
-            return (
-              item.product_name ||
-              (item.product && typeof item.product === "object"
-                ? item.product.name
-                : "") ||
-              ""
-            ).toLowerCase();
-          })
-          .filter((text) => text !== "")
-          .join(" ");
-
-        return (
-          orderId.includes(searchLower) ||
-          customerName.includes(searchLower) ||
-          itemsText.includes(searchLower)
-        );
-      });
-    }
-
-    // Filtro por status
-    if (state.filters.status) {
-      filtered = filtered.filter(
-        (order) => order.status === state.filters.status
-      );
-    }
-
-    // Filtro por canal (order_type/delivery_type)
-    if (state.filters.channel) {
-      filtered = filtered.filter((order) => {
-        const orderType =
-          order.order_type ||
-          order.delivery_type ||
-          order.deliveryType ||
-          "delivery";
-        return orderType === state.filters.channel;
-      });
-    }
-
-    // Filtro por período
-    if (state.filters.period && state.filters.period !== "all") {
-      const now = new Date();
-      let startDate = null;
-
-      switch (state.filters.period) {
-        case "today":
-          startDate = new Date(now);
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case "week":
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case "month":
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          startDate.setHours(0, 0, 0, 0);
-          break;
-      }
-
-      if (startDate) {
-        filtered = filtered.filter((order) => {
-          if (!order.created_at) return false;
-          try {
-            const orderDate = new Date(order.created_at);
-            if (isNaN(orderDate.getTime())) return false;
-            return orderDate >= startDate;
-          } catch (e) {
-            return false;
-          }
-        });
-      }
-    }
-
-    state.filteredOrders = filtered;
-
-    // Renderizar diretamente - telefones já foram buscados em loadOrders
-    // Evitar chamada duplicada que causaria requisições desnecessárias
-    renderOrders();
+    // ALTERAÇÃO: Resetar para primeira página ao aplicar filtros
+    state.pagination.currentPage = 1;
+    // Recarregar pedidos da API com os novos filtros
+    loadOrders();
   }
 
   /**
@@ -1038,7 +1017,8 @@ const isDevelopment = () => {
         return phoneFormatted;
       }
     } catch (error) {
-      if (isDevelopment()) {
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.warn(
           `Erro ao buscar telefone do usuário ${userId}:`,
           error.message
@@ -1241,14 +1221,15 @@ const isDevelopment = () => {
   function renderOrders() {
     if (!el.ordersList) return;
 
-    if (state.filteredOrders.length === 0) {
+    // ALTERAÇÃO: Limpar o container primeiro para garantir que não fiquem itens antigos
+    el.ordersList.innerHTML = "";
+
+    // ALTERAÇÃO: Garantir que filteredOrders seja sempre um array válido e atualizado
+    if (!state.filteredOrders || state.filteredOrders.length === 0) {
       el.ordersList.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fa-solid fa-clipboard-list"></i>
-                    </div>
-                    <h3>Nenhum pedido encontrado</h3>
-                    <p>Não há pedidos que correspondam aos filtros selecionados.</p>
+                <div style="text-align: center; padding: 48px; color: #666;">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
+                    <p style="font-size: 16px;">Nenhum pedido encontrado</p>
                 </div>
             `;
       return;
@@ -1632,13 +1613,182 @@ const isDevelopment = () => {
   }
 
   /**
+   * Renderiza controles de paginação
+   * ALTERAÇÃO: Função adicionada para paginação similar à seção de estoque
+   */
+  function renderPagination() {
+    if (!el.ordersList) return;
+
+    // Remover paginação existente
+    const existingPagination = el.ordersList.parentElement.querySelector(".pagination");
+    if (existingPagination) {
+      existingPagination.remove();
+    }
+
+    // Calcular informações de exibição
+    const startItem = state.pagination.totalItems === 0 ? 0 : (state.pagination.currentPage - 1) * state.pagination.pageSize + 1;
+    const endItem = Math.min(state.pagination.currentPage * state.pagination.pageSize, state.pagination.totalItems);
+
+    // Sempre renderizar paginação se houver itens (mesmo que seja apenas 1 página)
+    if (state.pagination.totalItems === 0) {
+      return;
+    }
+
+    // Criar elemento de paginação melhorado
+    const pagination = document.createElement("div");
+    pagination.className = "pagination";
+    pagination.innerHTML = `
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          <span class="pagination-text">
+            Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${state.pagination.totalItems}</strong> pedidos
+          </span>
+          ${state.pagination.totalPages > 1 ? `<span class="pagination-page-info">Página ${state.pagination.currentPage} de ${state.pagination.totalPages}</span>` : ''}
+        </div>
+        ${state.pagination.totalPages > 1 ? `
+        <div class="pagination-controls">
+          <button class="pagination-btn pagination-btn-nav" ${state.pagination.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span>Anterior</span>
+          </button>
+          <div class="pagination-pages">
+            ${generatePageNumbers()}
+          </div>
+          <button class="pagination-btn pagination-btn-nav" ${state.pagination.currentPage === state.pagination.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
+            <span>Próxima</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    // Adicionar event listeners
+    const handlePaginationClick = async (e) => {
+      const target = e.target.closest('.pagination-btn, .page-number');
+      if (!target) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (state.loading) return;
+      
+      // Verificar se é botão de navegação
+      if (target.classList.contains('pagination-btn')) {
+        if (target.disabled) return;
+        
+        const action = target.dataset.page;
+        
+        if (action === "prev" && state.pagination.currentPage > 1) {
+          state.pagination.currentPage = Math.max(1, state.pagination.currentPage - 1);
+        } else if (action === "next" && state.pagination.currentPage < state.pagination.totalPages) {
+          state.pagination.currentPage = Math.min(state.pagination.totalPages, state.pagination.currentPage + 1);
+        } else {
+          return;
+        }
+      } 
+      // Verificar se é número de página
+      else if (target.classList.contains('page-number')) {
+        const page = parseInt(target.dataset.page);
+        
+        if (isNaN(page) || page === state.pagination.currentPage || page < 1 || page > state.pagination.totalPages) {
+          return;
+        }
+        
+        state.pagination.currentPage = page;
+      } else {
+        return;
+      }
+      
+      await loadOrders();
+      scrollToTop();
+    };
+    
+    // Usar event delegation no elemento de paginação
+    pagination.addEventListener('click', handlePaginationClick);
+
+    // Inserir após o container de pedidos
+    el.ordersList.parentElement.appendChild(pagination);
+  }
+
+  /**
+   * Gera números de página para exibição
+   * ALTERAÇÃO: Função adicionada para paginação
+   */
+  function generatePageNumbers() {
+    const pages = [];
+    const maxVisible = 7; // Máximo de números de página visíveis
+    
+    if (state.pagination.totalPages <= maxVisible) {
+      // Se houver poucas páginas, mostrar todas
+      for (let i = 1; i <= state.pagination.totalPages; i++) {
+        pages.push(
+          `<button class="page-number ${i === state.pagination.currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`
+        );
+      }
+      return pages.join("");
+    }
+
+    // Lógica para muitas páginas
+    let startPage = Math.max(1, state.pagination.currentPage - 2);
+    let endPage = Math.min(state.pagination.totalPages, state.pagination.currentPage + 2);
+
+    // Ajustar início se estiver no final
+    if (endPage - startPage < 4) {
+      if (state.pagination.currentPage <= 3) {
+        startPage = 1;
+        endPage = Math.min(5, state.pagination.totalPages);
+      } else if (state.pagination.currentPage >= state.pagination.totalPages - 2) {
+        startPage = Math.max(1, state.pagination.totalPages - 4);
+        endPage = state.pagination.totalPages;
+      }
+    }
+
+    // Primeira página
+    if (startPage > 1) {
+      pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+      if (startPage > 2) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+      }
+    }
+
+    // Páginas do meio
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        `<button class="page-number ${i === state.pagination.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+      );
+    }
+
+    // Última página
+    if (endPage < state.pagination.totalPages) {
+      if (endPage < state.pagination.totalPages - 1) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+      }
+      pages.push(`<button class="page-number" data-page="${state.pagination.totalPages}" title="Última página">${state.pagination.totalPages}</button>`);
+    }
+
+    return pages.join("");
+  }
+
+  /**
+   * Faz scroll suave para o topo da seção
+   * ALTERAÇÃO: Função adicionada para paginação
+   */
+  function scrollToTop() {
+    const section = document.getElementById("secao-pedidos");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  /**
    * Anexar eventos aos elementos DOM
    */
   function attachEvents() {
     if (el.searchInput) {
       const debouncedSearch = debounce((value) => {
         state.filters.search = value;
-        applyFilters();
+        applyFilters(); // ALTERAÇÃO: Agora recarrega da API
       }, SEARCH_DEBOUNCE_MS);
 
       el.searchInput.addEventListener("input", (e) => {
@@ -1646,27 +1796,33 @@ const isDevelopment = () => {
       });
     }
 
-    // Filtro de status
+    // ALTERAÇÃO: Filtro de status - tratar valores vazios ou "todos"
     if (el.filterStatus) {
       el.filterStatus.addEventListener("change", (e) => {
-        state.filters.status = e.target.value;
-        applyFilters();
+        const value = e.target.value;
+        // ALTERAÇÃO: Se for vazio ou "todos", limpar o filtro
+        state.filters.status = (value && value !== "" && value !== "todos") ? value : null;
+        applyFilters(); // ALTERAÇÃO: Agora recarrega da API
       });
     }
 
-    // Filtro de canais
+    // ALTERAÇÃO: Filtro de canais - tratar valores vazios ou "todos"
     if (el.filterChannel) {
       el.filterChannel.addEventListener("change", (e) => {
-        state.filters.channel = e.target.value;
-        applyFilters();
+        const value = e.target.value;
+        // ALTERAÇÃO: Se for vazio ou "todos", limpar o filtro
+        state.filters.channel = (value && value !== "" && value !== "todos") ? value : null;
+        applyFilters(); // ALTERAÇÃO: Agora recarrega da API
       });
     }
 
-    // Filtro de período
+    // ALTERAÇÃO: Filtro de período - tratar valores vazios ou "todos"
     if (el.filterPeriod) {
       el.filterPeriod.addEventListener("change", (e) => {
-        state.filters.period = e.target.value;
-        loadOrders();
+        const value = e.target.value;
+        // ALTERAÇÃO: Se for vazio ou "todos" ou "all", limpar o filtro
+        state.filters.period = (value && value !== "" && value !== "todos" && value !== "all") ? value : null;
+        applyFilters(); // ALTERAÇÃO: Usa applyFilters para consistência
       });
     }
 

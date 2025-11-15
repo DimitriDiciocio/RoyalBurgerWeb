@@ -28,7 +28,10 @@ import { ProdutoExtrasManager } from "./produto-extras-manager.js";
 import { API_BASE_URL } from "../../api/api.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { renderListInChunks } from "../../utils/virtual-scroll.js";
+import { getMenuDashboardMetrics } from "../../api/dashboard.js";
 import { escapeHTML } from "../../utils/html-sanitizer.js";
+import { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } from "../../utils/pagination-utils.js";
+import { showLoadingOverlay, hideLoadingOverlay } from "../../utils/loading-indicator.js";
 
 /**
  * Gerenciador de dados de produtos
@@ -39,6 +42,9 @@ class ProdutoDataManager {
       data: null,
       lastFetch: null,
     };
+    // ALTERAÇÃO: Cache agora considera filtros - armazena cache por combinação de filtros
+    this.cacheByFilters = {}; // Cache indexado por chave de filtros
+    this.cacheTimestamps = {}; // Timestamps por chave de filtros
     this.cacheTimeout = 5 * 60 * 1000; // 5 minutos
   }
 
@@ -54,28 +60,76 @@ class ProdutoDataManager {
 
   /**
    * Limpa o cache
+   * ALTERAÇÃO: Agora limpa também o cache por filtros
    */
   clearCache() {
     this.cache.data = null;
     this.cache.lastFetch = null;
+    // ALTERAÇÃO: Limpar cache por filtros também
+    if (this.cacheByFilters) {
+      this.cacheByFilters = {};
+    }
+    if (this.cacheTimestamps) {
+      this.cacheTimestamps = {};
+    }
   }
 
   /**
    * Busca todos os produtos
+   * ALTERAÇÃO: Cache agora considera os filtros para evitar retornar dados incorretos
    */
   async getAllProdutos(options = {}) {
     try {
-      if (this.isCacheValid() && !options.forceRefresh) {
-        return this.cache.data;
+      // ALTERAÇÃO: Criar chave de cache baseada nos filtros para evitar usar cache incorreto
+      const cacheKey = JSON.stringify({
+        name: options.name || null,
+        category_id: options.category_id || null,
+        page: options.page || 1,
+        page_size: options.page_size || 10,
+        include_inactive: options.include_inactive !== undefined ? options.include_inactive : false,
+        only_inactive: options.only_inactive !== undefined ? options.only_inactive : false,
+        filter_unavailable: options.filter_unavailable !== undefined ? options.filter_unavailable : true
+      });
+      
+      // ALTERAÇÃO: Verificar se existe cache para esta combinação específica de filtros
+      if (!this.cacheByFilters) {
+        this.cacheByFilters = {};
+      }
+      
+      const cachedData = this.cacheByFilters[cacheKey];
+      const cacheTimestamp = this.cacheTimestamps?.[cacheKey];
+      
+      // ALTERAÇÃO: Verificar se o cache é válido para esta combinação de filtros
+      const isCacheValid = cacheTimestamp && 
+                           Date.now() - cacheTimestamp < this.cacheTimeout &&
+                           !options.forceRefresh;
+      
+      if (isCacheValid && cachedData) {
+        return cachedData;
       }
 
       const response = await getProducts(options);
+      
+      // ALTERAÇÃO: Armazenar cache por chave de filtros
+      if (!this.cacheByFilters) {
+        this.cacheByFilters = {};
+      }
+      if (!this.cacheTimestamps) {
+        this.cacheTimestamps = {};
+      }
+      this.cacheByFilters[cacheKey] = response;
+      this.cacheTimestamps[cacheKey] = Date.now();
+      
+      // Mantém compatibilidade com cache antigo
       this.cache.data = response;
       this.cache.lastFetch = Date.now();
 
       return response;
     } catch (error) {
-      console.error("Erro ao buscar produtos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar produtos:", error);
+      }
       throw error;
     }
   }
@@ -107,7 +161,10 @@ class ProdutoDataManager {
         },
       };
     } catch (error) {
-      console.error("Erro ao buscar todos os produtos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar todos os produtos:", error);
+      }
       throw error;
     }
   }
@@ -125,7 +182,10 @@ class ProdutoDataManager {
       });
       return response;
     } catch (error) {
-      console.error("Erro ao buscar produtos inativos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar produtos inativos:", error);
+      }
       return { items: [] };
     }
   }
@@ -152,7 +212,10 @@ class ProdutoDataManager {
           produto.updated_at || new Date().toISOString().split("T")[0],
       };
     } catch (error) {
-      console.error("Erro ao buscar produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar produto:", error);
+      }
       throw error;
     }
   }
@@ -210,7 +273,10 @@ class ProdutoDataManager {
         return response;
       }
     } catch (error) {
-      console.error("Erro ao adicionar produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar produto:", error);
+      }
 
       // Tratamento específico para conflito de nome
       if (
@@ -260,7 +326,10 @@ class ProdutoDataManager {
 
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao atualizar produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar produto:", error);
+      }
 
       // Tratamento específico para conflito de nome
       if (
@@ -285,7 +354,10 @@ class ProdutoDataManager {
       this.clearCache();
       return response;
     } catch (error) {
-      console.error("Erro ao atualizar imagem do produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar imagem do produto:", error);
+      }
       throw error;
     }
   }
@@ -302,7 +374,10 @@ class ProdutoDataManager {
       }
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao alterar status do produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao alterar status do produto:", error);
+      }
       throw error;
     }
   }
@@ -315,7 +390,10 @@ class ProdutoDataManager {
       const response = await canDeleteProduct(productId);
       return response;
     } catch (error) {
-      console.error("Erro ao verificar se produto pode ser excluído:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao verificar se produto pode ser excluído:", error);
+      }
       throw error;
     }
   }
@@ -329,7 +407,10 @@ class ProdutoDataManager {
       this.clearCache();
       return response;
     } catch (error) {
-      console.error("Erro ao excluir produto permanentemente:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao excluir produto permanentemente:", error);
+      }
       throw error;
     }
   }
@@ -342,7 +423,10 @@ class ProdutoDataManager {
       const response = await getProductIngredients(productId);
       return response;
     } catch (error) {
-      console.error("Erro ao buscar ingredientes do produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar ingredientes do produto:", error);
+      }
       throw error;
     }
   }
@@ -365,7 +449,10 @@ class ProdutoDataManager {
       await addIngredientToProduct(productIdNum, ingredientIdNum, portionsNum);
       this.clearCache();
     } catch (error) {
-      console.error("Erro ao adicionar ingrediente ao produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar ingrediente ao produto:", error);
+      }
       throw error;
     }
   }
@@ -455,7 +542,10 @@ class ProdutoDataManager {
       const response = await getCategories();
       return response;
     } catch (error) {
-      console.error("Erro ao buscar categorias:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar categorias:", error);
+      }
       throw error;
     }
   }
@@ -468,7 +558,10 @@ class ProdutoDataManager {
       const response = await getIngredients();
       return response;
     } catch (error) {
-      console.error("Erro ao buscar ingredientes:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar ingredientes:", error);
+      }
       throw error;
     }
   }
@@ -508,6 +601,15 @@ class ProdutoManager {
     this.imageCache = new Map(); // Cache para imagens
     this.extrasManager = null; // Gerenciador de extras (inicializado quando necessário)
     this.ingredientesCarregados = new Map(); // Cache dos ingredientes carregados do produto atual
+    // ALTERAÇÃO: Estado de paginação adicionado
+    this.currentPage = 1;
+    this.pageSize = 20;
+    this.totalPages = 1;
+    this.totalItems = 0;
+    this.currentSearchTerm = "";
+    this.currentCategoryFilter = "";
+    this.currentStatusFilter = "todos";
+    this.isLoading = false;
   }
 
   /**
@@ -534,7 +636,10 @@ class ProdutoManager {
       // Expor função global para atualização de produtos
       window.refreshAllProducts = () => this.refreshAllProducts();
     } catch (error) {
-      console.error("Erro ao inicializar módulo de produtos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao inicializar módulo de produtos:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados dos produtos");
     }
   }
@@ -586,63 +691,131 @@ class ProdutoManager {
 
   /**
    * Configura handlers de filtros
+   * ALTERAÇÃO: Agora recarrega da API ao invés de filtrar localmente
    */
   setupFilterHandlers() {
     const categoriaFilter = document.getElementById("categoria-filtro");
     const statusFilter = document.getElementById("status-filtro");
 
     if (categoriaFilter) {
-      categoriaFilter.addEventListener("change", (e) => {
-        this.applyAllFilters();
+      categoriaFilter.addEventListener("change", async (e) => {
+        const value = categoriaFilter.value || "";
+        // ALTERAÇÃO: Se for vazio ou "todos", limpar o filtro
+        this.currentCategoryFilter = (value !== "" && value !== "todos") ? value : "";
+        this.currentPage = 1; // Resetar para primeira página ao filtrar
+        await this.loadProdutos(); // Recarregar da API
       });
     }
 
     if (statusFilter) {
-      statusFilter.addEventListener("change", (e) => {
-        this.applyAllFilters();
+      statusFilter.addEventListener("change", async (e) => {
+        const value = statusFilter.value || "todos";
+        // ALTERAÇÃO: Garantir que o valor seja "todos" se vazio
+        this.currentStatusFilter = (value !== "") ? value : "todos";
+        this.currentPage = 1; // Resetar para primeira página ao filtrar
+        await this.loadProdutos(); // Recarregar da API
       });
     }
   }
 
   /**
    * Configura handlers de busca
+   * ALTERAÇÃO: Agora recarrega da API ao invés de filtrar localmente
    */
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-produto");
     if (searchInput) {
-      const debouncedFilter = debounce(() => {
-        this.applyAllFilters();
-      }, 300);
+      const debouncedSearch = debounce(async () => {
+        this.currentSearchTerm = searchInput.value.trim();
+        this.currentPage = 1; // Resetar para primeira página ao buscar
+        await this.loadProdutos(); // Recarregar da API
+      }, 500);
 
       searchInput.addEventListener("input", (e) => {
-        debouncedFilter();
+        debouncedSearch();
       });
     }
   }
 
   /**
    * Carrega produtos
+   * ALTERAÇÃO: Agora usa paginação e filtros na API ao invés de filtragem local
    */
   async loadProdutos() {
+    if (this.isLoading) return; // Evitar múltiplas requisições simultâneas
+    
     try {
-      // Carregar todos os produtos (ativos e inativos) da API
-      const response = await this.dataManager.getAllProdutos({
-        page_size: 1000,
-        include_inactive: true,
-      });
+      this.isLoading = true;
+      
+      // ALTERAÇÃO: Mostrar indicador de carregamento
+      showLoadingOverlay('#secao-cardapio .produtos', 'produtos-loading', 'Carregando produtos...');
+      
+      // ALTERAÇÃO: Preparar opções de paginação e filtros para enviar à API
+      const options = {
+        page: this.currentPage,
+        page_size: this.pageSize,
+        include_inactive: true, // Sempre incluir inativos para filtro funcionar
+      };
 
-      // A API retorna um objeto com 'items' contendo o array de produtos
-      const produtosRaw = response.items || [];
+      // Adicionar busca se houver termo de busca
+      if (this.currentSearchTerm) {
+        options.name = this.currentSearchTerm;
+      }
 
-      // Mapear dados da API para o formato esperado pelo frontend
-      const produtos = produtosRaw.map((produto) =>
-        this.mapProdutoFromAPI(produto)
-      );
+      // ALTERAÇÃO: Adicionar filtro de categoria se houver - usar ID diretamente do select
+      if (this.currentCategoryFilter && this.currentCategoryFilter !== "" && this.currentCategoryFilter !== "todos") {
+        // ALTERAÇÃO: currentCategoryFilter já contém o ID da categoria (select usa categoria.id como value)
+        // Converter para número para garantir tipo correto
+        const categoriaId = parseInt(this.currentCategoryFilter);
+        if (!isNaN(categoriaId) && categoriaId > 0) {
+          options.category_id = categoriaId;
+        }
+      }
+
+      // ALTERAÇÃO: Adicionar filtro de status - usar valor do estado e tratar corretamente
+      if (this.currentStatusFilter && this.currentStatusFilter !== "todos") {
+        // Se for "ativo", buscar apenas ativos (não incluir inativos)
+        if (this.currentStatusFilter === "ativo") {
+          options.include_inactive = false;
+        } else if (this.currentStatusFilter === "inativo") {
+          // ALTERAÇÃO: Para filtrar apenas inativos, usar parâmetro only_inactive
+          options.include_inactive = true;
+          options.only_inactive = true;
+        }
+      } else {
+        // ALTERAÇÃO: Se for "todos" ou vazio, incluir todos (ativos e inativos)
+        options.include_inactive = true;
+      }
+
+      // Carregar produtos da API com paginação e filtros
+      const response = await this.dataManager.getAllProdutos(options);
+
+      // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
+      const normalizedResponse = normalizePaginationResponse(response, 'items');
+      const produtosRaw = getItemsFromResponse(normalizedResponse);
+      const paginationInfo = getPaginationFromResponse(normalizedResponse);
+
+      // ALTERAÇÃO: Atualizar informações de paginação usando dados normalizados
+      this.totalPages = paginationInfo.total_pages || 1;
+      this.totalItems = paginationInfo.total || 0;
+
+      // ALTERAÇÃO: Garantir que o array seja vazio se não houver produtos
+      const produtos = produtosRaw && produtosRaw.length > 0 
+        ? produtosRaw.map((produto) => this.mapProdutoFromAPI(produto))
+        : [];
 
       await this.renderProdutoCards(produtos);
+      this.renderPagination(); // ALTERAÇÃO: Renderizar paginação
     } catch (error) {
-      console.error("Erro ao carregar produtos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar produtos:", error);
+      }
       this.showErrorMessage("Erro ao carregar produtos");
+    } finally {
+      this.isLoading = false;
+      // ALTERAÇÃO: Esconder indicador de carregamento
+      hideLoadingOverlay('produtos-loading');
     }
   }
 
@@ -695,7 +868,10 @@ class ProdutoManager {
             : true,
       }));
     } catch (error) {
-      console.error("Erro ao carregar ingredientes:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar ingredientes:", error);
+      }
       this.ingredientesDisponiveis = [];
     }
   }
@@ -708,7 +884,10 @@ class ProdutoManager {
       const response = await this.dataManager.getCategorias();
       this.categorias = response.items || response || [];
     } catch (error) {
-      console.error("Erro ao carregar categorias:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar categorias:", error);
+      }
       this.categorias = [];
     }
   }
@@ -720,15 +899,23 @@ class ProdutoManager {
     const container = document.querySelector(".produtos");
     if (!container) return;
 
-    // Limpar container existente (exceto botões)
+    // ALTERAÇÃO: Limpar TODO o conteúdo do container primeiro para garantir que não fiquem itens antigos
+    // Limpar cards existentes
     const existingCards = container.querySelectorAll(".card-produto");
     existingCards.forEach((card) => card.remove());
+    
+    // ALTERAÇÃO: Limpar qualquer estado vazio existente também
+    const existingEmptyState = container.querySelector(".empty-state");
+    if (existingEmptyState) {
+      existingEmptyState.remove();
+    }
 
+    // ALTERAÇÃO: Garantir que produtos seja sempre um array válido
     if (!produtos || produtos.length === 0) {
       container.innerHTML = `
-        <div class="empty-state">
-          <i class="fa-solid fa-box-open"></i>
-          <p>Nenhum produto encontrado</p>
+        <div style="text-align: center; padding: 48px; color: #666;">
+          <i class="fa-solid fa-box-open" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
+          <p style="font-size: 16px;">Nenhum produto encontrado</p>
         </div>
       `;
       return;
@@ -770,6 +957,172 @@ class ProdutoManager {
         // Atualiza custo estimado real baseado nos ingredientes
         this.refreshProductEstimatedCost(produto.id, card);
       });
+    }
+    
+    // ALTERAÇÃO: Paginação será renderizada separadamente após renderProdutoCards
+  }
+
+  /**
+   * Renderiza controles de paginação
+   * ALTERAÇÃO: Função adicionada para paginação similar à seção de estoque
+   */
+  renderPagination() {
+    const container = document.querySelector("#secao-cardapio .produtos");
+    if (!container) return;
+
+    // Remover paginação existente
+    const existingPagination = container.parentElement.querySelector(".pagination");
+    if (existingPagination) {
+      existingPagination.remove();
+    }
+
+    // Calcular informações de exibição
+    const startItem = this.totalItems === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+    const endItem = Math.min(this.currentPage * this.pageSize, this.totalItems);
+
+    // Sempre renderizar paginação se houver itens (mesmo que seja apenas 1 página)
+    if (this.totalItems === 0) {
+      return;
+    }
+
+    // Criar elemento de paginação melhorado
+    const pagination = document.createElement("div");
+    pagination.className = "pagination";
+    pagination.innerHTML = `
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          <span class="pagination-text">
+            Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${this.totalItems}</strong> produtos
+          </span>
+          ${this.totalPages > 1 ? `<span class="pagination-page-info">Página ${this.currentPage} de ${this.totalPages}</span>` : ''}
+        </div>
+        ${this.totalPages > 1 ? `
+        <div class="pagination-controls">
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span>Anterior</span>
+          </button>
+          <div class="pagination-pages">
+            ${this.generatePageNumbers()}
+          </div>
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
+            <span>Próxima</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    // Adicionar event listeners
+    const handlePaginationClick = async (e) => {
+      const target = e.target.closest('.pagination-btn, .page-number');
+      if (!target) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (this.isLoading) return;
+      
+      // Verificar se é botão de navegação
+      if (target.classList.contains('pagination-btn')) {
+        if (target.disabled) return;
+        
+        const action = target.dataset.page;
+        
+        if (action === "prev" && this.currentPage > 1) {
+          this.currentPage = Math.max(1, this.currentPage - 1);
+        } else if (action === "next" && this.currentPage < this.totalPages) {
+          this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+        } else {
+          return;
+        }
+      } 
+      // Verificar se é número de página
+      else if (target.classList.contains('page-number')) {
+        const page = parseInt(target.dataset.page);
+        
+        if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+          return;
+        }
+        
+        this.currentPage = page;
+      } else {
+        return;
+      }
+      
+      await this.loadProdutos();
+      this.scrollToTop();
+    };
+    
+    // Usar event delegation no elemento de paginação
+    pagination.addEventListener('click', handlePaginationClick);
+
+    // Inserir após o container de produtos
+    container.parentElement.appendChild(pagination);
+  }
+
+  /**
+   * Gera números de página para exibição
+   * ALTERAÇÃO: Função adicionada para paginação
+   */
+  generatePageNumbers() {
+    const pages = [];
+    const maxVisible = 7;
+    
+    if (this.totalPages <= maxVisible) {
+      for (let i = 1; i <= this.totalPages; i++) {
+        pages.push(
+          `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`
+        );
+      }
+      return pages.join("");
+    }
+
+    let startPage = Math.max(1, this.currentPage - 2);
+    let endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+    if (endPage - startPage < 4) {
+      if (this.currentPage <= 3) {
+        startPage = 1;
+        endPage = Math.min(5, this.totalPages);
+      } else if (this.currentPage >= this.totalPages - 2) {
+        startPage = Math.max(1, this.totalPages - 4);
+        endPage = this.totalPages;
+      }
+    }
+
+    if (startPage > 1) {
+      pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+      if (startPage > 2) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+      );
+    }
+
+    if (endPage < this.totalPages) {
+      if (endPage < this.totalPages - 1) {
+        pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+      }
+      pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página">${this.totalPages}</button>`);
+    }
+
+    return pages.join("");
+  }
+
+  /**
+   * Faz scroll suave para o topo da seção
+   * ALTERAÇÃO: Função adicionada para paginação
+   */
+  scrollToTop() {
+    const section = document.getElementById("secao-cardapio");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 
@@ -1042,7 +1395,8 @@ class ProdutoManager {
    * Utilitário para logs seguros (remove dados sensíveis)
    */
   safeLog(message, data = null) {
-    if (process.env.NODE_ENV === "development") {
+    // ALTERAÇÃO: Log condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       if (data) {
         console.log(message, data);
       } else {
@@ -1082,7 +1436,10 @@ class ProdutoManager {
         await this.openProdutoModal(produto);
       }
     } catch (error) {
-      console.error("Erro ao buscar produto para edição:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao buscar produto para edição:", error);
+      }
       this.showErrorMessage("Erro ao carregar dados do produto");
     }
   }
@@ -1120,7 +1477,10 @@ class ProdutoManager {
         await this.executePermanentDelete(produtoId, produtoNome);
       }
     } catch (error) {
-      console.error("Erro ao processar exclusão permanente:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao processar exclusão permanente:", error);
+      }
       this.showErrorMessage("Erro ao processar exclusão permanente");
     }
   }
@@ -1304,7 +1664,10 @@ class ProdutoManager {
       // Atualizar contadores se necessário
       this.updateVisibleProductsCount();
     } catch (error) {
-      console.error("Erro ao executar exclusão permanente:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao executar exclusão permanente:", error);
+      }
 
       let errorMessage = "Erro ao excluir produto permanentemente";
 
@@ -1345,7 +1708,10 @@ class ProdutoManager {
         window.refreshHome();
       }
     } catch (error) {
-      console.error("Erro ao alterar status do produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao alterar status do produto:", error);
+      }
       this.showErrorMessage("Erro ao alterar status do produto");
 
       // Reverter toggle
@@ -1355,39 +1721,13 @@ class ProdutoManager {
 
   /**
    * Aplica todos os filtros ativos de forma combinada
+   * ALTERAÇÃO: Agora apenas reseta a página e recarrega da API (filtros são feitos no backend)
    */
   applyAllFilters() {
-    const searchTerm = document.getElementById("busca-produto")?.value || "";
-    const categoriaId =
-      document.getElementById("categoria-filtro")?.value || "";
-    const status = document.getElementById("status-filtro")?.value || "todos";
-
-    // Aplicar filtros combinados
-
-    const cards = document.querySelectorAll(".card-produto");
-    let visibleCount = 0;
-
-    cards.forEach((card) => {
-      // Verificar filtro de busca
-      const searchPass = this.checkSearchFilter(card, searchTerm);
-
-      // Verificar filtro de categoria
-      const categoryPass = this.checkCategoryFilter(card, categoriaId);
-
-      // Verificar filtro de status
-      const statusPass = this.checkStatusFilter(card, status);
-
-      // Mostrar card apenas se passar em todos os filtros
-      const shouldShow = searchPass && categoryPass && statusPass;
-      card.style.display = shouldShow ? "block" : "none";
-
-      if (shouldShow) visibleCount++;
-    });
-
-    // Atualizar contador de produtos visíveis
-    this.updateVisibleProductsCount();
-
-    // Filtros aplicados com sucesso
+    // ALTERAÇÃO: Resetar para primeira página ao aplicar filtros
+    this.currentPage = 1;
+    // Recarregar produtos da API com os novos filtros
+    this.loadProdutos();
   }
 
   /**
@@ -1461,7 +1801,10 @@ class ProdutoManager {
   async openProdutoModal(produtoData = null) {
     const modal = document.getElementById("modal-produto");
     if (!modal) {
-      console.error("Modal #modal-produto não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Modal #modal-produto não encontrado");
+      }
       return;
     }
 
@@ -1519,7 +1862,10 @@ class ProdutoManager {
       abrirModal("modal-produto");
       await this.setupProdutoModalListeners(produtoData);
     } catch (error) {
-      console.error("Erro ao abrir modal de produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao abrir modal de produto:", error);
+      }
       // Garantir que a modal está fechada em caso de erro
       if (modal) {
         modal.style.display = 'none';
@@ -1803,12 +2149,18 @@ class ProdutoManager {
     );
 
     if (!modal) {
-      console.error("Modal #modal-ingrediente-receita não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Modal #modal-ingrediente-receita não encontrado");
+      }
       return;
     }
 
     if (!selectIngrediente) {
-      console.error("Select #ingrediente-select-modal não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Select #ingrediente-select-modal não encontrado");
+      }
       return;
     }
 
@@ -2504,7 +2856,10 @@ class ProdutoManager {
       // Atualizar custo estimado
       this.updateEstimatedCost();
     } catch (error) {
-      console.error("Erro ao carregar ingredientes existentes:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar ingredientes existentes:", error);
+      }
     }
   }
 
@@ -2570,7 +2925,10 @@ class ProdutoManager {
         window.refreshHome();
       }
     } catch (error) {
-      console.error("Erro ao adicionar produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao adicionar produto:", error);
+      }
 
       // Mensagem específica para conflito de nome
       if (
@@ -2598,7 +2956,10 @@ class ProdutoManager {
     const produtoId = this.currentEditingId;
 
     if (!produtoId) {
-      console.error("ID do produto não encontrado");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("ID do produto não encontrado");
+      }
       return;
     }
 
@@ -2624,7 +2985,10 @@ class ProdutoManager {
         window.refreshHome();
       }
     } catch (error) {
-      console.error("Erro ao atualizar produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar produto:", error);
+      }
 
       // Mensagem específica para conflito de nome
       if (
@@ -2679,7 +3043,10 @@ class ProdutoManager {
 
       await Promise.all(updatePromises);
     } catch (error) {
-      console.error("Erro ao atualizar produtos globalmente:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar produtos globalmente:", error);
+      }
       // Fallback: recarregar todos os produtos
       await this.loadProdutos();
     } finally {
@@ -2721,7 +3088,10 @@ class ProdutoManager {
       // Atualizar custo estimado real baseado nos ingredientes
       this.refreshProductEstimatedCost(produtoAtualizado.id, card);
     } catch (error) {
-      console.error("Erro ao atualizar card do produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar card do produto:", error);
+      }
     }
   }
 
@@ -2823,7 +3193,10 @@ class ProdutoManager {
       // Atualizar custo e margem se existirem
       this.updateProdutoCostAndMargin(card, produto);
     } catch (error) {
-      console.error("Erro ao atualizar informações do produto:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar informações do produto:", error);
+      }
       // Não quebrar o fluxo, apenas logar o erro
     }
   }
@@ -2926,7 +3299,10 @@ class ProdutoManager {
         }
       }
     } catch (error) {
-      console.error("Erro ao atualizar imagem do produto na interface:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao atualizar imagem do produto na interface:", error);
+      }
       // Se falhar, recarregar todos os produtos como fallback
       await this.loadProdutos();
     }
@@ -2967,7 +3343,10 @@ class ProdutoManager {
     try {
       await this.updateAllProdutosInUI();
     } catch (error) {
-      console.error("Erro na atualização global de produtos:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro na atualização global de produtos:", error);
+      }
     }
   }
 
@@ -3321,7 +3700,10 @@ class ProdutoManager {
         // Atualizar custo estimado
         this.updateEstimatedCost();
       } catch (error) {
-        console.error("Erro ao remover ingrediente:", error);
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error("Erro ao remover ingrediente:", error);
+        }
         this.showErrorMessage("Falha ao remover ingrediente");
       } finally {
         button.disabled = false;
@@ -3380,7 +3762,10 @@ class ProdutoManager {
         selectModal.appendChild(option);
       });
     } else {
-      console.error("Select #ingrediente-select-modal não encontrado no DOM");
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Select #ingrediente-select-modal não encontrado no DOM");
+      }
     }
   }
 
@@ -3518,7 +3903,10 @@ class ProdutoManager {
 
       return produtoId;
     } catch (error) {
-      console.error("Erro ao salvar produto com ingredientes:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao salvar produto com ingredientes:", error);
+      }
       throw error;
     }
   }
@@ -3528,20 +3916,52 @@ class ProdutoManager {
    */
   async updateDashboard() {
     try {
-      // Buscar todos os produtos
-      const response = await this.dataManager.getAllProdutos({
-        page_size: 1000,
-        include_inactive: true,
-      });
-      const produtos = response.items || [];
-
-      // Calcular estatísticas
-      const stats = this.calculateProductStats(produtos);
+      // ALTERAÇÃO: Buscar métricas via API SQL em vez de calcular no frontend
+      const response = await getMenuDashboardMetrics();
+      
+      if (!response.success) {
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error("❌ [DASHBOARD] Erro ao buscar métricas:", response.error);
+        }
+        // Usar valores padrão em caso de erro
+        this.updateDashboardCards({
+          totalProdutos: 0,
+          produtosInativos: 0,
+          precoMedio: 0,
+          margemMedia: 0,
+          tempoMedio: 0
+        });
+        return;
+      }
+      
+      const metrics = response.data;
+      
+      // Mapear dados da API para o formato esperado pelos cards
+      const stats = {
+        totalProdutos: metrics.total_products || 0,
+        produtosInativos: metrics.inactive_products || 0,
+        precoMedio: metrics.avg_price || 0,
+        margemMedia: metrics.avg_margin || 0,
+        tempoMedio: metrics.avg_preparation_time || 0
+      };
 
       // Atualizar os quadros do dashboard
       this.updateDashboardCards(stats);
     } catch (error) {
-      console.error("Erro ao atualizar dashboard:", error);
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("❌ [DASHBOARD] Erro ao atualizar dashboard:", error);
+        console.error("❌ [DASHBOARD] Stack trace:", error.stack);
+      }
+      // Usar valores padrão em caso de erro
+      this.updateDashboardCards({
+        totalProdutos: 0,
+        produtosInativos: 0,
+        precoMedio: 0,
+        margemMedia: 0,
+        tempoMedio: 0
+      });
     }
   }
 
@@ -3600,37 +4020,58 @@ class ProdutoManager {
    * Atualiza os quadros do dashboard
    */
   updateDashboardCards(stats) {
+    // ALTERAÇÃO: Seletores agora usam escopo da seção de cardápio
+    const secaoCardapio = document.getElementById("secao-cardapio");
+    if (!secaoCardapio) {
+      // ALTERAÇÃO: Log condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("❌ [DASHBOARD] Seção de cardápio não encontrada!");
+      }
+      return;
+    }
+    
     // Total de Itens
-    const totalElement = document.querySelector(
+    const totalElement = secaoCardapio.querySelector(
       ".relata .quadro:nth-child(1) .valor .grande"
     );
-    const indisponiveisElement = document.querySelector(
+    const indisponiveisElement = secaoCardapio.querySelector(
       ".relata .quadro:nth-child(1) .valor .descricao"
     );
-    if (totalElement) totalElement.textContent = stats.totalProdutos;
-    if (indisponiveisElement)
-      indisponiveisElement.textContent = `${stats.produtosInativos} indisponíveis`;
+    
+    if (totalElement) {
+      totalElement.textContent = stats.totalProdutos || 0;
+    }
+    
+    if (indisponiveisElement) {
+      indisponiveisElement.textContent = `${stats.produtosInativos || 0} indisponíveis`;
+    }
 
     // Preço Médio
-    const precoElement = document.querySelector(
+    const precoElement = secaoCardapio.querySelector(
       ".relata .quadro:nth-child(2) .valor .grande"
     );
-    if (precoElement)
-      precoElement.textContent = `R$ ${this.formatCurrency(stats.precoMedio)}`;
+    if (precoElement) {
+      const precoFormatado = `R$ ${this.formatCurrency(stats.precoMedio || 0)}`;
+      precoElement.textContent = precoFormatado;
+    }
 
     // Margem Média
-    const margemElement = document.querySelector(
+    const margemElement = secaoCardapio.querySelector(
       ".relata .quadro:nth-child(3) .valor .grande"
     );
-    if (margemElement)
-      margemElement.textContent = `${stats.margemMedia.toFixed(1)}%`;
+    if (margemElement) {
+      const margemFormatada = `${(stats.margemMedia || 0).toFixed(1)}%`;
+      margemElement.textContent = margemFormatada;
+    }
 
     // Tempo Médio de Preparo
-    const tempoElement = document.querySelector(
+    const tempoElement = secaoCardapio.querySelector(
       ".relata .quadro:nth-child(4) .valor .grande"
     );
-    if (tempoElement)
-      tempoElement.textContent = `${Math.round(stats.tempoMedio)} min`;
+    if (tempoElement) {
+      const tempoFormatado = `${Math.round(stats.tempoMedio || 0)} min`;
+      tempoElement.textContent = tempoFormatado;
+    }
   }
 }
 

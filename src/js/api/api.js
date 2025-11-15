@@ -7,8 +7,21 @@ const STORAGE_KEYS = {
   user: "rb.user",
 };
 
+// TODO: REVISAR - Armazenamento de tokens no localStorage
+// Tokens JWT armazenados no localStorage são vulneráveis a XSS.
+// Considerar migrar para httpOnly cookies (requer mudanças no backend) ou
+// usar sessionStorage para reduzir o tempo de exposição.
+// Alternativa: implementar refresh tokens com armazenamento mais seguro.
+
 // Ajuste se necessário. Mantém flexível para backends montados em outras portas.
+// TODO: REVISAR - URL hardcoded
+// Considerar usar variável de ambiente ou configuração dinâmica baseada no ambiente
+// (desenvolvimento/produção). Para produção, usar HTTPS obrigatoriamente.
 export const API_BASE_URL = (() => {
+  // ALTERAÇÃO: Permitir override via variável de ambiente se disponível
+  if (typeof window !== "undefined" && window.API_BASE_URL) {
+    return window.API_BASE_URL;
+  }
   return "http://127.0.0.1:5000";
 })();
 
@@ -97,11 +110,12 @@ export async function apiRequest(
           maxRetries,
           // Não fazer retry para erros 401 (token expirado) ou 403 (acesso negado)
           onRetry: (attempt, delay, error) => {
-            // Log apenas em desenvolvimento
+            // ALTERAÇÃO: Log apenas em desenvolvimento - removido console.log em produção
             const isDev =
               typeof process !== "undefined" &&
               process.env?.NODE_ENV === "development";
             if (isDev) {
+              // eslint-disable-next-line no-console
               console.log(
                 `Tentativa ${attempt} de requisição para ${path} após ${delay}ms`
               );
@@ -142,11 +156,12 @@ export async function apiRequest(
             (data && (data.error || data.message)) ||
             "Endpoint do carrinho não encontrado. Verifique se a API está rodando e se o endpoint está registrado.";
           
-          // Log detalhado em desenvolvimento para debug
+          // ALTERAÇÃO: Log detalhado apenas em desenvolvimento - removido console.error em produção
           const isDev =
             typeof process !== "undefined" &&
             process.env?.NODE_ENV === "development";
           if (isDev) {
+            // eslint-disable-next-line no-console
             console.error('[API] Erro 404 em endpoint de carrinho:', {
               path,
               url,

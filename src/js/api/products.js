@@ -13,6 +13,7 @@ import { apiRequest } from './api.js';
  * @param {number} options.page - Página
  * @param {number} options.page_size - Itens por página
  * @param {boolean} options.include_inactive - Incluir produtos inativos
+ * @param {boolean} options.only_inactive - Filtrar apenas produtos inativos (requer include_inactive=true)
  * @param {boolean} options.filter_unavailable - Filtrar produtos indisponíveis (padrão: false para admin, true para frontend)
  * @returns {Promise<Object>} Lista de produtos com paginação
  */
@@ -24,6 +25,10 @@ export const getProducts = async (options = {}) => {
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
     if (options.include_inactive !== undefined) params.append('include_inactive', options.include_inactive);
+    // ALTERAÇÃO: Adiciona parâmetro only_inactive para filtrar apenas produtos inativos
+    if (options.only_inactive !== undefined) {
+        params.append('only_inactive', options.only_inactive.toString());
+    }
     // NOVO: Adiciona parâmetro filter_unavailable para filtrar produtos sem estoque
     if (options.filter_unavailable !== undefined) {
         params.append('filter_unavailable', options.filter_unavailable.toString());

@@ -7,9 +7,13 @@ import { apiRequest } from './api.js';
 
 /**
  * Lista todas as promoções ativas
- * @param {Object} options - Opções de filtro
+ * @param {Object} options - Opções de filtro e paginação
  * @param {boolean} options.include_expired - Incluir promoções expiradas (padrão: false)
- * @returns {Promise<Object>} Lista de promoções com detalhes dos produtos
+ * @param {number} options.page - Página atual (padrão: 1)
+ * @param {number} options.page_size - Itens por página (padrão: 20)
+ * @param {string} options.search - Termo de busca (nome do produto, ID da promoção)
+ * @param {string} options.status - Filtro por status (ativas, expiradas, todas)
+ * @returns {Promise<Object>} Lista de promoções com detalhes dos produtos e paginação
  */
 export const getPromotions = async (options = {}) => {
     const params = new URLSearchParams();
@@ -17,6 +21,10 @@ export const getPromotions = async (options = {}) => {
     if (options.include_expired !== undefined) {
         params.append('include_expired', options.include_expired.toString());
     }
+    if (options.page) params.append('page', options.page);
+    if (options.page_size) params.append('page_size', options.page_size);
+    if (options.search) params.append('search', options.search);
+    if (options.status) params.append('status', options.status);
     
     const queryString = params.toString();
     const url = `/api/promotions${queryString ? `?${queryString}` : ''}`;

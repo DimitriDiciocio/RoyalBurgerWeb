@@ -10,7 +10,7 @@ import { getIngredients } from "../api/ingredients.js";
 import { addToCart, updateCartItem, getCart } from "../api/cart.js";
 import { getPromotionByProductId } from "../api/promotions.js";
 import { showToast } from "./alerts.js";
-import { API_BASE_URL } from "../api/api.js";
+import { API_BASE_URL, getStoredUser } from "../api/api.js";
 import { cacheManager } from "../utils/cache-manager.js";
 import { delegate, debounce } from "../utils/performance-utils.js";
 import { $id, $q } from "../utils/dom-cache.js";
@@ -655,7 +655,7 @@ const VALIDATION_LIMITS = {
             try {
               await loadIngredientes(state.productId);
             } catch (err) {
-              // ALTERAÇÃO: Substituído console.error por logging condicional
+              // ALTERAÇÃO: Log condicional apenas em modo debug
               if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('[QUANTITY DECREASE] Erro ao recarregar ingredientes:', err);
               }
@@ -809,25 +809,28 @@ const VALIDATION_LIMITS = {
         // CORREÇÃO: Adicionar classe CSS quando limite é atingido (max_quantity já considera estoque)
         const stockLimitedClass = !showPlus ? ' stock-limited' : '';
 
+        // ALTERAÇÃO: Escapar atributos data-* e title para prevenir XSS
+        const titleAttr = !showPlus ? ` title="${escapeAttribute('Limite atingido')}"` : '';
+        const titlePlusAttr = !showPlus ? ` title="${escapeAttribute('Limite de estoque atingido')}"` : '';
+        const minusDisabledStyle = !showMinus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;"' : 'style="cursor: pointer;"';
+        const plusDisabledStyle = !showPlus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;"' : 'style="cursor: pointer;"';
+        
         return `
             <div class="item${stockLimitedClass}" 
-                 data-ingrediente-id="${ingId}" 
-                 data-preco="${ingPrice}" 
-                 data-porcoes="${basePortions}"
-                 data-min-qty="${minQuantity}"
-                 data-max-qty="${maxQuantity}"
-                 ${!showPlus ? 'title="Limite atingido"' : ''}>
+                 data-ingrediente-id="${escapeAttribute(String(ingId))}" 
+                 data-preco="${escapeAttribute(String(ingPrice))}" 
+                 data-porcoes="${escapeAttribute(String(basePortions))}"
+                 data-min-qty="${escapeAttribute(String(minQuantity))}"
+                 data-max-qty="${escapeAttribute(String(maxQuantity))}"
+                 ${titleAttr}>
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
               </div>
               <div class="quantidade">
-                <i class="fa-solid fa-minus${!showMinus ? ' dessativo disabled' : ''}" ${!showMinus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;"' : 'style="cursor: pointer;"'}></i>
-                <p class="qtd-extra">${String(effectiveQty).padStart(
-                  2,
-                  "0"
-                )}</p>
-                <i class="fa-solid fa-plus${!showPlus ? ' dessativo disabled' : ''}" ${!showPlus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;" title="Limite de estoque atingido"' : 'style="cursor: pointer;"'}></i>
+                <i class="fa-solid fa-minus${!showMinus ? ' dessativo disabled' : ''}" ${minusDisabledStyle} aria-label="${!showMinus ? escapeAttribute('Não é possível diminuir') : escapeAttribute('Diminuir quantidade')}"></i>
+                <p class="qtd-extra">${String(effectiveQty).padStart(2, "0")}</p>
+                <i class="fa-solid fa-plus${!showPlus ? ' dessativo disabled' : ''}" ${plusDisabledStyle}${titlePlusAttr} aria-label="${!showPlus ? escapeAttribute('Limite de estoque atingido') : escapeAttribute('Aumentar quantidade')}"></i>
               </div>
             </div>`;
       })
@@ -896,25 +899,28 @@ const VALIDATION_LIMITS = {
         // CORREÇÃO: Adicionar classe CSS quando limite é atingido (max_quantity já considera estoque)
         const stockLimitedClass = !showPlus ? ' stock-limited' : '';
 
+        // ALTERAÇÃO: Escapar atributos data-* e title para prevenir XSS
+        const titleAttr = !showPlus ? ` title="${escapeAttribute('Limite atingido')}"` : '';
+        const titlePlusAttr = !showPlus ? ` title="${escapeAttribute('Limite de estoque atingido')}"` : '';
+        const minusDisabledStyle = !showMinus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;"' : 'style="cursor: pointer;"';
+        const plusDisabledStyle = !showPlus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;"' : 'style="cursor: pointer;"';
+        
         return `
             <div class="item${stockLimitedClass}" 
-                 data-ingrediente-id="${ingId}" 
-                 data-preco="${ingPrice}" 
-                 data-porcoes="${basePortions}"
-                 data-min-qty="${minQuantity}"
-                 data-max-qty="${maxQuantity}"
-                 ${!showPlus ? 'title="Limite atingido"' : ''}>
+                 data-ingrediente-id="${escapeAttribute(String(ingId))}" 
+                 data-preco="${escapeAttribute(String(ingPrice))}" 
+                 data-porcoes="${escapeAttribute(String(basePortions))}"
+                 data-min-qty="${escapeAttribute(String(minQuantity))}"
+                 data-max-qty="${escapeAttribute(String(maxQuantity))}"
+                 ${titleAttr}>
               <div class="item-adicional-container">
                 <p class="nome-adicional">${ingName}</p>
                 <p class="preco-adicional">${toBRL(ingPrice)}</p>
               </div>
               <div class="quantidade">
-                <i class="fa-solid fa-minus${!showMinus ? ' dessativo disabled' : ''}" ${!showMinus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;"' : 'style="cursor: pointer;"'}></i>
-                <p class="qtd-extra">${String(effectiveQty).padStart(
-                  2,
-                  "0"
-                )}</p>
-                <i class="fa-solid fa-plus${!showPlus ? ' dessativo disabled' : ''}" ${!showPlus ? 'style="opacity: 0.5; pointer-events: none; cursor: not-allowed;" title="Limite de estoque atingido"' : 'style="cursor: pointer;"'}></i>
+                <i class="fa-solid fa-minus${!showMinus ? ' dessativo disabled' : ''}" ${minusDisabledStyle} aria-label="${!showMinus ? escapeAttribute('Não é possível diminuir') : escapeAttribute('Diminuir quantidade')}"></i>
+                <p class="qtd-extra">${String(effectiveQty).padStart(2, "0")}</p>
+                <i class="fa-solid fa-plus${!showPlus ? ' dessativo disabled' : ''}" ${plusDisabledStyle}${titlePlusAttr} aria-label="${!showPlus ? escapeAttribute('Limite de estoque atingido') : escapeAttribute('Aumentar quantidade')}"></i>
               </div>
             </div>`;
       })
@@ -1291,6 +1297,31 @@ const VALIDATION_LIMITS = {
 
     el.btnAdicionarCesta.addEventListener("click", async () => {
       try {
+        // ALTERAÇÃO: Validar se o usuário pode adicionar itens ao carrinho antes de prosseguir
+        const user = getStoredUser();
+        const token = localStorage.getItem('rb.token') || localStorage.getItem('authToken');
+        const isAuth = !!token;
+        
+        // Se estiver logado, verifica o role
+        if (isAuth && user) {
+          const userRole = (user.role || user.profile || user.type || user.user_type || 'customer').toLowerCase();
+          const allowedRoles = ['cliente', 'customer', 'atendente', 'attendant'];
+          const isAllowed = allowedRoles.includes(userRole);
+          
+          if (!isAllowed) {
+            // Exibir mensagem de erro personalizada
+            showToast(
+              'Apenas clientes e atendentes podem adicionar itens à cesta.',
+              {
+                type: "error",
+                title: "Permissão Negada",
+                autoClose: 5000,
+              }
+            );
+            return; // Impede a execução da função
+          }
+        }
+        
         // Desabilitar botão durante operação
         el.btnAdicionarCesta.disabled = true;
         el.btnAdicionarCesta.textContent = state.isEditing
@@ -1589,8 +1620,7 @@ const VALIDATION_LIMITS = {
       // ALTERAÇÃO: Removido console.log em produção
       // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
     } catch (err) {
-      // ALTERAÇÃO: Removido console.error em produção
-      // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+      // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao carregar ingredientes:", err.message);
       }
@@ -1628,7 +1658,7 @@ const VALIDATION_LIMITS = {
       } catch (error) {
         // Se não houver promoção (404) ou outro erro, continuar sem promoção
         state.promotion = null;
-        // ALTERAÇÃO: Removido console.warn em produção
+        // ALTERAÇÃO: Log condicional apenas em modo debug
         if (typeof window !== 'undefined' && window.DEBUG_MODE) {
           console.warn("Erro ao buscar promoção do produto:", error);
         }
@@ -1697,8 +1727,7 @@ const VALIDATION_LIMITS = {
         // Continuar normalmente para permitir edição mesmo com erro de capacidade
       }
     } catch (err) {
-      // ALTERAÇÃO: Removido console.error em produção
-      // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+      // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao carregar produto:", err.message);
       }
@@ -1748,8 +1777,7 @@ const VALIDATION_LIMITS = {
         debouncedUpdateProductCapacity(false);
       }
     } catch (err) {
-      // ALTERAÇÃO: Removido console.error em produção
-      // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+      // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao carregar item da cesta:", err.message);
       }
@@ -1923,8 +1951,7 @@ const VALIDATION_LIMITS = {
         // Continuar normalmente para permitir edição mesmo com erro de capacidade
       }
     } catch (err) {
-      // ALTERAÇÃO: Removido console.error em produção
-      // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
+      // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao carregar item do carrinho:", err);
       }

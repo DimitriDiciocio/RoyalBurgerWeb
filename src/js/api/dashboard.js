@@ -20,7 +20,10 @@ export async function getDashboardMetrics() {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao buscar métricas:', error.message);
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error('Erro ao buscar métricas:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -76,4 +79,82 @@ export function formatTime(minutes) {
 export function calculatePercentage(value, total) {
     if (!total || total === 0) return 0;
     return Math.round((value / total) * 100);
+}
+
+/**
+ * Busca métricas do dashboard de cardápio (produtos)
+ * @returns {Promise<Object>} Métricas do dashboard de cardápio
+ */
+export async function getMenuDashboardMetrics() {
+    try {
+        const data = await apiRequest('/api/dashboard/menu', {
+            method: 'GET'
+        });
+
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error('Erro ao buscar métricas do dashboard de cardápio:', error.message);
+        }
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Busca métricas do dashboard de estoque
+ * @returns {Promise<Object>} Métricas do dashboard de estoque
+ */
+export async function getStockDashboardMetrics() {
+    try {
+        const data = await apiRequest('/api/dashboard/stock', {
+            method: 'GET'
+        });
+
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error('Erro ao buscar métricas do dashboard de estoque:', error.message);
+        }
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Busca métricas do dashboard de promoções
+ * @returns {Promise<Object>} Métricas do dashboard de promoções
+ */
+export async function getPromotionsDashboardMetrics() {
+    try {
+        const data = await apiRequest('/api/dashboard/promotions', {
+            method: 'GET'
+        });
+
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error('Erro ao buscar métricas do dashboard de promoções:', error.message);
+        }
+        return {
+            success: false,
+            error: error.message
+        };
+    }
 }

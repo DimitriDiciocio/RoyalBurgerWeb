@@ -17,6 +17,9 @@ import { showToast, showConfirm, toastFromApiError, toastFromApiSuccess, showAct
 import { abrirModal, fecharModal } from '../modais.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
 import { debounce } from '../../utils/performance-utils.js';
+import { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } from '../../utils/pagination-utils.js';
+import { showLoadingOverlay, hideLoadingOverlay } from '../../utils/loading-indicator.js';
+import { getPromotionsDashboardMetrics } from '../../api/dashboard.js';
 
 /**
  * Gerenciador de dados de promoções
@@ -62,7 +65,7 @@ class PromocaoDataManager {
             return response;
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao buscar promoções:', error);
             }
             throw error;
@@ -77,7 +80,7 @@ class PromocaoDataManager {
             return await getPromotionById(id);
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao buscar promoção:', error);
             }
             throw error;
@@ -98,7 +101,7 @@ class PromocaoDataManager {
                 return null;
             }
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao buscar promoção por produto:', error);
             }
             throw error;
@@ -115,7 +118,7 @@ class PromocaoDataManager {
         } catch (error) {
             // ALTERAÇÃO: Não logar erro 409 aqui, será tratado no savePromocao
             // Apenas logar outros erros se DEBUG_MODE estiver ativo
-            if (error.status !== 409 && window.DEBUG_MODE) {
+            if (error.status !== 409 && typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao adicionar promoção:', error);
             }
             throw error;
@@ -131,7 +134,7 @@ class PromocaoDataManager {
             this.clearCache();
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao atualizar promoção:', error);
             }
             throw error;
@@ -147,7 +150,7 @@ class PromocaoDataManager {
             this.clearCache();
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao remover promoção:', error);
             }
             throw error;
@@ -167,6 +170,12 @@ class PromocaoManager {
         this.eventListeners = [];
         this.filtroStatus = 'todas';
         this.termoBusca = '';
+        // ALTERAÇÃO: Estado de paginação adicionado
+        this.currentPage = 1;
+        this.pageSize = 20;
+        this.totalPages = 1;
+        this.totalItems = 0;
+        this.isLoading = false;
     }
 
     /**
@@ -177,10 +186,10 @@ class PromocaoManager {
             await this.loadProdutos();
             await this.loadPromocoes();
             this.setupEventListeners();
-            this.updateMetrics();
+            await this.updateMetrics();
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao inicializar módulo de promoções:', error);
             }
             this.showErrorMessage('Erro ao carregar dados das promoções');
@@ -196,7 +205,7 @@ class PromocaoManager {
             this.produtos = response.items || [];
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao carregar produtos:', error);
             }
             this.produtos = [];
@@ -205,21 +214,69 @@ class PromocaoManager {
 
     /**
      * Carrega promoções
+     * ALTERAÇÃO: Agora usa paginação e filtros na API ao invés de filtragem local
      */
-    async loadPromocoes() {
-        try {
-            const response = await this.dataManager.getAllPromocoes(true);
-            this.promocoes = response.items || response || [];
-            this.renderPromocoes();
-        } catch (error) {
-            // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
-                console.error('Erro ao carregar promoções:', error);
+        async loadPromocoes() {
+            if (this.isLoading) return; // Evitar múltiplas requisições simultâneas
+            
+            try {
+                this.isLoading = true;
+                
+                // ALTERAÇÃO: Mostrar indicador de carregamento
+                showLoadingOverlay('#secao-promocoes .promocoes-container', 'promocoes-loading', 'Carregando promoções...');
+                
+                // ALTERAÇÃO: Preparar opções de paginação e filtros para enviar à API
+            const options = {
+                page: this.currentPage,
+                page_size: this.pageSize,
+                include_expired: true, // Sempre incluir expiradas para filtro funcionar
+            };
+
+            // Adicionar busca se houver termo de busca
+            if (this.termoBusca) {
+                options.search = this.termoBusca;
             }
-            this.promocoes = [];
+
+            // Adicionar filtro de status se houver
+            if (this.filtroStatus && this.filtroStatus !== 'todas') {
+                options.status = this.filtroStatus;
+                // Se for "ativas", não incluir expiradas
+                if (this.filtroStatus === 'ativas') {
+                    options.include_expired = false;
+                } else if (this.filtroStatus === 'expiradas') {
+                    options.include_expired = true;
+                    options.status = 'expiradas';
+                }
+            }
+
+            // ALTERAÇÃO: Buscar promoções com paginação e filtros diretamente da API
+            const { getPromotions } = await import('../../api/promotions.js');
+            const response = await getPromotions(options);
+            
+            // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
+            const normalizedResponse = normalizePaginationResponse(response, 'items');
+            this.promocoes = getItemsFromResponse(normalizedResponse);
+            const paginationInfo = getPaginationFromResponse(normalizedResponse);
+            
+            // ALTERAÇÃO: Atualizar informações de paginação usando dados normalizados
+            this.totalPages = paginationInfo.total_pages || 1;
+            this.totalItems = paginationInfo.total || 0;
+            
             this.renderPromocoes();
+            this.renderPagination(); // ALTERAÇÃO: Renderizar paginação
+            } catch (error) {
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.error('Erro ao carregar promoções:', error);
+                }
+                this.promocoes = [];
+                this.renderPromocoes();
+            } finally {
+                this.isLoading = false;
+                // ALTERAÇÃO: Esconder indicador de carregamento
+                hideLoadingOverlay('promocoes-loading');
+            }
         }
-    }
 
     /**
      * Configura event listeners
@@ -238,10 +295,11 @@ class PromocaoManager {
         // Busca
         const buscaInput = document.getElementById('busca-promocao');
         if (buscaInput) {
-            const handler = debounce((e) => {
+            const handler = debounce(async (e) => {
                 this.termoBusca = e.target.value.toLowerCase();
-                this.renderPromocoes();
-            }, 300);
+                this.currentPage = 1; // Resetar para primeira página ao buscar
+                await this.loadPromocoes(); // ALTERAÇÃO: Recarregar da API
+            }, 500);
             buscaInput.addEventListener('input', handler);
             this.eventListeners.push({ element: buscaInput, event: 'input', handler });
         }
@@ -249,9 +307,10 @@ class PromocaoManager {
         // Filtro de status
         const filtroStatus = document.getElementById('filtro-status-promocao');
         if (filtroStatus) {
-            const handler = (e) => {
+            const handler = async (e) => {
                 this.filtroStatus = e.target.value;
-                this.renderPromocoes();
+                this.currentPage = 1; // Resetar para primeira página ao filtrar
+                await this.loadPromocoes(); // ALTERAÇÃO: Recarregar da API
             };
             filtroStatus.addEventListener('change', handler);
             this.eventListeners.push({ element: filtroStatus, event: 'change', handler });
@@ -378,38 +437,14 @@ class PromocaoManager {
 
     /**
      * Renderiza lista de promoções
+     * ALTERAÇÃO: Removida filtragem local - os dados já vêm filtrados da API
      */
     renderPromocoes() {
         const container = document.getElementById('promocoes-list');
         if (!container) return;
 
-        let promocoesFiltradas = [...this.promocoes];
-
-        // Filtro por status
-        if (this.filtroStatus === 'ativas') {
-            promocoesFiltradas = promocoesFiltradas.filter(p => {
-                const expiresAt = new Date(p.expires_at);
-                return expiresAt > new Date();
-            });
-        } else if (this.filtroStatus === 'expiradas') {
-            promocoesFiltradas = promocoesFiltradas.filter(p => {
-                // ALTERAÇÃO: Comparar datas corretamente (backend retorna UTC)
-                const expiresAt = new Date(p.expires_at);
-                const now = new Date();
-                return expiresAt <= now;
-            });
-        }
-
-        // Filtro por busca
-        if (this.termoBusca) {
-            promocoesFiltradas = promocoesFiltradas.filter(p => {
-                const produtoNome = (p.product?.name || '').toLowerCase();
-                const promocaoId = p.id.toString();
-                return produtoNome.includes(this.termoBusca) || promocaoId.includes(this.termoBusca);
-            });
-        }
-
-        if (promocoesFiltradas.length === 0) {
+        // ALTERAÇÃO: Usar diretamente as promoções retornadas da API (já filtradas)
+        if (this.promocoes.length === 0) {
             container.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: #666;">
                     <i class="fa-solid fa-tags" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
@@ -419,7 +454,171 @@ class PromocaoManager {
             return;
         }
 
-        container.innerHTML = promocoesFiltradas.map(promocao => this.createPromocaoCard(promocao)).join('');
+        container.innerHTML = this.promocoes.map(promocao => this.createPromocaoCard(promocao)).join('');
+    }
+
+    /**
+     * Renderiza controles de paginação
+     * ALTERAÇÃO: Função adicionada para paginação similar à seção de estoque
+     */
+    renderPagination() {
+        const container = document.getElementById('promocoes-list');
+        if (!container) return;
+
+        // Remover paginação existente
+        const existingPagination = container.parentElement.querySelector(".pagination");
+        if (existingPagination) {
+            existingPagination.remove();
+        }
+
+        // Calcular informações de exibição
+        const startItem = this.totalItems === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+        const endItem = Math.min(this.currentPage * this.pageSize, this.totalItems);
+
+        // Sempre renderizar paginação se houver itens (mesmo que seja apenas 1 página)
+        if (this.totalItems === 0) {
+            return;
+        }
+
+        // Criar elemento de paginação melhorado
+        const pagination = document.createElement("div");
+        pagination.className = "pagination";
+        pagination.innerHTML = `
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          <span class="pagination-text">
+            Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${this.totalItems}</strong> promoções
+          </span>
+          ${this.totalPages > 1 ? `<span class="pagination-page-info">Página ${this.currentPage} de ${this.totalPages}</span>` : ''}
+        </div>
+        ${this.totalPages > 1 ? `
+        <div class="pagination-controls">
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span>Anterior</span>
+          </button>
+          <div class="pagination-pages">
+            ${this.generatePageNumbers()}
+          </div>
+          <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
+            <span>Próxima</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+        // Adicionar event listeners
+        const handlePaginationClick = async (e) => {
+            const target = e.target.closest('.pagination-btn, .page-number');
+            if (!target) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (this.isLoading) return;
+            
+            // Verificar se é botão de navegação
+            if (target.classList.contains('pagination-btn')) {
+                if (target.disabled) return;
+                
+                const action = target.dataset.page;
+                
+                if (action === "prev" && this.currentPage > 1) {
+                    this.currentPage = Math.max(1, this.currentPage - 1);
+                } else if (action === "next" && this.currentPage < this.totalPages) {
+                    this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+                } else {
+                    return;
+                }
+            } 
+            // Verificar se é número de página
+            else if (target.classList.contains('page-number')) {
+                const page = parseInt(target.dataset.page);
+                
+                if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+                    return;
+                }
+                
+                this.currentPage = page;
+            } else {
+                return;
+            }
+            
+            await this.loadPromocoes();
+            this.scrollToTop();
+        };
+        
+        // Usar event delegation no elemento de paginação
+        pagination.addEventListener('click', handlePaginationClick);
+
+        // Inserir após o container de promoções
+        container.parentElement.appendChild(pagination);
+    }
+
+    /**
+     * Gera números de página para exibição
+     * ALTERAÇÃO: Função adicionada para paginação
+     */
+    generatePageNumbers() {
+        const pages = [];
+        const maxVisible = 7;
+        
+        if (this.totalPages <= maxVisible) {
+            for (let i = 1; i <= this.totalPages; i++) {
+                pages.push(
+                    `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`
+                );
+            }
+            return pages.join("");
+        }
+
+        let startPage = Math.max(1, this.currentPage - 2);
+        let endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+        if (endPage - startPage < 4) {
+            if (this.currentPage <= 3) {
+                startPage = 1;
+                endPage = Math.min(5, this.totalPages);
+            } else if (this.currentPage >= this.totalPages - 2) {
+                startPage = Math.max(1, this.totalPages - 4);
+                endPage = this.totalPages;
+            }
+        }
+
+        if (startPage > 1) {
+            pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+            if (startPage > 2) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(
+                `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+            );
+        }
+
+        if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
+            pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página">${this.totalPages}</button>`);
+        }
+
+        return pages.join("");
+    }
+
+    /**
+     * Faz scroll suave para o topo da seção
+     * ALTERAÇÃO: Função adicionada para paginação
+     */
+    scrollToTop() {
+        const section = document.getElementById("secao-promocoes");
+        if (section) {
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
     }
 
     /**
@@ -502,56 +701,62 @@ class PromocaoManager {
 
     /**
      * Atualiza métricas
+     * ALTERAÇÃO: Agora usa API SQL em vez de calcular no frontend
      */
-    updateMetrics() {
-        const now = new Date();
-        // ALTERAÇÃO: Otimizado para usar um único loop em vez de dois filtros separados
-        const ativas = [];
-        const expiradas = [];
-        
-        this.promocoes.forEach(p => {
-            const expiresAt = new Date(p.expires_at);
-            if (expiresAt > now) {
-                ativas.push(p);
-            } else {
-                expiradas.push(p);
-            }
-        });
-
-        // ALTERAÇÃO: Calcular desconto médio das promoções ativas
-        let descontoMedio = 0;
-        if (ativas.length > 0) {
-            const descontos = ativas.map(p => {
-                if (p.discount_percentage) {
-                    return parseFloat(p.discount_percentage);
-                } else if (p.discount_value && p.product && p.product.price) {
-                    const preco = parseFloat(p.product.price);
-                    // ALTERAÇÃO: Prevenir divisão por zero
-                    if (preco > 0) {
-                        const valorDesconto = parseFloat(p.discount_value);
-                        return (valorDesconto / preco) * 100;
-                    }
-                }
-                return 0;
-            }).filter(d => d > 0);
+    async updateMetrics() {
+        try {
+            // ALTERAÇÃO: Buscar métricas via API SQL em vez de calcular no frontend
+            const response = await getPromotionsDashboardMetrics();
             
-            if (descontos.length > 0) {
-                const soma = descontos.reduce((acc, d) => acc + d, 0);
-                descontoMedio = soma / descontos.length;
+            if (!response.success) {
+                    // ALTERAÇÃO: Log condicional apenas em modo debug
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.error("Erro ao buscar métricas do dashboard de promoções:", response.error);
+                    }
+                // Usar valores padrão em caso de erro
+                this.updateMetricsDisplay({
+                    total_promotions: 0,
+                    active_promotions: 0,
+                    expired_promotions: 0,
+                    avg_discount: 0
+                });
+                return;
             }
+            
+            const metrics = response.data;
+            this.updateMetricsDisplay(metrics);
+        } catch (error) {
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error("Erro ao atualizar métricas de promoções:", error);
+            }
+            // Usar valores padrão em caso de erro
+            this.updateMetricsDisplay({
+                total_promotions: 0,
+                active_promotions: 0,
+                expired_promotions: 0,
+                avg_discount: 0
+            });
         }
+    }
 
+    /**
+     * Atualiza a exibição das métricas
+     * ALTERAÇÃO: Função separada para atualizar os elementos DOM
+     */
+    updateMetricsDisplay(metrics) {
         const metricAtivas = document.getElementById('metric-promocoes-ativas');
         const metricExpiradas = document.getElementById('metric-promocoes-expiradas');
         const metricTotal = document.getElementById('metric-total-promocoes');
         const metricDescontoMedio = document.getElementById('metric-desconto-medio');
 
-        if (metricAtivas) metricAtivas.textContent = ativas.length;
-        if (metricExpiradas) metricExpiradas.textContent = expiradas.length;
-        if (metricTotal) metricTotal.textContent = this.promocoes.length;
+        if (metricAtivas) metricAtivas.textContent = metrics.active_promotions || 0;
+        if (metricExpiradas) metricExpiradas.textContent = metrics.expired_promotions || 0;
+        if (metricTotal) metricTotal.textContent = metrics.total_promotions || 0;
         if (metricDescontoMedio) {
-            metricDescontoMedio.textContent = descontoMedio > 0 
-                ? `${descontoMedio.toFixed(1)}%` 
+            const avgDiscount = metrics.avg_discount || 0;
+            metricDescontoMedio.textContent = avgDiscount > 0 
+                ? `${avgDiscount.toFixed(1)}%` 
                 : '0%';
         }
     }
@@ -574,7 +779,7 @@ class PromocaoManager {
             this.openModal(promocao);
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao carregar promoção:', error);
             }
             toastFromApiError(error, 'Erro ao carregar dados da promoção');
@@ -602,10 +807,10 @@ class PromocaoManager {
             const response = await this.dataManager.deletePromocao(promocaoId);
             toastFromApiSuccess(response, 'Promoção excluída com sucesso');
             await this.loadPromocoes();
-            this.updateMetrics();
+            await this.updateMetrics();
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (window.DEBUG_MODE) {
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao excluir promoção:', error);
             }
             toastFromApiError(error, 'Erro ao excluir promoção');
@@ -959,10 +1164,10 @@ class PromocaoManager {
 
             this.closeModal();
             await this.loadPromocoes();
-            this.updateMetrics();
+            await this.updateMetrics();
         } catch (error) {
-            // ALTERAÇÃO: Removido console.error para produção, mantendo apenas tratamento de erro via toast
-            if (window.DEBUG_MODE) {
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao salvar promoção:', error);
             }
             toastFromApiError(error, 'Erro ao salvar promoção');
