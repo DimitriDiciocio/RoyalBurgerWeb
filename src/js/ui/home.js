@@ -938,10 +938,20 @@ async function updatePromotionsSection(promotions) {
     .join("");
   
   // ALTERAÇÃO: Atualizar contador de expiração se houver promoções
+  // ALTERAÇÃO: Usar a promoção com maior tempo de validade para o cronômetro
   if (availableProductsWithPromotion.length > 0 && subtitulo) {
-    const firstPromotion = availableProductsWithPromotion[0].promotion;
-    if (firstPromotion.expires_at) {
-      updatePromotionCountdown(subtitulo, firstPromotion.expires_at);
+    // Encontrar a promoção com maior tempo de validade (maior expires_at)
+    const promotionWithLongestValidity = availableProductsWithPromotion
+      .filter(({ promotion }) => promotion && promotion.expires_at)
+      .reduce((longest, current) => {
+        if (!longest) return current;
+        const longestExpiry = new Date(longest.promotion.expires_at);
+        const currentExpiry = new Date(current.promotion.expires_at);
+        return currentExpiry > longestExpiry ? current : longest;
+      }, null);
+    
+    if (promotionWithLongestValidity && promotionWithLongestValidity.promotion.expires_at) {
+      updatePromotionCountdown(subtitulo, promotionWithLongestValidity.promotion.expires_at);
       subtitulo.style.display = "block";
     } else {
       subtitulo.style.display = "none";
