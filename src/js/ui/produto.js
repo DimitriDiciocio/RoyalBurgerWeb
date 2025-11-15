@@ -8,6 +8,7 @@ import {
 } from "../api/products.js";
 import { getIngredients } from "../api/ingredients.js";
 import { addToCart, updateCartItem, getCart } from "../api/cart.js";
+import { getPromotionByProductId } from "../api/promotions.js";
 import { showToast } from "./alerts.js";
 import { API_BASE_URL } from "../api/api.js";
 import { cacheManager } from "../utils/cache-manager.js";
@@ -18,6 +19,7 @@ import {
   escapeAttribute,
   sanitizeURL,
 } from "../utils/html-sanitizer.js";
+import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../utils/price-utils.js";
 
 // Constantes de cache
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
@@ -43,6 +45,7 @@ const VALIDATION_LIMITS = {
   const state = {
     productId: null,
     product: null,
+    promotion: null, // ALTERAÇÃO: Armazenar promoção ativa do produto
     basePrice: 0,
     quantity: 1,
     extrasById: new Map(),
@@ -259,12 +262,23 @@ const VALIDATION_LIMITS = {
 
     const name = state.product.name || "Produto";
     const desc = state.product.description || "";
-    const price = parseFloat(state.product.price) || 0;
-    state.basePrice = price;
-
+    const originalPrice = parseFloat(state.product.price) || 0;
+    
+    // ALTERAÇÃO: Calcular preço com promoção se houver
+    const priceInfo = calculatePriceWithPromotion(originalPrice, state.promotion);
+    state.basePrice = priceInfo.finalPrice; // Usar preço final (com desconto) como base
+    
     if (el.nome) el.nome.textContent = name;
     if (el.descricao) el.descricao.textContent = desc;
-    if (el.precoApartir) el.precoApartir.textContent = formatBRL(price);
+    
+    // ALTERAÇÃO: Exibir preço com desconto e preço original riscado se houver promoção
+    if (el.precoApartir) {
+      if (priceInfo.hasPromotion) {
+        el.precoApartir.innerHTML = `<span class="original-price" style="text-decoration: line-through; color: #999; margin-right: 8px;">${formatBRL(priceInfo.originalPrice)}</span>${formatBRL(priceInfo.finalPrice)}`;
+      } else {
+        el.precoApartir.textContent = formatBRL(priceInfo.finalPrice);
+      }
+    }
 
     const imagePath =
       state.product.image_url || getProductImageUrl(state.product.id);
@@ -1601,6 +1615,24 @@ const VALIDATION_LIMITS = {
       
       // Se a resposta vem com wrapper { product: {...} }, extrair o produto
       const produto = produtoData?.product || produtoData;
+      
+      // ALTERAÇÃO: Buscar promoção ativa para o produto
+      try {
+        const promotion = await getPromotionByProductId(state.productId, false);
+        // Verificar se a promoção está ativa (não expirada)
+        if (promotion && isPromotionActive(promotion)) {
+          state.promotion = promotion;
+        } else {
+          state.promotion = null;
+        }
+      } catch (error) {
+        // Se não houver promoção (404) ou outro erro, continuar sem promoção
+        state.promotion = null;
+        // ALTERAÇÃO: Removido console.warn em produção
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn("Erro ao buscar promoção do produto:", error);
+        }
+      }
       
       // IMPORTANTE: Se produto já tem ingredientes (vindo de getProductById), usar eles
       // pois já têm max_quantity calculado corretamente para a quantidade atual do produto

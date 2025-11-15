@@ -18,6 +18,8 @@ const PAGE_SCRIPTS = {
       "home.js",
     ],
     optional: ["carrossel.js"],
+    // ALTERAÇÃO: mostruarios-infinite-scroll.js carregado após home.js para adicionar rolagem infinita
+    afterRequired: ["mostruarios-infinite-scroll.js"],
   },
   // Página de produto
   produto: {
@@ -238,6 +240,21 @@ export async function initializeLazyLoading() {
     loadScript(script)
   );
   await Promise.all(requiredPromises);
+
+  // ALTERAÇÃO: Carregar scripts afterRequired após os obrigatórios (para adicionar funcionalidades)
+  if (pageConfig.afterRequired && pageConfig.afterRequired.length > 0) {
+    // Aguardar um pouco para garantir que os scripts obrigatórios terminaram
+    setTimeout(() => {
+      pageConfig.afterRequired.forEach((script) => {
+        loadScript(script).catch((err) => {
+          // REVISÃO: Log apenas em desenvolvimento
+          if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+            console.warn(`Script afterRequired ${script} não pôde ser carregado:`, err);
+          }
+        });
+      });
+    }, 100);
+  }
 
   // REVISÃO: Carregar scripts opcionais em background (não bloqueia)
   if (pageConfig.optional && pageConfig.optional.length > 0) {

@@ -8,11 +8,13 @@ import {
   getOrderDetails,
   formatOrderStatus,
 } from "../api/orders.js";
+import { getPromotionByProductId } from "../api/promotions.js";
 import { showError } from "./alerts.js";
 
 // Importar helper de configurações
 import * as settingsHelper from "../utils/settings-helper.js";
 import { escapeHTML } from "../utils/html-sanitizer.js";
+import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../utils/price-utils.js";
 
 (function initOrderHistory() {
   // Verificar se estamos na página de histórico de pedidos
@@ -442,9 +444,9 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
 
   /**
    * Renderizar lista de pedidos (apenas exibição)
-   * @returns {void}
+   * @returns {Promise<void>}
    */
-  function renderOrders() {
+  async function renderOrders() {
     if (!el.ordersContainer) return;
 
     const startIndex =
@@ -470,8 +472,8 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
     const telefoneBruto = usuario?.phone || usuario?.telefone || "(00)0000-000";
     const telefoneUsuario = formatarTelefone(telefoneBruto);
 
-    const ordersHtml = ordersToShow
-      .map((order) => {
+    const ordersHtml = await Promise.all(
+      ordersToShow.map(async (order) => {
         // Validar orderId antes de processar
         const orderId = order.order_id || order.id;
         if (!orderId) {
@@ -585,11 +587,76 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
         const timeEstimate = calculateEstimatedDeliveryTime(orderType, items);
         const tempoTexto = `${timeEstimate.minTime} - ${timeEstimate.maxTime} min`;
 
+        // ALTERAÇÃO: Buscar promoções para todos os itens em paralelo
+        const itemsWithPromotions = await Promise.all(
+          items.map(async (item) => {
+            let promotion = null;
+            try {
+              const productId = item.product_id || item.product?.id;
+              if (productId) {
+                // Buscar promoção que estava ativa na data do pedido
+                const promo = await getPromotionByProductId(productId, false);
+                if (promo) {
+                  // Verificar se a promoção estava ativa na data do pedido
+                  const orderDate = new Date(order.created_at);
+                  const promoStart = new Date(promo.starts_at);
+                  const promoEnd = new Date(promo.expires_at);
+                  if (orderDate >= promoStart && orderDate <= promoEnd) {
+                    promotion = promo;
+                  }
+                }
+              }
+            } catch (error) {
+              // Se não houver promoção, continuar sem ela
+              promotion = null;
+            }
+            return { item, promotion };
+          })
+        );
+
+        // ALTERAÇÃO: Calcular total de descontos aplicados
+        let totalDescontos = 0;
+        itemsWithPromotions.forEach(({ item, promotion }) => {
+          if (promotion) {
+            const productId = item.product_id || item.product?.id;
+            const originalPrice = parseFloat(item.unit_price || item.product?.price || 0);
+            const priceInfo = calculatePriceWithPromotion(originalPrice, promotion);
+            
+            if (priceInfo.hasPromotion) {
+              const itemQuantity = parseInt(item.quantity || 1, 10);
+              
+              // Calcular total de extras
+              const extras = item.extras || item.additional_items || [];
+              const extrasTotal = extras.reduce((sum, extra) => {
+                return sum + (parseFloat(extra.ingredient_price || extra.price || 0) * parseFloat(extra.quantity || 0));
+              }, 0);
+              
+              // Calcular total de base_modifications
+              const baseMods = item.base_modifications || [];
+              const baseModsTotal = baseMods.reduce((sum, mod) => {
+                return sum + (parseFloat(mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
+              }, 0);
+              
+              // Preço total original (sem desconto)
+              const precoTotalOriginal = (originalPrice * itemQuantity) + extrasTotal + baseModsTotal;
+              
+              // Preço total com desconto (já calculado pela API)
+              const precoTotalComDesconto = parseFloat(
+                item.item_subtotal || item.subtotal || precoTotalOriginal
+              );
+              
+              // Desconto aplicado
+              const descontoItem = Math.max(0, precoTotalOriginal - precoTotalComDesconto);
+              totalDescontos += descontoItem;
+            }
+          }
+        });
+
         // Renderizar itens (usar valores já calculados da API)
         const itemsHtml =
-          items.length > 0
-            ? items
-                .map((item) => {
+          itemsWithPromotions.length > 0
+            ? itemsWithPromotions
+                .map(({ item, promotion }) => {
                   // Validar item antes de processar
                   if (!item || typeof item !== "object") {
                     return "";
@@ -610,6 +677,32 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
                     item.item_subtotal ||
                     item.subtotal ||
                     parseFloat(item.unit_price || 0) * itemQuantity;
+                  
+                  // ALTERAÇÃO: Calcular preço original para exibição quando houver promoção
+                  let precoOriginalHtml = "";
+                  if (promotion) {
+                    const originalPrice = parseFloat(item.unit_price || item.product?.price || 0);
+                    const priceInfo = calculatePriceWithPromotion(originalPrice, promotion);
+                    
+                    if (priceInfo.hasPromotion) {
+                      // Calcular total de extras
+                      const extras = item.extras || item.additional_items || [];
+                      const extrasTotal = extras.reduce((sum, extra) => {
+                        return sum + (parseFloat(extra.ingredient_price || extra.price || 0) * parseFloat(extra.quantity || 0));
+                      }, 0);
+                      
+                      // Calcular total de base_modifications
+                      const baseMods = item.base_modifications || [];
+                      const baseModsTotal = baseMods.reduce((sum, mod) => {
+                        return sum + (parseFloat(mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
+                      }, 0);
+                      
+                      // Preço total original (sem desconto)
+                      const precoTotalOriginal = (originalPrice * itemQuantity) + extrasTotal + baseModsTotal;
+                      
+                      precoOriginalHtml = `<span class="item-price-original" style="text-decoration: line-through; color: #999; font-size: 0.9em; margin-right: 8px;">R$ ${formatCurrency(precoTotalOriginal)}</span>`;
+                    }
+                  }
 
                   // Preparar HTML para extras e modificações (versão compacta)
                   const extras = item.extras || item.additional_items || [];
@@ -680,7 +773,10 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
                                 <span class="item-qtd">${itemQuantity}</span>
                                 <span class="item-name">${itemName}</span>
                             </div>
-                            <span class="item-price">R$ ${formatCurrency(safeItemTotal)}</span>
+                            <div class="item-price-container" style="display: flex; align-items: center; gap: 0.5rem;">
+                                ${precoOriginalHtml}
+                                <span class="item-price">R$ ${formatCurrency(safeItemTotal)}</span>
+                            </div>
                         </div>
                         ${modificationsHtml ? `<div class="order-item-modifications">${modificationsHtml}</div>` : ''}
                     </div>
@@ -765,16 +861,23 @@ import { escapeHTML } from "../utils/html-sanitizer.js";
                     </div>
 
                     <div class="order-footer">
-                        <div class="order-total">
-                            <span class="total-label">Total</span>
-                            <span class="total-value">R$ ${totalFormatted}</span>
+                        <div class="order-summary">
+                            ${totalDescontos > 0 ? `
+                                <div class="order-discount" style="font-size: 0.9em; color: #666; margin-bottom: 4px;">
+                                    <span>Descontos: </span>
+                                    <span style="color: #28a745; font-weight: 600;">-R$ ${formatCurrency(totalDescontos)}</span>
+                                </div>
+                            ` : ''}
+                            <div class="order-total">
+                                <span class="total-label">Total</span>
+                                <span class="total-value">R$ ${totalFormatted}</span>
+                            </div>
                         </div>
                         <button class="order-action-btn btn-view-details" data-order-id="${safeOrderId}">Ver mais</button>
                     </div>
                 </div>`;
       })
-      .filter((html) => html !== "")
-      .join(""); // Filtrar entradas vazias
+    ).then(results => results.filter((html) => html !== "").join("")); // Filtrar entradas vazias
 
     el.ordersContainer.innerHTML = ordersHtml;
   }

@@ -16,18 +16,30 @@
 
 main {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    align-items: flex-start;
     gap: 60px;
     overflow-x: hidden;
+    min-height: calc(100vh - 68px);
+    position: relative;
+    padding-bottom: 40px;
 
     & .navegacao {
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         position: sticky;
         top: 40px;
         gap: 20px;
-        height: 90vh;
+        height: fit-content;
+        max-height: calc(100vh - 108px);
+        align-self: flex-start;
+        flex-shrink: 0;
+        width: auto;
+        z-index: 10;
+        background-color: var(--color-background);
+        padding-top: 20px;
+        padding-bottom: 20px;
 
         & div {
             display: flex;
@@ -59,15 +71,18 @@ main {
     #secao-pedidos,
     #secao-venda,
     #secao-cardapio,
+    #secao-promocoes,
     #secao-estoque,
     #secao-relatorios,
     #secao-financeiro,
     #secao-funcionarios,
     #secao-configuracoes {
         width: 100%;
+        flex: 1;
         display: flex;
         flex-direction: column;
         overflow-x: hidden;
+        min-width: 0;
     }
 
     /* ============================================================================
@@ -4729,4 +4744,188 @@ main {
 
 .btn-clear-search i {
     font-size: 0.8rem;
+}
+
+/* ============================================================================
+   SEÇÃO GERENCIAMENTO DE PROMOÇÕES
+   ============================================================================ */
+
+#secao-promocoes {
+    padding-bottom: 50px;
+}
+
+& .filtros {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 20px;
+    margin-top: 30px;
+    margin-bottom: 30px;
+}
+
+.div-input {
+    & label {
+        background: var(--color-background);
+    }
+}
+
+.promocoes-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.promocao-card {
+    background: var(--cor-div-primary);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 20px;
+    transition: all 0.3s ease;
+    border: 1px solid #e0e0e0;
+}
+
+.promocao-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.promocao-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.promocao-info {
+    flex: 1;
+}
+
+.promocao-info h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-texto-black);
+    margin: 0 0 8px 0;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-badge.ativa {
+    background-color: #28a745;
+    color: var(--color-texto-white);
+}
+
+.status-badge.expirada {
+    background-color: #dc3545;
+    color: var(--color-texto-white);
+}
+
+.promocao-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-editar-promocao,
+.btn-excluir-promocao {
+    background: transparent;
+    border: none;
+    color: var(--color-texto-erased);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+}
+
+.btn-editar-promocao:hover {
+    background: #f0f0f0;
+    color: var(--color-primary);
+}
+
+.btn-excluir-promocao:hover {
+    background: #f0f0f0;
+    color: var(--color-secondary);
+}
+
+.promocao-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.promocao-precos {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.preco-original,
+.preco-final {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.preco-original .label,
+.preco-final .label {
+    font-size: 0.9rem;
+    color: var(--color-texto-erased);
+}
+
+.preco-original .valor {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-texto-light);
+    text-decoration: line-through;
+}
+
+.preco-final .valor {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #28a745;
+}
+
+.desconto-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-primary);
+    color: var(--color-texto-black);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    width: fit-content;
+}
+
+.desconto-badge i {
+    font-size: 0.75rem;
+}
+
+.promocao-detalhes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detalhe-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--color-texto-light);
+}
+
+.detalhe-item i {
+    color: var(--color-texto-erased);
+    font-size: 0.85rem;
 }

@@ -4,8 +4,10 @@
  */
 
 import { cacheManager } from "../utils/cache-manager.js";
-import { getProducts } from "../api/products.js";
+import { getProducts, simulateProductCapacity } from "../api/products.js";
 import { getCategories } from "../api/categories.js";
+import { getPromotions, getPromotionByProductId } from "../api/promotions.js";
+import { apiRequest } from "../api/api.js";
 import { API_BASE_URL } from "../api/api.js";
 import { delegate } from "../utils/performance-utils.js";
 import { $q, $qa } from "../utils/dom-cache.js";
@@ -15,6 +17,7 @@ import {
 } from "../utils/virtual-scroll.js";
 import { escapeHTML, escapeAttribute } from "../utils/html-sanitizer.js";
 import { getEstimatedDeliveryTimes } from "../utils/settings-helper.js";
+import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../utils/price-utils.js";
 
 // NOVO: TTL reduzido para refletir mudanças de estoque mais rapidamente
 // Cache curto (60 segundos) para garantir que produtos indisponíveis sejam atualizados rapidamente
@@ -23,6 +26,9 @@ const CACHE_KEYS = {
   products: "products_all",
   categories: "categories_all",
   estimatedTimes: "estimated_times",
+  mostOrdered: "products_most_ordered",
+  recentlyAdded: "products_recently_added",
+  promotions: "promotions_active",
 };
 
 // Cache para prazos de entrega
@@ -38,10 +44,14 @@ const VALIDATION_LIMITS = {
 
 /**
  * Limpa o cache de produtos (útil quando produtos são atualizados)
+ * ALTERAÇÃO: Invalida também cache de seções horizontais
  */
 function clearProductsCache() {
   cacheManager.invalidate(CACHE_KEYS.products);
   cacheManager.invalidate(CACHE_KEYS.categories);
+  cacheManager.invalidate(CACHE_KEYS.mostOrdered);
+  cacheManager.invalidate(CACHE_KEYS.recentlyAdded);
+  cacheManager.invalidate(CACHE_KEYS.promotions);
 }
 
 /**
@@ -80,7 +90,10 @@ async function loadProducts() {
 
     return availableProducts;
   } catch (error) {
-    console.error('[HOME] Erro ao carregar produtos:', error.message);
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error('[HOME] Erro ao carregar produtos:', error.message);
+    }
     const cached = cacheManager.get(CACHE_KEYS.products);
     return cached || [];
   }
@@ -105,8 +118,10 @@ async function loadCategories() {
 
     return categories;
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao carregar categorias:", error.message);
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao carregar categorias:", error.message);
+    }
 
     // Retornar cache anterior se disponível, senão array vazio
     const cached = cacheManager.get(CACHE_KEYS.categories);
@@ -215,18 +230,31 @@ function calculateProductDeliveryTime(productPreparationTime = 0) {
 
 /**
  * Cria o HTML de um produto (mantendo formatação original)
- * NOVO: Adiciona badges de estoque limitado/baixo
+ * NOVO: Adiciona badges de estoque limitado/baixo e suporte a promoções
+ * @param {Object} product - Dados do produto
+ * @param {Object} promotion - Dados da promoção (opcional)
+ * @param {boolean} isHorizontal - Se true, badge de estoque fica sobre a imagem (mostruário horizontal), senão fica dentro da div.informa (mostruário vertical)
  */
-function createProductHTML(product) {
+function createProductHTML(product, promotion = null, isHorizontal = false) {
   // Validar dados do produto
   if (!product || !product.id) {
     return "";
   }
 
   const imageUrl = buildImageUrl(product.image_url, product.image_hash);
-  const price = product.price
-    ? `R$ ${parseFloat(product.price).toFixed(2).replace(".", ",")}`
-    : "R$ 0,00";
+  
+  // ALTERAÇÃO: Suporte a promoções - calcular preço com desconto usando função utilitária
+  const productPrice = product.price ? parseFloat(product.price) : 0;
+  const priceInfo = calculatePriceWithPromotion(productPrice, promotion);
+  
+  let priceDisplay = formatPrice(priceInfo.finalPrice);
+  let originalPriceDisplay = "";
+  let discountBadge = "";
+  
+  if (priceInfo.hasPromotion) {
+    originalPriceDisplay = `<span class="original-price">${formatPrice(priceInfo.originalPrice)}</span>`;
+    discountBadge = `<span class="discount-badge">-${priceInfo.discountPercentage.toFixed(0)}%</span>`;
+  }
   
   // Calcular tempo usando prazos do sistema + tempo de preparo do produto
   const productPrepTime = product.preparation_time_minutes || 0;
@@ -249,33 +277,71 @@ function createProductHTML(product) {
 
   // NOVO: Adicionar badge de estoque limitado/baixo
   // ALTERAÇÃO: Sanitização de availabilityStatus para prevenir XSS
+  // ALTERAÇÃO: Badge de estoque posicionado conforme o tipo de mostruário
   let stockBadge = '';
-  const availabilityStatus = String(product.availability_status || '').toLowerCase();
+  let availabilityStatus = String(product.availability_status || '').toLowerCase();
+  
+  // ALTERAÇÃO: Se availability_status não estiver definido, tentar calcular baseado em max_quantity
+  // ou outros indicadores de estoque limitado
+  if (!availabilityStatus || (availabilityStatus !== 'limited' && availabilityStatus !== 'low_stock')) {
+    // Se o produto tem max_quantity definido e é baixo, considerar como limited
+    if (product.max_quantity !== undefined && product.max_quantity !== null) {
+      const maxQty = parseInt(product.max_quantity, 10);
+      if (maxQty > 0 && maxQty <= 5) {
+        availabilityStatus = 'limited';
+      } else if (maxQty > 5 && maxQty <= 15) {
+        availabilityStatus = 'low_stock';
+      }
+    }
+  }
+  
   if (availabilityStatus === 'limited') {
     stockBadge = '<span class="stock-badge limited">Últimas unidades</span>';
   } else if (availabilityStatus === 'low_stock') {
     stockBadge = '<span class="stock-badge low">Estoque baixo</span>';
   }
 
-  // NOVO: Container para imagem e badge (permite posicionamento absoluto do badge)
-  const imageContainer = stockBadge 
-    ? `<div class="product-image-container">
-        <img src="${imageUrl}" alt="${safeName}" id="foto">
-        ${stockBadge}
-      </div>`
-    : `<img src="${imageUrl}" alt="${safeName}" id="foto">`;
+  // ALTERAÇÃO: No mostruário horizontal, badge de estoque fica sobre a imagem (lado direito)
+  // No mostruário vertical, badge de estoque fica dentro da div.informa
+  let imageContainer;
+  let stockBadgeInInfo = '';
+  
+  if (isHorizontal) {
+    // Mostruário horizontal: badge de estoque sobre a imagem (lado direito)
+    const hasAnyBadge = stockBadge || discountBadge;
+    imageContainer = hasAnyBadge
+      ? `<div class="product-image-container">
+          <img src="${imageUrl}" alt="${safeName}" id="foto">
+          ${discountBadge}
+          ${stockBadge}
+        </div>`
+      : `<img src="${imageUrl}" alt="${safeName}" id="foto">`;
+  } else {
+    // Mostruário vertical: badge de estoque dentro da div.informa
+    imageContainer = discountBadge
+      ? `<div class="product-image-container">
+          <img src="${imageUrl}" alt="${safeName}" id="foto">
+          ${discountBadge}
+        </div>`
+      : `<img src="${imageUrl}" alt="${safeName}" id="foto">`;
+    stockBadgeInInfo = stockBadge;
+  }
 
+  // ALTERAÇÃO: Adicionar aria-label para acessibilidade
+  const ariaLabel = `Ver detalhes do produto ${safeName}`;
+  
   return `
-        <a href="src/pages/produto.html?id=${safeId}">
+        <a href="src/pages/produto.html?id=${safeId}" aria-label="${escapeAttribute(ariaLabel)}">
             <div id="ficha-produto">
                 ${imageContainer}
                 <div class="informa">
                     <div>
+                        ${stockBadgeInInfo}
                         <p id="nome">${safeName}</p>
                         <p id="descricao">${safeDescription}</p>
                     </div>
                     <div>
-                        <p id="preco">${price}</p>
+                        <p id="preco">${originalPriceDisplay}${priceDisplay}</p>
                         <p id="tempo">${prepTime} • ${deliveryFee}</p>
                     </div>
                 </div>
@@ -331,31 +397,207 @@ async function loadEstimatedTimes() {
 }
 
 /**
+ * Valida se um produto tem estoque disponível e retorna dados de capacidade
+ * ALTERAÇÃO: Verifica capacidade/estoque antes de exibir no mostruário e retorna dados completos
+ * @param {Object} product - Dados do produto
+ * @returns {Promise<Object|null>} { isValid: boolean, capacityData: Object } ou null em caso de erro
+ */
+async function validateProductStockWithCapacity(product) {
+  if (!product || !product.id) {
+    return { isValid: false, capacityData: null };
+  }
+
+  try {
+    // Verificar capacidade do produto (quantidade 1, sem extras)
+    const capacityData = await simulateProductCapacity(product.id, [], 1, []);
+    
+    // Produto está disponível se is_available é true e max_quantity >= 1
+    const isValid = capacityData?.is_available === true && (capacityData?.max_quantity ?? 0) >= 1;
+    
+    return { isValid, capacityData };
+  } catch (error) {
+    // ALTERAÇÃO: Em caso de erro, considerar produto indisponível para segurança
+    // Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error(`[HOME] Erro ao validar estoque do produto ${product.id}:`, error);
+    }
+    return { isValid: false, capacityData: null };
+  }
+}
+
+/**
+ * Filtra produtos que têm estoque disponível e adiciona availability_status
+ * ALTERAÇÃO: Valida estoque de múltiplos produtos em paralelo e adiciona status de disponibilidade
+ * @param {Array} products - Lista de produtos para validar
+ * @returns {Promise<Array>} Lista de produtos com estoque disponível e availability_status
+ */
+async function filterProductsWithStock(products) {
+  if (!products || products.length === 0) {
+    return [];
+  }
+
+  // Validar estoque de todos os produtos em paralelo
+  const stockValidations = await Promise.allSettled(
+    products.map(product => validateProductStockWithCapacity(product))
+  );
+
+  // Filtrar apenas produtos com estoque disponível e adicionar availability_status
+  const availableProducts = [];
+  for (let i = 0; i < products.length; i++) {
+    const validation = stockValidations[i];
+    if (validation.status === 'fulfilled' && validation.value.isValid) {
+      const product = { ...products[i] };
+      const capacityData = validation.value.capacityData;
+      
+      // ALTERAÇÃO: Adicionar availability_status e max_quantity do capacityData ao produto
+      if (capacityData) {
+        if (capacityData.availability_status) {
+          product.availability_status = capacityData.availability_status;
+        }
+        // Adicionar max_quantity para cálculo de badge se availability_status não estiver presente
+        if (capacityData.max_quantity !== undefined && capacityData.max_quantity !== null) {
+          product.max_quantity = capacityData.max_quantity;
+        }
+      }
+      availableProducts.push(product);
+    }
+  }
+
+  return availableProducts;
+}
+
+/**
+ * Carrega produtos mais pedidos da API
+ * ALTERAÇÃO: Melhor tratamento de erros conforme roteiro
+ */
+async function loadMostOrderedProducts() {
+  try {
+    const cached = cacheManager.get(CACHE_KEYS.mostOrdered);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await apiRequest('/api/products/most-ordered?page_size=10', {
+      method: 'GET'
+    });
+
+    const products = response?.items || [];
+    cacheManager.set(CACHE_KEYS.mostOrdered, products, CACHE_TTL);
+    return products;
+  } catch (error) {
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error('[HOME] Erro ao carregar mais pedidos:', error);
+    }
+    // Retornar array vazio para não quebrar a UI
+    const cached = cacheManager.get(CACHE_KEYS.mostOrdered);
+    return cached || [];
+  }
+}
+
+/**
+ * Carrega produtos recentemente adicionados (novidades) da API
+ * ALTERAÇÃO: Melhor tratamento de erros conforme roteiro
+ */
+async function loadRecentlyAddedProducts() {
+  try {
+    const cached = cacheManager.get(CACHE_KEYS.recentlyAdded);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await apiRequest('/api/products/recently-added?page_size=10', {
+      method: 'GET'
+    });
+
+    const products = response?.items || [];
+    cacheManager.set(CACHE_KEYS.recentlyAdded, products, CACHE_TTL);
+    return products;
+  } catch (error) {
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error('[HOME] Erro ao carregar novidades:', error);
+    }
+    // Retornar array vazio para não quebrar a UI
+    const cached = cacheManager.get(CACHE_KEYS.recentlyAdded);
+    return cached || [];
+  }
+}
+
+/**
+ * Carrega promoções ativas da API
+ * ALTERAÇÃO: Melhor tratamento de erros conforme roteiro
+ */
+async function loadActivePromotions() {
+  try {
+    const cached = cacheManager.get(CACHE_KEYS.promotions);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await getPromotions({ include_expired: false });
+    const promotions = response?.items || [];
+    
+    cacheManager.set(CACHE_KEYS.promotions, promotions, CACHE_TTL);
+    return promotions;
+  } catch (error) {
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error('[HOME] Erro ao carregar promoções:', error);
+    }
+    // Retornar array vazio para não quebrar a UI
+    const cached = cacheManager.get(CACHE_KEYS.promotions);
+    return cached || [];
+  }
+}
+
+/**
  * Atualiza as seções de produtos na home (versão simplificada)
+ * ALTERAÇÃO: Usar Promise.allSettled para não quebrar se uma seção falhar
  */
 async function updateProductSections() {
   try {
     // Carregar prazos de entrega antes de renderizar produtos
     await loadEstimatedTimes();
     
-    const [products, categories] = await Promise.all([
+    // ALTERAÇÃO: Usar Promise.allSettled para não quebrar se uma seção falhar
+    // Isso garante que falha em uma seção não impede carregamento das outras
+    const results = await Promise.allSettled([
       loadProducts(),
       loadCategories(),
+      loadMostOrderedProducts(),
+      loadRecentlyAddedProducts(),
+      loadActivePromotions(),
+    ]);
+    
+    // Extrair valores ou usar array vazio em caso de falha
+    const products = results[0].status === 'fulfilled' ? results[0].value : [];
+    const categories = results[1].status === 'fulfilled' ? results[1].value : [];
+    const mostOrdered = results[2].status === 'fulfilled' ? results[2].value : [];
+    const recentlyAdded = results[3].status === 'fulfilled' ? results[3].value : [];
+    const promotions = results[4].status === 'fulfilled' ? results[4].value : [];
+
+    // Atualizar seções horizontais
+    // ALTERAÇÃO: Aguardar validação de estoque antes de renderizar
+    await Promise.allSettled([
+      updateMostOrderedSection(mostOrdered),
+      updatePromotionsSection(promotions),
+      updateRecentlyAddedSection(recentlyAdded)
     ]);
 
-    // Atualizar seção "Os mais pedidos" com produtos reais
-    updateMostOrderedSection(products);
+    // ALTERAÇÃO: Atualizar seções e obter apenas categorias com produtos
+    const categoriesWithProducts = await updateCategorySectionsWithProducts(products, categories);
 
-    await updateCategorySectionsWithProducts(products, categories);
-
-    // Atualizar menu de categorias com categorias reais
-    updateCategoryMenu(categories);
+    // ALTERAÇÃO: Atualizar menu de categorias apenas com categorias que têm produtos
+    updateCategoryMenu(categoriesWithProducts || []);
 
     // Atualizar imagens existentes de forma inteligente
     updateExistingProductImages(products);
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao atualizar seções de produtos:", error.message);
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao atualizar seções de produtos:", error.message);
+    }
   }
 }
 
@@ -363,11 +605,13 @@ let incrementalRenderers = new Map();
 
 /**
  * Atualiza as seções de categorias com produtos organizados por categoria
+ * ALTERAÇÃO: Retorna apenas as categorias que têm produtos vinculados
+ * @returns {Array} Lista de categorias que têm produtos
  */
 async function updateCategorySectionsWithProducts(products, categories) {
   const rolagemInfinita = $q(".rolagem-infinita");
 
-  if (!rolagemInfinita) return;
+  if (!rolagemInfinita) return [];
 
   // Limpar renderizadores anteriores
   incrementalRenderers.forEach((renderer) => {
@@ -380,8 +624,28 @@ async function updateCategorySectionsWithProducts(products, categories) {
   // Limpar conteúdo existente
   rolagemInfinita.innerHTML = "";
 
-  // Agrupar produtos por categoria
-  const groupedProducts = groupProductsByCategory(products, categories);
+  // ALTERAÇÃO: Buscar promoções para todos os produtos em paralelo
+  const productsWithPromotions = await Promise.all(
+    products.map(async (product) => {
+      let promotion = null;
+      try {
+        const promo = await getPromotionByProductId(product.id, false);
+        if (promo && isPromotionActive(promo)) {
+          promotion = promo;
+        }
+      } catch (error) {
+        // Se não houver promoção, continuar sem ela
+        promotion = null;
+      }
+      return { product, promotion };
+    })
+  );
+
+  // Agrupar produtos por categoria (mantendo promoções)
+  const groupedProducts = groupProductsByCategoryWithPromotions(productsWithPromotions, categories);
+
+  // ALTERAÇÃO: Coletar apenas categorias que têm produtos
+  const categoriesWithProducts = [];
 
   // Criar seções para cada categoria que tem produtos
   let categoryIndex = 0;
@@ -389,6 +653,8 @@ async function updateCategorySectionsWithProducts(products, categories) {
     const categoryProducts = groupedProducts[category.id] || [];
 
     if (categoryProducts.length > 0) {
+      // ALTERAÇÃO: Adicionar categoria à lista de categorias com produtos
+      categoriesWithProducts.push(category);
       const sectionId = `secao-cat-${categoryIndex + 1}`;
 
       // Criar container da seção
@@ -415,10 +681,14 @@ async function updateCategorySectionsWithProducts(products, categories) {
         const pairTemplate = (pair, index) => {
           let html = '<div class="dupla">';
           if (pair.first) {
-            html += createProductHTML(pair.first);
+            // ALTERAÇÃO: Passar promoção se disponível
+            const promotion1 = pair.first._promotion || null;
+            html += createProductHTML(pair.first, promotion1);
           }
           if (pair.second) {
-            html += createProductHTML(pair.second);
+            // ALTERAÇÃO: Passar promoção se disponível
+            const promotion2 = pair.second._promotion || null;
+            html += createProductHTML(pair.second, promotion2);
           }
           html += "</div>";
           return html;
@@ -437,12 +707,16 @@ async function updateCategorySectionsWithProducts(products, categories) {
 
           // Primeiro produto do par
           if (categoryProducts[i]) {
-            productsHTML += createProductHTML(categoryProducts[i]);
+            // ALTERAÇÃO: Passar promoção se disponível
+            const promotion1 = categoryProducts[i]._promotion || null;
+            productsHTML += createProductHTML(categoryProducts[i], promotion1);
           }
 
           // Segundo produto do par
           if (categoryProducts[i + 1]) {
-            productsHTML += createProductHTML(categoryProducts[i + 1]);
+            // ALTERAÇÃO: Passar promoção se disponível
+            const promotion2 = categoryProducts[i + 1]._promotion || null;
+            productsHTML += createProductHTML(categoryProducts[i + 1], promotion2);
           }
 
           productsHTML += "</div>";
@@ -453,6 +727,9 @@ async function updateCategorySectionsWithProducts(products, categories) {
       categoryIndex++;
     }
   });
+
+  // ALTERAÇÃO: Retornar apenas categorias que têm produtos
+  return categoriesWithProducts;
 }
 
 /**
@@ -477,20 +754,298 @@ function groupProductsByCategory(products, categories) {
 }
 
 /**
- * Atualiza a seção "Os mais pedidos" (mantendo formatação original)
+ * Agrupa produtos com promoções por categoria
+ * ALTERAÇÃO: Versão que mantém promoções associadas aos produtos
  */
-function updateMostOrderedSection(products) {
-  const containers = $qa(".mostruario-horizontal .container .rolagem");
+function groupProductsByCategoryWithPromotions(productsWithPromotions, categories) {
+  const grouped = {};
 
-  // Atualizar todos os containers com os mesmos produtos (como estava antes)
-  containers.forEach((container) => {
-    if (products.length > 0) {
-      container.innerHTML = products
-        .slice(0, 6)
-        .map((product) => createProductHTML(product))
-        .join("");
+  // Inicializar grupos com categorias existentes
+  categories.forEach((category) => {
+    grouped[category.id] = [];
+  });
+
+  // Agrupar produtos por categoria (mantendo promoções)
+  productsWithPromotions.forEach(({ product, promotion }) => {
+    if (grouped[product.category_id]) {
+      // Criar objeto produto com promoção associada
+      const productWithPromo = { ...product, _promotion: promotion };
+      grouped[product.category_id].push(productWithPromo);
     }
   });
+
+  return grouped;
+}
+
+/**
+ * Atualiza a seção "Os mais pedidos"
+ * ALTERAÇÃO: Só exibe se houver produtos retornando e com estoque disponível
+ */
+async function updateMostOrderedSection(products) {
+  const containers = $qa(".mostruario-horizontal .container");
+  const targetContainer = containers[0]; // Primeiro container é "Os mais pedidos"
+  
+  if (!targetContainer) return;
+  
+  const rolagem = targetContainer.querySelector(".rolagem");
+  if (!rolagem) return;
+  
+  // ALTERAÇÃO: Ocultar container inteiro se não houver produtos
+  if (!products || products.length === 0) {
+    targetContainer.style.display = "none";
+    return;
+  }
+  
+  // ALTERAÇÃO: Filtrar produtos com estoque disponível antes de exibir
+  const productsWithStock = await filterProductsWithStock(products.slice(0, 10));
+  
+  // ALTERAÇÃO: Ocultar container se não houver produtos com estoque
+  if (!productsWithStock || productsWithStock.length === 0) {
+    targetContainer.style.display = "none";
+    return;
+  }
+  
+  // ALTERAÇÃO: Buscar promoções para produtos mais pedidos
+  const productsWithPromotions = await Promise.all(
+    productsWithStock.map(async (product) => {
+      let promotion = null;
+      try {
+        const promo = await getPromotionByProductId(product.id, false);
+        if (promo && isPromotionActive(promo)) {
+          promotion = promo;
+        }
+      } catch (error) {
+        promotion = null;
+      }
+      return { product, promotion };
+    })
+  );
+
+  // Exibir container e renderizar produtos
+  // ALTERAÇÃO: Passar isHorizontal=true para badge de estoque aparecer sobre a imagem
+  targetContainer.style.display = "block";
+  rolagem.innerHTML = productsWithPromotions
+    .map(({ product, promotion }) => createProductHTML(product, promotion, true))
+    .join("");
+}
+
+/**
+ * Atualiza a seção "Promoções especiais"
+ * ALTERAÇÃO: Exibe produtos com promoção e calcula desconto, validando estoque disponível
+ */
+async function updatePromotionsSection(promotions) {
+  const containers = $qa(".mostruario-horizontal .container");
+  const targetContainer = containers[1]; // Segundo container é "Promoções especiais"
+  
+  if (!targetContainer) return;
+  
+  const rolagem = targetContainer.querySelector(".rolagem");
+  const subtitulo = targetContainer.querySelector("#subtitulo-promocoes");
+  if (!rolagem) return;
+  
+  // ALTERAÇÃO: Ocultar container inteiro se não houver promoções
+  if (!promotions || promotions.length === 0) {
+    targetContainer.style.display = "none";
+    return;
+  }
+  
+  // Exibir container
+  targetContainer.style.display = "block";
+  
+  // ALTERAÇÃO: Preparar produtos com dados de promoção
+  // ALTERAÇÃO: Filtrar promoções expiradas antes de exibir
+  const now = new Date();
+  const productsWithPromotion = promotions
+    .filter(promo => {
+      // Verificar se o produto está ativo
+      if (!promo.product || !promo.product.is_active) {
+        return false;
+      }
+      // ALTERAÇÃO: Verificar se a promoção não está expirada
+      if (promo.expires_at) {
+        const expiresAt = new Date(promo.expires_at);
+        if (expiresAt <= now) {
+          return false; // Promoção expirada, não exibir
+        }
+      }
+      return true;
+    })
+    .slice(0, 10)
+    .map(promo => {
+      // Combinar dados do produto com dados da promoção
+      const product = {
+        ...promo.product,
+        id: promo.product_id,
+        price: promo.product.price,
+        image_url: promo.product.image_url,
+      };
+      return { product, promotion: promo };
+    });
+  
+  // ALTERAÇÃO: Ocultar container se não houver promoções válidas após filtrar expiradas
+  if (productsWithPromotion.length === 0) {
+    targetContainer.style.display = "none";
+    if (subtitulo) subtitulo.style.display = "none";
+    return;
+  }
+  
+  // ALTERAÇÃO: Filtrar produtos com estoque disponível e adicionar availability_status
+  const productsToDisplay = productsWithPromotion.map(({ product }) => product);
+  const productsWithStock = await filterProductsWithStock(productsToDisplay);
+  
+  // ALTERAÇÃO: Combinar produtos validados com estoque com suas promoções
+  // e preservar availability_status e max_quantity dos produtos validados
+  const availableProductsWithPromotion = productsWithPromotion
+    .map(({ product, promotion }) => {
+      // Encontrar o produto validado com dados de capacidade
+      const validatedProduct = productsWithStock.find(p => p.id === product.id);
+      if (validatedProduct) {
+        // Usar o produto validado que tem availability_status e max_quantity
+        return { product: validatedProduct, promotion };
+      }
+      return null;
+    })
+    .filter(item => item !== null);
+  
+  // ALTERAÇÃO: Ocultar container se não houver produtos com estoque após validação
+  if (availableProductsWithPromotion.length === 0) {
+    targetContainer.style.display = "none";
+    if (subtitulo) subtitulo.style.display = "none";
+    return;
+  }
+  
+  // Renderizar produtos com promoção
+  // ALTERAÇÃO: Passar isHorizontal=true para badge de estoque aparecer sobre a imagem
+  rolagem.innerHTML = availableProductsWithPromotion
+    .map(({ product, promotion }) => createProductHTML(product, promotion, true))
+    .join("");
+  
+  // ALTERAÇÃO: Atualizar contador de expiração se houver promoções
+  if (availableProductsWithPromotion.length > 0 && subtitulo) {
+    const firstPromotion = availableProductsWithPromotion[0].promotion;
+    if (firstPromotion.expires_at) {
+      updatePromotionCountdown(subtitulo, firstPromotion.expires_at);
+      subtitulo.style.display = "block";
+    } else {
+      subtitulo.style.display = "none";
+    }
+  } else if (subtitulo) {
+    subtitulo.style.display = "none";
+  }
+}
+
+/**
+ * Atualiza a seção "Novidades"
+ * ALTERAÇÃO: Só exibe se houver produtos retornando e com estoque disponível
+ */
+async function updateRecentlyAddedSection(products) {
+  const containers = $qa(".mostruario-horizontal .container");
+  const targetContainer = containers[2]; // Terceiro container é "Novidades"
+  
+  if (!targetContainer) return;
+  
+  const rolagem = targetContainer.querySelector(".rolagem");
+  if (!rolagem) return;
+  
+  // ALTERAÇÃO: Ocultar container inteiro se não houver produtos
+  if (!products || products.length === 0) {
+    targetContainer.style.display = "none";
+    return;
+  }
+  
+  // ALTERAÇÃO: Filtrar produtos com estoque disponível antes de exibir
+  const productsWithStock = await filterProductsWithStock(products.slice(0, 10));
+  
+  // ALTERAÇÃO: Ocultar container se não houver produtos com estoque
+  if (!productsWithStock || productsWithStock.length === 0) {
+    targetContainer.style.display = "none";
+    return;
+  }
+  
+  // ALTERAÇÃO: Buscar promoções para produtos recentemente adicionados
+  const productsWithPromotions = await Promise.all(
+    productsWithStock.map(async (product) => {
+      let promotion = null;
+      try {
+        const promo = await getPromotionByProductId(product.id, false);
+        if (promo && isPromotionActive(promo)) {
+          promotion = promo;
+        }
+      } catch (error) {
+        promotion = null;
+      }
+      return { product, promotion };
+    })
+  );
+
+  // Exibir container e renderizar produtos
+  // ALTERAÇÃO: Passar isHorizontal=true para badge de estoque aparecer sobre a imagem
+  targetContainer.style.display = "block";
+  rolagem.innerHTML = productsWithPromotions
+    .map(({ product, promotion }) => createProductHTML(product, promotion, true))
+    .join("");
+}
+
+// ALTERAÇÃO: Armazenar intervalos ativos para cleanup adequado (prevenir memory leak)
+const activeCountdownIntervals = new Map();
+
+/**
+ * Atualiza contador de expiração da promoção
+ * ALTERAÇÃO: Limpa intervalos anteriores para prevenir memory leak
+ */
+function updatePromotionCountdown(element, expiresAt) {
+  const spans = element.querySelectorAll("span");
+  if (spans.length !== 3) return;
+  
+  // ALTERAÇÃO: Limpar intervalo anterior se existir para este elemento
+  if (activeCountdownIntervals.has(element)) {
+    clearInterval(activeCountdownIntervals.get(element));
+  }
+  
+  const updateCountdown = () => {
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    const diff = expiry - now;
+    
+    if (diff <= 0) {
+      spans[0].textContent = "00";
+      spans[1].textContent = "00";
+      spans[2].textContent = "00";
+      // ALTERAÇÃO: Limpar intervalo quando expirar
+      if (activeCountdownIntervals.has(element)) {
+        clearInterval(activeCountdownIntervals.get(element));
+        activeCountdownIntervals.delete(element);
+      }
+      return;
+    }
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    spans[0].textContent = String(hours).padStart(2, "0");
+    spans[1].textContent = String(minutes).padStart(2, "0");
+    spans[2].textContent = String(seconds).padStart(2, "0");
+  };
+  
+  updateCountdown();
+  // Atualizar a cada segundo
+  const intervalId = setInterval(updateCountdown, 1000);
+  // ALTERAÇÃO: Armazenar intervalo para cleanup
+  activeCountdownIntervals.set(element, intervalId);
+  
+  // Limpar intervalo quando a promoção expirar
+  const expiry = new Date(expiresAt);
+  const now = new Date();
+  const timeout = expiry - now;
+  if (timeout > 0) {
+    setTimeout(() => {
+      if (activeCountdownIntervals.has(element)) {
+        clearInterval(activeCountdownIntervals.get(element));
+        activeCountdownIntervals.delete(element);
+      }
+    }, timeout);
+  }
 }
 
 /**
@@ -529,7 +1084,9 @@ function updateCategoryMenu(categories) {
     originalCategories.forEach((categoryName, index) => {
       const categoryId = `categoria${index + 1}`;
       const isSelected = index === 0 ? "selecionado" : "";
-      menuHTML += `<p class="${isSelected}" id="${categoryId}">${categoryName}</p>`;
+      // ALTERAÇÃO: Sanitizar nome da categoria para prevenir XSS
+      const safeCategoryName = escapeHTML(categoryName);
+      menuHTML += `<p class="${isSelected}" id="${categoryId}">${safeCategoryName}</p>`;
     });
   }
 
@@ -591,8 +1148,10 @@ async function refreshHome() {
     clearProductsCache();
     await updateProductSections();
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao atualizar home:", error.message);
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao atualizar home:", error.message);
+    }
   }
 }
 
@@ -617,8 +1176,10 @@ async function initHome() {
       window.carregarPontosHeader();
     }
   } catch (error) {
-    // TODO: Implementar logging estruturado em produção
-    console.error("Erro ao inicializar home:", error.message);
+    // ALTERAÇÃO: Logging condicional apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.error("Erro ao inicializar home:", error.message);
+    }
   }
 }
 

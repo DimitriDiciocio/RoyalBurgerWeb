@@ -108,6 +108,24 @@
     display: flex;
     flex-direction: row;
     gap: 25px;
+    cursor: grab; /* ALTERAÇÃO: Cursor para indicar que pode arrastar */
+    
+    /* ALTERAÇÃO: Ocultar scrollbar no Chrome/Safari */
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* ALTERAÇÃO: Prevenir seleção de texto durante arrasto */
+    user-select: none;
+    -webkit-user-select: none;
+
+    & a {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      width: 250px;
+      flex-shrink: 0;
+    }
 
     & #ficha-produto {
       background-color: var(--color-texto-white);
@@ -165,6 +183,23 @@
         color: #fff;
       }
 
+      /* ALTERAÇÃO: Badge de desconto - posicionado sobre a imagem */
+      & .discount-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        display: inline-block;
+        padding: 0.4rem 0.6rem;
+        border-radius: 0.25rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        background-color: var(--color-secondary);
+        color: var(--color-texto-white);
+        z-index: 10;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+      }
+
       & .informa {
         padding: 5px 15px;
         height: 170px;
@@ -172,6 +207,30 @@
         flex-direction: column;
         justify-content: space-between;
         flex: 1;
+
+        /* ALTERAÇÃO: Badge de estoque dentro da div.informa - não usa position absolute */
+        & .stock-badge {
+          position: static;
+          display: inline-block;
+          margin-bottom: 0.5rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+          align-self: flex-start;
+        }
+
+        & .stock-badge.limited {
+          background-color: #ffc107;
+          color: #000;
+        }
+
+        & .stock-badge.low {
+          background-color: #ff9800;
+          color: #fff;
+        }
 
         & #nome {
           font-size: 20px;
@@ -202,6 +261,18 @@
           color: var(--color-texto-black);
           margin: 0;
           font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+
+          /* ALTERAÇÃO: Preço original riscado quando há promoção */
+          & .original-price {
+            font-size: 14px;
+            color: var(--color-texto-erased);
+            text-decoration: line-through;
+            font-weight: 400;
+          }
         }
 
         & #tempo {
@@ -257,11 +328,43 @@
   }
 
   & .rolagem-infinita {
+    max-height: 80vh; /* ALTERAÇÃO: Limitar altura para permitir scroll vertical */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    
+    /* ALTERAÇÃO: Ocultar scrollbar no Chrome/Safari */
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 10px;
+    }
+    
+    &::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+    
     & .dupla {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding-bottom: 20px;
+
+      & a {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        width: 560px;
+        flex-shrink: 0;
+      }
 
       & #ficha-produto {
         display: flex;
@@ -318,6 +421,23 @@
           color: #fff;
         }
 
+        /* ALTERAÇÃO: Badge de desconto para layout vertical - posicionado sobre a imagem */
+        & .discount-badge {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          display: inline-block;
+          padding: 0.4rem 0.6rem;
+          border-radius: 0.25rem;
+          font-size: 0.85rem;
+          font-weight: 700;
+          background-color: var(--color-secondary);
+          color: var(--color-texto-white);
+          z-index: 10;
+          box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.3);
+          pointer-events: none;
+        }
+
         & .informa {
           padding: 15px 15px;
           height: 170px;
@@ -355,6 +475,18 @@
             color: var(--color-texto-black);
             margin: 0;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+
+            /* ALTERAÇÃO: Preço original riscado quando há promoção */
+            & .original-price {
+              font-size: 14px;
+              color: var(--color-texto-erased);
+              text-decoration: line-through;
+              font-weight: 400;
+            }
           }
 
           & #tempo {
@@ -498,6 +630,30 @@
           padding: 5px 15px;
           height: 140px;
 
+          /* ALTERAÇÃO: Badge de estoque dentro da div.informa - não usa position absolute */
+          & .stock-badge {
+            position: static;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+            align-self: flex-start;
+          }
+
+          & .stock-badge.limited {
+            background-color: #ffc107;
+            color: #000;
+          }
+
+          & .stock-badge.low {
+            background-color: #ff9800;
+            color: #fff;
+          }
+
           & #nome {
             font-size: 1.2rem;
             height: 22px;
@@ -580,10 +736,43 @@
             font-size: 0.65rem;
           }
 
+          /* ALTERAÇÃO: Badge de desconto no layout 1280px */
+          & .discount-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            padding: 0.3rem 0.5rem;
+            font-size: 0.75rem;
+          }
+
           & .informa {
             padding: 12px 15px;
             height: 150px;
             gap: 8px;
+
+            /* ALTERAÇÃO: Badge de estoque dentro da div.informa - não usa position absolute */
+            & .stock-badge {
+              position: static;
+              display: inline-block;
+              margin-bottom: 0.5rem;
+              padding: 0.25rem 0.5rem;
+              border-radius: 0.25rem;
+              font-size: 0.7rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+              align-self: flex-start;
+            }
+
+            & .stock-badge.limited {
+              background-color: #ffc107;
+              color: #000;
+            }
+
+            & .stock-badge.low {
+              background-color: #ff9800;
+              color: #fff;
+            }
 
             & #nome {
               font-size: 1.2rem;
@@ -598,6 +787,17 @@
 
             & #preco {
               font-size: 1.1rem;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              flex-wrap: wrap;
+
+              & .original-price {
+                font-size: 1rem;
+                color: var(--color-texto-erased);
+                text-decoration: line-through;
+                font-weight: 400;
+              }
             }
 
             & #tempo {
@@ -800,6 +1000,15 @@
             font-size: 0.6rem;
           }
 
+          /* ALTERAÇÃO: Badge de desconto no layout 1024px */
+          & .discount-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            padding: 0.25rem 0.4rem;
+            font-size: 0.7rem;
+          }
+
           & .informa {
             padding: 7px 10px;
             height: 120px;
@@ -821,6 +1030,17 @@
 
             & #preco {
               font-size: 0.9rem;
+              display: flex;
+              align-items: center;
+              gap: 0.4rem;
+              flex-wrap: wrap;
+
+              & .original-price {
+                font-size: 0.8rem;
+                color: var(--color-texto-erased);
+                text-decoration: line-through;
+                font-weight: 400;
+              }
             }
 
             & #tempo {
@@ -1017,6 +1237,15 @@
             font-size: 0.6rem;
           }
 
+          /* ALTERAÇÃO: Badge de desconto no layout 768px vertical */
+          & .discount-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            padding: 0.25rem 0.4rem;
+            font-size: 0.65rem;
+          }
+
           & .informa {
             padding: 7px 10px;
             height: 0px;
@@ -1037,6 +1266,17 @@
 
             & #preco {
               font-size: 0.9rem;
+              display: flex;
+              align-items: center;
+              gap: 0.4rem;
+              flex-wrap: wrap;
+
+              & .original-price {
+                font-size: 0.8rem;
+                color: var(--color-texto-erased);
+                text-decoration: line-through;
+                font-weight: 400;
+              }
             }
 
             & #tempo {
@@ -1244,6 +1484,15 @@
             font-size: 0.55rem;
           }
 
+          /* ALTERAÇÃO: Badge de desconto no layout 320px */
+          & .discount-badge {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            padding: 0.2rem 0.35rem;
+            font-size: 0.6rem;
+          }
+
           & .informa {
             padding: 7px 10px;
             height: 0px;
@@ -1270,6 +1519,17 @@
 
               & #preco {
                 font-size: 0.7rem;
+                display: flex;
+                align-items: center;
+                gap: 0.3rem;
+                flex-wrap: wrap;
+
+                & .original-price {
+                  font-size: 0.65rem;
+                  color: var(--color-texto-erased);
+                  text-decoration: line-through;
+                  font-weight: 400;
+                }
               }
 
               & #tempo {
@@ -1469,6 +1729,17 @@
 
               & #preco {
                 font-size: 0.7rem;
+                display: flex;
+                align-items: center;
+                gap: 0.3rem;
+                flex-wrap: wrap;
+
+                & .original-price {
+                  font-size: 0.65rem;
+                  color: var(--color-texto-erased);
+                  text-decoration: line-through;
+                  font-weight: 400;
+                }
               }
 
               & #tempo {

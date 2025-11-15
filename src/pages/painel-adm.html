@@ -22,6 +22,7 @@
     <script src="../js/ui/admin/painel-adm.js" type="module" defer></script>
     <script src="../js/ui/admin/order-management.js" type="module" defer></script>
     <script src="../js/ui/admin/configuracoes-gerenciamento.js" type="module" defer></script>
+    <script src="../js/ui/admin/promocoes-gerenciamento.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -51,6 +52,11 @@
             <div id="nav-cardapio" class="navegacao__item">
                 <i class="fa-solid fa-burger"></i>
                 <p>Cardápio</p>
+            </div>
+
+            <div id="nav-promocoes" class="navegacao__item">
+                <i class="fa-solid fa-tags"></i>
+                <p>Promoções</p>
             </div>
 
             <div id="nav-estoque" class="navegacao__item">
@@ -299,6 +305,89 @@
                     <i class="fa-solid fa-plus"></i>
                     <p>Novo Item</p>
                 </button>
+            </div>
+        </section>
+
+        <section id="secao-promocoes" style="display: none;">
+            <div class="header">
+                <div class="texto">
+                    <p class="titulo-secao">Gerenciamento de Promoções</p>
+                    <p class="descricao-secao">Crie e gerencie promoções especiais para seus produtos</p>
+                </div>
+
+                <button class="adicionar" id="btn-nova-promocao">
+                    <i class="fa-solid fa-plus"></i>
+                    <p>Nova Promoção</p>
+                </button>
+            </div>
+
+            <!-- Cards de Métricas -->
+            <div class="relata">
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Promoções Ativas</p>
+                        <i class="fa-solid fa-tags"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-promocoes-ativas">0</p>
+                        <p class="descricao">Em andamento</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Promoções Expiradas</p>
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-promocoes-expiradas">0</p>
+                        <p class="descricao">Finalizadas</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Total de Promoções</p>
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-total-promocoes">0</p>
+                        <p class="descricao">Todas as promoções</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Desconto Médio</p>
+                        <i class="fa-solid fa-percent" aria-label="Desconto médio" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande" id="metric-desconto-medio">0%</p>
+                        <p class="descricao">Média das promoções ativas</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filtros ">
+                <div class="div-input">
+                    <label for="busca-promocao">Buscar por produto ou ID</label>
+                    <input type="text" id="busca-promocao" name="busca-promocao" autocomplete="off">
+                </div>
+
+                <div class="div-input">
+                    <label for="filtro-status-promocao">Status</label>
+                    <select id="filtro-status-promocao" name="filtro-status-promocao">
+                        <option value="todas">Todas</option>
+                        <option value="ativas">Ativas</option>
+                        <option value="expiradas">Expiradas</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Lista de Promoções -->
+            <div class="promocoes-container" id="promocoes-list">
+                <!-- As promoções serão carregadas dinamicamente aqui -->
             </div>
         </section>
 
@@ -1630,6 +1719,88 @@
             <div class="footer-modal">
                 <button class="btn-cancelar" id="cancelar-config-extra">Cancelar</button>
                 <button class="btn-salvar" id="salvar-config-extra">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar/Editar Promoção -->
+    <div id="modal-promocao" class="modal" style="display: none;" data-reset-on-close>
+        <div class="div-overlay"></div>
+        <div class="modal-content-promocao">
+            <div class="header-modal">
+                <h2 id="titulo-modal-promocao">Adicionar Promoção</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-promocao"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input div-input-produto">
+                    <label for="produto-promocao">Produto *</label>
+                    <select id="produto-promocao" name="produto-promocao" required>
+                        <option value="">Selecione um produto</option>
+                        <!-- Produtos serão carregados dinamicamente -->
+                    </select>
+                </div>
+
+                <div class="div-input">
+                    <label>Tipo de Desconto *</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="tipo-desconto" value="percentual" checked>
+                            <span>Percentual (%)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="tipo-desconto" value="valor">
+                            <span>Valor Fixo (R$)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ALTERAÇÃO: Adicionados aria-label e aria-describedby para acessibilidade -->
+                <div class="div-input" id="div-desconto-percentual" style="display: flex; visibility: visible; opacity: 1;">
+                    <label for="desconto-percentual">Desconto Percentual (%) *</label>
+                    <input type="text" id="desconto-percentual" name="desconto-percentual" 
+                           autocomplete="off" placeholder="Ex: 15,5" inputmode="decimal"
+                           aria-label="Desconto percentual" aria-describedby="desconto-percentual-help">
+                    <small id="desconto-percentual-help" class="form-text">Valor entre 0 e 100 (use vírgula para decimais)</small>
+                </div>
+
+                <div class="div-input" id="div-desconto-valor" style="display: none; visibility: hidden; opacity: 0;">
+                    <label for="desconto-valor">Desconto em Valor (R$) *</label>
+                    <input type="text" id="desconto-valor" name="desconto-valor" 
+                           autocomplete="off" placeholder="Ex: 5,00" inputmode="decimal"
+                           aria-label="Desconto em valor fixo" aria-describedby="desconto-valor-help">
+                    <small id="desconto-valor-help" class="form-text">Valor fixo de desconto em reais</small>
+                </div>
+
+                <div class="div-input">
+                    <label for="data-expiracao-promocao">Data de Expiração *</label>
+                    <input type="datetime-local" id="data-expiracao-promocao" name="data-expiracao-promocao" 
+                           required autocomplete="off" min=""
+                           aria-label="Data e hora de expiração da promoção" aria-describedby="data-expiracao-help">
+                    <small id="data-expiracao-help" class="form-text">Data e hora em que a promoção expira (deve ser no futuro)</small>
+                </div>
+
+                <div class="info-promocao" id="info-promocao" style="display: none;">
+                    <h4>Informações do Produto</h4>
+                    <div>
+                        <div>
+                            <span>Preço Original:</span>
+                            <span id="preco-original-promocao" class="valor-info">R$ 0,00</span>
+                        </div>
+                        <div>
+                            <span>Preço com Desconto:</span>
+                            <span id="preco-com-desconto-promocao" class="valor-info" style="color: #28a745;">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-cancelar" id="cancelar-promocao">Cancelar</button>
+                <button class="btn-adicionar" id="salvar-promocao">
+                    <i class="fa-solid fa-plus"></i>
+                    <span id="texto-botao-promocao">Adicionar</span>
+                </button>
             </div>
         </div>
     </div>

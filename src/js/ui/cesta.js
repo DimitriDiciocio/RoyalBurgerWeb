@@ -9,6 +9,7 @@ import {
   clearCart,
   claimGuestCart,
 } from "../api/cart.js";
+import { getPromotionByProductId } from "../api/promotions.js";
 import { API_BASE_URL } from "../api/api.js";
 import { delegate } from "../utils/performance-utils.js";
 import { renderList } from "../utils/dom-renderer.js";
@@ -19,6 +20,7 @@ import {
   STATE_KEYS,
   STATE_EVENTS,
 } from "../utils/state-manager.js";
+import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../utils/price-utils.js";
 
 
 // Constantes para validação e limites
@@ -155,26 +157,44 @@ async function carregarCesta() {
         throw new Error("Formato de dados do carrinho inválido");
       }
 
-      state.itens = apiItems.map((item) => {
+      // ALTERAÇÃO: Buscar promoções para todos os produtos em paralelo
+      const itemsWithPromotions = await Promise.all(
+        apiItems.map(async (item) => {
+          let promotion = null;
+          try {
+            const promo = await getPromotionByProductId(item.product.id, false);
+            if (promo && isPromotionActive(promo)) {
+              promotion = promo;
+            }
+          } catch (error) {
+            // Se não houver promoção, continuar sem ela
+            promotion = null;
+          }
+          return { item, promotion };
+        })
+      );
+
+      state.itens = itemsWithPromotions.map(({ item, promotion }) => {
         // ALTERAÇÃO: Sempre usar item_subtotal do backend quando disponível
         // O backend já calcula corretamente considerando quantidade do produto e extras
         // CORREÇÃO: Não calcular manualmente para evitar multiplicação incorreta
         const itemSubtotal = parseFloat(item.item_subtotal || 0);
         const itemQuantity = parseInt(item.quantity || 1, 10);
 
-        // ALTERAÇÃO: Usar item_subtotal do backend sempre que disponível e válido
-        // Se item_subtotal for 0 ou inválido, calcular manualmente apenas como último recurso
+        // ALTERAÇÃO: Calcular preço base com promoção se houver
+        const originalPrice = parseFloat(item.product?.price || 0);
+        const priceInfo = calculatePriceWithPromotion(originalPrice, promotion);
+        const precoBaseComPromocao = priceInfo.finalPrice;
+
+        // ALTERAÇÃO: A API agora retorna item_subtotal COM desconto aplicado
+        // Usar diretamente o valor da API sem recalcular ou aplicar desconto novamente
         let precoTotalCalculado = itemSubtotal;
         if (itemSubtotal <= 0 || !isFinite(itemSubtotal)) {
-          // CORREÇÃO: Cálculo manual corrigido - extras já são por unidade do produto
-          // O backend multiplica: (preco_base + extras_por_unidade) * quantidade_produto
-          const precoBase = parseFloat(item.product?.price || 0);
-          
-          // CORREÇÃO: extras.quantity já é por unidade do produto, então somar preço * quantidade do extra
+          // CORREÇÃO: Cálculo manual apenas como fallback (quando API não retornou valor válido)
+          // Calcular total de extras
           const extrasTotal = (item.extras || []).reduce((sum, extra) => {
             const extraPrice = parseFloat(extra.ingredient_price || 0) || 0;
             const extraQty = parseInt(extra.quantity || 0, 10) || 0;
-            // Validar que são números finitos antes de calcular
             if (isFinite(extraPrice) && isFinite(extraQty) && extraPrice >= 0 && extraQty >= 0) {
               const extraTotal = extraPrice * extraQty;
               return sum + extraTotal;
@@ -182,12 +202,10 @@ async function carregarCesta() {
             return sum;
           }, 0);
           
-          // ALTERAÇÃO: Validação mais robusta para prevenir cálculos incorretos
           const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
             if (!mod || typeof mod !== 'object') return sum;
             const price = parseFloat(mod.ingredient_price || mod.price || 0) || 0;
             const delta = parseInt(mod.delta || 0, 10) || 0;
-            // Validar que ambos são números finitos antes de calcular
             if (isFinite(price) && isFinite(delta) && price >= 0) {
               const modTotal = price * Math.abs(delta);
               return sum + modTotal;
@@ -195,10 +213,11 @@ async function carregarCesta() {
             return sum;
           }, 0);
           
-          // CORREÇÃO: Calcular preço unitário primeiro, depois multiplicar pela quantidade
-          const precoUnitario = precoBase + extrasTotal + baseModsTotal;
+          // Usar preço com promoção como base (já calculado acima)
+          const precoUnitario = precoBaseComPromocao + extrasTotal + baseModsTotal;
           precoTotalCalculado = precoUnitario * itemQuantity;
         }
+        // ALTERAÇÃO: Não aplicar desconto novamente - a API já retorna item_subtotal com desconto aplicado
 
         // ALTERAÇÃO: Validação mais robusta para prevenir dados inválidos
         // Mapear BASE_MODIFICATIONS (modificações da receita base)
@@ -250,6 +269,8 @@ async function carregarCesta() {
           imagem: item.product.image_url,
           imageHash: item.product.image_hash,
           precoBase: item.product.price,
+          precoBaseComPromocao: precoBaseComPromocao, // ALTERAÇÃO: Preço base com desconto aplicado
+          promotion: promotion, // ALTERAÇÃO: Armazenar promoção para exibição
           quantidade: itemQuantity,
           extras: extrasMapeados,
           base_modifications: baseModsMapeados,
@@ -376,13 +397,55 @@ function calcularTotais() {
     return sum + itemTotal;
   }, 0);
   
+  // ALTERAÇÃO: Calcular total de descontos aplicados por promoções (apenas informativo)
+  // A API já retorna item_subtotal com desconto aplicado, então calculamos apenas para exibição
+  state.descontos = state.itens.reduce((sum, item) => {
+    // Se o item não tem promoção, desconto é 0
+    if (!item.promotion || (!item.promotion.discount_percentage && !item.promotion.discount_value)) {
+      return sum;
+    }
+    
+    // Calcular preço total original (sem desconto) do item para comparação
+    const precoBaseOriginal = parseFloat(item.precoBase || 0);
+    const quantidade = item.quantidade || 1;
+    
+    // Calcular total de extras
+    const extrasTotal = (item.extras || []).reduce((extrasSum, extra) => {
+      const extraPrice = parseFloat(extra.preco || 0) || 0;
+      const extraQty = parseFloat(extra.quantidade || 0) || 0;
+      // Extra quantidade já é por unidade, multiplicar pela quantidade do produto
+      return extrasSum + (extraPrice * extraQty * quantidade);
+    }, 0);
+    
+    // Calcular total de base_modifications
+    const baseModsTotal = (item.base_modifications || []).reduce((modsSum, mod) => {
+      const modPrice = parseFloat(mod.preco || 0) || 0;
+      const modDelta = Math.abs(parseInt(mod.delta || 0, 10) || 0);
+      return modsSum + (modPrice * modDelta * quantidade);
+    }, 0);
+    
+    // Preço total original (sem desconto)
+    const precoTotalOriginal = (precoBaseOriginal * quantidade) + extrasTotal + baseModsTotal;
+    
+    // Preço total com desconto (vem da API em precoTotal)
+    const precoTotalComDesconto = parseFloat(item.precoTotal || 0);
+    
+    // Desconto aplicado = diferença entre original e com desconto
+    // Este valor é apenas informativo, não é subtraído do total
+    const descontoItem = Math.max(0, precoTotalOriginal - precoTotalComDesconto);
+    
+    return sum + descontoItem;
+  }, 0);
+  
   // Se não há itens, total deve ser 0 (sem taxas)
   if (state.itens.length === 0) {
     state.total = 0;
     state.descontos = 0;
   } else {
-    state.total =
-      state.subtotal + state.taxaEntrega  - state.descontos;
+    // CORREÇÃO: O subtotal já tem desconto aplicado, então não devemos subtrair o desconto novamente
+    // O campo de descontos é apenas informativo (mostra quanto foi economizado)
+    // Total = Subtotal (já com desconto) + Taxa de entrega
+    state.total = state.subtotal + state.taxaEntrega;
   }
 
   stateManager.setMultiple({
@@ -504,7 +567,22 @@ function renderItem(item, index) {
             ${obsHtml}
             <div class="item-extras-separator"></div>
             <div class="item-footer">
-                <p class="item-preco">${formatBRL(item.precoTotal)}</p>
+                <div class="item-preco-container">
+                    ${item.promotion ? (() => {
+                      // Calcular preço original total para exibição
+                      const precoBaseOriginal = parseFloat(item.precoBase || 0);
+                      const quantidade = item.quantidade || 1;
+                      const extrasTotal = (item.extras || []).reduce((sum, extra) => {
+                        return sum + (parseFloat(extra.preco || 0) * parseFloat(extra.quantidade || 0) * quantidade);
+                      }, 0);
+                      const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
+                        return sum + (parseFloat(mod.preco || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0) * quantidade);
+                      }, 0);
+                      const precoTotalOriginal = (precoBaseOriginal * quantidade) + extrasTotal + baseModsTotal;
+                      return `<span class="item-preco-original" style="text-decoration: line-through; color: #999; font-size: 0.9em; margin-right: 8px;">${formatBRL(precoTotalOriginal)}</span>`;
+                    })() : ''}
+                    <p class="item-preco">${formatBRL(item.precoTotal)}</p>
+                </div>
                 <div class="item-footer-controls">
                     ${
                       item.quantidade === 1

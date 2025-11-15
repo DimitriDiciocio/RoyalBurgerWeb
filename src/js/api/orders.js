@@ -36,7 +36,25 @@ function isValidStatus(status) {
  * @param {string} [orderData.cpf_on_invoice] - CPF na nota
  * @param {number} [orderData.points_to_redeem] - Pontos para resgatar
  * @param {boolean} [orderData.use_cart] - Usar carrinho
+ * @param {Array} [orderData.promotions] - Informações de promoções para aplicar descontos
+ * @param {Object} [orderData.promotions[].product_id] - ID do produto com promoção
+ * @param {number} [orderData.promotions[].promotion_id] - ID da promoção
+ * @param {number} [orderData.promotions[].discount_percentage] - Desconto percentual (se aplicável)
+ * @param {number} [orderData.promotions[].discount_value] - Desconto em valor fixo (se aplicável)
  * @returns {Promise<Object>} Resultado da operação
+ * 
+ * IMPORTANTE - APLICAÇÃO DE DESCONTOS:
+ * Quando orderData.promotions é fornecido, o backend DEVE:
+ * 1. Para cada item do carrinho, verificar se há promoção correspondente em orderData.promotions
+ * 2. Aplicar o desconto ao calcular item_subtotal de cada item
+ * 3. Salvar o item_subtotal COM desconto aplicado no banco de dados
+ * 4. Calcular subtotal, total e discounts do pedido considerando os descontos aplicados
+ * 
+ * Exemplo de cálculo:
+ * - Produto: R$ 20,00, quantidade: 2, promoção: 10% de desconto
+ * - item_subtotal original: R$ 40,00
+ * - item_subtotal com desconto: R$ 36,00 (40 - 10% = 36)
+ * - O valor R$ 36,00 deve ser salvo no banco como item_subtotal
  */
 export async function createOrder(orderData) {
     try {
@@ -177,7 +195,10 @@ export async function calculateOrderTotal(items, points_to_redeem = 0, order_typ
             data: data
         };
     } catch (error) {
-        console.error('Erro ao calcular total:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao calcular total:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -198,7 +219,10 @@ export async function getMyOrders() {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao buscar pedidos:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao buscar pedidos:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -221,7 +245,10 @@ export async function getAllOrders() {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao buscar todos os pedidos:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao buscar todos os pedidos:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -244,7 +271,10 @@ export async function getTodayOrders() {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao buscar pedidos do dia:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao buscar pedidos do dia:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -278,7 +308,10 @@ export async function updateOrderStatus(orderId, status) {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao atualizar status:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao atualizar status:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -306,7 +339,10 @@ export async function getOrderDetails(orderId) {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao buscar detalhes do pedido:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao buscar detalhes do pedido:', error.message);
+        }
         return {
             success: false,
             error: error.message
@@ -334,7 +370,10 @@ export async function cancelOrder(orderId) {
             data: data
         };
     } catch (error) {
-        console.error('Erro ao cancelar pedido:', error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('Erro ao cancelar pedido:', error.message);
+        }
         return {
             success: false,
             error: error.message

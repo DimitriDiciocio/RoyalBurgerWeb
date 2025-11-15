@@ -100,7 +100,8 @@
   & .modal-content-selecao-insumos,
   & .modal-content-configuracao,
   & .modal-content-horarios,
-  & .modal-content-grupos {
+  & .modal-content-grupos,
+  & .modal-content-promocao {
     pointer-events: auto;
     position: relative;
     z-index: 110;
@@ -2289,6 +2290,7 @@
         display: flex;
         justify-content: center;
       }
+
       & i {
         cursor: pointer;
         font-size: 1.2rem;
@@ -4191,10 +4193,11 @@
       }
     }
 
-    & .btn-adicionar-insumo-extra{
+    & .btn-adicionar-insumo-extra {
       background-color: transparent;
       color: var(--color-texto-erased);
       border: 2px dashed var(--color-texto-light);
+
       &:hover {
         border-color: var(--color-primary);
         background-color: var(--color-primary);
@@ -5454,7 +5457,7 @@
       }
 
       &#btn-adicionar-endereco-modal {
-        background-color: var(--cor-div-secondary );
+        background-color: var(--cor-div-secondary);
         color: var(--color-texto-white);
 
         &:hover {
@@ -5473,24 +5476,49 @@
   flex-direction: column;
   gap: 20px;
 
-    & .endereco-item {
-      background-color: var(--cor-div-primary);
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: var(--box-shadow);
-      border-radius: var(--border-radius);
-      position: relative;
-      padding: 15px 20px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 2px solid transparent;
+  & .endereco-item {
+    background-color: var(--cor-div-primary);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    position: relative;
+    padding: 15px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+
+    &:hover {
+      border-color: var(--color-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    &.selecionado {
+      border-color: var(--color-primary);
+      background-color: #fff8e1;
+    }
+
+    &.endereco-padrao {
+      border-color: var(--color-primary);
+
+      & .endereco-info .titulo::after {
+        content: " (Padrão)";
+        color: var(--color-primary);
+        font-weight: 600;
+      }
+    }
+
+    /* Estilos específicos para opção de retirada no local */
+    &.endereco-pickup {
+      background: var(--cor-div-primary);
+      border: 2px solid var(--color-primary);
 
       &:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        background: var(--cor-div-primary);
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
       }
 
       &.selecionado {
@@ -5498,68 +5526,43 @@
         background-color: #fff8e1;
       }
 
-      &.endereco-padrao {
-        border-color: var(--color-primary);
-
-        & .endereco-info .titulo::after {
-          content: " (Padrão)";
-          color: var(--color-primary);
-          font-weight: 600;
-        }
+      & .endereco-info i {
+        color: var(--color-primary);
+        font-size: 22px;
       }
 
-      /* Estilos específicos para opção de retirada no local */
-      &.endereco-pickup {
-        background: var(--cor-div-primary);
-        border: 2px solid var(--color-primary);
-
-        &:hover {
-          background: var(--cor-div-primary);
-          box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        &.selecionado {
-          border-color: var(--color-primary);
-          background-color: #fff8e1;
-        }
-
-        & .endereco-info i {
-          color: var(--color-primary);
-          font-size: 22px;
-        }
-
-        & .endereco-check {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
-          background-color: var(--color-primary);
-          border-radius: 50%;
-          color: var(--color-texto-black);
-          font-size: 16px;
-          margin-left: 10px;
-        }
-      }
-
-      /* Estilos para check de seleção */
       & .endereco-check {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
         background-color: var(--color-primary);
         border-radius: 50%;
         color: var(--color-texto-black);
-        font-size: 14px;
-        font-weight: 600;
-        flex-shrink: 0;
+        font-size: 16px;
+        margin-left: 10px;
       }
+    }
+
+    /* Estilos para check de seleção */
+    & .endereco-check {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background-color: var(--color-primary);
+      border-radius: 50%;
+      color: var(--color-texto-black);
+      font-size: 14px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
 
     & .endereco-info {
       display: flex;
-      align-items: center;  
+      align-items: center;
       gap: 15px;
 
       & i {
@@ -5574,13 +5577,15 @@
         margin-bottom: 0;
         color: var(--color-texto-black);
       }
+
       & .descricao {
         font-size: 14px;
         font-weight: 400;
         margin: 0;
-        
+
         color: var(--color-texto-erased);
       }
+
       & .endereco-info-content {
         display: flex;
         flex-direction: column;
@@ -5623,6 +5628,7 @@
         &:active {
           color: #d2a400;
         }
+
         &.btn-editar {
           color: var(--color-texto-erased);
 
@@ -5670,7 +5676,7 @@
       color: var(--color-texto-erased);
       font-size: 14px;
     }
-    
+
     & .btn-adicionar-primeiro {
       background-color: var(--color-primary);
       color: var(--color-texto-black);
@@ -5791,6 +5797,7 @@
 
 /* Responsividade para modais de endereços */
 @media (max-width: 768px) {
+
   #modal-enderecos .modal-contet,
   #modal-endereco-form .modal-contet {
     width: 95%;
@@ -6327,6 +6334,288 @@
               padding: 6px 8px;
             }
           }
+        }
+      }
+    }
+  }
+}
+
+/* ============================================================================
+   MODAL DE PROMOÇÕES
+   ============================================================================ */
+
+#modal-promocao {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  display: none;
+  justify-content: center;
+  align-items: center;
+
+  & .div-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 100;
+  }
+
+  & .modal-content-promocao {
+    z-index: 110;
+    background-color: var(--cor-div-primary);
+    padding: 30px;
+    max-width: 600px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    position: relative;
+    gap: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+
+    & .header-modal {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+
+      & h2 {
+        color: var(--color-texto-black);
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0;
+      }
+
+      & .fechar-modal {
+        background: none;
+        border: none;
+        font-size: 20px;
+        color: var(--color-texto-erased);
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 4px;
+        transition: 0.3s;
+
+        &:hover {
+          color: var(--color-texto-black);
+          background-color: #f3f4f6;
+        }
+      }
+    }
+
+    & .conteudo-modal {
+      padding-top: 10px;
+      width: 100%;
+      max-height: 500px;
+      overflow-y: auto;
+      overflow-x: visible;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+
+      /* ALTERAÇÃO: Restaurados estilos completos de .div-input que foram removidos acidentalmente */
+      & .div-input {
+        & label {
+            background: var(--cor-div-primary);
+        }
+
+        &:focus {
+          border: 2px var(--color-tertiary) solid;
+          z-index: 2;
+        }
+
+        &.error {
+          border-color: var(--color-secondary);
+          background-color: #fff5f5;
+        }
+
+        &.success {
+          border-color: #28a745;
+          background-color: #f8fff9;
+        }
+      }
+
+      & select {
+        cursor: pointer;
+      }
+
+    }
+
+    & .form-text {
+      display: block;
+      margin-top: 0;
+      color: var(--color-texto-erased);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    /* Garantir que os campos de desconto sejam exibidos corretamente */
+    &#div-desconto-percentual,
+    &#div-desconto-valor {
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    /* Quando visível */
+    &#div-desconto-percentual:not([style*="display: none"]):not([style*="display:none"]),
+    &#div-desconto-valor:not([style*="display: none"]):not([style*="display:none"]) {
+      display: flex;
+      opacity: 1;
+      visibility: visible;
+      height: auto;
+      min-height: auto;
+    }
+
+    /* Quando oculto */
+    &#div-desconto-percentual[style*="display: none"],
+    &#div-desconto-percentual[style*="display:none"],
+    &#div-desconto-valor[style*="display: none"],
+    &#div-desconto-valor[style*="display:none"] {
+      display: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+
+  & .radio-group {
+    display: flex;
+    gap: 20px;
+    margin-top: 25px;
+    justify-content: start;
+    align-items: center;
+    z-index: 1;
+    pointer-events: auto;
+
+    & label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: var(--color-texto-black);
+      position: relative;
+      z-index: 1;
+      pointer-events: auto;
+    }
+
+    & input[type="radio"] {
+      cursor: pointer;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--color-primary);
+      position: relative;
+      z-index: 1;
+      pointer-events: auto;
+    }
+  }
+
+  & .info-promocao {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+
+    & h4 {
+      margin-bottom: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-texto-black);
+    }
+
+    &>div {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    & span {
+      color: var(--color-texto-erased);
+    }
+
+    & .valor-info {
+      font-weight: 600;
+      margin-left: 5px;
+      color: var(--color-texto-black);
+    }
+  }
+}
+
+& .footer-modal {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+
+  & button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+
+    &.btn-cancelar {
+      background-color: #f3f4f6;
+      color: var(--color-texto-black);
+
+      &:hover {
+        background-color: #e5e7eb;
+      }
+    }
+
+    &.btn-adicionar {
+      background-color: var(--color-texto-black);
+      color: var(--color-texto-white);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      &:hover {
+        background-color: #374151;
+      }
+
+      & i {
+        font-size: 12px;
+      }
+    }
+  }
+}
+
+/* Responsividade para modal de promoções */
+@media (max-width: 768px) {
+  #modal-promocao {
+    & .modal-content-promocao {
+      width: 95%;
+      padding: 20px;
+
+      & .header-modal {
+        & h2 {
+          font-size: 20px;
+        }
+      }
+
+      & .conteudo-modal {
+        & .info-promocao>div {
+          grid-template-columns: 1fr;
         }
       }
     }

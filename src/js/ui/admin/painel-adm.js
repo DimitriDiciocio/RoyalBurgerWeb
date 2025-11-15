@@ -9,6 +9,7 @@ import { ProdutoManager } from './produtos-gerenciamento.js';
 import { InsumoManager } from './insumos-gerenciamento.js';
 import { CategoriaManager } from './categorias-gerenciamento.js';
 import { GruposInsumosManager } from './grupos-insumos-gerenciamento.js';
+import { initPromocoesManager } from './promocoes-gerenciamento.js';
 
 import { showToast } from '../alerts.js';
 import { fetchMe } from '../../api/auth.js';
@@ -22,6 +23,7 @@ const ADMIN_CONFIG = {
         pedidos: 'secao-pedidos',
         venda: 'secao-venda',
         cardapio: 'secao-cardapio',
+        promocoes: 'secao-promocoes',
         estoque: 'secao-estoque',
         relatorios: 'secao-relatorios',
         financeiro: 'secao-financeiro',
@@ -33,6 +35,7 @@ const ADMIN_CONFIG = {
         pedidos: 'nav-pedidos',
         venda: 'nav-venda',
         cardapio: 'nav-cardapio',
+        promocoes: 'nav-promocoes',
         estoque: 'nav-estoque',
         relatorios: 'nav-relatorios',
         financeiro: 'nav-financeiro',
@@ -259,6 +262,7 @@ class AdminPanelManager {
             'nav-pedidos': 'pedidos',
             'nav-venda': 'venda',
             'nav-cardapio': 'cardapio',
+            'nav-promocoes': 'promocoes',
             'nav-estoque': 'estoque',
             'nav-relatorios': 'relatorios',
             'nav-financeiro': 'financeiro',
@@ -394,6 +398,9 @@ class AdminPanelManager {
                 case 'cardapio':
                     await this.initializeCardapioSection();
                     break;
+                case 'promocoes':
+                    await this.initializePromocoesSection();
+                    break;
                 case 'estoque':
                     await this.initializeEstoqueSection();
                     break;
@@ -438,6 +445,13 @@ class AdminPanelManager {
             this.managers.insumos = new InsumoManager();
         }
         await this.managers.insumos.init();
+    }
+
+    /**
+     * Inicializa seção de promoções
+     */
+    async initializePromocoesSection() {
+        await initPromocoesManager();
     }
 
 

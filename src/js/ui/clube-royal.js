@@ -56,7 +56,10 @@ const VALIDATION_LIMITS = {
     try {
       return dateFormatter.format(new Date(date));
     } catch (error) {
-      console.warn("Erro ao formatar data:", error);
+      // ALTERAÇÃO: Logging condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn("Erro ao formatar data:", error);
+      }
       return "Data inválida";
     }
   };
@@ -128,8 +131,10 @@ const VALIDATION_LIMITS = {
         throw new Error("Função getStoredUser não disponível");
       }
     } catch (err) {
-      // TODO: Implementar logging estruturado em produção
-      console.error("Erro ao carregar usuário:", err.message);
+      // ALTERAÇÃO: Logging condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar usuário:", err.message);
+      }
       state.usuario = null;
     }
   }
@@ -137,8 +142,10 @@ const VALIDATION_LIMITS = {
   // Carregar pontos do usuário via API
   async function carregarPontos() {
     if (!state.usuario || !isValidUserId(state.usuario.id)) {
-      // TODO: Implementar logging estruturado em produção
-      console.error("Usuário não encontrado ou inválido");
+      // ALTERAÇÃO: Logging condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Usuário não encontrado ou inválido");
+      }
       return;
     }
 
@@ -175,8 +182,10 @@ const VALIDATION_LIMITS = {
       // Atualizar DOM de forma otimizada
       atualizarExibicaoPontos(diasRestantes);
     } catch (error) {
-      // TODO: Implementar logging estruturado em produção
-      console.error("Erro ao carregar pontos:", error.message);
+      // ALTERAÇÃO: Logging condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar pontos:", error.message);
+      }
       state.error = error.message;
 
       // Fallback para dados simulados em caso de erro
@@ -198,8 +207,10 @@ const VALIDATION_LIMITS = {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return Math.max(0, diffDays);
     } catch (error) {
-      // TODO: Implementar logging estruturado em produção
-      console.warn("Erro ao calcular dias restantes:", error.message);
+      // ALTERAÇÃO: Logging condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.warn("Erro ao calcular dias restantes:", error.message);
+      }
       return 0;
     }
   }
@@ -328,8 +339,10 @@ const VALIDATION_LIMITS = {
         })
         .filter((item) => item !== null); // Remover itens inválidos
     } catch (error) {
-      // TODO: Implementar logging estruturado em produção
-      console.error("Erro ao carregar histórico:", error.message);
+      // ALTERAÇÃO: Logging condicional apenas em modo debug
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error("Erro ao carregar histórico:", error.message);
+      }
       state.error = error.message;
 
       // Fallback para dados simulados em caso de erro
@@ -491,6 +504,9 @@ const VALIDATION_LIMITS = {
         maximumFractionDigits: 2,
       });
 
+      // ALTERAÇÃO: Calcular pontos ganhos para o valor de gainRate (sempre 1 ponto)
+      const pontosPorGainRate = 1; // A cada gainRate (ex: R$ 0,10) gasto, ganha 1 ponto
+
       // Calcular quantos pontos = R$ 1,00 de desconto
       const pontosParaUmReal =
         redemptionRate > 0 ? Math.round(1 / redemptionRate) : 100;
@@ -504,12 +520,12 @@ const VALIDATION_LIMITS = {
         }
       );
 
-      // Atualizar primeira explicação (acumule pontos)
+      // ALTERAÇÃO: Atualizar primeira explicação (acumule pontos) - corrigido para mostrar 1 ponto a cada R$ 0,10
       const descricao1 = document.querySelector(
         "#secao-explicacao .informa > div:nth-child(1) .descricao"
       );
       if (descricao1) {
-        descricao1.textContent = `A cada ${realFormatado} que você gasta, ganha ${pontosPorReal} pontos Royal automaticamente. Quanto mais você compra, mais pontos acumula!`;
+        descricao1.textContent = `A cada ${realFormatado} que você gasta, ganha ${pontosPorGainRate} ponto Royal automaticamente. Quanto mais você compra, mais pontos acumula!`;
       }
 
       // Atualizar segunda explicação (use pontos para descontos)
@@ -518,6 +534,14 @@ const VALIDATION_LIMITS = {
       );
       if (descricao2) {
         descricao2.textContent = `Na finalização do pedido, você pode usar seus pontos para obter descontos reais. ${pontosParaUmReal} pontos = ${descontoUmReal} de desconto!`;
+      }
+
+      // ALTERAÇÃO: Atualizar terceira explicação (como funciona o sistema)
+      const descricao3 = document.querySelector(
+        "#secao-explicacao .informa > div:nth-child(3) .descricao"
+      );
+      if (descricao3) {
+        descricao3.textContent = `O Clube Royal é nosso programa de fidelidade! A cada compra, você acumula pontos automaticamente. Quanto mais você compra, mais pontos ganha. Use seus pontos acumulados para obter descontos em futuras compras e aproveite benefícios exclusivos!`;
       }
 
       // Atualizar quarta explicação (pontos expiram)
@@ -534,7 +558,10 @@ const VALIDATION_LIMITS = {
         typeof process !== "undefined" &&
         process.env?.NODE_ENV === "development"
       ) {
-        console.warn("Erro ao atualizar explicações:", error.message);
+        // ALTERAÇÃO: Logging condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.warn("Erro ao atualizar explicações:", error.message);
+        }
       }
       // Manter valores padrão do HTML em caso de erro
     }

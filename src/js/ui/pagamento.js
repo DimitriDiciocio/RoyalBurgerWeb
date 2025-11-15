@@ -21,11 +21,13 @@ import {
 } from "../api/address.js";
 import { createOrder, calculateOrderTotal } from "../api/orders.js";
 import { getCart, removeCartItem } from "../api/cart.js";
+import { getPromotionByProductId } from "../api/promotions.js";
 import { simulateProductCapacity } from "../api/products.js";
 import { showError, showSuccess, showToast, showConfirm } from "./alerts.js";
 import { getIngredients } from "../api/ingredients.js";
 import { API_BASE_URL } from "../api/api.js";
 import { validateCPF } from "../utils/validators.js";
+import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../utils/price-utils.js";
 
 // Importar helper de configurações
 // Importação estática garante que o módulo esteja disponível quando necessário
@@ -313,11 +315,31 @@ const VALIDATION_LIMITS = {
       const cartResult = await getCart();
 
       if (cartResult.success && cartResult.data.items) {
+        // ALTERAÇÃO: Buscar promoções para todos os produtos em paralelo
+        const itemsWithPromotions = await Promise.all(
+          cartResult.data.items.map(async (item) => {
+            let promotion = null;
+            try {
+              const productId = item.product_id || item.product?.id;
+              if (productId) {
+                const promo = await getPromotionByProductId(productId, false);
+                if (promo && isPromotionActive(promo)) {
+                  promotion = promo;
+                }
+              }
+            } catch (error) {
+              // Se não houver promoção, continuar sem ela
+              promotion = null;
+            }
+            return { item, promotion };
+          })
+        );
+
         // Converter formato da API para formato local
         // IMPORTANTE: Validar e normalizar dados para garantir compatibilidade com validações rigorosas do backend
         // CORREÇÃO: Combina filter e map em um único processamento para evitar duplicação de validação
-        state.cesta = cartResult.data.items
-          .map((item) => {
+        state.cesta = itemsWithPromotions
+          .map(({ item, promotion }) => {
             // Validar product_id uma única vez (evita duplicação)
             const productId = validateId(item.product_id);
             if (!productId) {
@@ -406,24 +428,55 @@ const VALIDATION_LIMITS = {
             // Validar quantidade do item (backend requer >= 1)
             const quantidade = validateQuantity(item.quantity);
 
+            // ALTERAÇÃO: Calcular preço base com promoção se houver
+            const originalPrice = (() => {
+              const priceRaw = parseFloat(item.product?.price);
+              return Number.isFinite(priceRaw) && priceRaw >= 0 ? priceRaw : 0;
+            })();
+            const priceInfo = calculatePriceWithPromotion(originalPrice, promotion);
+            const precoBaseComPromocao = priceInfo.finalPrice;
+
+            // ALTERAÇÃO: Calcular preço total considerando promoção
+            // Se o backend já calculou o subtotal, aplicar desconto da promoção se necessário
+            let precoTotalCalculado = (() => {
+              const subtotalRaw = parseFloat(item.item_subtotal);
+              return Number.isFinite(subtotalRaw) && subtotalRaw >= 0 ? subtotalRaw : 0;
+            })();
+
+            // Se há promoção e o backend não aplicou, aplicar desconto
+            if (promotion && priceInfo.hasPromotion && precoTotalCalculado > 0) {
+              // Calcular total de extras e base_modifications
+              const extrasTotal = extrasMapeados.reduce((sum, extra) => {
+                return sum + (parseFloat(extra.preco || 0) * parseFloat(extra.quantidade || 0));
+              }, 0);
+              
+              const baseModsTotal = baseModsMapeados.reduce((sum, mod) => {
+                return sum + (parseFloat(mod.preco || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
+              }, 0);
+
+              // Preço total original (sem desconto)
+              const precoTotalOriginal = (originalPrice * quantidade) + extrasTotal + baseModsTotal;
+              
+              // Aplicar desconto proporcionalmente
+              const descontoPorUnidade = priceInfo.discountValue;
+              const descontoTotal = descontoPorUnidade * quantidade;
+              
+              // Se o subtotal do backend parece não ter desconto aplicado, aplicar
+              if (precoTotalCalculado >= precoTotalOriginal - 0.01) {
+                precoTotalCalculado = Math.max(0, precoTotalCalculado - descontoTotal);
+              }
+            }
+
             return {
               id: productId, // ID do produto
               cartItemId: item.id || item.cart_item_id || null, // ID do item no carrinho (para remoção)
               nome: item.product?.name || "Produto",
               descricao: item.product?.description || "",
-              // CORREÇÃO: Validar que preços são números válidos (evita NaN/Infinity)
-              preco: (() => {
-                const priceRaw = parseFloat(item.product?.price);
-                return Number.isFinite(priceRaw) && priceRaw >= 0
-                  ? priceRaw
-                  : 0;
-              })(),
-              precoTotal: (() => {
-                const subtotalRaw = parseFloat(item.item_subtotal);
-                return Number.isFinite(subtotalRaw) && subtotalRaw >= 0
-                  ? subtotalRaw
-                  : 0;
-              })(),
+              // ALTERAÇÃO: Armazenar preço original e com promoção
+              preco: originalPrice,
+              precoBaseComPromocao: precoBaseComPromocao,
+              promotion: promotion, // ALTERAÇÃO: Armazenar promoção para exibição
+              precoTotal: precoTotalCalculado,
               quantidade: quantidade, // Já validado por validateQuantity (>= 1)
               extras: extrasMapeados,
               base_modifications: baseModsMapeados,
@@ -439,22 +492,16 @@ const VALIDATION_LIMITS = {
         // Atualizar totais da API
         // CORREÇÃO: Validar que valores são números válidos (evita NaN/Infinity de cálculos malformados)
         if (cartResult.data.summary) {
-          const subtotalRaw = parseFloat(cartResult.data.summary.subtotal);
           const feesRaw = parseFloat(cartResult.data.summary.fees);
-          const discountsRaw = parseFloat(cartResult.data.summary.discounts);
-          const totalRaw = parseFloat(cartResult.data.summary.total);
-
-          state.subtotal =
-            Number.isFinite(subtotalRaw) && subtotalRaw >= 0 ? subtotalRaw : 0;
+          // ALTERAÇÃO: Usar taxa de entrega do backend, mas recalcular subtotal e descontos
+          // pois precisamos aplicar descontos de promoções
           state.taxaEntrega =
             Number.isFinite(feesRaw) && feesRaw >= 0 ? feesRaw : 5.0;
-          state.descontos =
-            Number.isFinite(discountsRaw) && discountsRaw >= 0
-              ? discountsRaw
-              : 0;
-          state.total =
-            Number.isFinite(totalRaw) && totalRaw >= 0 ? totalRaw : 0;
         }
+        
+        // ALTERAÇÃO: Recalcular totais após aplicar promoções
+        // Isso garante que subtotal, descontos e total estão corretos
+        calcularTotais();
         
         // Atualizar tempo estimado após carregar cesta (usa maior tempo de preparo dos produtos)
         atualizarExibicaoTempo();
@@ -582,6 +629,45 @@ const VALIDATION_LIMITS = {
       return sum + itemTotal;
     }, 0);
 
+    // ALTERAÇÃO: Calcular total de descontos aplicados por promoções
+    // Para cada item, calcular: (preço original total) - (preço com desconto total) = desconto aplicado
+    const descontosPromocoes = state.cesta.reduce((sum, item) => {
+      // Se o item não tem promoção, desconto é 0
+      if (!item.promotion || (!item.promotion.discount_percentage && !item.promotion.discount_value)) {
+        return sum;
+      }
+      
+      // Calcular preço total original (sem desconto) do item
+      // Preço base original * quantidade + extras + base_modifications
+      const precoBaseOriginal = parseFloat(item.preco || 0);
+      const quantidade = item.quantidade || 1;
+      
+      // Calcular total de extras
+      const extrasTotal = (item.extras || []).reduce((extrasSum, extra) => {
+        const extraPrice = parseFloat(extra.preco || 0) || 0;
+        const extraQty = parseFloat(extra.quantidade || 0) || 0;
+        return extrasSum + (extraPrice * extraQty);
+      }, 0);
+      
+      // Calcular total de base_modifications
+      const baseModsTotal = (item.base_modifications || []).reduce((modsSum, mod) => {
+        const modPrice = parseFloat(mod.preco || 0) || 0;
+        const modDelta = Math.abs(parseInt(mod.delta || 0, 10) || 0);
+        return modsSum + (modPrice * modDelta);
+      }, 0);
+      
+      // Preço total original (sem desconto)
+      const precoTotalOriginal = (precoBaseOriginal * quantidade) + extrasTotal + baseModsTotal;
+      
+      // Preço total com desconto (já calculado em precoTotal)
+      const precoTotalComDesconto = parseFloat(item.precoTotal || 0);
+      
+      // Desconto aplicado = diferença entre original e com desconto
+      const descontoItem = Math.max(0, precoTotalOriginal - precoTotalComDesconto);
+      
+      return sum + descontoItem;
+    }, 0);
+
     // Total antes do desconto (subtotal + taxa de entrega, se delivery)
     // CORREÇÃO: Garantir que taxaEntrega é número válido antes de calcular
     const taxaEntregaValida =
@@ -639,14 +725,20 @@ const VALIDATION_LIMITS = {
       ? calculateDiscountFromPoints(state.pontosParaUsar)
       : 0;
     // CORREÇÃO: Validar que desconto é número válido antes de calcular
-    const descontoValido =
+    const descontoPontosValido =
       Number.isFinite(descontoPontos) && descontoPontos >= 0
         ? descontoPontos
         : 0;
-    state.descontos = Math.min(descontoValido, totalAntesDesconto);
+    
+    // ALTERAÇÃO: Total de descontos = descontos de promoções + descontos de pontos
+    // O desconto de pontos é limitado ao total antes do desconto
+    const descontoPontosLimitado = Math.min(descontoPontosValido, totalAntesDesconto);
+    state.descontos = descontosPromocoes + descontoPontosLimitado;
 
-    // CORREÇÃO: Garantir que total é um número válido (evita NaN em cálculos)
-    const totalCalculado = totalAntesDesconto - state.descontos;
+    // CORREÇÃO: O subtotal já tem desconto de promoções aplicado
+    // Então o total = subtotal (com desconto de promoções) + taxa - desconto de pontos
+    // Ou seja: total = subtotal + taxa - descontoPontosLimitado
+    const totalCalculado = totalAntesDesconto - descontoPontosLimitado;
     state.total =
       Number.isFinite(totalCalculado) && totalCalculado >= 0
         ? totalCalculado
@@ -798,7 +890,22 @@ const VALIDATION_LIMITS = {
                     ${obsHtml}
                     <div class="item-extras-separator"></div>
                     <div class="item-footer">
-                        <p class="item-preco">${formatBRL(item.precoTotal)}</p>
+                        <div class="item-preco-container">
+                            ${item.promotion ? 
+                              (() => {
+                                // Calcular preço total original (sem desconto)
+                                const extrasTotal = (item.extras || []).reduce((sum, extra) => {
+                                  return sum + (parseFloat(extra.preco || 0) * parseFloat(extra.quantidade || 0));
+                                }, 0);
+                                const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
+                                  return sum + (parseFloat(mod.preco || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
+                                }, 0);
+                                const precoTotalOriginal = (item.preco * item.quantidade) + extrasTotal + baseModsTotal;
+                                return `<span class="item-preco-original" style="text-decoration: line-through; color: #999; font-size: 0.9em; margin-right: 8px;">${formatBRL(precoTotalOriginal)}</span>`;
+                              })()
+                              : ''}
+                            <p class="item-preco">${formatBRL(item.precoTotal)}</p>
+                        </div>
                         <p class="item-quantidade">Qtd: ${item.quantidade}</p>
                     </div>
                 </div>
@@ -2777,6 +2884,18 @@ const VALIDATION_LIMITS = {
       //
       // A conversão de unidades (ex: 100g → 0.100kg) é feita automaticamente pelo backend
       // usando BASE_PORTION_QUANTITY, BASE_PORTION_UNIT e STOCK_UNIT dos ingredientes
+      
+      // ALTERAÇÃO: Preparar informações de promoções para o backend aplicar descontos
+      // O backend deve usar essas informações para calcular os valores com desconto
+      const promotionsData = state.cesta
+        .filter(item => item.promotion && item.promotion.id)
+        .map(item => ({
+          product_id: item.id,
+          promotion_id: item.promotion.id,
+          discount_percentage: item.promotion.discount_percentage || null,
+          discount_value: item.promotion.discount_value || null
+        }));
+      
       const orderData = {
         payment_method: backendPaymentMethod,
         notes:
@@ -2791,6 +2910,9 @@ const VALIDATION_LIMITS = {
         points_to_redeem: pontosParaResgate,
         use_cart: true, // CRÍTICO: Indica ao backend para usar o carrinho atual (busca do banco de dados)
         order_type: isPickupOrderCheck ? "pickup" : "delivery", // Especificar tipo de pedido (pickup ou delivery)
+        // ALTERAÇÃO: Enviar informações de promoções para o backend aplicar descontos
+        // O backend deve usar essas informações para calcular item_subtotal com desconto aplicado
+        promotions: promotionsData.length > 0 ? promotionsData : undefined
       };
 
       // Se for delivery, validar e incluir address_id
