@@ -823,9 +823,10 @@ const isDevelopment = () => {
                   // ALTERAÇÃO: Log condicional apenas em modo debug
                   if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                     console.warn(
-                    `Erro ao buscar detalhes do pedido ${orderId}:`,
-                    err.message
-                  );
+                      `Erro ao buscar detalhes do pedido ${orderId}:`,
+                      err.message
+                    );
+                  }
                 }
                 return order;
               }
