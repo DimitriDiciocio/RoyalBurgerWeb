@@ -369,44 +369,44 @@ header.header-logged-out {
 
 /* Aplicar mesmas regras de perfil no modal */
 .header-profile-visitor .nav-modal-links .nav-link-base {
-  display: block !important;
+  display: flex !important;
 }
 
 .header-profile-customer .nav-modal-links .nav-link-base {
-  display: block !important;
+  display: flex !important;
 }
 .header-profile-customer .nav-modal-links .nav-link-customer {
-  display: block !important;
+  display: flex !important;
 }
 
 .header-profile-attendant .nav-modal-links .nav-link-base {
-  display: block !important;
+  display: flex !important;
 }
 .header-profile-attendant .nav-modal-links .nav-link-attendant {
-  display: block !important;
+  display: flex !important;
 }
 
 .header-profile-manager .nav-modal-links .nav-link-base {
-  display: block !important;
+  display: flex !important;
 }
 .header-profile-manager .nav-modal-links .nav-link-manager {
-  display: block !important;
+  display: flex !important;
 }
 
 .header-profile-admin .nav-modal-links .nav-link-base {
-  display: block !important;
+  display: flex !important;
 }
 .header-profile-admin .nav-modal-links .nav-link-admin {
-  display: block !important;
+  display: flex !important;
 }
 
 /* Herança no modal */
 .header-profile-admin .nav-modal-links .nav-link-manager {
-  display: block !important;
+  display: flex !important;
 }
 
 .header-profile-manager .nav-modal-links .nav-link-attendant {
-  display: block !important;
+  display: flex !important;
 }
 
 /* Modal de navegação (hambúrguer) */
@@ -418,7 +418,7 @@ header.header-logged-out {
 }
 
 .nav-modal.open {
-  display: block;
+  display: flex;
 }
 
 .nav-modal .nav-modal-overlay {
@@ -430,7 +430,7 @@ header.header-logged-out {
 .nav-modal .nav-modal-dialog {
   position: absolute;
   top: 0;
-  right: 0;
+  left: 0;
   height: 100%;
   width: 85%;
   max-width: 360px;
@@ -438,7 +438,7 @@ header.header-logged-out {
   box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 10px 16px;
   transform: translateX(100%);
   transition: transform .25s ease;
 }
@@ -454,7 +454,7 @@ header.header-logged-out {
 }
 
 .nav-modal .logo-modal {
-  height: 36px;
+  height: 45px;
 }
 
 .nav-modal .nav-modal-close {
@@ -467,14 +467,45 @@ header.header-logged-out {
 .nav-modal .nav-modal-links {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 7px;
   padding: 18px 6px;
 }
 
 .nav-modal .nav-modal-links a {
   color: var(--color-texto-black);
+  cursor: pointer;
   font-size: 16px;
 }
+
+.nav-modal .nav-modal-links .div-adm {
+  display: flex;
+  flex-direction: column;
+  margin-left: 20px;
+  gap: 7px;
+  
+  & div {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      color: var(--color-texto-black);
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+
+      &:hover {
+          color: #525252;
+      }
+
+      &:active {
+          color: #D9D9D9;
+      }
+  }
+
+  & div.select {
+      color: var(--color-texto-black);
+  }
+}
+
 
 .nav-modal .nav-modal-auth {
   margin-top: 10px;
