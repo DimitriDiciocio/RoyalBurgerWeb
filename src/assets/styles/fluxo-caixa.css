@@ -1,0 +1,1269 @@
+/**
+ * Estilos do Módulo de Fluxo de Caixa
+ * Mantém consistência com painel-adm.css
+ */
+
+/* === VARIÁVEIS CSS === */
+:root {
+    --financial-primary: #2563eb;
+    --financial-success: #10b981;
+    --financial-danger: #ef4444;
+    --financial-warning: #f59e0b;
+    --financial-info: #3b82f6;
+    
+    /* Receitas - Verde */
+    --revenue-color: #10b981;
+    --revenue-light: #d1fae5;
+    --revenue-dark: #065f46;
+    
+    /* Despesas - Vermelho */
+    --expense-color: #ef4444;
+    --expense-light: #fee2e2;
+    --expense-dark: #991b1b;
+    
+    /* CMV - Amarelo/Laranja */
+    --cmv-color: #f59e0b;
+    --cmv-light: #fef3c7;
+    --cmv-dark: #92400e;
+    
+    /* Impostos - Roxo */
+    --tax-color: #8b5cf6;
+    --tax-light: #ede9fe;
+    --tax-dark: #5b21b6;
+    
+    /* Status */
+    --pending-color: #f59e0b;
+    --paid-color: #10b981;
+    --reconciled-color: #3b82f6;
+}
+
+/* === CONTAINER PRINCIPAL === */
+.fluxo-caixa-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* === HEADER DA SEÇÃO === */
+.fluxo-caixa-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.fluxo-caixa-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.fluxo-caixa-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* === TABS DE NAVEGAÇÃO === */
+.financeiro-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid #e5e7eb;
+    overflow-x: auto;
+}
+
+.financeiro-tab {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.financeiro-tab:hover {
+    color: #374151;
+    background: #f9fafb;
+}
+
+.financeiro-tab.active {
+    color: var(--financial-primary);
+    border-bottom-color: var(--financial-primary);
+}
+
+.financeiro-tab i {
+    font-size: 1rem;
+}
+
+/* === CONTEÚDO DAS TABS === */
+.financeiro-content {
+    width: 100%;
+}
+
+.financeiro-tab-content {
+    display: none;
+}
+
+.financeiro-tab-content.active {
+    display: block;
+}
+
+/* === CARDS DE RESUMO === */
+.financial-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.financial-summary-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.financial-summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.financial-summary-card.revenue {
+    border-left-color: var(--revenue-color);
+}
+
+.financial-summary-card.expense {
+    border-left-color: var(--expense-color);
+}
+
+.financial-summary-card.cmv {
+    border-left-color: var(--cmv-color);
+}
+
+.financial-summary-card.profit {
+    border-left-color: var(--financial-primary);
+}
+
+.financial-summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.financial-summary-card-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.financial-summary-card-icon {
+    font-size: 1.5rem;
+    opacity: 0.7;
+}
+
+.financial-summary-card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.financial-summary-card-change {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.financial-summary-card-change.positive {
+    color: var(--financial-success);
+}
+
+.financial-summary-card-change.negative {
+    color: var(--financial-danger);
+}
+
+/* === FILTROS === */
+.financial-filters {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.financial-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.financial-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.financial-filter-group label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.financial-filter-group select,
+.financial-filter-group input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+/* === TABELA DE MOVIMENTAÇÕES === */
+.financial-movements-table-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.financial-movements-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.financial-movements-table thead {
+    background: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.financial-movements-table th {
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.financial-movements-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+    color: #1f2937;
+}
+
+.financial-movements-table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.financial-movements-table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* === CARD DE MOVIMENTAÇÃO === */
+.financial-movement-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 4px solid transparent;
+}
+
+.financial-movement-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.financial-movement-card.type-revenue {
+    border-left-color: var(--revenue-color);
+}
+
+.financial-movement-card.type-expense {
+    border-left-color: var(--expense-color);
+}
+
+.financial-movement-card.type-cmv {
+    border-left-color: var(--cmv-color);
+}
+
+.financial-movement-card.type-tax {
+    border-left-color: var(--tax-color);
+}
+
+.financial-movement-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.financial-movement-card-type {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.financial-movement-card-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.financial-movement-card-body {
+    margin-bottom: 1rem;
+}
+
+.financial-movement-card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+}
+
+.financial-movement-card-value .value-sign {
+    font-size: 1.25rem;
+}
+
+.financial-movement-card-value .value-sign.positive {
+    color: var(--revenue-color);
+}
+
+.financial-movement-card-value .value-sign.negative {
+    color: var(--expense-color);
+}
+
+.financial-movement-card-value .value-amount {
+    color: #1f2937;
+}
+
+.financial-movement-card-description {
+    margin-bottom: 1rem;
+}
+
+.financial-movement-card-description .description-text {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.financial-movement-card-description .description-meta {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.financial-movement-card-details {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.financial-movement-card-details .detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.financial-movement-card-details .detail-item i {
+    font-size: 0.875rem;
+    opacity: 0.7;
+}
+
+.financial-movement-card-footer {
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.financial-movement-card-footer .related-link {
+    color: var(--financial-primary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.financial-movement-card-footer .related-link:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+
+/* === BADGES === */
+.financial-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.financial-badge.type-revenue {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.financial-badge.type-expense {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.financial-badge.type-cmv {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.financial-badge.type-tax {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.financial-badge.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.financial-badge.status-paid {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.financial-badge.reconciled {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* === BOTÕES DE AÇÃO === */
+.financial-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.financial-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.financial-btn-primary {
+    background: var(--financial-primary);
+    color: white;
+}
+
+.financial-btn-primary:hover {
+    background: #1d4ed8;
+}
+
+.financial-btn-success {
+    background: var(--financial-success);
+    color: white;
+}
+
+.financial-btn-danger {
+    background: var(--financial-danger);
+    color: white;
+}
+
+.financial-btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.financial-btn-icon {
+    padding: 0.5rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #6b7280;
+    transition: color 0.2s;
+    font-size: 0.875rem;
+}
+
+.financial-btn-icon:hover {
+    color: var(--financial-primary);
+}
+
+.financial-btn-icon.danger:hover {
+    color: var(--financial-danger);
+}
+
+/* === DASHBOARD === */
+.dashboard-financeiro {
+    width: 100%;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.dashboard-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.dashboard-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dashboard-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+    cursor: pointer;
+}
+
+.dashboard-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #374151;
+    cursor: pointer;
+}
+
+.dashboard-checkbox input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.dashboard-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.chart-container h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+}
+
+.chart-container canvas {
+    max-height: 300px;
+}
+
+.dashboard-recent-movements {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-recent-movements h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+}
+
+/* === PAGINAÇÃO === */
+.pagination-container {
+    margin-top: 2rem;
+    padding: 1rem 0;
+}
+
+.pagination-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.pagination-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.pagination-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.pagination-text strong {
+    color: #1f2937;
+    font-weight: 600;
+}
+
+.pagination-page-info {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-numbers {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.pagination-btn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: #f9fafb;
+    border-color: var(--financial-primary);
+    color: var(--financial-primary);
+}
+
+.pagination-btn:active:not(:disabled) {
+    background: #f3f4f6;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-btn.active {
+    background: var(--financial-primary);
+    color: white;
+    border-color: var(--financial-primary);
+}
+
+.pagination-btn.active:hover {
+    background: #1d4ed8;
+}
+
+.pagination-ellipsis {
+    padding: 0.5rem 0.25rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.pagination-btn-nav {
+    min-width: 100px;
+    justify-content: center;
+}
+
+/* === GESTÃO DE COMPRAS === */
+.compras-container {
+    width: 100%;
+}
+
+.compras-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.compras-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.compras-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.compra-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 4px solid var(--financial-primary);
+}
+
+.compra-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.compra-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.compra-card-header h4 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.compra-supplier {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.compra-card-body {
+    margin-bottom: 1rem;
+}
+
+.compra-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.compra-info .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.compra-info .info-item .label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.compra-info .info-item .value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+.compra-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* === GESTÃO DE RECORRÊNCIAS === */
+.recorrencias-container {
+    width: 100%;
+}
+
+.recorrencias-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.recorrencias-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.recorrencias-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.recorrencias-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.recorrencia-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 4px solid var(--financial-primary);
+}
+
+.recorrencia-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.recorrencia-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.recorrencia-card-header h4 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.recorrencia-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.recorrencia-card-body {
+    margin-bottom: 1rem;
+}
+
+.recorrencia-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.recorrencia-info .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.recorrencia-info .info-item .label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.recorrencia-info .info-item .value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+.recorrencia-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* === CONTAS A PAGAR === */
+.contas-pagar-container {
+    width: 100%;
+}
+
+.contas-pagar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.contas-pagar-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.contas-pagar-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.info-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--pending-color);
+    color: white;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.contas-pagar-list {
+    margin-top: 2rem;
+}
+
+/* === CONCILIAÇÃO BANCÁRIA === */
+.conciliacao-container {
+    width: 100%;
+}
+
+.conciliacao-header {
+    margin-bottom: 2rem;
+}
+
+.conciliacao-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.conciliacao-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.conciliacao-summary {
+    margin-bottom: 2rem;
+}
+
+.conciliacao-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.conciliacao-list {
+    margin-top: 2rem;
+}
+
+/* === RESPONSIVIDADE === */
+@media (max-width: 768px) {
+    .fluxo-caixa-container {
+        padding: 1rem;
+    }
+    
+    .financial-summary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .financial-movements-table-container {
+        overflow-x: auto;
+    }
+    
+    .financial-movements-table {
+        min-width: 800px;
+    }
+
+    .dashboard-charts {
+        grid-template-columns: 1fr;
+    }
+
+    .financeiro-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .compras-list {
+        grid-template-columns: 1fr;
+    }
+
+    .compras-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .recorrencias-list {
+        grid-template-columns: 1fr;
+    }
+
+    .recorrencias-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .recorrencias-actions {
+        width: 100%;
+    }
+
+    .recorrencias-actions .financial-btn {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .conciliacao-summary-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .contas-pagar-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* === ESTADOS DE LOADING === */
+.financial-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem;
+    color: #6b7280;
+}
+
+.financial-loading::before {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e5e7eb;
+    border-top-color: var(--financial-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 1rem;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* === FEEDBACK VISUAL === */
+.financial-fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.financial-card-update {
+    animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+/* === MELHORIAS DE ACESSIBILIDADE === */
+.financial-btn:focus-visible,
+.financeiro-tab:focus-visible {
+    outline: 2px solid var(--financial-primary);
+    outline-offset: 2px;
+}
+
+.financial-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* === MELHORIAS DE HIERARQUIA VISUAL === */
+.financial-summary-card-value {
+    line-height: 1.2;
+}
+
+.financial-summary-card-change {
+    font-weight: 500;
+}
+
+/* === TRANSIÇÕES SUAVES === */
+.financial-movement-card,
+.compra-card,
+.recorrencia-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.financial-btn {
+    transition: all 0.2s ease;
+}
+
+.financeiro-tab {
+    transition: all 0.2s ease;
+}
+
+/* === ESTILOS PARA MODAIS === */
+.invoice-details {
+    padding: 1rem 0;
+}
+
+.invoice-detail-section {
+    margin-bottom: 2rem;
+}
+
+.invoice-detail-section h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+}
+
+.invoice-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.invoice-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.invoice-detail-item .label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.invoice-detail-item .value {
+    font-size: 1rem;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+.invoice-items-list {
+    margin-top: 1rem;
+}
+
+.invoice-items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.invoice-items-table thead {
+    background: #f9fafb;
+}
+
+.invoice-items-table th {
+    padding: 0.75rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.invoice-items-table td {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    color: #1f2937;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.invoice-items-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+/* === ESTILOS PARA GRÁFICOS === */
+.chart-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.chart-container h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+}
+
+.chart-container canvas {
+    max-height: 300px;
+}
+
+.dashboard-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* === ESTILOS PARA FORMULÁRIOS === */
+/* Os estilos de formulário seguem o padrão do modais.css usando .div-input */
+
+/* === RESPONSIVIDADE PARA MODAIS === */
+@media (max-width: 768px) {
+    .invoice-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-charts {
+        grid-template-columns: 1fr;
+    }
+
+    .invoice-items-table {
+        font-size: 0.75rem;
+    }
+
+    .invoice-items-table th,
+    .invoice-items-table td {
+        padding: 0.5rem;
+    }
+}
+

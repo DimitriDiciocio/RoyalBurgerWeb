@@ -146,6 +146,7 @@ export async function apiRequest(
           path.includes("/login") || path.includes("/users/login");
         const isCartEndpoint = path.includes("/cart");
         const isProductIngredientEndpoint = path.includes("/products") && path.includes("/ingredients");
+        const isPromotionEndpoint = path.includes("/promotions/product/");
         
         if (isLoginEndpoint && data?.error) {
           // É um erro de login - usar a mensagem do backend
@@ -172,6 +173,10 @@ export async function apiRequest(
         } else if (isProductIngredientEndpoint && data?.error) {
           // Erro 404 em endpoints de ingredientes de produto - usar mensagem do backend
           errorMessage = data.error || data.message || "Vínculo produto-ingrediente não encontrado.";
+        } else if (isPromotionEndpoint) {
+          // ALTERAÇÃO: 404 em endpoints de promoção por produto não é um erro - significa apenas que não há promoção
+          // Retornar null silenciosamente sem lançar erro
+          return null;
         } else {
           // Endpoint não encontrado
           errorMessage =

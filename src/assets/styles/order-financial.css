@@ -1,0 +1,79 @@
+/**
+ * Estilos para Informações Financeiras em Pedidos
+ * Integração do fluxo de caixa com o gerenciamento de pedidos
+ */
+
+.order-financial-info-placeholder:empty {
+    display: none;
+}
+
+.order-financial-info {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--financial-primary);
+}
+
+.order-financial-info h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.financial-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.financial-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.financial-info-item .label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+.financial-info-item .value {
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.financial-info-item .value.revenue {
+    color: var(--revenue-color);
+}
+
+.financial-info-item .value.expense,
+.financial-info-item .value.cmv {
+    color: var(--expense-color);
+}
+
+.financial-info-item .value.positive {
+    color: var(--financial-success);
+}
+
+.financial-info-item .value.negative {
+    color: var(--financial-danger);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .financial-info-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .financial-info-item .value {
+        font-size: 1rem;
+    }
+}
+

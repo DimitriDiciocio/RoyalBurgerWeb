@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="../assets/styles/mensagens.css">
     <link rel="stylesheet" href="../assets/styles/modais.css">
     <link rel="stylesheet" href="../assets/styles/painel-adm.css">
+    <link rel="stylesheet" href="../assets/styles/fluxo-caixa.css">
+    <link rel="stylesheet" href="../assets/styles/order-financial.css">
     <!-- js sistema -->
     <script src="../js/utils.js" type="module" defer></script>
     <script src="../js/ui/header.js" type="module" defer></script>
@@ -26,6 +28,7 @@
     <!-- js complementares -->
     <script src="https://kit.fontawesome.com/ac1aaaa398.js" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -555,8 +558,69 @@
         <section id="secao-financeiro" style="display: none;">
             <div class="header">
                 <div class="texto">
-                    <p class="titulo-secao">Financeiro</p>
-                    <p class="descricao-secao">Adicione receitas, despesas, defina impostos e gerencie suas finanças</p>
+                    <p class="titulo-secao">Fluxo de Caixa</p>
+                    <p class="descricao-secao">Gestão completa das movimentações financeiras</p>
+                </div>
+                <div class="acoes">
+                    <button class="btn-primary" id="btn-nova-movimentacao">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                        <span>Nova Movimentação</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- // ALTERAÇÃO: Tabs principais do módulo financeiro -->
+            <div class="financeiro-tabs">
+                <button class="financeiro-tab active" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button class="financeiro-tab" data-tab="movimentacoes">
+                    <i class="fa-solid fa-list" aria-hidden="true"></i>
+                    <span>Movimentações</span>
+                </button>
+                <button class="financeiro-tab" data-tab="contas-pagar">
+                    <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                    <span>Contas a Pagar</span>
+                </button>
+                <button class="financeiro-tab" data-tab="compras">
+                    <i class="fa-solid fa-shopping-cart" aria-hidden="true"></i>
+                    <span>Compras</span>
+                </button>
+                <button class="financeiro-tab" data-tab="recorrencias">
+                    <i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                    <span>Recorrências</span>
+                </button>
+                <button class="financeiro-tab" data-tab="conciliacao">
+                    <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                    <span>Conciliação</span>
+                </button>
+            </div>
+
+            <!-- // ALTERAÇÃO: Conteúdo dinâmico das tabs -->
+            <div class="financeiro-content">
+                <div id="tab-dashboard" class="financeiro-tab-content active" aria-labelledby="Dashboard">
+                    <div id="dashboard-financeiro-container"></div>
+                </div>
+
+                <div id="tab-movimentacoes" class="financeiro-tab-content" aria-labelledby="Movimentações">
+                    <div id="movimentacoes-list-container"></div>
+                </div>
+
+                <div id="tab-contas-pagar" class="financeiro-tab-content" aria-labelledby="Contas a pagar">
+                    <div id="contas-pagar-container"></div>
+                </div>
+
+                <div id="tab-compras" class="financeiro-tab-content" aria-labelledby="Compras">
+                    <div id="compras-container"></div>
+                </div>
+
+                <div id="tab-recorrencias" class="financeiro-tab-content" aria-labelledby="Recorrências">
+                    <div id="recorrencias-container"></div>
+                </div>
+
+                <div id="tab-conciliacao" class="financeiro-tab-content" aria-labelledby="Conciliação">
+                    <div id="conciliacao-container"></div>
                 </div>
             </div>
         </section>

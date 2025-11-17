@@ -16,6 +16,7 @@ import {
   formatTime,
 } from "../../api/dashboard.js";
 import { getUserById } from "../../api/user.js";
+import { getFinancialMovements } from "../../api/financial-movements.js";
 import { showSuccess, showError, showConfirm } from "../alerts.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { escapeHTML as escapeHTMLCentralized } from "../../utils/html-sanitizer.js";
@@ -1513,6 +1514,12 @@ const isDevelopment = () => {
                         : ""
                     }
 
+                    <div class="order-financial-info-placeholder" data-order-id="${escapeHTML(
+                      String(orderId)
+                    )}">
+                        <!-- Informações financeiras serão carregadas aqui -->
+                    </div>
+
                     <div class="order-footer">
                         <div class="order-total">
                             <span class="total-label">Total</span>
@@ -1544,6 +1551,104 @@ const isDevelopment = () => {
 
     // Atualizar DOM
     el.ordersList.innerHTML = ordersHtml;
+
+    // Carregar informações financeiras para cada pedido
+    state.filteredOrders.forEach((order) => {
+      if (order && typeof order === "object") {
+        const orderId = order.order_id || order.id;
+        if (orderId) {
+          displayOrderFinancialInfo(orderId);
+        }
+      }
+    });
+  }
+
+  /**
+   * Exibe informações financeiras do pedido
+   * @param {number|string} orderId - ID do pedido
+   */
+  async function displayOrderFinancialInfo(orderId) {
+    try {
+      // Buscar movimentações relacionadas ao pedido
+      const movements = await getFinancialMovements({
+        related_entity_type: "order",
+        related_entity_id: orderId,
+      });
+
+      if (!movements || movements.length === 0) {
+        return;
+      }
+
+      // Agrupar por tipo
+      const revenue = movements.find((m) => m.type === "REVENUE");
+      const cmv = movements.find((m) => m.type === "CMV");
+      const fee = movements.find(
+        (m) => m.type === "EXPENSE" && m.subcategory === "Taxas de Pagamento"
+      );
+
+      // Calcular lucro
+      const revenueValue = parseFloat(revenue?.value || revenue?.amount || 0);
+      const cmvValue = parseFloat(cmv?.value || cmv?.amount || 0);
+      const feeValue = parseFloat(fee?.value || fee?.amount || 0);
+      const grossProfit = revenueValue - cmvValue;
+      const netProfit = grossProfit - feeValue;
+
+      // Renderizar card financeiro
+      const financialCard = `
+            <div class="order-financial-info">
+                <h4>Informações Financeiras</h4>
+                <div class="financial-info-grid">
+                    <div class="financial-info-item">
+                        <span class="label">Receita:</span>
+                        <span class="value revenue">R$ ${formatCurrencyValue(revenueValue)}</span>
+                    </div>
+                    <div class="financial-info-item">
+                        <span class="label">CMV:</span>
+                        <span class="value cmv">R$ ${formatCurrencyValue(cmvValue)}</span>
+                    </div>
+                    <div class="financial-info-item">
+                        <span class="label">Taxa:</span>
+                        <span class="value expense">R$ ${formatCurrencyValue(feeValue)}</span>
+                    </div>
+                    <div class="financial-info-item">
+                        <span class="label">Lucro Bruto:</span>
+                        <span class="value ${grossProfit >= 0 ? "positive" : "negative"}">
+                            R$ ${formatCurrencyValue(grossProfit)}
+                        </span>
+                    </div>
+                    <div class="financial-info-item">
+                        <span class="label">Lucro Líquido:</span>
+                        <span class="value ${netProfit >= 0 ? "positive" : "negative"}">
+                            R$ ${formatCurrencyValue(netProfit)}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+      // Inserir no card do pedido
+      const placeholder = document.querySelector(
+        `.order-financial-info-placeholder[data-order-id="${orderId}"]`
+      );
+      if (placeholder) {
+        placeholder.innerHTML = financialCard;
+      }
+    } catch (error) {
+      console.error("Erro ao carregar informações financeiras:", error);
+      // Não exibir erro para o usuário, apenas logar
+    }
+  }
+
+  /**
+   * Formata valor monetário
+   * @param {number} value - Valor a formatar
+   * @returns {string} Valor formatado
+   */
+  function formatCurrencyValue(value) {
+    if (formatCurrency) {
+      return formatCurrency(value);
+    }
+    return Math.abs(value || 0).toFixed(2).replace(".", ",");
   }
 
   /**

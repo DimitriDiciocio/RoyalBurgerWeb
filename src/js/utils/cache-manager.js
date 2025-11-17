@@ -1,225 +1,114 @@
-// src/js/utils/cache-manager.js
-// Cache Manager Compartilhado - Seção 1.1 da análise de performance
-
 /**
- * Gerenciador de cache compartilhado para reduzir requisições HTTP redundantes
- * Suporta cache em memória e sessionStorage para persistência entre páginas
+ * Gerenciador de Cache
+ * Gerencia cache de dados com TTL (Time To Live)
  */
+
 class CacheManager {
-  constructor() {
-    this.memoryCache = new Map();
-    this.defaultTTL = 5 * 60 * 1000; // 5 minutos padrão
-    this.storagePrefix = "rb_cache_";
-
-    // Limpar cache expirado do sessionStorage ao iniciar
-    this._cleanExpiredStorage();
-  }
-
-  /**
-   * Obtém valor do cache
-   * @param {string} key - Chave do cache
-   * @returns {any|null} Valor em cache ou null se não encontrado/expirado
-   */
-  get(key) {
-    // Tentar memória primeiro (mais rápido)
-    const memoryEntry = this.memoryCache.get(key);
-    if (memoryEntry) {
-      if (Date.now() > memoryEntry.expires) {
-        this.memoryCache.delete(key);
-        this._removeFromStorage(key);
-        return null;
-      }
-      return memoryEntry.value;
+    constructor() {
+        this.cache = new Map();
+        this.defaultTTL = 5 * 60 * 1000; // 5 minutos em milissegundos
     }
 
-    // Tentar sessionStorage
-    try {
-      const storageKey = this.storagePrefix + key;
-      const stored = sessionStorage.getItem(storageKey);
-      if (stored) {
-        const entry = JSON.parse(stored);
-        if (Date.now() > entry.expires) {
-          sessionStorage.removeItem(storageKey);
-          return null;
+    /**
+     * Armazena um valor no cache
+     * @param {string} key - Chave do cache
+     * @param {*} value - Valor a ser armazenado
+     * @param {number} ttl - Tempo de vida em milissegundos (padrão: 5 minutos)
+     */
+    set(key, value, ttl = null) {
+        const expirationTime = Date.now() + (ttl || this.defaultTTL);
+        this.cache.set(key, {
+            value,
+            expirationTime
+        });
+    }
+
+    /**
+     * Obtém um valor do cache
+     * @param {string} key - Chave do cache
+     * @returns {*|null} Valor armazenado ou null se expirado/não encontrado
+     */
+    get(key) {
+        const item = this.cache.get(key);
+        
+        if (!item) {
+            return null;
         }
-        // Restaurar para memória para acesso mais rápido
-        this.memoryCache.set(key, entry);
-        return entry.value;
-      }
-    } catch (e) {
-      // sessionStorage pode estar indisponível ou cheio
-      console.warn("Erro ao acessar sessionStorage:", e);
-    }
 
-    return null;
-  }
-
-  /**
-   * Define valor no cache
-   * @param {string} key - Chave do cache
-   * @param {any} value - Valor a ser armazenado
-   * @param {number} ttl - Time to live em milissegundos (opcional, usa default se não fornecido)
-   */
-  set(key, value, ttl = this.defaultTTL) {
-    const entry = {
-      value,
-      expires: Date.now() + ttl,
-      createdAt: Date.now(),
-    };
-
-    // Armazenar em memória
-    this.memoryCache.set(key, entry);
-
-    // Armazenar em sessionStorage (com tratamento de erro)
-    try {
-      const storageKey = this.storagePrefix + key;
-      sessionStorage.setItem(storageKey, JSON.stringify(entry));
-    } catch (e) {
-      // sessionStorage pode estar cheio, apenas logar aviso
-      console.warn(
-        "Erro ao salvar no sessionStorage (cache continuará funcionando em memória):",
-        e
-      );
-    }
-  }
-
-  /**
-   * Invalida uma chave específica do cache
-   * @param {string} key - Chave a ser invalidada
-   */
-  invalidate(key) {
-    this.memoryCache.delete(key);
-    this._removeFromStorage(key);
-  }
-
-  /**
-   * Invalida múltiplas chaves de uma vez (útil para invalidar por padrão)
-   * @param {string|RegExp} pattern - Padrão de chaves a invalidar (string exata ou RegExp)
-   */
-  invalidatePattern(pattern) {
-    const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
-
-    // Invalidar em memória
-    for (const key of this.memoryCache.keys()) {
-      if (regex.test(key)) {
-        this.memoryCache.delete(key);
-      }
-    }
-
-    // Invalidar em sessionStorage
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const storageKey = sessionStorage.key(i);
-        if (storageKey && storageKey.startsWith(this.storagePrefix)) {
-          const cacheKey = storageKey.replace(this.storagePrefix, "");
-          if (regex.test(cacheKey)) {
-            keysToRemove.push(storageKey);
-          }
+        // Verificar se expirou
+        if (Date.now() > item.expirationTime) {
+            this.cache.delete(key);
+            return null;
         }
-      }
-      keysToRemove.forEach((key) => sessionStorage.removeItem(key));
-    } catch (e) {
-      console.warn("Erro ao invalidar padrão no sessionStorage:", e);
+
+        return item.value;
     }
-  }
 
-  /**
-   * Limpa todo o cache
-   */
-  clear() {
-    this.memoryCache.clear();
-
-    // Limpar sessionStorage
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const storageKey = sessionStorage.key(i);
-        if (storageKey && storageKey.startsWith(this.storagePrefix)) {
-          keysToRemove.push(storageKey);
+    /**
+     * Verifica se uma chave existe e não expirou
+     * @param {string} key - Chave do cache
+     * @returns {boolean} True se existe e não expirou
+     */
+    has(key) {
+        const item = this.cache.get(key);
+        
+        if (!item) {
+            return false;
         }
-      }
-      keysToRemove.forEach((key) => sessionStorage.removeItem(key));
-    } catch (e) {
-      console.warn("Erro ao limpar sessionStorage:", e);
+
+        // Verificar se expirou
+        if (Date.now() > item.expirationTime) {
+            this.cache.delete(key);
+            return false;
+        }
+
+        return true;
     }
-  }
 
-  /**
-   * Remove uma chave do sessionStorage
-   * @private
-   */
-  _removeFromStorage(key) {
-    try {
-      const storageKey = this.storagePrefix + key;
-      sessionStorage.removeItem(storageKey);
-    } catch (e) {
-      // Ignorar erros silenciosamente
+    /**
+     * Remove uma chave do cache
+     * @param {string} key - Chave a ser removida
+     */
+    delete(key) {
+        this.cache.delete(key);
     }
-  }
 
-  /**
-   * Limpa entradas expiradas do sessionStorage
-   * @private
-   */
-  _cleanExpiredStorage() {
-    try {
-      const now = Date.now();
-      const keysToRemove = [];
+    /**
+     * Limpa todo o cache
+     */
+    clear() {
+        this.cache.clear();
+    }
 
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const storageKey = sessionStorage.key(i);
-        if (storageKey && storageKey.startsWith(this.storagePrefix)) {
-          try {
-            const stored = sessionStorage.getItem(storageKey);
-            if (stored) {
-              const entry = JSON.parse(stored);
-              if (now > entry.expires) {
-                keysToRemove.push(storageKey);
-              }
+    /**
+     * Remove itens expirados do cache
+     */
+    cleanup() {
+        const now = Date.now();
+        for (const [key, item] of this.cache.entries()) {
+            if (now > item.expirationTime) {
+                this.cache.delete(key);
             }
-          } catch (e) {
-            // Se não conseguir parsear, remover (corrompido)
-            keysToRemove.push(storageKey);
-          }
         }
-      }
-
-      keysToRemove.forEach((key) => sessionStorage.removeItem(key));
-    } catch (e) {
-      // Ignorar erros silenciosamente
-    }
-  }
-
-  /**
-   * Retorna estatísticas do cache (útil para debugging)
-   * @returns {Object} Estatísticas do cache
-   */
-  getStats() {
-    const memorySize = this.memoryCache.size;
-    let storageSize = 0;
-
-    try {
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && key.startsWith(this.storagePrefix)) {
-          storageSize++;
-        }
-      }
-    } catch (e) {
-      // Ignorar erro
     }
 
-    return {
-      memoryEntries: memorySize,
-      storageEntries: storageSize,
-      totalEntries: memorySize, // Pode haver overlap, mas dá uma ideia
-    };
-  }
+    /**
+     * Obtém estatísticas do cache
+     * @returns {Object} Estatísticas do cache
+     */
+    getStats() {
+        this.cleanup(); // Limpar expirados antes de contar
+        return {
+            size: this.cache.size,
+            keys: Array.from(this.cache.keys())
+        };
+    }
 }
 
 // Exportar instância singleton
 export const cacheManager = new CacheManager();
 
-// Exportar classe também para testes ou casos especiais
-export { CacheManager };
+// Limpar cache expirado a cada 1 minuto
+setInterval(() => {
+    cacheManager.cleanup();
+}, 60 * 1000);

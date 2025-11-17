@@ -10,6 +10,13 @@ import { InsumoManager } from './insumos-gerenciamento.js';
 import { CategoriaManager } from './categorias-gerenciamento.js';
 import { GruposInsumosManager } from './grupos-insumos-gerenciamento.js';
 import { initPromocoesManager } from './promocoes-gerenciamento.js';
+import { FinancialDashboard } from './dashboard-financeiro.js';
+import { MovementsList } from './movimentacoes-list.js';
+import { ComprasManager } from './compras-manager.js';
+import { RecorrenciasManager } from './recorrencias-manager.js';
+import { ContasPagarManager } from './contas-pagar.js';
+import { ConciliacaoBancariaManager } from './conciliacao-bancaria.js';
+import { MovimentacaoForm } from './movimentacao-form.js';
 
 import { showToast } from '../alerts.js';
 import { fetchMe } from '../../api/auth.js';
@@ -54,12 +61,20 @@ const ADMIN_CONFIG = {
 class AdminPanelManager {
     constructor() {
         this.currentSection = null;
+        this.financialTabsSetup = false;
         this.managers = {
             usuarios: null,
             produtos: null,
             insumos: null,
             categorias: null,
-            gruposInsumos: null
+            gruposInsumos: null,
+            financialDashboard: null,
+            movementsList: null,
+            comprasManager: null,
+            recorrenciasManager: null,
+            contasPagarManager: null,
+            conciliacaoBancariaManager: null,
+            movimentacaoForm: null
         };
         this.isInitialized = false;
     }
@@ -407,6 +422,9 @@ class AdminPanelManager {
                 case 'dashboard':
                     await this.initializeDashboardSection();
                     break;
+                case 'financeiro':
+                    await this.initializeFinancialSection();
+                    break;
                 default:
                     // Seção não requer inicialização específica
                     break;
@@ -454,6 +472,150 @@ class AdminPanelManager {
         await initPromocoesManager();
     }
 
+    /**
+     * Inicializa seção financeira
+     */
+    async initializeFinancialSection() {
+        try {
+            // Inicializar dashboard financeiro
+            if (!this.managers.financialDashboard) {
+                this.managers.financialDashboard = new FinancialDashboard('dashboard-financeiro-container');
+            }
+            await this.managers.financialDashboard.init();
+
+            // Configurar tabs
+            this.setupFinancialTabs();
+
+            // Configurar botão de nova movimentação
+            const btnNovaMovimentacao = document.getElementById('btn-nova-movimentacao');
+            if (btnNovaMovimentacao) {
+                // ALTERAÇÃO: Remover listener anterior se existir para evitar duplicação
+                const newBtn = btnNovaMovimentacao.cloneNode(true);
+                btnNovaMovimentacao.parentNode.replaceChild(newBtn, btnNovaMovimentacao);
+
+                // Inicializar formulário de movimentação se ainda não foi inicializado
+                if (!this.managers.movimentacaoForm) {
+                    // Verificar se o modal existe no HTML, senão criar dinamicamente
+                    let modal = document.getElementById('modal-movimentacao');
+                    if (!modal) {
+                        modal = document.createElement('div');
+                        modal.id = 'modal-movimentacao';
+                        modal.className = 'modal';
+                        modal.style.display = 'none';
+                        document.body.appendChild(modal);
+                    }
+                    this.managers.movimentacaoForm = new MovimentacaoForm('modal-movimentacao');
+                    await this.managers.movimentacaoForm.init();
+                }
+                
+                // Re-selecionar botão após clonagem
+                const newBtnRef = document.getElementById('btn-nova-movimentacao');
+                if (newBtnRef) {
+                    newBtnRef.addEventListener('click', () => {
+                        if (this.managers.movimentacaoForm) {
+                            this.managers.movimentacaoForm.openNew(() => {
+                                // Recarregar dashboard e lista após criar movimentação
+                                if (this.managers.financialDashboard) {
+                                    this.managers.financialDashboard.loadData();
+                                }
+                                if (this.managers.movementsList) {
+                                    this.managers.movementsList.loadMovements();
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao inicializar seção financeira:', error);
+            showToast('Erro ao carregar módulo financeiro', { 
+                type: 'error',
+                title: 'Erro'
+            });
+        }
+    }
+
+    /**
+     * Configura tabs do módulo financeiro
+     */
+    setupFinancialTabs() {
+        // ALTERAÇÃO: Evitar configuração duplicada de tabs
+        if (this.financialTabsSetup) {
+            return;
+        }
+
+        const tabs = document.querySelectorAll('.financeiro-tab');
+        const contents = document.querySelectorAll('.financeiro-tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+
+                // Remover classe active de todas as tabs e contents
+                tabs.forEach(t => t.classList.remove('active'));
+                contents.forEach(c => c.classList.remove('active'));
+
+                // Adicionar classe active na tab e content selecionados
+                tab.classList.add('active');
+                const targetContent = document.getElementById(`tab-${targetTab}`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+
+                // Inicializar conteúdo da tab se necessário
+                this.initializeFinancialTab(targetTab);
+            });
+        });
+
+        this.financialTabsSetup = true;
+    }
+
+    /**
+     * Inicializa conteúdo de uma tab financeira específica
+     * @param {string} tabId - ID da tab
+     */
+    async initializeFinancialTab(tabId) {
+        switch (tabId) {
+            case 'dashboard':
+                // Dashboard já é inicializado no initializeFinancialSection
+                break;
+            case 'movimentacoes':
+                // Inicializar lista de movimentações
+                if (!this.managers.movementsList) {
+                    this.managers.movementsList = new MovementsList('movimentacoes-list-container');
+                }
+                await this.managers.movementsList.init();
+                break;
+            case 'contas-pagar':
+                // Inicializar gerenciador de contas a pagar
+                if (!this.managers.contasPagarManager) {
+                    this.managers.contasPagarManager = new ContasPagarManager('contas-pagar-container');
+                }
+                await this.managers.contasPagarManager.init();
+                break;
+            case 'compras':
+                // Inicializar gerenciador de compras
+                if (!this.managers.comprasManager) {
+                    this.managers.comprasManager = new ComprasManager('compras-container');
+                }
+                await this.managers.comprasManager.init();
+                break;
+            case 'recorrencias':
+                // Inicializar gerenciador de recorrências
+                if (!this.managers.recorrenciasManager) {
+                    this.managers.recorrenciasManager = new RecorrenciasManager('recorrencias-container');
+                }
+                await this.managers.recorrenciasManager.init();
+                break;
+            case 'conciliacao':
+                // Inicializar gerenciador de conciliação bancária
+                if (!this.managers.conciliacaoBancariaManager) {
+                    this.managers.conciliacaoBancariaManager = new ConciliacaoBancariaManager('conciliacao-container');
+                }
+                await this.managers.conciliacaoBancariaManager.init();
+                break;
+        }
+    }
 
     /**
      * Inicializa seção de dashboard
