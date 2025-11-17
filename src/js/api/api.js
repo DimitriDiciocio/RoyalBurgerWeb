@@ -22,7 +22,7 @@ export const API_BASE_URL = (() => {
   if (typeof window !== "undefined" && window.API_BASE_URL) {
     return window.API_BASE_URL;
   }
-  return "http://127.0.0.1:5000";
+  return "http://10.92.3.120:5000";
 })();
 
 export function getStoredToken() {
