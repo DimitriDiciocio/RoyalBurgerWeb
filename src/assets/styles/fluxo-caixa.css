@@ -750,86 +750,216 @@
     gap: 1.5rem;
 }
 
+/* ALTERAÇÃO: Design melhorado dos cards de compra baseado nos padrões do painel-adm.css */
 .compra-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-    border-left: 4px solid var(--financial-primary);
+    background-color: var(--cor-div-primary);
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
 }
 
 .compra-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* ALTERAÇÃO: Borda colorida baseada no status de pagamento */
+.compra-card[data-payment-status="pending"],
+.compra-card[data-payment-status="Pending"] {
+    border-left: 4px solid var(--color-quaternary);
+}
+
+.compra-card[data-payment-status="paid"],
+.compra-card[data-payment-status="Paid"] {
+    border-left: 4px solid #4CAF50;
 }
 
 .compra-card-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
     border-bottom: 1px solid #e5e7eb;
 }
 
+.compra-card-header .compra-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
 .compra-card-header h4 {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1f2937;
-    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-texto-black);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.compra-card-header h4 i {
+    font-size: 0.9rem;
+    color: var(--color-primary);
 }
 
 .compra-supplier {
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.85rem;
+    color: var(--color-texto-erased);
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.compra-supplier i {
+    font-size: 0.75rem;
+}
+
+/* ALTERAÇÃO: Container de ações do header */
+.compra-card-header .compra-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* ALTERAÇÃO: Botão de editar no header (padronizado) */
+.compra-card-header .btn-editar-compra {
+    background: none;
+    border: none;
+    color: var(--color-texto-erased);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 6px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.compra-card-header .btn-editar-compra:hover {
+    color: var(--color-texto-black);
+    background-color: #f3f4f6;
+}
+
+.compra-card-header .btn-editar-compra:active {
+    color: var(--color-tertiary);
+    background-color: #e5e7eb;
+}
+
+.compra-card-header .btn-editar-compra i {
+    font-size: 0.9rem;
+}
+
+/* ALTERAÇÃO: Badge de status melhorado */
+.compra-card-header .financial-badge {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .compra-card-body {
-    margin-bottom: 1rem;
+    margin-bottom: 12px;
+    flex: 1;
 }
 
 .compra-info {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
 }
 
 .compra-info .info-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 8px 0;
 }
 
 .compra-info .info-item .label {
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.85rem;
+    color: var(--color-texto-erased);
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.compra-info .info-item .label i {
+    font-size: 0.75rem;
+    color: var(--color-texto-erased);
 }
 
 .compra-info .info-item .value {
-    font-size: 0.875rem;
-    color: #1f2937;
+    font-size: 0.9rem;
+    color: var(--color-texto-black);
     font-weight: 600;
+}
+
+/* ALTERAÇÃO: Valor total destacado */
+.compra-info .info-item.total .value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary);
 }
 
 .compra-card-footer {
     display: flex;
-    gap: 0.75rem;
+    gap: 8px;
     flex-wrap: wrap;
     justify-content: flex-start;
-    margin-top: 1rem;
-    padding-top: 1rem;
+    margin-top: auto;
+    padding-top: 12px;
     border-top: 1px solid #e5e7eb;
 }
 
-/* ALTERAÇÃO: Ajustar tamanho dos botões no footer */
+/* ALTERAÇÃO: Botões melhorados seguindo padrão do sistema */
 .compra-card-footer .financial-btn {
     flex: 0 1 auto;
-    min-width: 120px;
-    font-size: 0.875rem;
-    padding: 0.5rem 1rem;
+    min-width: auto;
+    font-size: 0.85rem;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.compra-card-footer .financial-btn i {
+    font-size: 0.8rem;
+}
+
+/* ALTERAÇÃO: Botão de pagamento com destaque */
+.compra-card-footer .financial-btn-pay {
+    background-color: #4CAF50;
+    color: var(--color-texto-white);
+    border: none;
+}
+
+.compra-card-footer .financial-btn-pay:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.compra-card-footer .financial-btn-pay:active {
+    transform: translateY(0);
 }
 
 /* ALTERAÇÃO: Botão de excluir com estilo de perigo */
@@ -843,6 +973,29 @@
     background-color: #dc2626;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.compra-card-footer .financial-btn-danger:active {
+    transform: translateY(0);
+}
+
+/* ALTERAÇÃO: Botão secundário */
+.compra-card-footer .financial-btn-secondary {
+    background-color: var(--color-background);
+    color: var(--color-texto-black);
+    border: 2px solid #e0e1e4;
+}
+
+.compra-card-footer .financial-btn-secondary:hover {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-texto-black);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.compra-card-footer .financial-btn-secondary:active {
+    transform: translateY(0);
 }
 
 /* === GESTÃO DE RECORRÊNCIAS === */
@@ -1059,6 +1212,40 @@
 
     .compras-list {
         grid-template-columns: 1fr;
+    }
+
+    /* ALTERAÇÃO: Estilos responsivos para cards de compra */
+    .compra-card {
+        padding: 16px;
+    }
+
+    .compra-card-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .compra-card-header .compra-header-info {
+        width: 100%;
+    }
+
+    .compra-card-header .compra-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .compra-card-header .financial-badge {
+        align-self: flex-start;
+    }
+
+    .compra-card-footer {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .compra-card-footer .financial-btn {
+        width: 100%;
+        justify-content: center;
     }
 
     .compras-header {

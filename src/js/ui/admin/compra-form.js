@@ -797,7 +797,7 @@ export class CompraForm {
                         <div class="compra-item-detalhes">
                             <div class="detalhe-item">
                                 <span class="detalhe-label">Quantidade:</span>
-                                <span class="detalhe-value">${item.quantity.toFixed(3)} ${this.normalizeUnit(item.ingredient_data?.stock_unit || 'un').toUpperCase()}</span>
+                                <span class="detalhe-value">${this.formatQuantity(item.quantity, item.ingredient_data?.stock_unit || 'un')}</span>
                             </div>
                             <div class="detalhe-item">
                                 <span class="detalhe-label">Valor:</span>
@@ -1174,6 +1174,90 @@ export class CompraForm {
         return u;
     }
 
+    /**
+     * ALTERAÇÃO: Formata quantidade com base na unidade de medida do ingrediente
+     * Converte automaticamente da unidade base (g/ml) para a unidade de exibição (kg/L) quando necessário
+     * @param {number} quantity - Quantidade armazenada (pode estar em unidade base ou exibição)
+     * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
+     * @returns {string} Quantidade formatada com unidade
+     */
+    formatQuantity(quantity, stockUnit) {
+        if (!quantity || quantity === 0) return '0';
+        
+        const normalizedUnit = this.normalizeUnit(stockUnit);
+        let displayQuantity = quantity;
+        let displayUnit = normalizedUnit;
+
+        // ALTERAÇÃO: Se a unidade é kg ou L, assumir que quantidade pode estar em unidade base
+        // Para exibição, sempre mostrar na unidade do ingrediente
+        if (normalizedUnit === 'kg') {
+            // Se quantidade >= 1000, provavelmente está em gramas, converter para kg
+            if (quantity >= 1000) {
+                displayQuantity = quantity / 1000;
+                displayUnit = 'kg';
+            } else {
+                displayQuantity = quantity;
+                displayUnit = 'kg';
+            }
+        } else if (normalizedUnit === 'l') {
+            // Se quantidade >= 1000, provavelmente está em ml, converter para L
+            if (quantity >= 1000) {
+                displayQuantity = quantity / 1000;
+                displayUnit = 'L';
+            } else {
+                displayQuantity = quantity;
+                displayUnit = 'L';
+            }
+        } else {
+            // Para g, ml, un - quantidade já está na unidade correta
+            displayQuantity = quantity;
+            displayUnit = normalizedUnit;
+        }
+
+        // ALTERAÇÃO: Formatar quantidade com decimais apropriados
+        let formattedQuantity;
+        if (displayUnit === 'kg' || displayUnit === 'L') {
+            formattedQuantity = displayQuantity % 1 === 0 
+                ? displayQuantity.toFixed(0) 
+                : parseFloat(displayQuantity.toFixed(3)).toString();
+        } else if (displayUnit === 'g' || displayUnit === 'ml') {
+            formattedQuantity = displayQuantity % 1 === 0 
+                ? displayQuantity.toFixed(0) 
+                : parseFloat(displayQuantity.toFixed(1)).toString();
+        } else {
+            formattedQuantity = displayQuantity % 1 === 0 
+                ? displayQuantity.toFixed(0) 
+                : parseFloat(displayQuantity.toFixed(3)).toString();
+        }
+
+        return `${formattedQuantity} ${displayUnit.toUpperCase()}`;
+    }
+
+    /**
+     * ALTERAÇÃO: Converte quantidade da unidade de exibição para unidade base
+     * Usado ao salvar itens (o usuário digita na unidade de exibição, mas o backend espera unidade base)
+     * @param {number} quantity - Quantidade digitada pelo usuário (na unidade de exibição: kg, L, etc)
+     * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
+     * @returns {number} Quantidade na unidade base (g para peso, ml para volume, un para unidades)
+     */
+    convertQuantityToBase(quantity, stockUnit) {
+        if (!quantity || quantity === 0) return 0;
+        
+        const normalizedUnit = this.normalizeUnit(stockUnit);
+        
+        // ALTERAÇÃO: Converter da unidade de exibição para unidade base
+        if (normalizedUnit === 'kg') {
+            // Usuário digitou em kg, converter para gramas (unidade base)
+            return quantity * 1000;
+        } else if (normalizedUnit === 'l') {
+            // Usuário digitou em L, converter para ml (unidade base)
+            return quantity * 1000;
+        }
+        
+        // Para g, ml, un - quantidade já está na unidade base
+        return quantity;
+    }
+
 
     /**
      * Atualiza total geral da compra
@@ -1254,15 +1338,19 @@ export class CompraForm {
         const validItems = [];
         
         this.items.forEach(item => {
-            const quantity = item.quantity || 0;
+            const displayQuantity = item.quantity || 0;
             const totalPrice = item.total_price || 0;
-            const unitPrice = item.unit_price || 0; // Já calculado na validação
+            const stockUnit = item.ingredient_data?.stock_unit || 'un';
+            
+            // ALTERAÇÃO: Converter quantidade da unidade de exibição para unidade base antes de salvar
+            const baseQuantity = this.convertQuantityToBase(displayQuantity, stockUnit);
+            const unitPrice = totalPrice / baseQuantity; // Preço unitário calculado com base na quantidade convertida
             
             totalAmount += totalPrice;
             
             validItems.push({
                 ingredient_id: item.ingredient_id,
-                quantity: quantity,
+                quantity: baseQuantity, // ALTERAÇÃO: Salvar na unidade base
                 unit_price: unitPrice // Preço unitário para o backend
             });
         });
