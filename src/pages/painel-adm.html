@@ -89,20 +89,16 @@
         </nav>
 
         <section id="secao-dashboard" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Dashboard</p>
-                    <p class="descricao-secao">Visão geral das operações em tempo real</p>
-                </div>
+            <div class="informa">
+                <p class="titulo">Dashboard</p>
+                <p class="descricao">Visão geral das operações em tempo real</p>
             </div>
         </section>
 
         <section id="secao-pedidos" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Pedidos</p>
-                    <p class="descricao-secao">Gerencie todos os pedidos em tempo real</p>
-                </div>
+            <div class="informa">
+                <p class="titulo">Pedidos</p>
+                <p class="descricao">Gerencie todos os pedidos em tempo real</p>
             </div>
 
             <!-- Cards de Métricas -->
@@ -110,7 +106,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Pedidos ativos</p>
-                        <i class="fa-solid fa-basket-shopping"></i>
+                        <i class="fa-solid fa-basket-shopping" style="color: #3b82f6;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-active-orders">00</p>
@@ -124,7 +120,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Prontos/Entrega</p>
-                        <i class="fa-solid fa-dollar-sign"></i>
+                        <i class="fa-solid fa-check-circle" style="color: #10b981;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-prontos-entrega">00</p>
@@ -138,7 +134,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Concluídos</p>
-                        <i class="fa-solid fa-dollar-sign"></i>
+                        <i class="fa-solid fa-circle-check" style="color: #059669;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-concluidos">00</p>
@@ -149,7 +145,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Tempo Médio de Ciclo</p>
-                        <i class="fa-solid fa-clock"></i>
+                        <i class="fa-solid fa-clock" style="color: #f59e0b;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-tempo-medio">0 min</p>
@@ -208,21 +204,18 @@
         </section>
 
         <section id="secao-venda" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Ponto de Venda</p>
-                    <p class="descricao-secao">Sistema de vendas e caixa</p>
-                </div>
+            <div class="informa">
+                <p class="titulo">Ponto de Venda</p>
+                <p class="descricao">Sistema de vendas e caixa</p>
             </div>
         </section>
 
         <section id="secao-cardapio" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Gerenciamento do Cardápio</p>
-                    <p class="descricao-secao">Configure itens, preços e disponibilidade</p>
+            <div class="informa">
+                <div>
+                    <p class="titulo">Gerenciamento do Cardápio</p>
+                    <p class="descricao">Configure itens, preços e disponibilidade</p>
                 </div>
-
                 <button class="adicionar">
                     <i class="fa-solid fa-plus"></i>
                     <p>Novo Item</p>
@@ -233,7 +226,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Total de Itens</p>
-                        <i class="fa-solid fa-basket-shopping"></i>
+                        <i class="fa-solid fa-basket-shopping" style="color: #3b82f6;"></i>
                     </div>
 
                     <div class="valor">
@@ -245,7 +238,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Preço Médio</p>
-                        <i class="fa-solid fa-dollar-sign"></i>
+                        <i class="fa-solid fa-dollar-sign" style="color: #10b981;"></i>
                     </div>
 
                     <div class="valor">
@@ -257,7 +250,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Margem Média</p>
-                        <i class="fa-solid fa-dollar-sign"></i>
+                        <i class="fa-solid fa-chart-line" style="color: #059669;"></i>
                     </div>
 
                     <div class="valor">
@@ -269,7 +262,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Tempo Médio de Preparo</p>
-                        <i class="fa-solid fa-clock"></i>
+                        <i class="fa-solid fa-clock" style="color: #f59e0b;"></i>
                     </div>
 
                     <div class="valor">
@@ -303,21 +296,16 @@
             </div>
 
             <div class="produtos">
-
-                <button class="adicionar">
-                    <i class="fa-solid fa-plus"></i>
-                    <p>Novo Item</p>
-                </button>
+                <!-- Produtos serão carregados dinamicamente -->
             </div>
         </section>
 
         <section id="secao-promocoes" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Gerenciamento de Promoções</p>
-                    <p class="descricao-secao">Crie e gerencie promoções especiais para seus produtos</p>
+            <div class="informa">
+                <div>
+                    <p class="titulo">Gerenciamento de Promoções</p>
+                    <p class="descricao">Crie e gerencie promoções especiais para seus produtos</p>
                 </div>
-
                 <button class="adicionar" id="btn-nova-promocao">
                     <i class="fa-solid fa-plus"></i>
                     <p>Nova Promoção</p>
@@ -329,7 +317,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Promoções Ativas</p>
-                        <i class="fa-solid fa-tags"></i>
+                        <i class="fa-solid fa-tags" style="color: #10b981;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-promocoes-ativas">0</p>
@@ -340,7 +328,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Promoções Expiradas</p>
-                        <i class="fa-solid fa-clock"></i>
+                        <i class="fa-solid fa-clock" style="color: #6b7280;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-promocoes-expiradas">0</p>
@@ -351,7 +339,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Total de Promoções</p>
-                        <i class="fa-solid fa-chart-line"></i>
+                        <i class="fa-solid fa-chart-line" style="color: #3b82f6;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-total-promocoes">0</p>
@@ -362,7 +350,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Desconto Médio</p>
-                        <i class="fa-solid fa-percent" aria-label="Desconto médio" aria-hidden="true"></i>
+                        <i class="fa-solid fa-percent" style="color: #f59e0b;" aria-label="Desconto médio" aria-hidden="true"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="metric-desconto-medio">0%</p>
@@ -395,12 +383,11 @@
         </section>
 
         <section id="secao-estoque" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Gerenciamento de estoque</p>
-                    <p class="descricao-secao">Gerencie ingredientes e insumos</p>
+            <div class="informa">
+                <div>
+                    <p class="titulo">Gerenciamento de estoque</p>
+                    <p class="descricao">Gerencie ingredientes e insumos</p>
                 </div>
-
                 <button class="adicionar">
                     <i class="fa-solid fa-plus"></i>
                     <p>Novo Ingrediente</p>
@@ -412,7 +399,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Valor Total em Estoque</p>
-                        <i class="fa-solid fa-dollar-sign"></i>
+                        <i class="fa-solid fa-dollar-sign" style="color: #10b981;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="valor-total-estoque">R$0</p>
@@ -423,7 +410,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Sem Estoque</p>
-                        <i class="fa-solid fa-ban"></i>
+                        <i class="fa-solid fa-ban" style="color: #ef4444;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="sem-estoque-count">0</p>
@@ -434,7 +421,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Estoque Baixo</p>
-                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="estoque-baixo-count">0</p>
@@ -445,7 +432,7 @@
                 <div class="quadro">
                     <div class="titulo">
                         <p>Em Estoque</p>
-                        <i class="fa-solid fa-check"></i>
+                        <i class="fa-solid fa-check" style="color: #10b981;"></i>
                     </div>
                     <div class="valor">
                         <p class="grande" id="em-estoque-count">0</p>
@@ -536,37 +523,38 @@
             </div>
 
             <!-- Cards de Ingredientes -->
-            <button class="adicionar-2">
-                <i class="fa-solid fa-plus"></i>
-                <p>Novo Ingrediente</p>
-            </button>
-
             <div class="ingredientes">
                 <!-- Os cards serão gerados dinamicamente pelo JavaScript -->
             </div>
         </section>
 
         <section id="secao-relatorios" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Relatórios e Analytics</p>
-                    <p class="descricao-secao">Análise detalhada de vendas, finanças, performance e funcionários</p>
-                </div>
+            <div class="informa">
+                <p class="titulo">Relatórios e Analytics</p>
+                <p class="descricao">Análise detalhada de vendas, finanças, performance e funcionários</p>
             </div>
         </section>
 
         <section id="secao-financeiro" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Fluxo de Caixa</p>
-                    <p class="descricao-secao">Gestão completa das movimentações financeiras</p>
+            <div class="informa">
+                <div>
+                    <p class="titulo">Fluxo de Caixa</p>
+                    <p class="descricao">Gestão completa das movimentações financeiras</p>
                 </div>
-                <div class="acoes">
-                    <button class="btn-primary" id="btn-nova-movimentacao">
-                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                        <span>Nova Movimentação</span>
-                    </button>
-                </div>
+                <button class="adicionar" id="btn-nova-movimentacao">
+                    <i class="fa-solid fa-plus"></i>
+                    <p>Nova Movimentação</p>
+                </button>
+            </div>
+
+            <!-- // ALTERAÇÃO: Cards de dashboard financeiro (exibidos antes das tabs) -->
+            <div class="relata" id="financeiro-dashboard-cards" style="display: none;">
+                <!-- Cards serão renderizados dinamicamente pelo JavaScript -->
+            </div>
+
+            <!-- // ALTERAÇÃO: Cards de dashboard de conciliação (exibidos antes das tabs quando tab Conciliação estiver ativa) -->
+            <div class="relata" id="conciliacao-dashboard-cards" style="display: none;">
+                <!-- Cards serão renderizados dinamicamente pelo JavaScript -->
             </div>
 
             <!-- // ALTERAÇÃO: Tabs principais do módulo financeiro -->
@@ -626,12 +614,11 @@
         </section>
 
         <section id="secao-funcionarios" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Gerenciamento de usuários</p>
-                    <p class="descricao-secao">Gerencie seus usuários em atividade e adicione contas corporativas</p>
+            <div class="informa">
+                <div>
+                    <p class="titulo">Gerenciamento de usuários</p>
+                    <p class="descricao">Gerencie seus usuários em atividade e adicione contas corporativas</p>
                 </div>
-
                 <button class="adicionar">
                     <i class="fa-solid fa-plus"></i>
                     <p>Novo usuário</p>
@@ -675,12 +662,10 @@
         </section>
 
         <section id="secao-configuracoes" style="display: none;">
-            <div class="header">
-                <div class="texto">
-                    <p class="titulo-secao">Configurações</p>
-                    <p class="descricao-secao">Defina metas financeiras, categorias, prazos, taxas e informações da
+            <div class="informa">
+                <p class="titulo">Configurações</p>
+                <p class="descricao">Defina metas financeiras, categorias, prazos, taxas e informações da
                         empresa</p>
-                </div>
             </div>
 
             <div class="secao">
@@ -819,6 +804,46 @@
                         <p class="config">Taxa de expiração de pontos do clube</p>
                         <p class="descricao">Período em dias após o qual os pontos acumulados expiram se o cliente não
                             realizar nenhuma compra.</p>
+                    </div>
+                    <div class="valor"></div>
+                </div>
+
+                <div class="info">
+                    <div class="info-content">
+                        <p class="config">Taxa de Cartão de Crédito (%)</p>
+                        <p class="descricao">Percentual cobrado pela operadora de cartão de crédito sobre o valor da venda. Este valor será automaticamente deduzido como despesa quando um pedido for pago com cartão de crédito.</p>
+                    </div>
+                    <div class="valor"></div>
+                </div>
+
+                <div class="info">
+                    <div class="info-content">
+                        <p class="config">Taxa de Cartão de Débito (%)</p>
+                        <p class="descricao">Percentual cobrado pela operadora de cartão de débito sobre o valor da venda. Este valor será automaticamente deduzido como despesa quando um pedido for pago com cartão de débito.</p>
+                    </div>
+                    <div class="valor"></div>
+                </div>
+
+                <div class="info">
+                    <div class="info-content">
+                        <p class="config">Taxa de PIX (%)</p>
+                        <p class="descricao">Percentual cobrado sobre o valor da venda quando o pagamento é feito via PIX. Geralmente é 0% pois o PIX não possui taxa de transação.</p>
+                    </div>
+                    <div class="valor"></div>
+                </div>
+
+                <div class="info">
+                    <div class="info-content">
+                        <p class="config">Taxa do iFood (%)</p>
+                        <p class="descricao">Percentual cobrado pela plataforma iFood sobre o valor total do pedido. Este valor será automaticamente deduzido como despesa quando um pedido vier do iFood.</p>
+                    </div>
+                    <div class="valor"></div>
+                </div>
+
+                <div class="info">
+                    <div class="info-content">
+                        <p class="config">Taxa do Uber Eats (%)</p>
+                        <p class="descricao">Percentual cobrado pela plataforma Uber Eats sobre o valor total do pedido. Este valor será automaticamente deduzido como despesa quando um pedido vier do Uber Eats.</p>
                     </div>
                     <div class="valor"></div>
                 </div>

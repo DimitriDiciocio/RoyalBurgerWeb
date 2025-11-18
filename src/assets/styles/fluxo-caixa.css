@@ -4,37 +4,39 @@
  */
 
 /* === VARIÁVEIS CSS === */
+/* ALTERAÇÃO: Usando cores padronizadas do sistema ao invés de cores azuis */
 :root {
-    --financial-primary: #2563eb;
-    --financial-success: #10b981;
-    --financial-danger: #ef4444;
-    --financial-warning: #f59e0b;
-    --financial-info: #3b82f6;
+    /* Usar cores padronizadas do sistema */
+    --financial-primary: var(--color-primary); /* Amarelo (#FFC700) */
+    --financial-success: #10b981; /* Verde mantido para sucesso */
+    --financial-danger: var(--color-secondary); /* Vermelho (#FF0000) */
+    --financial-warning: var(--color-quaternary); /* Laranja (#F95A00) */
+    --financial-info: var(--color-tertiary); /* Marrom escuro (#3D1807) */
     
     /* Receitas - Verde */
     --revenue-color: #10b981;
     --revenue-light: #d1fae5;
     --revenue-dark: #065f46;
     
-    /* Despesas - Vermelho */
-    --expense-color: #ef4444;
+    /* Despesas - Vermelho padronizado */
+    --expense-color: var(--color-secondary); /* Vermelho (#FF0000) */
     --expense-light: #fee2e2;
     --expense-dark: #991b1b;
     
-    /* CMV - Amarelo/Laranja */
-    --cmv-color: #f59e0b;
+    /* CMV - Laranja padronizado */
+    --cmv-color: var(--color-quaternary); /* Laranja (#F95A00) */
     --cmv-light: #fef3c7;
     --cmv-dark: #92400e;
     
-    /* Impostos - Roxo */
-    --tax-color: #8b5cf6;
-    --tax-light: #ede9fe;
-    --tax-dark: #5b21b6;
+    /* Impostos - Marrom padronizado */
+    --tax-color: var(--color-tertiary); /* Marrom escuro (#3D1807) */
+    --tax-light: #f3f4f6;
+    --tax-dark: var(--color-tertiary);
     
     /* Status */
-    --pending-color: #f59e0b;
-    --paid-color: #10b981;
-    --reconciled-color: #3b82f6;
+    --pending-color: var(--color-quaternary); /* Laranja (#F95A00) */
+    --paid-color: #10b981; /* Verde mantido para pago */
+    --reconciled-color: var(--color-primary); /* Amarelo (#FFC700) */
 }
 
 /* === CONTAINER PRINCIPAL === */
@@ -98,9 +100,10 @@
     background: #f9fafb;
 }
 
+/* ALTERAÇÃO: Tab ativa usa amarelo para detalhes */
 .financeiro-tab.active {
-    color: var(--financial-primary);
-    border-bottom-color: var(--financial-primary);
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
 }
 
 .financeiro-tab i {
@@ -407,8 +410,9 @@
     transition: color 0.2s;
 }
 
+/* ALTERAÇÃO: Hover com cor padronizada */
 .financial-movement-card-footer .related-link:hover {
-    color: #1d4ed8;
+    color: var(--color-tertiary);
     text-decoration: underline;
 }
 
@@ -454,9 +458,10 @@
     color: #065f46;
 }
 
+/* ALTERAÇÃO: Badge reconciliado com cores padronizadas */
 .financial-badge.reconciled {
-    background: #dbeafe;
-    color: #1e40af;
+    background: rgba(255, 199, 0, 0.2); /* Amarelo claro */
+    color: var(--color-tertiary);
 }
 
 /* === BOTÕES DE AÇÃO === */
@@ -478,13 +483,15 @@
     gap: 0.5rem;
 }
 
+/* ALTERAÇÃO: Botão primário usa cor preta */
 .financial-btn-primary {
-    background: var(--financial-primary);
-    color: white;
+    background: var(--color-texto-black);
+    color: var(--color-texto-white);
 }
 
 .financial-btn-primary:hover {
-    background: #1d4ed8;
+    background: var(--cor-div-secondary);
+    opacity: 0.9;
 }
 
 .financial-btn-success {
@@ -497,9 +504,15 @@
     color: white;
 }
 
+/* ALTERAÇÃO: Botão secundário usa cor laranja */
 .financial-btn-secondary {
-    background: #6b7280;
-    color: white;
+    background: var(--color-quaternary);
+    color: var(--color-texto-white);
+}
+
+.financial-btn-secondary:hover {
+    background: var(--color-quaternary);
+    opacity: 0.9;
 }
 
 .financial-btn-icon {
@@ -512,8 +525,9 @@
     font-size: 0.875rem;
 }
 
+/* ALTERAÇÃO: Hover do botão icon usa amarelo */
 .financial-btn-icon:hover {
-    color: var(--financial-primary);
+    color: var(--color-primary);
 }
 
 .financial-btn-icon.danger:hover {
@@ -670,10 +684,11 @@
     gap: 0.5rem;
 }
 
+/* ALTERAÇÃO: Hover do botão de paginação usa amarelo */
 .pagination-btn:hover:not(:disabled) {
     background: #f9fafb;
-    border-color: var(--financial-primary);
-    color: var(--financial-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
 }
 
 .pagination-btn:active:not(:disabled) {
@@ -685,14 +700,16 @@
     cursor: not-allowed;
 }
 
+/* ALTERAÇÃO: Botão de paginação ativo usa cor preta */
 .pagination-btn.active {
-    background: var(--financial-primary);
-    color: white;
-    border-color: var(--financial-primary);
+    background: var(--color-texto-black);
+    color: var(--color-texto-white);
+    border-color: var(--color-texto-black);
 }
 
 .pagination-btn.active:hover {
-    background: #1d4ed8;
+    background: var(--cor-div-secondary);
+    opacity: 0.9;
 }
 
 .pagination-ellipsis {
@@ -1109,9 +1126,10 @@
 }
 
 /* === MELHORIAS DE ACESSIBILIDADE === */
+/* ALTERAÇÃO: Focus usa amarelo */
 .financial-btn:focus-visible,
 .financeiro-tab:focus-visible {
-    outline: 2px solid var(--financial-primary);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
 

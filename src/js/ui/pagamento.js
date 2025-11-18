@@ -57,6 +57,7 @@ const VALIDATION_LIMITS = {
     enderecos: [],
     enderecoSelecionado: null,
     formaPagamento: "pix",
+    tipoCartao: null, // ALTERAÇÃO: Armazena tipo de cartão selecionado ('credito' ou 'debito')
     cpf: "",
     usarPontos: false,
     pontosDisponiveis: 0,
@@ -109,11 +110,15 @@ const VALIDATION_LIMITS = {
 
       // Modais
       modalTroco: document.querySelector("#modal-troco"),
+      modalTipoCartao: document.querySelector("#modal-tipo-cartao"), // ALTERAÇÃO: Modal para tipo de cartão
       modalRevisao: document.querySelector("#modal-revisao"),
       valorTroco: document.querySelector("#valor"),
       btnConfirmarTroco: document.querySelector("#btn-confirmar-troco"),
+      btnCartaoCredito: document.querySelector("#btn-cartao-credito"),
+      btnCartaoDebito: document.querySelector("#btn-cartao-debito"),
       btnConfirmarPedido: document.querySelector("#btn-confirmar-pedido"),
       trocoInfo: document.querySelector("#troco-info"),
+      cartaoTipoInfo: document.querySelector("#cartao-tipo-info"), // ALTERAÇÃO: Elemento para exibir tipo de cartão
 
       // CPF
       cpfInput: document.querySelector('input[name="cpf"]'),
@@ -1868,18 +1873,26 @@ const VALIDATION_LIMITS = {
           // Adicionar seleção atual
           forma.classList.add("selecionado");
 
-          // Atualizar forma de pagamento
+          // ALTERAÇÃO: Cartão abre modal para escolher tipo, mantém um só quadro
           const texto = forma.querySelector("p").textContent.toLowerCase();
           if (texto.includes("pix")) {
             state.formaPagamento = "pix";
+            state.tipoCartao = null; // Limpar tipo de cartão se mudar de pagamento
             state.valorTroco = null; // Limpar troco se mudar de dinheiro
             atualizarExibicaoTroco(); // Atualizar exibição
-          } else if (texto.includes("cartão")) {
+            atualizarExibicaoTipoCartao(); // Atualizar exibição do tipo de cartão
+          } else if (texto.includes("cartão") || texto.includes("cartao")) {
+            // ALTERAÇÃO: Definir forma de pagamento como cartão antes de abrir modal
             state.formaPagamento = "cartao";
             state.valorTroco = null; // Limpar troco se mudar de dinheiro
             atualizarExibicaoTroco(); // Atualizar exibição
+            atualizarExibicaoTipoCartao(); // Atualizar exibição do tipo de cartão
+            // Abrir modal para escolher tipo de cartão
+            abrirModalTipoCartao();
           } else if (texto.includes("dinheiro")) {
             state.formaPagamento = "dinheiro";
+            state.tipoCartao = null; // Limpar tipo de cartão se mudar de pagamento
+            atualizarExibicaoTipoCartao(); // Atualizar exibição do tipo de cartão
             // Só abrir modal de troco se o total for maior que 0
             // Se total = 0 e há desconto por pontos, não precisa de troco
             if (state.total > 0) {
@@ -1891,6 +1904,19 @@ const VALIDATION_LIMITS = {
             }
           }
         });
+      });
+    }
+
+    // ALTERAÇÃO: Event listeners para botões de tipo de cartão
+    if (el.btnCartaoCredito) {
+      el.btnCartaoCredito.addEventListener("click", () => {
+        selecionarTipoCartao("credito");
+      });
+    }
+
+    if (el.btnCartaoDebito) {
+      el.btnCartaoDebito.addEventListener("click", () => {
+        selecionarTipoCartao("debito");
       });
     }
 
@@ -1945,7 +1971,8 @@ const VALIDATION_LIMITS = {
     const btnFazerPedido = document.querySelector(".pagamento button");
     if (btnFazerPedido) {
       btnFazerPedido.addEventListener("click", () => {
-        abrirModalRevisao();
+        // ALTERAÇÃO: Validar dados necessários antes de abrir modal de revisão
+        validarDadosPagamentoAntesDeRevisar();
       });
     }
 
@@ -2502,10 +2529,105 @@ const VALIDATION_LIMITS = {
     }
   }
 
+  // ALTERAÇÃO: Funções para modal de tipo de cartão
+  function abrirModalTipoCartao() {
+    if (typeof window.abrirModal === "function") {
+      window.abrirModal("modal-tipo-cartao");
+    } else {
+      const modal = document.getElementById("modal-tipo-cartao");
+      if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("show");
+      }
+    }
+  }
+
+  function fecharModalTipoCartao() {
+    if (typeof window.fecharModal === "function") {
+      window.fecharModal("modal-tipo-cartao");
+    } else {
+      const modal = document.getElementById("modal-tipo-cartao");
+      if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("show");
+      }
+    }
+  }
+
+  function selecionarTipoCartao(tipo) {
+    // tipo: 'credito' ou 'debito'
+    state.formaPagamento = "cartao";
+    state.tipoCartao = tipo;
+    fecharModalTipoCartao();
+    atualizarExibicaoTipoCartao();
+    // ALTERAÇÃO: Abrir modal de revisão automaticamente após selecionar tipo de cartão
+    // Pequeno delay para garantir que a modal de tipo de cartão foi fechada
+    setTimeout(() => {
+      abrirModalRevisao();
+    }, 300);
+  }
+
+  function atualizarExibicaoTipoCartao() {
+    if (!el.cartaoTipoInfo) return;
+
+    if (state.formaPagamento === "cartao" && state.tipoCartao) {
+      // Exibir tipo de cartão abaixo do título
+      const tipoText = state.tipoCartao === "credito" ? "Crédito" : "Débito";
+      el.cartaoTipoInfo.textContent = tipoText;
+      el.cartaoTipoInfo.style.display = "block";
+    } else {
+      // Esconder se não for cartão ou se não tiver tipo selecionado
+      el.cartaoTipoInfo.style.display = "none";
+      el.cartaoTipoInfo.textContent = "";
+    }
+  }
+
+  // ALTERAÇÃO: Função para validar dados de pagamento antes de abrir modal de revisão
+  function validarDadosPagamentoAntesDeRevisar() {
+    // Verificar se o pedido está completamente pago com pontos
+    const isFullyPaidWithPoints =
+      state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+
+    // Se não há valor a pagar (pago com pontos), pular validações de pagamento
+    if (isFullyPaidWithPoints) {
+      abrirModalRevisao();
+      return;
+    }
+
+    // Validar forma de pagamento
+    if (!state.formaPagamento) {
+      showError("Selecione uma forma de pagamento.");
+      return;
+    }
+
+    // ALTERAÇÃO: Validar dados necessários para métodos de pagamento específicos
+    // Se selecionou cartão mas não escolheu tipo (crédito/débito), abrir modal
+    if (state.formaPagamento === "cartao" && !state.tipoCartao) {
+      abrirModalTipoCartao();
+      return;
+    }
+
+    // Se selecionou dinheiro mas não informou valor do troco (e há valor a pagar), abrir modal
+    if (state.formaPagamento === "dinheiro") {
+      // Verificar se há valor a pagar e se não foi informado o valor do troco
+      const valorTotal = state.total;
+      const temValorAPagar = Number.isFinite(valorTotal) && valorTotal > 0;
+      
+      if (temValorAPagar && (!state.valorTroco || !Number.isFinite(state.valorTroco) || state.valorTroco <= 0)) {
+        abrirModalTroco();
+        return;
+      }
+    }
+
+    // Se todas as validações passaram, abrir modal de revisão
+    abrirModalRevisao();
+  }
+
   function abrirModalRevisao() {
     // Atualizar exibição antes de abrir a modal
     atualizarExibicaoPagamento();
     atualizarExibicaoTroco();
+    atualizarExibicaoTipoCartao(); // ALTERAÇÃO: Atualizar exibição do tipo de cartão
 
     if (typeof window.abrirModal === "function") {
       window.abrirModal("modal-revisao");
@@ -2574,6 +2696,12 @@ const VALIDATION_LIMITS = {
 
     // Atualizar exibição do pagamento
     atualizarExibicaoPagamento();
+
+    // ALTERAÇÃO: Abrir modal de revisão automaticamente após confirmar troco
+    // Pequeno delay para garantir que a modal de troco foi fechada
+    setTimeout(() => {
+      abrirModalRevisao();
+    }, 300);
   }
 
   function atualizarExibicaoTroco() {
@@ -2838,7 +2966,9 @@ const VALIDATION_LIMITS = {
       const isFullyPaidWithPoints =
         state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
 
-      // Validar forma de pagamento apenas se houver valor a pagar
+      // ALTERAÇÃO: Validação de pagamento movida para antes de abrir modal de revisão
+      // A validação agora acontece ao clicar em "Fazer pedido" na página principal
+      // Esta validação aqui é apenas um fallback de segurança
       if (!isFullyPaidWithPoints && !state.formaPagamento) {
         showError("Selecione uma forma de pagamento.");
         return;
@@ -2884,17 +3014,30 @@ const VALIDATION_LIMITS = {
         }
       }
 
-      // Mapear método de pagamento para valores esperados pelo backend
+      // ALTERAÇÃO: Mapear método de pagamento diferenciando crédito e débito
       // Se o pedido está completamente pago com pontos, usar um método especial ou null
       let backendPaymentMethod = null;
       if (!isFullyPaidWithPoints) {
-        const paymentMethodMap = {
-          pix: "pix",
-          cartao: "credit_card", // Cartão mapeado para credit_card
-          dinheiro: "money",
-        };
-        backendPaymentMethod =
-          paymentMethodMap[state.formaPagamento] || state.formaPagamento;
+        if (state.formaPagamento === "cartao") {
+          // Usar o tipo de cartão selecionado na modal
+          if (state.tipoCartao === "credito") {
+            backendPaymentMethod = "credit";
+          } else if (state.tipoCartao === "debito") {
+            backendPaymentMethod = "debit";
+          } else {
+            // Se cartão selecionado mas sem tipo, usar crédito como padrão ou pedir seleção
+            showError("Por favor, selecione o tipo de cartão (crédito ou débito).");
+            reabilitarBotaoConfirmar();
+            return;
+          }
+        } else {
+          const paymentMethodMap = {
+            pix: "pix",
+            dinheiro: "money",
+          };
+          backendPaymentMethod =
+            paymentMethodMap[state.formaPagamento] || state.formaPagamento;
+        }
 
         // Validar que o método de pagamento foi mapeado corretamente
         if (!backendPaymentMethod || backendPaymentMethod.trim() === "") {
@@ -3295,15 +3438,42 @@ const VALIDATION_LIMITS = {
       if (text) text.style.display = "none";
     });
 
+    // ALTERAÇÃO: Lógica atualizada para usar state.formaPagamento === "cartao" e state.tipoCartao
     // Mostrar apenas o selecionado
     if (state.formaPagamento === "pix") {
       if (pixIcon) pixIcon.style.display = "flex";
       if (pagamentoTexts[0]) pagamentoTexts[0].style.display = "block"; // "Pagamento na entrega"
-      if (pagamentoTexts[1]) pagamentoTexts[1].style.display = "block"; // "PIX"
+      // Esconder outros textos de pagamento
+      const modalPixText = document.getElementById("modal-pagamento-pix");
+      const modalCreditoText = document.getElementById("modal-pagamento-credito");
+      const modalDebitoText = document.getElementById("modal-pagamento-debito");
+      const modalDinheiroText = document.getElementById("modal-pagamento-dinheiro");
+      if (modalPixText) modalPixText.style.display = "block";
+      if (modalCreditoText) modalCreditoText.style.display = "none";
+      if (modalDebitoText) modalDebitoText.style.display = "none";
+      if (modalDinheiroText) modalDinheiroText.style.display = "none";
     } else if (state.formaPagamento === "cartao") {
+      // Mostrar ícone de cartão
       if (cartaoIcon) cartaoIcon.style.display = "flex";
       if (pagamentoTexts[0]) pagamentoTexts[0].style.display = "block"; // "Pagamento na entrega"
-      if (pagamentoTexts[2]) pagamentoTexts[2].style.display = "block"; // "Cartão"
+      
+      // Esconder outros textos
+      const modalPixText = document.getElementById("modal-pagamento-pix");
+      const modalCreditoText = document.getElementById("modal-pagamento-credito");
+      const modalDebitoText = document.getElementById("modal-pagamento-debito");
+      const modalDinheiroText = document.getElementById("modal-pagamento-dinheiro");
+      
+      if (modalPixText) modalPixText.style.display = "none";
+      if (modalDinheiroText) modalDinheiroText.style.display = "none";
+      
+      // Mostrar texto baseado no tipo de cartão selecionado
+      if (state.tipoCartao === "credito") {
+        if (modalCreditoText) modalCreditoText.style.display = "block";
+        if (modalDebitoText) modalDebitoText.style.display = "none";
+      } else if (state.tipoCartao === "debito") {
+        if (modalCreditoText) modalCreditoText.style.display = "none";
+        if (modalDebitoText) modalDebitoText.style.display = "block";
+      }
     } else if (state.formaPagamento === "dinheiro") {
       // Verificar se o pedido está completamente pago com pontos
       const isFullyPaidWithPoints =
@@ -3316,28 +3486,41 @@ const VALIDATION_LIMITS = {
 
       if (dinheiroIcon) dinheiroIcon.style.display = "flex";
       if (pagamentoTexts[0]) pagamentoTexts[0].style.display = "block"; // "Pagamento na entrega"
+      
+      // Esconder outros textos de pagamento
+      const modalPixText = document.getElementById("modal-pagamento-pix");
+      const modalCreditoText = document.getElementById("modal-pagamento-credito");
+      const modalDebitoText = document.getElementById("modal-pagamento-debito");
+      const modalDinheiroText = document.getElementById("modal-pagamento-dinheiro");
+      
+      if (modalPixText) modalPixText.style.display = "none";
+      if (modalCreditoText) modalCreditoText.style.display = "none";
+      if (modalDebitoText) modalDebitoText.style.display = "none";
 
       // Se está pago com pontos, mostrar apenas "Pago com pontos" ou "Dinheiro" sem troco
       if (isFullyPaidWithPoints) {
-        if (pagamentoTexts[3]) {
-          pagamentoTexts[3].textContent = "Dinheiro - Pago com pontos";
-          pagamentoTexts[3].style.display = "block";
+        if (modalDinheiroText) {
+          modalDinheiroText.textContent = "Dinheiro - Pago com pontos";
+          modalDinheiroText.style.display = "block";
         }
       } else if (state.valorTroco) {
         // Atualizar texto do dinheiro com troco se necessário
-        if (pagamentoTexts[3]) {
+        if (modalDinheiroText) {
           const troco = state.valorTroco - state.total;
           if (troco > 0) {
-            pagamentoTexts[3].textContent = `Dinheiro - Troco: R$ ${troco
+            modalDinheiroText.textContent = `Dinheiro - Troco: R$ ${troco
               .toFixed(2)
               .replace(".", ",")}`;
           } else {
-            pagamentoTexts[3].textContent = "Dinheiro - Valor exato";
+            modalDinheiroText.textContent = "Dinheiro - Valor exato";
           }
-          pagamentoTexts[3].style.display = "block";
+          modalDinheiroText.style.display = "block";
         }
       } else {
-        if (pagamentoTexts[3]) pagamentoTexts[3].style.display = "block"; // "Dinheiro"
+        if (modalDinheiroText) {
+          modalDinheiroText.textContent = "Dinheiro";
+          modalDinheiroText.style.display = "block";
+        }
       }
     }
   }

@@ -454,9 +454,16 @@ function calcularTotais() {
   });
 }
 
-// Calcular pontos Royal (10 pontos a cada R$ 1,00 gasto)
+// ALTERAÇÃO: Calcular pontos Royal apenas sobre o subtotal (produtos), sem taxa de entrega
+// IMPORTANTE: Pontos são calculados sobre SUBTOTAL (produtos), NÃO sobre total (com entrega)
+// Conforme padrão de programas de fidelidade: pontos não incluem taxas de entrega
 function calcularPontos() {
-  return Math.floor(state.total * 10);
+  // O subtotal já tem descontos de promoções aplicados
+  // Calcular base para pontos: subtotal (produtos apenas, sem taxa de entrega)
+  let basePontos = state.subtotal;
+  
+  // Fallback: 10 pontos por real (R$ 0,10 = 1 ponto)
+  return Math.floor(basePontos * 10);
 }
 
 // Renderizar item individual

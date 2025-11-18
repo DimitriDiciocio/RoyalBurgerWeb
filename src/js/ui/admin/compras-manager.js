@@ -9,6 +9,7 @@ import { escapeHTML } from '../../utils/html-sanitizer.js';
 import { abrirModal, fecharModal } from '../modais.js';
 import { debounce } from '../../utils/performance-utils.js';
 import { formatDateForAPI } from '../../utils/date-formatter.js';
+import { CompraForm } from './compra-form.js';
 
 export class ComprasManager {
     constructor(containerId) {
@@ -22,6 +23,7 @@ export class ComprasManager {
         };
         this.isInitialized = false;
         this.isLoading = false;
+        this.compraForm = null;
     }
 
     /**
@@ -42,6 +44,7 @@ export class ComprasManager {
         this.render();
         await this.loadInvoices();
         this.setupEventListeners();
+        await this.initCompraForm();
     }
 
     /**
@@ -159,7 +162,8 @@ export class ComprasManager {
             const paymentStatus = (invoice.payment_status || 'Pending').toLowerCase();
             const totalAmount = parseFloat(invoice.total_amount || invoice.total || 0);
             const purchaseDate = invoice.purchase_date || invoice.date || invoice.created_at;
-            const paymentMethod = escapeHTML(invoice.payment_method || '-');
+            // ALTERAÇÃO: Formatar método de pagamento para exibição
+            const paymentMethod = this.formatPaymentMethod(invoice.payment_method || '-');
             const statusLabel = this.translateStatus(invoice.payment_status || 'Pending');
 
             return `
@@ -185,7 +189,7 @@ export class ComprasManager {
                             </div>
                             <div class="info-item">
                                 <span class="label">Método de Pagamento:</span>
-                                <span class="value">${paymentMethod}</span>
+                                <span class="value">${escapeHTML(paymentMethod)}</span>
                             </div>
                         </div>
                     </div>
@@ -294,13 +298,30 @@ export class ComprasManager {
     }
 
     /**
+     * Inicializa o formulário de compra
+     */
+    async initCompraForm() {
+        if (!this.compraForm) {
+            this.compraForm = new CompraForm('modal-nova-compra');
+            await this.compraForm.init();
+        }
+    }
+
+    /**
      * Abre modal de nova compra
      */
     openNewPurchaseModal() {
-        // TODO: Implementar modal de nova compra
-        showToast('Funcionalidade em desenvolvimento', { 
-            type: 'info',
-            title: 'Em desenvolvimento'
+        if (!this.compraForm) {
+            showToast('Formulário ainda não inicializado', { 
+                type: 'error',
+                title: 'Erro'
+            });
+            return;
+        }
+        
+        this.compraForm.openNew(() => {
+            // Callback após salvar com sucesso
+            this.loadInvoices();
         });
     }
 
@@ -339,7 +360,8 @@ export class ComprasManager {
         const supplierName = escapeHTML(invoice.supplier_name || 'Fornecedor não informado');
         const totalAmount = parseFloat(invoice.total_amount || invoice.total || 0);
         const purchaseDate = invoice.purchase_date || invoice.date || invoice.created_at;
-        const paymentMethod = escapeHTML(invoice.payment_method || '-');
+        // ALTERAÇÃO: Formatar método de pagamento para exibição
+        const paymentMethod = this.formatPaymentMethod(invoice.payment_method || '-');
         const paymentStatus = (invoice.payment_status || 'Pending').toLowerCase();
         const statusLabel = this.translateStatus(invoice.payment_status || 'Pending');
         const items = invoice.items || [];
@@ -369,7 +391,7 @@ export class ComprasManager {
                                 </div>
                                 <div class="invoice-detail-item">
                                     <span class="label">Método de Pagamento:</span>
-                                    <span class="value">${paymentMethod}</span>
+                                    <span class="value">${escapeHTML(paymentMethod)}</span>
                                 </div>
                                 <div class="invoice-detail-item">
                                     <span class="label">Status:</span>
@@ -453,6 +475,25 @@ export class ComprasManager {
         } catch (error) {
             return dateString;
         }
+    }
+
+    /**
+     * ALTERAÇÃO: Formata método de pagamento para exibição
+     * @param {string} method - Método de pagamento
+     * @returns {string} Método formatado em português
+     */
+    formatPaymentMethod(method) {
+        if (!method || method === '-') return '-';
+        const m = String(method).toLowerCase();
+        if (m === 'credit' || m.includes('credito')) return 'Cartão de Crédito';
+        if (m === 'debit' || m.includes('debito')) return 'Cartão de Débito';
+        if (m === 'pix') return 'PIX';
+        if (m === 'money' || m.includes('dinheiro') || m.includes('cash')) return 'Dinheiro';
+        if (m === 'bank_transfer' || m.includes('transfer')) return 'Transferência Bancária';
+        // Fallback para valores antigos
+        if (m.includes('credit card')) return 'Cartão de Crédito';
+        if (m.includes('debit card')) return 'Cartão de Débito';
+        return method; // Retornar o valor original se não reconhecer
     }
 
     /**

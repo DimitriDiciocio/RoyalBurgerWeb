@@ -85,11 +85,7 @@ export class ConciliacaoBancariaManager {
                     </div>
                 </div>
 
-                <!-- Resumo -->
-                <div class="conciliacao-summary" id="conciliacao-summary">
-                    <!-- Será preenchido dinamicamente -->
-                </div>
-
+                <!-- ALTERAÇÃO: Resumo removido - cards são renderizados em conciliacao-dashboard-cards antes das tabs -->
                 <!-- Lista de Movimentações -->
                 <div class="conciliacao-list" id="conciliacao-list">
                     <div class="financial-loading">Carregando...</div>
@@ -140,11 +136,13 @@ export class ConciliacaoBancariaManager {
      * Renderiza resumo da conciliação
      */
     renderSummary() {
-        const summaryContainer = document.getElementById('conciliacao-summary');
-        if (!summaryContainer) return;
-
+        // ALTERAÇÃO: Renderizar cards apenas no container antes das tabs
+        const externalCardsContainer = document.getElementById('conciliacao-dashboard-cards');
+        
         if (!this.report) {
-            summaryContainer.innerHTML = '';
+            if (externalCardsContainer) {
+                externalCardsContainer.style.display = 'none';
+            }
             return;
         }
 
@@ -153,38 +151,51 @@ export class ConciliacaoBancariaManager {
         const pending = total - reconciled;
         const percentage = total > 0 ? ((reconciled / total) * 100).toFixed(1) : 0;
 
-        summaryContainer.innerHTML = `
-            <div class="conciliacao-summary-cards">
-                <div class="financial-summary-card">
-                    <div class="financial-summary-card-header">
-                        <span class="financial-summary-card-title">Total de Movimentações</span>
-                        <i class="fa-solid fa-list financial-summary-card-icon" aria-hidden="true"></i>
+        // ALTERAÇÃO: Renderizar apenas no container antes das tabs usando estrutura padrão (.quadro)
+        if (externalCardsContainer) {
+            externalCardsContainer.style.display = 'flex';
+            externalCardsContainer.innerHTML = `
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Total de Movimentações</p>
+                        <i class="fa-solid fa-list" aria-hidden="true"></i>
                     </div>
-                    <p class="financial-summary-card-value">${total}</p>
-                </div>
-                <div class="financial-summary-card">
-                    <div class="financial-summary-card-header">
-                        <span class="financial-summary-card-title">Reconciliadas</span>
-                        <i class="fa-solid fa-check-double financial-summary-card-icon" style="color: var(--reconciled-color);" aria-hidden="true"></i>
+                    <div class="valor">
+                        <p class="grande">${total}</p>
                     </div>
-                    <p class="financial-summary-card-value">${reconciled}</p>
                 </div>
-                <div class="financial-summary-card">
-                    <div class="financial-summary-card-header">
-                        <span class="financial-summary-card-title">Pendentes</span>
-                        <i class="fa-solid fa-clock financial-summary-card-icon" style="color: var(--pending-color);" aria-hidden="true"></i>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Reconciliadas</p>
+                        <i class="fa-solid fa-check-double" style="color: var(--reconciled-color, #10b981);" aria-hidden="true"></i>
                     </div>
-                    <p class="financial-summary-card-value">${pending}</p>
-                </div>
-                <div class="financial-summary-card">
-                    <div class="financial-summary-card-header">
-                        <span class="financial-summary-card-title">Taxa de Conciliação</span>
-                        <i class="fa-solid fa-percent financial-summary-card-icon" aria-hidden="true"></i>
+                    <div class="valor">
+                        <p class="grande">${reconciled}</p>
                     </div>
-                    <p class="financial-summary-card-value">${percentage}%</p>
                 </div>
-            </div>
-        `;
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Pendentes</p>
+                        <i class="fa-solid fa-clock" style="color: var(--pending-color, #f59e0b);" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">${pending}</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Taxa de Conciliação</p>
+                        <i class="fa-solid fa-percent" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">${percentage}%</p>
+                    </div>
+                </div>
+            `;
+        }
     }
 
     /**

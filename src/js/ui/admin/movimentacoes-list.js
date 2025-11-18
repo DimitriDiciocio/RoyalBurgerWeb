@@ -44,6 +44,7 @@ export class MovementsList {
 
         this.isInitialized = true;
         this.render();
+        await this.loadCategories(); // ALTERAÇÃO: Carregar categorias antes de carregar movimentações
         await this.loadMovements();
         this.setupEventListeners();
     }
@@ -85,7 +86,10 @@ export class MovementsList {
                         </div>
                         <div class="financial-filter-group">
                             <label for="filter-category">Categoria</label>
-                            <input type="text" id="filter-category" class="filter-input" placeholder="Buscar categoria" aria-label="Filtrar por categoria">
+                            <select id="filter-category" class="filter-select" aria-label="Filtrar por categoria">
+                                <option value="">Todas</option>
+                                <!-- Categorias serão carregadas dinamicamente -->
+                            </select>
                         </div>
                         <div class="financial-filter-group">
                             <label>&nbsp;</label>
@@ -123,6 +127,85 @@ export class MovementsList {
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Carrega categorias únicas das movimentações
+     */
+    async loadCategories() {
+        try {
+            // ALTERAÇÃO: Buscar movimentações com limite maior para obter categorias únicas
+            // Usar um limite razoável (ex: 1000) para não sobrecarregar a API
+            const response = await getFinancialMovements({});
+            
+            // Extrair categorias únicas
+            let movements = [];
+            if (Array.isArray(response)) {
+                movements = response;
+            } else if (response && response.items) {
+                movements = response.items || [];
+            }
+            
+            // Obter categorias únicas e ordenadas
+            const categories = [...new Set(movements
+                .map(m => m.category)
+                .filter(cat => cat && cat.trim() !== '')
+            )].sort();
+            
+            // Popular o select de categorias
+            const categorySelect = document.getElementById('filter-category');
+            if (categorySelect) {
+                // Manter a opção "Todas"
+                const currentValue = categorySelect.value;
+                categorySelect.innerHTML = '<option value="">Todas</option>';
+                
+                // Adicionar categorias
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    categorySelect.appendChild(option);
+                });
+                
+                // Restaurar valor selecionado se ainda existir
+                if (currentValue) {
+                    categorySelect.value = currentValue;
+                }
+            }
+            
+            // Se não encontrou categorias, usar categorias padrão como fallback
+            if (categories.length === 0) {
+                this.loadDefaultCategories();
+            }
+        } catch (error) {
+            console.error('Erro ao carregar categorias:', error);
+            // Em caso de erro, usar categorias padrão
+            this.loadDefaultCategories();
+        }
+    }
+
+    /**
+     * Carrega categorias padrão (fallback)
+     */
+    loadDefaultCategories() {
+        const categorySelect = document.getElementById('filter-category');
+        if (!categorySelect) return;
+        
+        const defaultCategories = [
+            'Vendas',
+            'Custos Variáveis',
+            'Custos Fixos',
+            'Tributos',
+            'Compras de Estoque'
+        ];
+        
+        categorySelect.innerHTML = '<option value="">Todas</option>';
+        defaultCategories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            categorySelect.appendChild(option);
+        });
     }
 
     /**
@@ -380,6 +463,8 @@ export class MovementsList {
                 modal = document.createElement('div');
                 modal.id = 'modal-movimentacao';
                 modal.className = 'modal';
+                // ALTERAÇÃO: Adicionar atributo para resetar campos ao fechar usando sistema de modais
+                modal.setAttribute('data-reset-on-close', 'true');
                 modal.style.display = 'none';
                 document.body.appendChild(modal);
             }
@@ -403,7 +488,7 @@ export class MovementsList {
         // Inputs de data com debounce
         const startDateInput = document.getElementById('filter-start-date');
         const endDateInput = document.getElementById('filter-end-date');
-        const categoryInput = document.getElementById('filter-category');
+        const categorySelect = document.getElementById('filter-category'); // ALTERAÇÃO: Agora é select
 
         if (startDateInput) {
             startDateInput.addEventListener('change', () => {
@@ -417,11 +502,11 @@ export class MovementsList {
             });
         }
 
-        // Input de categoria com debounce (300ms para busca)
-        if (categoryInput) {
-            categoryInput.addEventListener('input', debounce(() => {
-                debouncedApplyFilters();
-            }, 300));
+        // ALTERAÇÃO: Select de categoria com evento change (não precisa debounce)
+        if (categorySelect) {
+            categorySelect.addEventListener('change', () => {
+                this.applyFilters();
+            });
         }
 
         // Botão de aplicar filtros

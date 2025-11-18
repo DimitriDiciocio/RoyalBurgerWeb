@@ -501,6 +501,8 @@ class AdminPanelManager {
                         modal = document.createElement('div');
                         modal.id = 'modal-movimentacao';
                         modal.className = 'modal';
+                        // ALTERAÇÃO: Adicionar atributo para resetar campos ao fechar usando sistema de modais
+                        modal.setAttribute('data-reset-on-close', 'true');
                         modal.style.display = 'none';
                         document.body.appendChild(modal);
                     }
@@ -555,6 +557,18 @@ class AdminPanelManager {
                 tabs.forEach(t => t.classList.remove('active'));
                 contents.forEach(c => c.classList.remove('active'));
 
+                // ALTERAÇÃO: Gerenciar exibição dos cards de dashboard
+                const financeiroCards = document.getElementById('financeiro-dashboard-cards');
+                const conciliacaoCards = document.getElementById('conciliacao-dashboard-cards');
+
+                // Ocultar todos os cards de dashboard
+                if (financeiroCards) {
+                    financeiroCards.style.display = 'none';
+                }
+                if (conciliacaoCards) {
+                    conciliacaoCards.style.display = 'none';
+                }
+
                 // Adicionar classe active na tab e content selecionados
                 tab.classList.add('active');
                 const targetContent = document.getElementById(`tab-${targetTab}`);
@@ -563,7 +577,37 @@ class AdminPanelManager {
                 }
 
                 // Inicializar conteúdo da tab se necessário
-                this.initializeFinancialTab(targetTab);
+                const initPromise = this.initializeFinancialTab(targetTab);
+                
+                // ALTERAÇÃO: Após inicializar a tab, verificar se há cards para exibir
+                if (initPromise && typeof initPromise.then === 'function') {
+                    initPromise.then(() => {
+                        if (targetTab === 'conciliacao' && conciliacaoCards) {
+                            // Verificar se os cards já foram renderizados (se o relatório já foi carregado)
+                            setTimeout(() => {
+                                if (conciliacaoCards.children.length > 0) {
+                                    conciliacaoCards.style.display = 'flex';
+                                }
+                            }, 100);
+                        } else if (targetTab === 'dashboard' && financeiroCards) {
+                            // Verificar se os cards do dashboard financeiro já foram renderizados
+                            setTimeout(() => {
+                                if (financeiroCards.children.length > 0) {
+                                    financeiroCards.style.display = 'flex';
+                                }
+                            }, 100);
+                        }
+                    });
+                } else {
+                    // Se não retornar Promise, verificar após um pequeno delay
+                    setTimeout(() => {
+                        if (targetTab === 'conciliacao' && conciliacaoCards && conciliacaoCards.children.length > 0) {
+                            conciliacaoCards.style.display = 'flex';
+                        } else if (targetTab === 'dashboard' && financeiroCards && financeiroCards.children.length > 0) {
+                            financeiroCards.style.display = 'flex';
+                        }
+                    }, 200);
+                }
             });
         });
 

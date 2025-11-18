@@ -81,13 +81,17 @@
                 </div>
 
                 <div class="formas-pagamento">
+                    <!-- ALTERAÇÃO: Mantido um só quadro de cartão com modal para escolha de tipo -->
                     <div class="quadro-forma selecionado">
                         <p>Pix</p>
                         <i class="fa-brands fa-pix"></i>
                     </div>
 
-                    <div class="quadro-forma">
-                        <p>Cartão</p>
+                    <div class="quadro-forma" id="quadro-cartao">
+                        <div>
+                            <p>Cartão</p>
+                            <p class="cartao-tipo-info" id="cartao-tipo-info" style="display: none; font-size: 12px; color: #666; margin-top: 4px;"></p>
+                        </div>
                         <i class="fa-solid fa-credit-card"></i>
                     </div>
 
@@ -192,6 +196,49 @@
         </div>
     </div>
 
+    <!-- MODAL TIPO DE CARTÃO -->
+    <div id="modal-tipo-cartao" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-metricas">
+            <div class="header-modal">
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-tipo-cartao"></i>
+                <h2>Selecione o tipo de cartão</h2>
+            </div>
+
+            <div class="conteudo-modal">
+                <p>
+                    Escolha se o pagamento será feito com cartão de crédito ou débito.
+                </p>
+
+                <div class="tipos-cartao-container">
+                    <button class="btn-tipo-cartao" id="btn-cartao-credito" type="button">
+                        <div class="btn-tipo-cartao-content">
+                            <i class="fa-solid fa-credit-card btn-tipo-cartao-icon"></i>
+                            <div class="btn-tipo-cartao-text">
+                                <p class="btn-tipo-cartao-title">Cartão de Crédito</p>
+                                <p class="btn-tipo-cartao-desc">Pagamento via cartão de crédito</p>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="btn-tipo-cartao" id="btn-cartao-debito" type="button">
+                        <div class="btn-tipo-cartao-content">
+                            <i class="fa-solid fa-credit-card btn-tipo-cartao-icon"></i>
+                            <div class="btn-tipo-cartao-text">
+                                <p class="btn-tipo-cartao-title">Cartão de Débito</p>
+                                <p class="btn-tipo-cartao-desc">Pagamento via cartão de débito</p>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button class="btn-fechar" data-close-modal="modal-tipo-cartao">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL TREVISANDO O PEDIDO -->
     <div id="modal-revisao" class="modal" style="display: none;">
         <div class="div-overlay"></div>
@@ -221,15 +268,18 @@
                 </div>
 
                 <div>
+                    <!-- ALTERAÇÃO: Separado ícones para cartão de crédito e débito -->
                     <i class="fa-brands fa-pix" style="display: flex;"></i>
-                    <i class="fa-solid fa-credit-card" style="display: none;"></i>
+                    <i class="fa-solid fa-credit-card" id="modal-cartao-credito-icon" style="display: none;"></i>
+                    <i class="fa-solid fa-credit-card" id="modal-cartao-debito-icon" style="display: none;"></i>
                     <i class="fa-solid fa-money-bill" style="display: none;"></i>
 
                     <div>
                         <p>Pagamento na entraga</p>
-                        <p>PIX</p>
-                        <p style="display: none;">Cartão</p>
-                        <p style="display: none;">Dinheiro - Troco para R$100,00</p>
+                        <p id="modal-pagamento-pix">PIX</p>
+                        <p id="modal-pagamento-credito" style="display: none;">Cartão de Crédito</p>
+                        <p id="modal-pagamento-debito" style="display: none;">Cartão de Débito</p>
+                        <p id="modal-pagamento-dinheiro" style="display: none;">Dinheiro - Troco para R$100,00</p>
                     </div>
                 </div>
             </div>

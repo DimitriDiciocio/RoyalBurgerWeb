@@ -64,11 +64,7 @@ export class FinancialDashboard {
                     </div>
                 </div>
 
-                <!-- Cards de Resumo -->
-                <div class="financial-summary-grid" id="summary-cards">
-                    <!-- Será preenchido dinamicamente -->
-                </div>
-
+                <!-- ALTERAÇÃO: Cards de resumo removidos daqui - agora são renderizados antes das tabs -->
                 <!-- Gráficos -->
                 <div class="dashboard-charts">
                     <div class="chart-container">
@@ -135,8 +131,15 @@ export class FinancialDashboard {
      * @param {Object} summary - Resumo do fluxo de caixa
      */
     renderSummaryCards(summary) {
-        const cardsContainer = document.getElementById('summary-cards');
+        // ALTERAÇÃO: Renderizar cards no container antes das tabs (se existir) ou no container padrão
+        const externalCardsContainer = document.getElementById('financeiro-dashboard-cards');
+        const cardsContainer = externalCardsContainer || document.getElementById('summary-cards');
         if (!cardsContainer) return;
+
+        // ALTERAÇÃO: Mostrar container de cards se estava oculto
+        if (externalCardsContainer) {
+            externalCardsContainer.style.display = 'flex';
+        }
 
         const totalRevenue = summary.total_revenue || 0;
         const totalExpense = summary.total_expense || 0;
@@ -151,61 +154,117 @@ export class FinancialDashboard {
         const expenseChange = this.calculatePercentageChange(previousExpense, totalExpense);
         const profitChange = this.calculatePercentageChange(previousProfit, netProfit);
 
-        cardsContainer.innerHTML = `
-            <div class="financial-summary-card revenue">
-                <div class="financial-summary-card-header">
-                    <span class="financial-summary-card-title">Receitas</span>
-                    <i class="fa-solid fa-arrow-up financial-summary-card-icon" style="color: var(--revenue-color);" aria-hidden="true"></i>
-                </div>
-                <p class="financial-summary-card-value">R$ ${this.formatCurrency(totalRevenue)}</p>
-                ${revenueChange !== null ? `
-                    <div class="financial-summary-card-change ${revenueChange >= 0 ? 'positive' : 'negative'}">
-                        <i class="fa-solid fa-${revenueChange >= 0 ? 'arrow-up' : 'arrow-down'}" aria-hidden="true"></i>
-                        <span>${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs período anterior</span>
+        // ALTERAÇÃO: Usar estrutura de cards padrão (.quadro) se renderizando antes das tabs
+        if (externalCardsContainer) {
+            cardsContainer.innerHTML = `
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Receitas</p>
+                        <i class="fa-solid fa-arrow-up" style="color: var(--revenue-color);" aria-hidden="true"></i>
                     </div>
-                ` : ''}
-            </div>
-
-            <div class="financial-summary-card expense">
-                <div class="financial-summary-card-header">
-                    <span class="financial-summary-card-title">Despesas</span>
-                    <i class="fa-solid fa-arrow-down financial-summary-card-icon" style="color: var(--expense-color);" aria-hidden="true"></i>
-                </div>
-                <p class="financial-summary-card-value">R$ ${this.formatCurrency(totalExpense)}</p>
-                ${expenseChange !== null ? `
-                    <div class="financial-summary-card-change ${expenseChange <= 0 ? 'positive' : 'negative'}">
-                        <i class="fa-solid fa-${expenseChange <= 0 ? 'arrow-down' : 'arrow-up'}" aria-hidden="true"></i>
-                        <span>${expenseChange >= 0 ? '+' : ''}${expenseChange.toFixed(1)}% vs período anterior</span>
+                    <div class="valor">
+                        <p class="grande">R$ ${this.formatCurrency(totalRevenue)}</p>
+                        ${revenueChange !== null ? `
+                            <p class="descricao">${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs período anterior</p>
+                        ` : ''}
                     </div>
-                ` : ''}
-            </div>
+                </div>
 
-            <div class="financial-summary-card cmv">
-                <div class="financial-summary-card-header">
-                    <span class="financial-summary-card-title">CMV</span>
-                    <i class="fa-solid fa-box financial-summary-card-icon" style="color: var(--cmv-color);" aria-hidden="true"></i>
-                </div>
-                <p class="financial-summary-card-value">R$ ${this.formatCurrency(totalCmv)}</p>
-            </div>
-
-            <div class="financial-summary-card profit">
-                <div class="financial-summary-card-header">
-                    <span class="financial-summary-card-title">Lucro Líquido</span>
-                    <i class="fa-solid fa-chart-line financial-summary-card-icon" style="color: var(--financial-primary);" aria-hidden="true"></i>
-                </div>
-                <p class="financial-summary-card-value">R$ ${this.formatCurrency(netProfit)}</p>
-                <div class="financial-summary-card-change ${netProfit >= 0 ? 'positive' : 'negative'}">
-                    <i class="fa-solid fa-${netProfit >= 0 ? 'arrow-up' : 'arrow-down'}" aria-hidden="true"></i>
-                    <span>Margem: ${this.calculateMargin(totalRevenue, netProfit)}%</span>
-                </div>
-                ${profitChange !== null ? `
-                    <div class="financial-summary-card-change ${profitChange >= 0 ? 'positive' : 'negative'}" style="margin-top: 0.5rem;">
-                        <i class="fa-solid fa-${profitChange >= 0 ? 'arrow-up' : 'arrow-down'}" aria-hidden="true"></i>
-                        <span>${profitChange >= 0 ? '+' : ''}${profitChange.toFixed(1)}% vs período anterior</span>
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Despesas</p>
+                        <i class="fa-solid fa-arrow-down" style="color: var(--expense-color);" aria-hidden="true"></i>
                     </div>
-                ` : ''}
-            </div>
-        `;
+                    <div class="valor">
+                        <p class="grande">R$ ${this.formatCurrency(totalExpense)}</p>
+                        ${expenseChange !== null ? `
+                            <p class="descricao">${expenseChange >= 0 ? '+' : ''}${expenseChange.toFixed(1)}% vs período anterior</p>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>CMV</p>
+                        <i class="fa-solid fa-box" style="color: var(--cmv-color);" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">R$ ${this.formatCurrency(totalCmv)}</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Lucro Líquido</p>
+                        <i class="fa-solid fa-chart-line" style="color: var(--financial-primary);" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">R$ ${this.formatCurrency(netProfit)}</p>
+                        <p class="descricao">Margem: ${this.calculateMargin(totalRevenue, netProfit)}%</p>
+                        ${profitChange !== null ? `
+                            <p class="descricao">${profitChange >= 0 ? '+' : ''}${profitChange.toFixed(1)}% vs período anterior</p>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        } else {
+            // Estrutura original para renderização dentro da tab
+            cardsContainer.innerHTML = `
+                <div class="financial-summary-card revenue">
+                    <div class="financial-summary-card-header">
+                        <span class="financial-summary-card-title">Receitas</span>
+                        <i class="fa-solid fa-arrow-up financial-summary-card-icon" style="color: var(--revenue-color);" aria-hidden="true"></i>
+                    </div>
+                    <p class="financial-summary-card-value">R$ ${this.formatCurrency(totalRevenue)}</p>
+                    ${revenueChange !== null ? `
+                        <div class="financial-summary-card-change ${revenueChange >= 0 ? 'positive' : 'negative'}">
+                            <i class="fa-solid fa-${revenueChange >= 0 ? 'arrow-up' : 'arrow-down'}" aria-hidden="true"></i>
+                            <span>${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs período anterior</span>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="financial-summary-card expense">
+                    <div class="financial-summary-card-header">
+                        <span class="financial-summary-card-title">Despesas</span>
+                        <i class="fa-solid fa-arrow-down financial-summary-card-icon" style="color: var(--expense-color);" aria-hidden="true"></i>
+                    </div>
+                    <p class="financial-summary-card-value">R$ ${this.formatCurrency(totalExpense)}</p>
+                    ${expenseChange !== null ? `
+                        <div class="financial-summary-card-change ${expenseChange <= 0 ? 'positive' : 'negative'}">
+                            <i class="fa-solid fa-${expenseChange <= 0 ? 'arrow-down' : 'arrow-up'}" aria-hidden="true"></i>
+                            <span>${expenseChange >= 0 ? '+' : ''}${expenseChange.toFixed(1)}% vs período anterior</span>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="financial-summary-card cmv">
+                    <div class="financial-summary-card-header">
+                        <span class="financial-summary-card-title">CMV</span>
+                        <i class="fa-solid fa-box financial-summary-card-icon" style="color: var(--cmv-color);" aria-hidden="true"></i>
+                    </div>
+                    <p class="financial-summary-card-value">R$ ${this.formatCurrency(totalCmv)}</p>
+                </div>
+
+                <div class="financial-summary-card profit">
+                    <div class="financial-summary-card-header">
+                        <span class="financial-summary-card-title">Lucro Líquido</span>
+                        <i class="fa-solid fa-chart-line financial-summary-card-icon" style="color: var(--financial-primary);" aria-hidden="true"></i>
+                    </div>
+                    <p class="financial-summary-card-value">R$ ${this.formatCurrency(netProfit)}</p>
+                    <div class="financial-summary-card-change ${netProfit >= 0 ? 'positive' : 'negative'}">
+                        <i class="fa-solid fa-${netProfit >= 0 ? 'arrow-up' : 'arrow-down'}" aria-hidden="true"></i>
+                        <span>Margem: ${this.calculateMargin(totalRevenue, netProfit)}%</span>
+                    </div>
+                    ${profitChange !== null ? `
+                        <div class="financial-summary-card-change ${profitChange >= 0 ? 'positive' : 'negative'}" style="margin-top: 0.5rem;">
+                            <i class="fa-solid fa-${profitChange >= 0 ? 'arrow-up' : 'arrow-down'}" aria-hidden="true"></i>
+                            <span>${profitChange >= 0 ? '+' : ''}${profitChange.toFixed(1)}% vs período anterior</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
     }
 
     /**

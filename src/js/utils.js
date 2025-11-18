@@ -9,14 +9,21 @@ export function gerenciarEstadoInputs() {
   const inputs = document.querySelectorAll("input, select, textarea");
 
   inputs.forEach((input) => {
-    // Função para verificar se o input tem valor ou placeholder nativo
+    // ALTERAÇÃO: Função corrigida para verificar corretamente valores e placeholders
     function temValorOuPlaceholder() {
-      // Para SELECT, manter o label sempre ativo para não conflitar com o option visível
+      // Para SELECT: verificar se tem valor válido (não vazio)
       if (input.tagName === "SELECT") {
-        return true;
+        return input.value !== "" && input.value !== null && input.value !== undefined;
       }
+      
       const valor = (input.value || "").trim();
-      const temPlaceholder = input.placeholder && input.placeholder !== "";
+      
+      // ALTERAÇÃO: Não considerar placeholder com apenas espaço como placeholder válido
+      const temPlaceholder = input.placeholder && 
+                            input.placeholder.trim() !== "" && 
+                            input.placeholder.trim() !== " ";
+      
+      // ALTERAÇÃO: Para inputs de data, verificar se tem valor de fato
       const tipoComPlaceholder = [
         "date",
         "time",
@@ -24,7 +31,13 @@ export function gerenciarEstadoInputs() {
         "month",
         "week",
       ].includes(input.type);
-      return valor !== "" || temPlaceholder || tipoComPlaceholder;
+      
+      // Para tipos com placeholder nativo, verificar se tem valor real
+      if (tipoComPlaceholder) {
+        return valor !== "" && valor !== null;
+      }
+
+      return valor !== "" || temPlaceholder;
     }
 
     // Função para atualizar o estado do label
@@ -172,10 +185,21 @@ export function gerenciarInputsEspecificos(inputs) {
   if (!inputs || inputs.length === 0) return;
 
   inputs.forEach((input) => {
-    // Aplicar a mesma lógica da função principal
+    // ALTERAÇÃO: Lógica corrigida para verificar corretamente valores e placeholders
     function temValorOuPlaceholder() {
-      const valor = input.value.trim();
-      const temPlaceholder = input.placeholder && input.placeholder !== "";
+      // Para SELECT: verificar se tem valor válido (não vazio)
+      if (input.tagName === "SELECT") {
+        return input.value !== "" && input.value !== null && input.value !== undefined;
+      }
+      
+      const valor = (input.value || "").trim();
+      
+      // ALTERAÇÃO: Não considerar placeholder com apenas espaço como placeholder válido
+      const temPlaceholder = input.placeholder && 
+                            input.placeholder.trim() !== "" && 
+                            input.placeholder.trim() !== " ";
+      
+      // ALTERAÇÃO: Para inputs de data, verificar se tem valor de fato
       const tipoComPlaceholder = [
         "date",
         "time",
@@ -183,8 +207,13 @@ export function gerenciarInputsEspecificos(inputs) {
         "month",
         "week",
       ].includes(input.type);
+      
+      // Para tipos com placeholder nativo, verificar se tem valor real
+      if (tipoComPlaceholder) {
+        return valor !== "" && valor !== null;
+      }
 
-      return valor !== "" || temPlaceholder || tipoComPlaceholder;
+      return valor !== "" || temPlaceholder;
     }
 
     function atualizarEstadoLabel() {

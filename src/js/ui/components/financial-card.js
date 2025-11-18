@@ -30,6 +30,22 @@ export function createFinancialMovementCard(movement, options = {}) {
     const relatedEntityType = movement.related_entity_type || '';
     const relatedEntityId = movement.related_entity_id || '';
 
+    // ALTERAÇÃO: Formatar método de pagamento para exibição
+    const formatPaymentMethod = (method) => {
+        if (!method) return '';
+        const m = String(method).toLowerCase();
+        if (m === 'credit' || m.includes('credito')) return 'Cartão de Crédito';
+        if (m === 'debit' || m.includes('debito')) return 'Cartão de Débito';
+        if (m === 'pix') return 'PIX';
+        if (m === 'money' || m.includes('dinheiro') || m.includes('cash')) return 'Dinheiro';
+        if (m === 'bank_transfer' || m.includes('transfer')) return 'Transferência Bancária';
+        // Fallback para valores antigos
+        if (m.includes('credit card')) return 'Cartão de Crédito';
+        if (m.includes('debit card')) return 'Cartão de Débito';
+        return method; // Retornar o valor original se não reconhecer
+    };
+    const formattedPaymentMethod = formatPaymentMethod(paymentMethod);
+
     // Formatar valor monetário
     const formattedValue = formatCurrency(value);
     const valueSign = type === 'revenue' ? '+' : '-';
@@ -94,10 +110,10 @@ export function createFinancialMovementCard(movement, options = {}) {
                             <span>${formattedDate}</span>
                         </div>
                     ` : ''}
-                    ${paymentMethod ? `
+                    ${formattedPaymentMethod ? `
                         <div class="detail-item">
                             <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
-                            <span>${escapeHtml(paymentMethod)}</span>
+                            <span>${escapeHtml(formattedPaymentMethod)}</span>
                         </div>
                     ` : ''}
                     ${senderReceiver ? `

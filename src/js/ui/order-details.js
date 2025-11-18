@@ -540,20 +540,26 @@ const isDevelopment = () => {
         }
 
         // Método de pagamento (normalizado + ícone)
+        // ALTERAÇÃO: Normalizar método de pagamento para diferenciar crédito e débito
         const normalizePaymentMethod = (raw) => {
             const m = String(raw || '').toLowerCase();
             if (!m) return 'pix';
             if (m.includes('pix')) return 'pix';
-            if (m.includes('card') || m.includes('cart') || m.includes('credit') || m.includes('debit')) return 'card';
+            // Diferenciar crédito e débito
+            if (m === 'credit' || m.includes('credito')) return 'credit';
+            if (m === 'debit' || m.includes('debito')) return 'debit';
+            // Fallback para outros formatos antigos
+            if (m.includes('card') || m.includes('cart') || m.includes('credit') || m.includes('debit')) return 'credit'; // Default para crédito
             if (m.includes('din') || m.includes('cash') || m.includes('money')) return 'money';
             return 'pix';
         };
 
         const methodKey = normalizePaymentMethod(order.payment_method);
         const paymentConfig = {
-            pix:   { text: 'PIX',      elKey: 'paymentPixIcon'   },
-            card:  { text: 'Cartão',   elKey: 'paymentCardIcon'  },
-            money: { text: 'Dinheiro', elKey: 'paymentMoneyIcon' }
+            pix:    { text: 'PIX',              elKey: 'paymentPixIcon'   },
+            credit: { text: 'Cartão de Crédito', elKey: 'paymentCardIcon'  },
+            debit:  { text: 'Cartão de Débito',  elKey: 'paymentCardIcon'  },
+            money:  { text: 'Dinheiro',         elKey: 'paymentMoneyIcon' }
         };
         const payment = paymentConfig[methodKey] || paymentConfig.pix;
 

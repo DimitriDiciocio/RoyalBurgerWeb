@@ -146,6 +146,12 @@ class ConfiguracoesManager {
       "taxa-conversao-ganho-clube": "taxa_conversao_ganho_clube",
       "taxa-conversao-resgate-clube": "taxa_conversao_resgate_clube",
       "taxa-expiracao-pontos": "taxa_expiracao_pontos_clube",
+      // ALTERAÇÃO: Taxas financeiras adicionadas
+      "taxa-cartao-credito": "taxa_cartao_credito",
+      "taxa-cartao-debito": "taxa_cartao_debito",
+      "taxa-pix": "taxa_pix",
+      "taxa-ifood": "taxa_ifood",
+      "taxa-uber-eats": "taxa_uber_eats",
       "nome-fantasia": "nome_fantasia",
       "razao-social": "razao_social",
       cnpj: "cnpj",
@@ -328,7 +334,11 @@ class ConfiguracoesManager {
               configKey.includes("meta-receita") ||
               (configKey.includes("taxa") &&
                 configKey !== "taxa-expiracao-pontos" &&
-                !configKey.includes("taxa-conversao"))
+                !configKey.includes("taxa-conversao") &&
+                !configKey.includes("taxa-cartao") &&
+                !configKey.includes("taxa-pix") &&
+                !configKey.includes("taxa-ifood") &&
+                !configKey.includes("taxa-uber"))
             ) {
               displayValue =
                 "R$ " +
@@ -336,6 +346,18 @@ class ConfiguracoesManager {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 });
+            } else if (
+              configKey === "taxa-cartao-credito" ||
+              configKey === "taxa-cartao-debito" ||
+              configKey === "taxa-pix" ||
+              configKey === "taxa-ifood" ||
+              configKey === "taxa-uber-eats"
+            ) {
+              // ALTERAÇÃO: Formatação para taxas financeiras (percentual)
+              displayValue = num.toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }) + "%";
             } else if (configKey === "taxa-expiracao-pontos") {
               // Formatação especial para expiração (mostrar em dias)
               displayValue = `${num} ${num === 1 ? "dia" : "dias"}`;
@@ -780,6 +802,208 @@ class ConfiguracoesManager {
           "taxa_expiracao_pontos_clube",
           parseInt(value, 10)
         );
+      },
+    });
+
+    // ALTERAÇÃO: Handlers para taxas financeiras adicionados
+    // Taxa de Cartão de Crédito
+    this.registerHandler("taxa-cartao-credito", {
+      configKey: "taxa-cartao-credito",
+      title: "Definir Taxa de Cartão de Crédito",
+      label: "Taxa de Cartão de Crédito (%)",
+      description:
+        "Percentual cobrado pela operadora de cartão de crédito sobre o valor da venda. Este valor será automaticamente deduzido como despesa quando um pedido for pago com cartão de crédito. Deixe em branco para não configurar.",
+      inputLabel: "Taxa (%)",
+      inputType: "text",
+      placeholder: "Digite a taxa percentual (ex: 2,5) ou deixe em branco",
+      isOptional: true, // ALTERAÇÃO: Campo opcional para permitir null
+      validator: (value) => {
+        // Permitir vazio (null)
+        if (!value || value.trim() === "") return true;
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0 && num <= 100;
+      },
+      formatter: (value) => {
+        if (value === null || value === undefined || value === "") return "";
+        const num = parseFloat(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + "%";
+      },
+      parser: (value) => {
+        if (!value || value.trim() === "") return "";
+        return value.replace(/[^\d,.-]/g, "").replace(",", ".");
+      },
+      onSave: async (value) => {
+        // ALTERAÇÃO: Permitir null se valor vazio ou 0
+        if (!value || value.trim() === "") {
+          return await this.saveConfig("taxa_cartao_credito", null);
+        }
+        const num = parseFloat(value.replace(",", "."));
+        // Salvar 0 como 0, não como null
+        return await this.saveConfig("taxa_cartao_credito", isNaN(num) ? null : num);
+      },
+    });
+
+    // Taxa de Cartão de Débito
+    this.registerHandler("taxa-cartao-debito", {
+      configKey: "taxa-cartao-debito",
+      title: "Definir Taxa de Cartão de Débito",
+      label: "Taxa de Cartão de Débito (%)",
+      description:
+        "Percentual cobrado pela operadora de cartão de débito sobre o valor da venda. Este valor será automaticamente deduzido como despesa quando um pedido for pago com cartão de débito. Deixe em branco para não configurar.",
+      inputLabel: "Taxa (%)",
+      inputType: "text",
+      placeholder: "Digite a taxa percentual (ex: 1,5) ou deixe em branco",
+      isOptional: true, // ALTERAÇÃO: Campo opcional para permitir null
+      validator: (value) => {
+        // Permitir vazio (null)
+        if (!value || value.trim() === "") return true;
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0 && num <= 100;
+      },
+      formatter: (value) => {
+        if (value === null || value === undefined || value === "") return "";
+        const num = parseFloat(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + "%";
+      },
+      parser: (value) => {
+        if (!value || value.trim() === "") return "";
+        return value.replace(/[^\d,.-]/g, "").replace(",", ".");
+      },
+      onSave: async (value) => {
+        // ALTERAÇÃO: Permitir null se valor vazio
+        if (!value || value.trim() === "") {
+          return await this.saveConfig("taxa_cartao_debito", null);
+        }
+        const num = parseFloat(value.replace(",", "."));
+        return await this.saveConfig("taxa_cartao_debito", isNaN(num) ? null : num);
+      },
+    });
+
+    // Taxa de PIX
+    this.registerHandler("taxa-pix", {
+      configKey: "taxa-pix",
+      title: "Definir Taxa de PIX",
+      label: "Taxa de PIX (%)",
+      description:
+        "Percentual cobrado sobre o valor da venda quando o pagamento é feito via PIX. Geralmente é 0% pois o PIX não possui taxa de transação. Deixe em branco para não configurar.",
+      inputLabel: "Taxa (%)",
+      inputType: "text",
+      placeholder: "Digite a taxa percentual (ex: 0) ou deixe em branco",
+      isOptional: true, // ALTERAÇÃO: Campo opcional para permitir null
+      validator: (value) => {
+        // Permitir vazio (null)
+        if (!value || value.trim() === "") return true;
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0 && num <= 100;
+      },
+      formatter: (value) => {
+        if (value === null || value === undefined || value === "") return "";
+        const num = parseFloat(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + "%";
+      },
+      parser: (value) => {
+        if (!value || value.trim() === "") return "";
+        return value.replace(/[^\d,.-]/g, "").replace(",", ".");
+      },
+      onSave: async (value) => {
+        // ALTERAÇÃO: Permitir null se valor vazio
+        if (!value || value.trim() === "") {
+          return await this.saveConfig("taxa_pix", null);
+        }
+        const num = parseFloat(value.replace(",", "."));
+        return await this.saveConfig("taxa_pix", isNaN(num) ? null : num);
+      },
+    });
+
+    // Taxa do iFood
+    this.registerHandler("taxa-ifood", {
+      configKey: "taxa-ifood",
+      title: "Definir Taxa do iFood",
+      label: "Taxa do iFood (%)",
+      description:
+        "Percentual cobrado pela plataforma iFood sobre o valor total do pedido. Este valor será automaticamente deduzido como despesa quando um pedido vier do iFood. Deixe em branco para não configurar.",
+      inputLabel: "Taxa (%)",
+      inputType: "text",
+      placeholder: "Digite a taxa percentual (ex: 15) ou deixe em branco",
+      isOptional: true, // ALTERAÇÃO: Campo opcional para permitir null
+      validator: (value) => {
+        // Permitir vazio (null)
+        if (!value || value.trim() === "") return true;
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0 && num <= 100;
+      },
+      formatter: (value) => {
+        if (value === null || value === undefined || value === "") return "";
+        const num = parseFloat(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + "%";
+      },
+      parser: (value) => {
+        if (!value || value.trim() === "") return "";
+        return value.replace(/[^\d,.-]/g, "").replace(",", ".");
+      },
+      onSave: async (value) => {
+        // ALTERAÇÃO: Permitir null se valor vazio
+        if (!value || value.trim() === "") {
+          return await this.saveConfig("taxa_ifood", null);
+        }
+        const num = parseFloat(value.replace(",", "."));
+        return await this.saveConfig("taxa_ifood", isNaN(num) ? null : num);
+      },
+    });
+
+    // Taxa do Uber Eats
+    this.registerHandler("taxa-uber-eats", {
+      configKey: "taxa-uber-eats",
+      title: "Definir Taxa do Uber Eats",
+      label: "Taxa do Uber Eats (%)",
+      description:
+        "Percentual cobrado pela plataforma Uber Eats sobre o valor total do pedido. Este valor será automaticamente deduzido como despesa quando um pedido vier do Uber Eats. Deixe em branco para não configurar.",
+      inputLabel: "Taxa (%)",
+      inputType: "text",
+      placeholder: "Digite a taxa percentual (ex: 30) ou deixe em branco",
+      isOptional: true, // ALTERAÇÃO: Campo opcional para permitir null
+      validator: (value) => {
+        // Permitir vazio (null)
+        if (!value || value.trim() === "") return true;
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0 && num <= 100;
+      },
+      formatter: (value) => {
+        if (value === null || value === undefined || value === "") return "";
+        const num = parseFloat(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + "%";
+      },
+      parser: (value) => {
+        if (!value || value.trim() === "") return "";
+        return value.replace(/[^\d,.-]/g, "").replace(",", ".");
+      },
+      onSave: async (value) => {
+        // ALTERAÇÃO: Permitir null se valor vazio
+        if (!value || value.trim() === "") {
+          return await this.saveConfig("taxa_uber_eats", null);
+        }
+        const num = parseFloat(value.replace(",", "."));
+        return await this.saveConfig("taxa_uber_eats", isNaN(num) ? null : num);
       },
     });
 
@@ -1304,6 +1528,12 @@ class ConfiguracoesManager {
       "Taxa de conversão de ganho do clube": "taxa-conversao-ganho-clube",
       "Taxa de conversão de resgate do clube": "taxa-conversao-resgate-clube",
       "Taxa de expiração de pontos do clube": "taxa-expiracao-pontos",
+      // ALTERAÇÃO: Mapeamentos para taxas financeiras adicionados
+      "Taxa de Cartão de Crédito (%)": "taxa-cartao-credito",
+      "Taxa de Cartão de Débito (%)": "taxa-cartao-debito",
+      "Taxa de PIX (%)": "taxa-pix",
+      "Taxa do iFood (%)": "taxa-ifood",
+      "Taxa do Uber Eats (%)": "taxa-uber-eats",
       "Nome Fantasia": "nome-fantasia",
       "Razão Social": "razao-social",
       CNPJ: "cnpj",
@@ -1675,8 +1905,13 @@ class ConfiguracoesManager {
       this.el.input.maxLength = "255";
     }
 
-    // Campo obrigatório por padrão
-    this.el.input.required = true;
+    // Campo obrigatório por padrão, exceto se for opcional
+    // ALTERAÇÃO: Campos opcionais não são required (permite null)
+    if (!handler.isOptional) {
+      this.el.input.required = true;
+    } else {
+      this.el.input.required = false;
+    }
   }
 
   /**
@@ -1688,6 +1923,11 @@ class ConfiguracoesManager {
 
     const value = this.el.input.value.trim();
     const handler = this.currentConfig.handler;
+
+    // ALTERAÇÃO: Se campo for opcional e valor vazio, considerar válido (permite null)
+    if (handler.isOptional && (!value || value.trim() === "")) {
+      return true;
+    }
 
     // Validar
     let valueToValidate = value;
@@ -1719,7 +1959,8 @@ class ConfiguracoesManager {
       } else {
         errorMessage = "Valor inválido";
       }
-    } else if (!value && this.el.input.required) {
+    } else if (!value && this.el.input.required && !handler.isOptional) {
+      // ALTERAÇÃO: Não exigir valor se campo for opcional
       errorMessage = "Este campo é obrigatório";
     }
 
@@ -1748,7 +1989,9 @@ class ConfiguracoesManager {
     }
 
     const value = this.el.input.value.trim();
-    if (!value) {
+    // ALTERAÇÃO: Permitir valores vazios se campo for opcional (permite null)
+    const handler = this.currentConfig?.handler;
+    if (!value && (!handler || !handler.isOptional)) {
       showError("Por favor, preencha o valor");
       this.el.input.classList.add("error");
       return;
