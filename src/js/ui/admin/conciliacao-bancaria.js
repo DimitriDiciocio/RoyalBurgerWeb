@@ -28,7 +28,7 @@ export class ConciliacaoBancariaManager {
      */
     async init() {
         if (!this.container) {
-            console.error('Container de conciliação não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -236,7 +236,7 @@ export class ConciliacaoBancariaManager {
             });
             await this.loadReport();
         } catch (error) {
-            console.error('Erro ao reconciliar movimentação:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao reconciliar movimentação', { 
                 type: 'error',
                 title: 'Erro'

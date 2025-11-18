@@ -3,13 +3,14 @@
  * Gerencia notas fiscais de compra e entrada de estoque
  */
 
-import { createPurchaseInvoice, getPurchaseInvoices, getPurchaseInvoiceById } from '../../api/purchases.js';
+import { createPurchaseInvoice, getPurchaseInvoices, getPurchaseInvoiceById, updatePurchaseInvoice, deletePurchaseInvoice } from '../../api/purchases.js';
 import { showToast } from '../alerts.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
 import { abrirModal, fecharModal } from '../modais.js';
 import { debounce } from '../../utils/performance-utils.js';
 import { formatDateForAPI } from '../../utils/date-formatter.js';
 import { CompraForm } from './compra-form.js';
+import { gerenciarInputsEspecificos } from '../../utils.js';
 
 export class ComprasManager {
     constructor(containerId) {
@@ -31,7 +32,7 @@ export class ComprasManager {
      */
     async init() {
         if (!this.container) {
-            console.error('Container de compras não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -126,7 +127,7 @@ export class ComprasManager {
 
             this.renderInvoicesList();
         } catch (error) {
-            console.error('Erro ao carregar compras:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar compras', { 
                 type: 'error',
                 title: 'Erro'
@@ -201,6 +202,20 @@ export class ComprasManager {
                             <i class="fa-solid fa-eye" aria-hidden="true"></i>
                             <span>Ver Detalhes</span>
                         </button>
+                        <button class="financial-btn financial-btn-secondary" 
+                                data-action="edit" 
+                                data-invoice-id="${invoiceId}"
+                                aria-label="Editar nota fiscal ${invoiceNumber}">
+                            <i class="fa-solid fa-edit" aria-hidden="true"></i>
+                            <span>Editar</span>
+                        </button>
+                        <button class="financial-btn financial-btn-danger" 
+                                data-action="delete" 
+                                data-invoice-id="${invoiceId}"
+                                aria-label="Excluir nota fiscal ${invoiceNumber}">
+                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                            <span>Excluir</span>
+                        </button>
                     </div>
                 </div>
             `;
@@ -269,6 +284,12 @@ export class ComprasManager {
                 if (action === 'view' && invoiceId) {
                     e.preventDefault();
                     this.viewInvoice(invoiceId);
+                } else if (action === 'edit' && invoiceId) {
+                    e.preventDefault();
+                    this.editInvoice(invoiceId);
+                } else if (action === 'delete' && invoiceId) {
+                    e.preventDefault();
+                    this.confirmDeleteInvoice(invoiceId);
                 }
             });
         }
@@ -334,7 +355,7 @@ export class ComprasManager {
             const invoice = await getPurchaseInvoiceById(invoiceId);
             this.showInvoiceModal(invoice);
         } catch (error) {
-            console.error('Erro ao carregar nota fiscal:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar nota fiscal', { 
                 type: 'error',
                 title: 'Erro'
@@ -416,7 +437,7 @@ export class ComprasManager {
                                     <tbody>
                                         ${items.map(item => `
                                             <tr>
-                                                <td>${escapeHTML(item.name || item.product_name || 'Item')}</td>
+                                                <td>${escapeHTML(item.ingredient_name || item.name || item.product_name || 'Item')}</td>
                                                 <td>${item.quantity || 1}</td>
                                                 <td>R$ ${this.formatCurrency(item.unit_price || item.price || 0)}</td>
                                                 <td>R$ ${this.formatCurrency((item.unit_price || item.price || 0) * (item.quantity || 1))}</td>
@@ -507,6 +528,242 @@ export class ComprasManager {
             'Paid': 'Pago'
         };
         return translations[status] || status;
+    }
+
+    /**
+     * Edita uma nota fiscal
+     * ALTERAÇÃO: Modal de edição básica (status, método pagamento, notas)
+     * @param {number} invoiceId - ID da nota fiscal
+     */
+    async editInvoice(invoiceId) {
+        try {
+            const invoice = await getPurchaseInvoiceById(invoiceId);
+            if (!invoice) {
+                showToast('Nota fiscal não encontrada', { 
+                    type: 'error',
+                    title: 'Erro'
+                });
+                return;
+            }
+
+            // ALTERAÇÃO: Criar modal de edição
+            this.showEditInvoiceModal(invoice);
+        } catch (error) {
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
+            showToast('Erro ao carregar nota fiscal', { 
+                type: 'error',
+                title: 'Erro'
+            });
+        }
+    }
+
+    /**
+     * Exibe modal de edição de nota fiscal
+     * ALTERAÇÃO: Novo método para modal de edição
+     * @param {Object} invoice - Dados da nota fiscal
+     */
+    showEditInvoiceModal(invoice) {
+        let modal = document.getElementById('modal-compra-editar');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modal-compra-editar';
+            modal.className = 'modal';
+            document.body.appendChild(modal);
+        }
+
+        const invoiceNumber = escapeHTML(invoice.invoice_number || 'N/A');
+        const currentStatus = invoice.payment_status || 'Pending';
+        const currentMethod = invoice.payment_method || '';
+        const currentNotes = invoice.notes || '';
+
+        modal.innerHTML = `
+            <div class="div-overlay" data-close-modal="modal-compra-editar"></div>
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="header-modal">
+                    <h2>Editar Nota Fiscal ${invoiceNumber}</h2>
+                    <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-compra-editar" aria-label="Fechar modal"></i>
+                </div>
+                <div class="conteudo-modal">
+                    <form id="form-editar-compra">
+                        <div class="form-field-wrapper">
+                            <div class="div-input">
+                                <select id="edit-compra-payment-status" required>
+                                    <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''}>Pendente</option>
+                                    <option value="Paid" ${currentStatus === 'Paid' ? 'selected' : ''}>Pago</option>
+                                </select>
+                                <label for="edit-compra-payment-status" class="active">Status do Pagamento *</label>
+                            </div>
+                            <small class="form-text">Atualize o status de pagamento da nota fiscal</small>
+                        </div>
+
+                        <div class="form-field-wrapper">
+                            <div class="div-input">
+                                <select id="edit-compra-payment-method">
+                                    <option value="">Selecione...</option>
+                                    <option value="money" ${currentMethod === 'money' ? 'selected' : ''}>Dinheiro</option>
+                                    <option value="credit" ${currentMethod === 'credit' ? 'selected' : ''}>Cartão de Crédito</option>
+                                    <option value="debit" ${currentMethod === 'debit' ? 'selected' : ''}>Cartão de Débito</option>
+                                    <option value="pix" ${currentMethod === 'pix' ? 'selected' : ''}>PIX</option>
+                                </select>
+                                <label for="edit-compra-payment-method" class="${currentMethod ? 'active' : ''}">Forma de Pagamento</label>
+                            </div>
+                            <small class="form-text">Método de pagamento utilizado (opcional)</small>
+                        </div>
+
+                        <div class="form-field-wrapper">
+                            <div class="div-input">
+                                <textarea id="edit-compra-notes" rows="3">${escapeHTML(currentNotes)}</textarea>
+                                <label for="edit-compra-notes" class="${currentNotes ? 'active' : ''}">Observações</label>
+                            </div>
+                            <small class="form-text">Informações adicionais sobre a compra (opcional)</small>
+                        </div>
+
+                        <div class="form-info-box" style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 16px;">
+                            <p style="margin: 0; font-size: 14px; color: #92400e;">
+                                <i class="fa-solid fa-info-circle" aria-hidden="true"></i>
+                                <strong>Nota:</strong> Por enquanto, apenas status, método de pagamento e observações podem ser editados. 
+                                A edição de itens será implementada em breve.
+                            </p>
+                        </div>
+                    </form>
+                </div>
+                <div class="footer-modal">
+                    <button type="button" class="btn-cancelar" data-close-modal="modal-compra-editar">Cancelar</button>
+                    <button type="button" class="btn-salvar" id="btn-save-edit-compra" data-invoice-id="${invoice.id}">
+                        Salvar Alterações
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // Configurar event listeners
+        const btnSave = document.getElementById('btn-save-edit-compra');
+        if (btnSave) {
+            btnSave.addEventListener('click', () => {
+                this.saveEditInvoice(invoice.id);
+            });
+        }
+
+        // Fechar ao clicar fora
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.closest('[data-close-modal="modal-compra-editar"]')) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // Gerenciar estados dos inputs
+        const inputs = modal.querySelectorAll('.div-input input, .div-input select, .div-input textarea');
+        gerenciarInputsEspecificos(inputs);
+    }
+
+    /**
+     * Salva alterações da nota fiscal
+     * ALTERAÇÃO: Novo método para salvar edição
+     * @param {number} invoiceId - ID da nota fiscal
+     */
+    async saveEditInvoice(invoiceId) {
+        try {
+            const paymentStatus = document.getElementById('edit-compra-payment-status')?.value;
+            const paymentMethod = document.getElementById('edit-compra-payment-method')?.value || null;
+            const notes = document.getElementById('edit-compra-notes')?.value.trim() || null;
+
+            if (!paymentStatus) {
+                showToast('Status do pagamento é obrigatório', { 
+                    type: 'error',
+                    title: 'Erro'
+                });
+                return;
+            }
+
+            const updateData = {
+                payment_status: paymentStatus,
+                payment_method: paymentMethod,
+                notes: notes
+            };
+
+            // Se mudou para Paid, adicionar payment_date se não existir
+            if (paymentStatus === 'Paid') {
+                const invoice = await getPurchaseInvoiceById(invoiceId);
+                if (invoice && !invoice.payment_date) {
+                    updateData.payment_date = new Date().toISOString();
+                }
+            }
+
+            await updatePurchaseInvoice(invoiceId, updateData);
+
+            showToast('Nota fiscal atualizada com sucesso!', { 
+                type: 'success',
+                title: 'Sucesso'
+            });
+
+            // Fechar modal
+            const modal = document.getElementById('modal-compra-editar');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+
+            // Recarregar lista
+            await this.loadInvoices();
+        } catch (error) {
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
+            const errorMessage = error.message || 'Erro ao atualizar nota fiscal';
+            showToast(errorMessage, { 
+                type: 'error',
+                title: 'Erro'
+            });
+        }
+    }
+
+    /**
+     * Confirma exclusão de nota fiscal
+     * ALTERAÇÃO: Novo método para exclusão
+     * @param {number} invoiceId - ID da nota fiscal
+     */
+    async confirmDeleteInvoice(invoiceId) {
+        try {
+            const invoice = await getPurchaseInvoiceById(invoiceId);
+            if (!invoice) {
+                showToast('Nota fiscal não encontrada', { 
+                    type: 'error',
+                    title: 'Erro'
+                });
+                return;
+            }
+
+            const invoiceNumber = invoice.invoice_number || 'N/A';
+            const confirmed = confirm(
+                `Tem certeza que deseja excluir a nota fiscal ${invoiceNumber}?\n\n` +
+                `⚠️ ATENÇÃO: Esta ação irá:\n` +
+                `- Reverter a entrada de estoque dos ingredientes\n` +
+                `- Remover o movimento financeiro relacionado\n` +
+                `- Excluir permanentemente a nota fiscal\n\n` +
+                `Esta ação não pode ser desfeita!`
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            // ALTERAÇÃO: Excluir nota fiscal
+            await deletePurchaseInvoice(invoiceId);
+            
+            showToast('Nota fiscal excluída com sucesso!', { 
+                type: 'success',
+                title: 'Sucesso'
+            });
+
+            // Recarregar lista
+            await this.loadInvoices();
+        } catch (error) {
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
+            const errorMessage = error.message || 'Erro ao excluir nota fiscal';
+            showToast(errorMessage, { 
+                type: 'error',
+                title: 'Erro'
+            });
+        }
     }
 }
 

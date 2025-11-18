@@ -26,7 +26,7 @@ export class MovimentacaoForm {
      */
     async init() {
         if (!this.modal) {
-            console.error('Modal de movimentação não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -61,7 +61,7 @@ export class MovimentacaoForm {
             await this.render();
             this.showModal();
         } catch (error) {
-            console.error('Erro ao carregar movimentação:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar movimentação', { 
                 type: 'error',
                 title: 'Erro'
@@ -421,7 +421,7 @@ export class MovimentacaoForm {
                 this.onSuccess();
             }
         } catch (error) {
-            console.error('Erro ao salvar movimentação:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao salvar movimentação', { 
                 type: 'error',
                 title: 'Erro'
@@ -537,7 +537,7 @@ export class MovimentacaoForm {
             
             return categories || [];
         } catch (error) {
-            console.warn('Erro ao carregar categorias financeiras:', error);
+            // ALTERAÇÃO: Removido console.warn - retornar categorias padrão em caso de erro
             // Retornar categorias padrão em caso de erro
             return [
                 { name: 'Vendas', typeCompatible: 'REVENUE' },

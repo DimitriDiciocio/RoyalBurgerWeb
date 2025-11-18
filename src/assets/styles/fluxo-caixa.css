@@ -816,9 +816,33 @@
 
 .compra-card-footer {
     display: flex;
-    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-top: 1rem;
     padding-top: 1rem;
     border-top: 1px solid #e5e7eb;
+}
+
+/* ALTERAÇÃO: Ajustar tamanho dos botões no footer */
+.compra-card-footer .financial-btn {
+    flex: 0 1 auto;
+    min-width: 120px;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
+/* ALTERAÇÃO: Botão de excluir com estilo de perigo */
+.compra-card-footer .financial-btn-danger {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+}
+
+.compra-card-footer .financial-btn-danger:hover {
+    background-color: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* === GESTÃO DE RECORRÊNCIAS === */

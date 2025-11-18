@@ -27,7 +27,7 @@ export class FinancialDashboard {
      */
     async init() {
         if (!this.container) {
-            console.error('Container do dashboard não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -116,7 +116,7 @@ export class FinancialDashboard {
             this.renderCharts(summary);
             await this.loadRecentMovements();
         } catch (error) {
-            console.error('Erro ao carregar dados do dashboard:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar dados do dashboard', { 
                 type: 'error',
                 title: 'Erro'
@@ -274,7 +274,7 @@ export class FinancialDashboard {
     renderCharts(summary) {
         // Verificar se Chart.js está disponível
         if (typeof Chart === 'undefined') {
-            console.warn('Chart.js não está disponível. Gráficos não serão renderizados.');
+            // ALTERAÇÃO: Removido console.warn - Chart.js pode não estar disponível em todos os ambientes
             return;
         }
 
@@ -451,20 +451,20 @@ export class FinancialDashboard {
             // Renderizar cards de movimentações
             renderFinancialMovementCards(recentMovements, container, {
                 onEdit: (movementId) => {
-                    // TODO: Implementar edição de movimentação
-                    console.log('Editar movimentação:', movementId);
+                    // TODO: REVISAR Implementar edição de movimentação
+                    // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
                 },
                 onDelete: (movementId) => {
-                    // TODO: Implementar exclusão de movimentação
-                    console.log('Excluir movimentação:', movementId);
+                    // TODO: REVISAR Implementar exclusão de movimentação
+                    // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
                 },
                 onViewRelated: (entityType, entityId) => {
-                    // TODO: Implementar navegação para entidade relacionada
-                    console.log('Ver entidade relacionada:', entityType, entityId);
+                    // TODO: REVISAR Implementar navegação para entidade relacionada
+                    // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
                 }
             });
         } catch (error) {
-            console.error('Erro ao carregar movimentações recentes:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             const container = document.getElementById('recent-movements-list');
             if (container) {
                 // Não exibir erro para o usuário, apenas mostrar mensagem neutra

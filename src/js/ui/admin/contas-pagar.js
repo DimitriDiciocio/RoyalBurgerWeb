@@ -24,7 +24,7 @@ export class ContasPagarManager {
      */
     async init() {
         if (!this.container) {
-            console.error('Container de contas a pagar não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -110,7 +110,7 @@ export class ContasPagarManager {
             this.renderPendingPayments();
             this.updateTotalCount();
         } catch (error) {
-            console.error('Erro ao carregar contas a pagar:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar contas a pagar', { 
                 type: 'error',
                 title: 'Erro'
@@ -142,13 +142,13 @@ export class ContasPagarManager {
         // Usar componente de card de movimentação
         renderFinancialMovementCards(this.pendingPayments, listContainer, {
             onEdit: (movementId) => {
-                // TODO: Implementar edição
-                console.log('Editar movimentação:', movementId);
+                // TODO: REVISAR Implementar edição de movimentação
+                // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
             },
             onDelete: null, // Não permitir exclusão direta
             onViewRelated: (entityType, entityId) => {
-                // TODO: Implementar navegação
-                console.log('Ver entidade relacionada:', entityType, entityId);
+                // TODO: REVISAR Implementar navegação para entidade relacionada
+                // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
             }
         });
     }

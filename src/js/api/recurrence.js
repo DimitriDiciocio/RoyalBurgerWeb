@@ -69,3 +69,4 @@ export async function generateRecurringMovements(year = null, month = null, week
     });
 }
 
+

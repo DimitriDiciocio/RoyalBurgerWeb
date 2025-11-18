@@ -18,10 +18,6 @@ const STORAGE_KEYS = {
 // Considerar usar variável de ambiente ou configuração dinâmica baseada no ambiente
 // (desenvolvimento/produção). Para produção, usar HTTPS obrigatoriamente.
 export const API_BASE_URL = (() => {
-  // ALTERAÇÃO: Permitir override via variável de ambiente se disponível
-  if (typeof window !== "undefined" && window.API_BASE_URL) {
-    return window.API_BASE_URL;
-  }
   return "http://127.0.0.1:5000";
 })();
 
@@ -84,7 +80,29 @@ export async function apiRequest(
 
   if (!skipAuth) {
     const token = getStoredToken();
-    if (token) baseHeaders["Authorization"] = `Bearer ${token}`;
+    if (token) {
+      baseHeaders["Authorization"] = `Bearer ${token}`;
+      // ALTERAÇÃO: Log removido em produção - usar apenas em desenvolvimento
+      const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+      if (isDev) {
+        // eslint-disable-next-line no-console
+        console.log('[API] Token encontrado, enviando Authorization header:', {
+          tokenLength: token.length,
+          tokenPrefix: token.substring(0, 20) + '...',
+          url: url
+        });
+      }
+    } else {
+      // ALTERAÇÃO: Log removido em produção - usar apenas em desenvolvimento
+      const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+      if (isDev) {
+        // eslint-disable-next-line no-console
+        console.error('[API] Token não encontrado no localStorage!', {
+          storageKey: STORAGE_KEYS.token,
+          url: url
+        });
+      }
+    }
   }
 
   const fetchOptions = {

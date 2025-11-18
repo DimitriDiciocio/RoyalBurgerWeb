@@ -150,7 +150,7 @@ export function renderFinancialMovementCards(movements, container, options = {})
         : container;
 
     if (!containerElement) {
-        console.error('Container não encontrado para renderizar cards de movimentações');
+        // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
         return;
     }
 
@@ -290,4 +290,5 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
 

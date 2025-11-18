@@ -45,7 +45,7 @@ export function formatDateForAPI(date) {
     }
     
     if (isNaN(dateObj.getTime())) {
-        console.warn('Data inválida:', date);
+        // ALTERAÇÃO: Removido console.warn - usar logger se necessário em produção
         return null;
     }
     

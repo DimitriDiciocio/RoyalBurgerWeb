@@ -17,11 +17,16 @@ export class CompraForm {
     constructor(modalId) {
         this.modal = document.getElementById(modalId);
         this.form = null;
-        this.ingredients = [];
+        this.ingredients = []; // Todos os ingredientes
+        this.suppliers = []; // Lista de fornecedores únicos
+        this.filteredIngredients = []; // Ingredientes filtrados por fornecedor
+        this.selectedSupplier = null; // Fornecedor selecionado
         this.items = []; // Lista de itens da nota fiscal
         this.onSuccess = null;
         this.abortController = null; // Para cancelar requisições pendentes
         this.eventListeners = new Map(); // Para cleanup de event listeners
+        this.draftKey = 'compra-form-draft'; // ALTERAÇÃO: Chave para localStorage
+        this.autoSaveInterval = null; // ALTERAÇÃO: Intervalo de auto-save
     }
 
     /**
@@ -41,6 +46,7 @@ export class CompraForm {
 
     /**
      * Carrega lista de ingredientes
+     * ALTERAÇÃO: Extrair fornecedores únicos
      */
     async loadIngredients() {
         // ALTERAÇÃO: Usar cache para evitar chamadas API duplicadas
@@ -49,6 +55,8 @@ export class CompraForm {
         
         if (cached) {
             this.ingredients = cached;
+            this.extractSuppliers();
+            this.filteredIngredients = [...this.ingredients];
             return;
         }
 
@@ -57,21 +65,67 @@ export class CompraForm {
             this.ingredients = response.items || response || [];
             // ALTERAÇÃO: Cache por 5 minutos
             cacheManager.set(cacheKey, this.ingredients, 5 * 60 * 1000);
+            this.extractSuppliers();
+            this.filteredIngredients = [...this.ingredients];
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro será tratado pelo usuário se necessário
             this.ingredients = [];
+            this.suppliers = [];
+            this.filteredIngredients = [];
+        }
+    }
+
+    /**
+     * Extrai lista de fornecedores únicos dos ingredientes
+     * ALTERAÇÃO: Novo método para extrair fornecedores
+     */
+    extractSuppliers() {
+        const suppliersSet = new Set();
+        
+        this.ingredients.forEach(ingredient => {
+            if (ingredient.supplier && ingredient.supplier.trim() !== '' && ingredient.supplier !== 'Não informado') {
+                suppliersSet.add(ingredient.supplier.trim());
+            }
+        });
+
+        this.suppliers = Array.from(suppliersSet).sort((a, b) => 
+            a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
+        );
+    }
+
+    /**
+     * Filtra ingredientes por fornecedor
+     * ALTERAÇÃO: Novo método para filtrar ingredientes
+     */
+    filterIngredientsBySupplier(supplierName) {
+        if (!supplierName || supplierName === '') {
+            this.filteredIngredients = [...this.ingredients];
+            this.selectedSupplier = null;
+        } else {
+            this.filteredIngredients = this.ingredients.filter(ing => 
+                ing.supplier && ing.supplier.trim() === supplierName.trim()
+            );
+            this.selectedSupplier = supplierName;
         }
     }
 
     /**
      * Abre modal para nova compra
+     * ALTERAÇÃO: Verificar e carregar rascunho do localStorage
      * @param {Function} onSuccess - Callback chamado após sucesso
      */
     async openNew(onSuccess = null) {
         this.items = [];
         this.onSuccess = onSuccess;
         await this.render();
-        this.showModal();
+        
+        // ALTERAÇÃO: Verificar se existe rascunho salvo
+        if (this.hasDraft()) {
+            this.showDraftConfirmation();
+        } else {
+            this.showModal();
+            this.startAutoSave();
+        }
     }
 
     /**
@@ -90,6 +144,7 @@ export class CompraForm {
                 </div>
                 <div class="conteudo-modal">
                     <form id="form-nova-compra">
+                        <!-- 1. Número da Nota Fiscal -->
                         <div class="form-field-wrapper">
                             <div class="div-input">
                                 <input type="text" id="compra-invoice-number" 
@@ -99,15 +154,50 @@ export class CompraForm {
                             <small class="form-text">Digite o número da nota fiscal</small>
                         </div>
 
+                        <!-- 2. Fornecedor (Select Dinâmico) -->
                         <div class="form-field-wrapper">
                             <div class="div-input">
-                                <input type="text" id="compra-supplier-name" 
-                                       required>
-                                <label for="compra-supplier-name">Fornecedor *</label>
+                                <select id="compra-supplier-select">
+                                    <option value="">Selecione o fornecedor...</option>
+                                    ${this.suppliers.map(supplier => `
+                                        <option value="${escapeHTML(supplier)}">${escapeHTML(supplier)}</option>
+                                    `).join('')}
+                                </select>
+                                <label for="compra-supplier-select">Fornecedor *</label>
                             </div>
-                            <small class="form-text">Digite o nome do fornecedor</small>
+                            <small class="form-text">Selecione o fornecedor para filtrar insumos, ou escolha um insumo para selecionar automaticamente</small>
                         </div>
 
+                        <!-- 3. Itens da Nota Fiscal -->
+                        <div class="compra-items-section">
+                            <div class="compra-items-header">
+                                <h3>Itens da Nota Fiscal *</h3>
+                                <button type="button" class="btn-adicionar-item" id="btn-adicionar-item">
+                                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                    <span>Adicionar Item</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Formulário para adicionar item -->
+                            <div class="compra-item-form-wrapper" id="compra-item-form-wrapper" style="display: none;">
+                                <!-- Formulário será inserido aqui -->
+                            </div>
+                            
+                            <!-- Lista de itens cadastrados -->
+                            <div class="compra-items-cadastrados" id="compra-items-cadastrados">
+                                <p class="compra-no-items" id="compra-no-items">Nenhum item adicionado. Clique em "Adicionar Item" para começar.</p>
+                            </div>
+                            
+                            <!-- 4. Valor Total -->
+                            <div class="compra-total-wrapper">
+                                <div class="compra-total">
+                                    <span class="total-label">Valor Total:</span>
+                                    <span class="total-value" id="compra-total-value">R$ 0,00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5. Data da Compra -->
                         <div class="form-field-wrapper">
                             <div class="div-input">
                                 <input type="date" id="compra-purchase-date" 
@@ -117,6 +207,7 @@ export class CompraForm {
                             <small class="form-text">Selecione a data da compra</small>
                         </div>
 
+                        <!-- 6. Forma de Pagamento -->
                         <div class="form-field-wrapper">
                             <div class="div-input">
                                 <select id="compra-payment-method">
@@ -126,43 +217,24 @@ export class CompraForm {
                                     <option value="debit">Cartão de Débito</option>
                                     <option value="pix">PIX</option>
                                 </select>
-                                <label for="compra-payment-method">Método de Pagamento</label>
+                                <label for="compra-payment-method">Forma de Pagamento</label>
                             </div>
                             <small class="form-text">Selecione como foi realizado o pagamento (opcional)</small>
                         </div>
 
+                        <!-- 7. Status do Pagamento -->
                         <div class="form-field-wrapper">
                             <div class="div-input">
                                 <select id="compra-payment-status">
                                     <option value="Pending" selected>Pendente</option>
                                     <option value="Paid">Pago</option>
                                 </select>
-                                <label for="compra-payment-status" class="active">Status de Pagamento</label>
+                                <label for="compra-payment-status" class="active">Status do Pagamento</label>
                             </div>
                             <small class="form-text">Indique se o pagamento já foi realizado ou está pendente</small>
                         </div>
 
-                        <!-- Itens da Nota Fiscal -->
-                        <div class="compra-items-section">
-                            <div class="compra-items-header">
-                                <h3>Itens da Nota Fiscal *</h3>
-                                <button type="button" class="btn-adicionar-item" id="btn-adicionar-item">
-                                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                                    <span>Adicionar Item</span>
-                                </button>
-                            </div>
-                            <div class="compra-items-list" id="compra-items-list">
-                                <!-- Itens serão adicionados dinamicamente -->
-                                <p class="compra-no-items" id="compra-no-items">Nenhum item adicionado. Clique em "Adicionar Item" para começar.</p>
-                            </div>
-                            <div class="compra-total-wrapper">
-                                <div class="compra-total">
-                                    <span class="total-label">Total:</span>
-                                    <span class="total-value" id="compra-total-value">R$ 0,00</span>
-                                </div>
-                            </div>
-                        </div>
-
+                        <!-- 8. Observações -->
                         <div class="form-field-wrapper">
                             <div class="div-input">
                                 <textarea id="compra-notes" rows="3"></textarea>
@@ -184,78 +256,158 @@ export class CompraForm {
         // Configurar event listeners do formulário
         this.setupFormListeners();
         
+        // ALTERAÇÃO: Configurar listener do select de fornecedor
+        this.setupSupplierListener();
+        
         // Gerenciar estados dos inputs
         const inputs = this.modal.querySelectorAll('.div-input input, .div-input select, .div-input textarea');
         gerenciarInputsEspecificos(inputs);
+        
+        // ALTERAÇÃO: Configurar listeners para auto-save
+        this.setupAutoSaveListeners();
+    }
 
-        // Adicionar primeiro item automaticamente
-        this.addItem();
+    /**
+     * Configura listeners para auto-save
+     * ALTERAÇÃO: Novo método para salvar automaticamente
+     */
+    setupAutoSaveListeners() {
+        // Auto-save em mudanças de campos principais
+        const invoiceInput = document.getElementById('compra-invoice-number');
+        const supplierSelect = document.getElementById('compra-supplier-select');
+        const dateInput = document.getElementById('compra-purchase-date');
+        const paymentMethodSelect = document.getElementById('compra-payment-method');
+        const paymentStatusSelect = document.getElementById('compra-payment-status');
+        const notesTextarea = document.getElementById('compra-notes');
+
+        const fields = [invoiceInput, supplierSelect, dateInput, paymentMethodSelect, paymentStatusSelect, notesTextarea];
+        
+        fields.forEach(field => {
+            if (field) {
+                field.addEventListener('change', () => {
+                    this.saveDraft();
+                });
+            }
+        });
+    }
+
+    /**
+     * Configura listener do select de fornecedor
+     * ALTERAÇÃO: Novo método para sincronizar fornecedor e insumos
+     */
+    setupSupplierListener() {
+        const supplierSelect = document.getElementById('compra-supplier-select');
+        if (!supplierSelect) return;
+
+        supplierSelect.addEventListener('change', () => {
+            const selectedSupplier = supplierSelect.value;
+            
+            if (selectedSupplier) {
+                // Filtrar ingredientes pelo fornecedor selecionado
+                this.filterIngredientsBySupplier(selectedSupplier);
+            } else {
+                // Restaurar todos os ingredientes
+                this.filterIngredientsBySupplier(null);
+            }
+
+            // Atualizar select de insumos no formulário de item (se estiver aberto)
+            this.updateIngredientSelectInForm();
+        });
     }
 
     /**
      * Configura event listeners do formulário
      */
     setupFormListeners() {
-        // Botão adicionar item
-        const btnAdicionarItem = document.getElementById('btn-adicionar-item');
-        if (btnAdicionarItem) {
-            btnAdicionarItem.addEventListener('click', () => {
-                this.addItem();
-            });
+        // ALTERAÇÃO: Usar delegação de eventos no modal para garantir funcionamento
+        const modalContent = document.getElementById('modal-content-nova-compra');
+        if (!modalContent) return;
+
+        // ALTERAÇÃO: Remover listener anterior se existir
+        if (this.modalClickHandler) {
+            modalContent.removeEventListener('click', this.modalClickHandler);
         }
 
-        // Botão salvar
-        const btnSave = document.getElementById('btn-save-compra');
-        if (btnSave) {
-            btnSave.addEventListener('click', () => {
+        // ALTERAÇÃO: Criar handler que será armazenado para posterior remoção
+        this.modalClickHandler = (e) => {
+            // Botão adicionar item
+            if (e.target.closest('#btn-adicionar-item')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.addItemToForm();
+                return;
+            }
+
+            // Botão confirmar item (adicionar à lista)
+            if (e.target.closest('.btn-confirmar-item')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const itemId = e.target.closest('.btn-confirmar-item').dataset.itemId;
+                this.confirmItem(itemId);
+                return;
+            }
+
+            // Botão remover item da lista
+            if (e.target.closest('.btn-remover-item-lista')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const itemId = e.target.closest('.btn-remover-item-lista').dataset.itemId;
+                this.removeItemFromList(itemId);
+                return;
+            }
+
+            // Botão salvar
+            if (e.target.closest('#btn-save-compra')) {
+                e.preventDefault();
+                e.stopPropagation();
                 this.handleSubmit();
-            });
-        }
+                return;
+            }
+
+            // Botão fechar modal
+            const closeBtn = e.target.closest('[data-close-modal="modal-nova-compra"]');
+            if (closeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                fecharModal('modal-nova-compra');
+                return;
+            }
+        };
+
+        // ALTERAÇÃO: Adicionar listener usando delegação de eventos
+        modalContent.addEventListener('click', this.modalClickHandler);
     }
 
     /**
-     * Adiciona um novo item à lista
+     * Adiciona formulário de novo item
+     * ALTERAÇÃO: Renomeado de addItem para addItemToForm
      */
-    addItem() {
-        const itemsList = document.getElementById('compra-items-list');
-        const noItemsMsg = document.getElementById('compra-no-items');
-        if (!itemsList) return;
+    addItemToForm() {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper) return;
 
-        const itemIndex = this.items.length;
-        const itemId = `item-${itemIndex}`;
-
-        this.items.push({
-            id: itemId,
-            ingredient_id: null,
-            ingredient_data: null, // Dados completos do insumo (fornecedor, unidade, preço de referência)
-            quantity: null,
-            total_price: null, // Preço total (não unitário)
-            unit_price: null, // Calculado automaticamente para o backend
-            isCalculating: false // Flag para prevenir loops de cálculo
-        });
-
-        if (noItemsMsg) {
-            noItemsMsg.style.display = 'none';
+        // Verificar se já existe um formulário aberto
+        if (formWrapper.style.display !== 'none') {
+            showToast('Finalize o item atual antes de adicionar outro', { type: 'warning', title: 'Atenção' });
+            return;
         }
 
+        const itemIndex = this.items.length;
+        const itemId = `item-${Date.now()}`; // ALTERAÇÃO: Usar timestamp para ID único
+
         const itemHTML = `
-            <div class="compra-item" data-item-id="${itemId}">
-                <div class="compra-item-header">
-                    <h4>Item ${itemIndex + 1}</h4>
-                    <button type="button" class="btn-remover-item" data-item-id="${itemId}" aria-label="Remover item">
-                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div class="compra-item-body">
+            <div class="compra-item-form" data-item-id="${itemId}">
+                <h4>Novo Item</h4>
+                <div class="compra-item-form-body">
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <select class="compra-item-ingredient" data-item-id="${itemId}" required>
                                 <option value="">Selecione o insumo...</option>
-                                ${this.ingredients.map(ing => `
-                                    <option value="${ing.id}">${escapeHTML(ing.name || 'Insumo')}</option>
+                                ${this.filteredIngredients.map(ing => `
+                                    <option value="${ing.id}" data-supplier="${escapeHTML(ing.supplier || '')}">${escapeHTML(ing.name || 'Insumo')}</option>
                                 `).join('')}
                             </select>
-                            <label for="${itemId}-ingredient" class="">Insumo *</label>
+                            <label class="">Insumo *</label>
                         </div>
                         <small class="form-text">Selecione o insumo que foi comprado</small>
                     </div>
@@ -268,12 +420,8 @@ export class CompraForm {
                                 <span class="info-value compra-item-supplier" data-item-id="${itemId}">-</span>
                             </div>
                             <div class="compra-info-item">
-                                <span class="info-label">Unidade padrão:</span>
+                                <span class="info-label">Unidade:</span>
                                 <span class="info-value compra-item-unit" data-item-id="${itemId}">-</span>
-                            </div>
-                            <div class="compra-info-item" style="display: none;">
-                                <span class="info-label">Preço de referência:</span>
-                                <span class="info-value compra-item-ref-price" data-item-id="${itemId}">-</span>
                             </div>
                         </div>
                     </div>
@@ -284,127 +432,691 @@ export class CompraForm {
                                 <input type="number" class="compra-item-quantity" 
                                        data-item-id="${itemId}" 
                                        step="0.001" 
-                                       min="0">
-                                <label for="${itemId}-quantity" class="">Quantidade</label>
+                                       min="0" 
+                                       required>
+                                <label>Quantidade *</label>
                             </div>
-                            <small class="form-text">Quantidade comprada (informe quantidade OU valor total)</small>
+                            <small class="form-text">Quantidade comprada</small>
                         </div>
                         <div class="form-field-wrapper">
                             <div class="div-input">
                                 <input type="number" class="compra-item-price" 
                                        data-item-id="${itemId}" 
                                        step="0.01" 
-                                       min="0">
-                                <label for="${itemId}-price" class="">Preço Total (R$)</label>
+                                       min="0" 
+                                       required>
+                                <label>Valor Total (R$) *</label>
                             </div>
-                            <small class="form-text">Valor total gasto (informe quantidade OU valor total)</small>
+                            <small class="form-text">Valor total gasto</small>
                         </div>
+                    </div>
+
+                    <div class="compra-item-form-actions">
+                        <button type="button" class="btn-cancelar-item" data-item-id="${itemId}">
+                            <i class="fa-solid fa-times" aria-hidden="true"></i>
+                            Cancelar
+                        </button>
+                        <button type="button" class="btn-confirmar-item" data-item-id="${itemId}">
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            Confirmar
+                        </button>
                     </div>
                 </div>
             </div>
         `;
 
-        itemsList.insertAdjacentHTML('beforeend', itemHTML);
+        formWrapper.innerHTML = itemHTML;
+        formWrapper.style.display = 'block';
 
-        // Configurar event listeners do item
-        this.setupItemListeners(itemId);
+        // Configurar event listeners do formulário
+        this.setupFormItemListeners(itemId);
 
-        // Gerenciar estados dos inputs do item
-        const itemElement = itemsList.querySelector(`[data-item-id="${itemId}"]`);
-        const itemInputs = itemElement.querySelectorAll('.div-input input, .div-input select');
+        // Gerenciar estados dos inputs
+        const itemInputs = formWrapper.querySelectorAll('.div-input input, .div-input select');
         gerenciarInputsEspecificos(itemInputs);
+
+        // Adicionar listener para cancelar
+        const btnCancelar = formWrapper.querySelector('.btn-cancelar-item');
+        if (btnCancelar) {
+            btnCancelar.addEventListener('click', () => {
+                formWrapper.innerHTML = '';
+                formWrapper.style.display = 'none';
+            });
+        }
     }
 
     /**
-     * Configura event listeners de um item
-     * @param {string} itemId - ID do item
+     * Configura event listeners do formulário de item
+     * ALTERAÇÃO: Novo método para configurar listeners do formulário
      */
-    setupItemListeners(itemId) {
-        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (!itemElement) return;
+    setupFormItemListeners(itemId) {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper) return;
 
-        // Botão remover
-        const btnRemover = itemElement.querySelector('.btn-remover-item');
-        if (btnRemover) {
-            btnRemover.addEventListener('click', () => {
-                this.removeItem(itemId);
-            });
-        }
-
-        // Atualizar quando ingrediente for selecionado
-        const ingredientSelect = itemElement.querySelector('.compra-item-ingredient');
+        // Select de ingrediente
+        const ingredientSelect = formWrapper.querySelector('.compra-item-ingredient');
         if (ingredientSelect) {
             ingredientSelect.addEventListener('change', async () => {
-                await this.onIngredientSelected(itemId);
+                await this.onFormIngredientSelected(itemId);
             });
         }
 
-        // Atualizar total quando quantidade ou preço mudarem (cálculo dinâmico)
-        const quantityInput = itemElement.querySelector('.compra-item-quantity');
-        const priceInput = itemElement.querySelector('.compra-item-price');
+        // Inputs de quantidade e preço com cálculo automático
+        const quantityInput = formWrapper.querySelector('.compra-item-quantity');
+        const priceInput = formWrapper.querySelector('.compra-item-price');
 
-        // ALTERAÇÃO: Debounce para melhorar performance em digitação rápida
-        if (quantityInput) {
-            const debouncedHandler = debounce(() => {
-                if (!this.items.find(i => i.id === itemId)?.isCalculating) {
-                    this.calculatePriceFromQuantity(itemId);
-                }
-            }, 300);
-            
-            quantityInput.addEventListener('input', debouncedHandler);
-            // ALTERAÇÃO: Armazenar listener para cleanup
-            const listenerKey = `${itemId}:quantity:input`;
-            this.eventListeners.set(listenerKey, { element: quantityInput, event: 'input', handler: debouncedHandler });
-        }
+        if (quantityInput && priceInput) {
+            quantityInput.addEventListener('input', debounce(() => {
+                this.calculateFormPriceFromQuantity(itemId);
+            }, 300));
 
-        if (priceInput) {
-            const debouncedHandler = debounce(() => {
-                if (!this.items.find(i => i.id === itemId)?.isCalculating) {
-                    this.calculateQuantityFromPrice(itemId);
-                }
-            }, 300);
-            
-            priceInput.addEventListener('input', debouncedHandler);
-            // ALTERAÇÃO: Armazenar listener para cleanup
-            const listenerKey = `${itemId}:price:input`;
-            this.eventListeners.set(listenerKey, { element: priceInput, event: 'input', handler: debouncedHandler });
+            priceInput.addEventListener('input', debounce(() => {
+                this.calculateFormQuantityFromPrice(itemId);
+            }, 300));
         }
     }
 
     /**
-     * Remove um item da lista
-     * @param {string} itemId - ID do item
+     * Busca informações do insumo no formulário
+     * ALTERAÇÃO: Sincronizar fornecedor ao selecionar insumo
      */
-    removeItem(itemId) {
-        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+    async onFormIngredientSelected(itemId) {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper) return;
+
+        const ingredientSelect = formWrapper.querySelector('.compra-item-ingredient');
+        const ingredientId = ingredientSelect ? parseInt(ingredientSelect.value) : null;
+
+        if (!ingredientId) {
+            const infoDiv = formWrapper.querySelector('.compra-item-info');
+            if (infoDiv) infoDiv.style.display = 'none';
+            return;
+        }
+
+        try {
+            if (this.abortController) {
+                this.abortController.abort();
+            }
+            this.abortController = new AbortController();
+            
+            const cacheKey = `ingredient:${ingredientId}`;
+            let ingredient = cacheManager.get(cacheKey);
+            
+            if (!ingredient) {
+                ingredient = await getIngredientById(ingredientId);
+                cacheManager.set(cacheKey, ingredient, 10 * 60 * 1000);
+            }
+            
+            // Armazenar dados temporariamente
+            formWrapper.dataset.ingredientData = JSON.stringify({
+                id: ingredientId,
+                name: ingredient.name,
+                supplier: ingredient.supplier || 'Não informado',
+                stock_unit: ingredient.stock_unit || 'un',
+                price: ingredient.price || 0
+            });
+
+            // Exibir informações
+            const infoDiv = formWrapper.querySelector('.compra-item-info');
+            const supplierSpan = formWrapper.querySelector('.compra-item-supplier');
+            const unitSpan = formWrapper.querySelector('.compra-item-unit');
+
+            if (infoDiv) infoDiv.style.display = 'block';
+            if (supplierSpan) supplierSpan.textContent = ingredient.supplier || 'Não informado';
+            if (unitSpan) unitSpan.textContent = this.normalizeUnit(ingredient.stock_unit || 'un').toUpperCase();
+
+            // ALTERAÇÃO: Sincronizar fornecedor bidirecional
+            const supplierSelect = document.getElementById('compra-supplier-select');
+            if (supplierSelect && ingredient.supplier && ingredient.supplier !== 'Não informado') {
+                const currentSupplier = supplierSelect.value;
+                
+                // Se nenhum fornecedor selecionado, ou fornecedor diferente, atualizar
+                if (!currentSupplier || currentSupplier !== ingredient.supplier) {
+                    // Definir fornecedor no select
+                    supplierSelect.value = ingredient.supplier;
+                    const label = supplierSelect.closest('.div-input')?.querySelector('label');
+                    if (label) label.classList.add('active');
+                    
+                    // Filtrar ingredientes pelo fornecedor
+                    this.filterIngredientsBySupplier(ingredient.supplier);
+                    
+                    // Atualizar select de insumos
+                    this.updateIngredientSelectInForm();
+                }
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            showToast('Erro ao carregar informações do insumo', { type: 'error', title: 'Erro' });
+        }
+    }
+
+    /**
+     * Atualiza select de insumos no formulário de item
+     * ALTERAÇÃO: Novo método para atualizar select dinamicamente
+     */
+    updateIngredientSelectInForm() {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper || formWrapper.style.display === 'none') return;
+
+        const ingredientSelect = formWrapper.querySelector('.compra-item-ingredient');
+        if (!ingredientSelect) return;
+
+        const currentValue = ingredientSelect.value;
+
+        // Reconstruir options
+        const optionsHTML = `
+            <option value="">Selecione o insumo...</option>
+            ${this.filteredIngredients.map(ing => `
+                <option value="${ing.id}" data-supplier="${escapeHTML(ing.supplier || '')}">${escapeHTML(ing.name || 'Insumo')}</option>
+            `).join('')}
+        `;
+
+        ingredientSelect.innerHTML = optionsHTML;
+
+        // Restaurar valor selecionado se ainda existir na lista filtrada
+        if (currentValue) {
+            const optionExists = this.filteredIngredients.some(ing => ing.id == currentValue);
+            if (optionExists) {
+                ingredientSelect.value = currentValue;
+            } else {
+                // Se o ingrediente não existe mais na lista filtrada, limpar seleção
+                ingredientSelect.value = '';
+                const label = ingredientSelect.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.remove('active');
+                
+                // Limpar informações do insumo
+                const infoDiv = formWrapper.querySelector('.compra-item-info');
+                if (infoDiv) infoDiv.style.display = 'none';
+                formWrapper.dataset.ingredientData = '';
+            }
+        }
+
+        // Atualizar gerenciamento de inputs
+        gerenciarInputsEspecificos([ingredientSelect]);
+    }
+
+    /**
+     * Calcula preço a partir da quantidade (formulário)
+     * ALTERAÇÃO: Novo método para formulário
+     */
+    calculateFormPriceFromQuantity(itemId) {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper) return;
+
+        const quantityInput = formWrapper.querySelector('.compra-item-quantity');
+        const priceInput = formWrapper.querySelector('.compra-item-price');
+        
+        if (!quantityInput || !priceInput) return;
+
+        const quantity = parseFloat(quantityInput.value);
+        if (isNaN(quantity) || quantity <= 0) return;
+
+        const ingredientData = formWrapper.dataset.ingredientData;
+        if (!ingredientData) return;
+
+        try {
+            const data = JSON.parse(ingredientData);
+            if (data.price > 0) {
+                const calculatedPrice = quantity * data.price;
+                priceInput.value = calculatedPrice.toFixed(2);
+                const label = priceInput.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.add('active');
+            }
+        } catch (e) {
+            // Ignorar erro de parse
+        }
+    }
+
+    /**
+     * Calcula quantidade a partir do preço (formulário)
+     * ALTERAÇÃO: Novo método para formulário
+     */
+    calculateFormQuantityFromPrice(itemId) {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper) return;
+
+        const quantityInput = formWrapper.querySelector('.compra-item-quantity');
+        const priceInput = formWrapper.querySelector('.compra-item-price');
+        
+        if (!quantityInput || !priceInput) return;
+
+        const totalPrice = parseFloat(priceInput.value);
+        if (isNaN(totalPrice) || totalPrice <= 0) return;
+
+        const ingredientData = formWrapper.dataset.ingredientData;
+        if (!ingredientData) return;
+
+        try {
+            const data = JSON.parse(ingredientData);
+            if (data.price > 0) {
+                const calculatedQuantity = totalPrice / data.price;
+                quantityInput.value = calculatedQuantity.toFixed(3);
+                const label = quantityInput.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.add('active');
+            }
+        } catch (e) {
+            // Ignorar erro de parse
+        }
+    }
+
+    /**
+     * Confirma o item e adiciona à lista
+     * ALTERAÇÃO: Novo método para confirmar item
+     */
+    confirmItem(itemId) {
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (!formWrapper) return;
+
+        // Validar campos
+        const ingredientSelect = formWrapper.querySelector('.compra-item-ingredient');
+        const quantityInput = formWrapper.querySelector('.compra-item-quantity');
+        const priceInput = formWrapper.querySelector('.compra-item-price');
+
+        const ingredientId = ingredientSelect ? parseInt(ingredientSelect.value) : null;
+        const quantity = quantityInput ? parseFloat(quantityInput.value) : null;
+        const totalPrice = priceInput ? parseFloat(priceInput.value) : null;
+
+        if (!ingredientId) {
+            showToast('Selecione um insumo', { type: 'error', title: 'Erro' });
+            ingredientSelect?.focus();
+            return;
+        }
+
+        if (!quantity || quantity <= 0) {
+            showToast('Informe a quantidade', { type: 'error', title: 'Erro' });
+            quantityInput?.focus();
+            return;
+        }
+
+        if (!totalPrice || totalPrice <= 0) {
+            showToast('Informe o valor total', { type: 'error', title: 'Erro' });
+            priceInput?.focus();
+            return;
+        }
+
+        // Obter dados do ingrediente
+        let ingredientData = null;
+        try {
+            ingredientData = JSON.parse(formWrapper.dataset.ingredientData || '{}');
+        } catch (e) {
+            showToast('Erro ao processar dados do insumo', { type: 'error', title: 'Erro' });
+            return;
+        }
+
+        // Adicionar à lista de itens
+        const item = {
+            id: itemId,
+            ingredient_id: ingredientId,
+            ingredient_data: ingredientData,
+            quantity: quantity,
+            total_price: totalPrice,
+            unit_price: totalPrice / quantity
+        };
+
+        this.items.push(item);
+
+        // Renderizar na lista
+        this.renderItemInList(item);
+
+        // Limpar formulário
+        formWrapper.innerHTML = '';
+        formWrapper.style.display = 'none';
+
+        // Atualizar total
+        this.updateGrandTotal();
+
+        // ALTERAÇÃO: Salvar rascunho após adicionar item
+        this.saveDraft();
+
+        showToast('Item adicionado com sucesso!', { type: 'success', title: 'Sucesso' });
+    }
+
+    /**
+     * Renderiza item na lista de itens cadastrados
+     * ALTERAÇÃO: Novo método para renderizar item na lista
+     */
+    renderItemInList(item) {
+        const itemsList = document.getElementById('compra-items-cadastrados');
+        const noItemsMsg = document.getElementById('compra-no-items');
+        
+        if (!itemsList) return;
+
+        // Esconder mensagem de "sem itens"
+        if (noItemsMsg) {
+            noItemsMsg.style.display = 'none';
+        }
+
+        const itemHTML = `
+            <div class="compra-item-cadastrado" data-item-id="${item.id}">
+                <div class="compra-item-cadastrado-content">
+                    <div class="compra-item-info-main">
+                        <div class="compra-item-nome">
+                            <i class="fa-solid fa-box" aria-hidden="true"></i>
+                            <span class="nome-insumo">${escapeHTML(item.ingredient_data?.name || 'Insumo')}</span>
+                        </div>
+                        <div class="compra-item-detalhes">
+                            <div class="detalhe-item">
+                                <span class="detalhe-label">Quantidade:</span>
+                                <span class="detalhe-value">${item.quantity.toFixed(3)} ${this.normalizeUnit(item.ingredient_data?.stock_unit || 'un').toUpperCase()}</span>
+                            </div>
+                            <div class="detalhe-item">
+                                <span class="detalhe-label">Valor:</span>
+                                <span class="detalhe-value valor-destaque">R$ ${this.formatCurrency(item.total_price)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-remover-item-lista" data-item-id="${item.id}" aria-label="Remover item">
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        itemsList.insertAdjacentHTML('beforeend', itemHTML);
+    }
+
+    /**
+     * Remove item da lista
+     * ALTERAÇÃO: Novo método para remover item da lista
+     */
+    removeItemFromList(itemId) {
+        const itemElement = document.querySelector(`.compra-item-cadastrado[data-item-id="${itemId}"]`);
         if (itemElement) {
             itemElement.remove();
         }
 
         this.items = this.items.filter(item => item.id !== itemId);
 
-        // Atualizar índices e mostrar mensagem se vazio
-        this.updateItemIndices();
-        this.updateGrandTotal();
-
-        const itemsList = document.getElementById('compra-items-list');
+        // Mostrar mensagem se vazio
+        const itemsList = document.getElementById('compra-items-cadastrados');
         const noItemsMsg = document.getElementById('compra-no-items');
         if (itemsList && this.items.length === 0 && noItemsMsg) {
             noItemsMsg.style.display = 'block';
         }
+
+        // Atualizar total
+        this.updateGrandTotal();
+
+        // ALTERAÇÃO: Salvar rascunho após remover item
+        this.saveDraft();
+
+        showToast('Item removido', { type: 'info', title: 'Info' });
+    }
+
+
+    /**
+     * Salva rascunho no localStorage
+     * ALTERAÇÃO: Novo método para persistir dados
+     */
+    saveDraft() {
+        try {
+            const draft = {
+                invoiceNumber: document.getElementById('compra-invoice-number')?.value || '',
+                supplier: document.getElementById('compra-supplier-select')?.value || '',
+                purchaseDate: document.getElementById('compra-purchase-date')?.value || '',
+                paymentMethod: document.getElementById('compra-payment-method')?.value || '',
+                paymentStatus: document.getElementById('compra-payment-status')?.value || 'Pending',
+                notes: document.getElementById('compra-notes')?.value || '',
+                items: this.items.map(item => ({
+                    id: item.id,
+                    ingredient_id: item.ingredient_id,
+                    ingredient_data: item.ingredient_data,
+                    quantity: item.quantity,
+                    total_price: item.total_price,
+                    unit_price: item.unit_price
+                })),
+                selectedSupplier: this.selectedSupplier,
+                timestamp: new Date().toISOString()
+            };
+
+            localStorage.setItem(this.draftKey, JSON.stringify(draft));
+        } catch (error) {
+            // Ignorar erros de localStorage (quota exceeded, etc)
+        }
     }
 
     /**
-     * Atualiza índices dos itens na exibição
+     * Carrega rascunho do localStorage
+     * ALTERAÇÃO: Novo método para recuperar dados salvos
      */
-    updateItemIndices() {
-        const items = document.querySelectorAll('.compra-item');
-        items.forEach((item, index) => {
-            const header = item.querySelector('.compra-item-header h4');
-            if (header) {
-                header.textContent = `Item ${index + 1}`;
+    loadDraft() {
+        try {
+            const draftStr = localStorage.getItem(this.draftKey);
+            if (!draftStr) return false;
+
+            const draft = JSON.parse(draftStr);
+
+            // Preencher campos do formulário
+            const invoiceInput = document.getElementById('compra-invoice-number');
+            if (invoiceInput && draft.invoiceNumber) {
+                invoiceInput.value = draft.invoiceNumber;
+                const label = invoiceInput.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.add('active');
             }
-        });
+
+            const supplierSelect = document.getElementById('compra-supplier-select');
+            if (supplierSelect && draft.supplier) {
+                supplierSelect.value = draft.supplier;
+                const label = supplierSelect.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.add('active');
+                
+                // Aplicar filtro de fornecedor
+                this.filterIngredientsBySupplier(draft.supplier);
+            }
+
+            const dateInput = document.getElementById('compra-purchase-date');
+            if (dateInput && draft.purchaseDate) {
+                dateInput.value = draft.purchaseDate;
+            }
+
+            const paymentMethodSelect = document.getElementById('compra-payment-method');
+            if (paymentMethodSelect && draft.paymentMethod) {
+                paymentMethodSelect.value = draft.paymentMethod;
+                const label = paymentMethodSelect.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.add('active');
+            }
+
+            const paymentStatusSelect = document.getElementById('compra-payment-status');
+            if (paymentStatusSelect && draft.paymentStatus) {
+                paymentStatusSelect.value = draft.paymentStatus;
+            }
+
+            const notesTextarea = document.getElementById('compra-notes');
+            if (notesTextarea && draft.notes) {
+                notesTextarea.value = draft.notes;
+                const label = notesTextarea.closest('.div-input')?.querySelector('label');
+                if (label) label.classList.add('active');
+            }
+
+            // Restaurar itens
+            if (draft.items && draft.items.length > 0) {
+                this.items = draft.items;
+                
+                // Renderizar itens na lista
+                const itemsList = document.getElementById('compra-items-cadastrados');
+                const noItemsMsg = document.getElementById('compra-no-items');
+                
+                if (itemsList && noItemsMsg) {
+                    noItemsMsg.style.display = 'none';
+                    
+                    draft.items.forEach(item => {
+                        this.renderItemInList(item);
+                    });
+                }
+
+                // Atualizar total
+                this.updateGrandTotal();
+            }
+
+            return true;
+        } catch (error) {
+            // Em caso de erro, limpar rascunho corrompido
+            this.clearDraft();
+            return false;
+        }
+    }
+
+    /**
+     * Verifica se existe rascunho salvo
+     * ALTERAÇÃO: Novo método para verificar localStorage
+     */
+    hasDraft() {
+        try {
+            const draft = localStorage.getItem(this.draftKey);
+            return draft !== null && draft !== '';
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Limpa rascunho do localStorage
+     * ALTERAÇÃO: Novo método para limpar dados salvos
+     */
+    clearDraft() {
+        try {
+            localStorage.removeItem(this.draftKey);
+        } catch (error) {
+            // Ignorar erros
+        }
+    }
+
+    /**
+     * Mostra confirmação para carregar rascunho
+     * ALTERAÇÃO: Novo método para perguntar ao usuário
+     */
+    showDraftConfirmation() {
+        const draftStr = localStorage.getItem(this.draftKey);
+        if (!draftStr) {
+            this.showModal();
+            this.startAutoSave();
+            return;
+        }
+
+        try {
+            const draft = JSON.parse(draftStr);
+            const timestamp = new Date(draft.timestamp);
+            const timeAgo = this.getTimeAgo(timestamp);
+
+            // Criar modal de confirmação
+            const confirmHTML = `
+                <div class="draft-confirmation-overlay" id="draft-confirmation-overlay">
+                    <div class="draft-confirmation-modal">
+                        <div class="draft-confirmation-header">
+                            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                            <h3>Rascunho Encontrado</h3>
+                        </div>
+                        <div class="draft-confirmation-body">
+                            <p>Foi encontrado um rascunho salvo automaticamente ${timeAgo}.</p>
+                            <div class="draft-info">
+                                <div class="draft-info-item">
+                                    <span class="draft-label">Nota Fiscal:</span>
+                                    <span class="draft-value">${escapeHTML(draft.invoiceNumber || 'Não informado')}</span>
+                                </div>
+                                <div class="draft-info-item">
+                                    <span class="draft-label">Fornecedor:</span>
+                                    <span class="draft-value">${escapeHTML(draft.supplier || 'Não informado')}</span>
+                                </div>
+                                <div class="draft-info-item">
+                                    <span class="draft-label">Itens:</span>
+                                    <span class="draft-value">${draft.items?.length || 0} item(ns)</span>
+                                </div>
+                            </div>
+                            <p class="draft-question">Deseja continuar de onde parou?</p>
+                        </div>
+                        <div class="draft-confirmation-actions">
+                            <button type="button" class="btn-draft-discard" id="btn-draft-discard">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                Descartar
+                            </button>
+                            <button type="button" class="btn-draft-load" id="btn-draft-load">
+                                <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', confirmHTML);
+
+            // Event listeners
+            const btnLoad = document.getElementById('btn-draft-load');
+            const btnDiscard = document.getElementById('btn-draft-discard');
+            const overlay = document.getElementById('draft-confirmation-overlay');
+
+            if (btnLoad) {
+                btnLoad.addEventListener('click', () => {
+                    overlay.remove();
+                    this.showModal();
+                    this.loadDraft();
+                    this.startAutoSave();
+                    showToast('Rascunho carregado com sucesso!', { type: 'success', title: 'Sucesso' });
+                });
+            }
+
+            if (btnDiscard) {
+                btnDiscard.addEventListener('click', () => {
+                    this.clearDraft();
+                    overlay.remove();
+                    this.showModal();
+                    this.startAutoSave();
+                    showToast('Rascunho descartado', { type: 'info', title: 'Info' });
+                });
+            }
+        } catch (error) {
+            // Em caso de erro, limpar e abrir modal normalmente
+            this.clearDraft();
+            this.showModal();
+            this.startAutoSave();
+        }
+    }
+
+    /**
+     * Retorna tempo decorrido em formato legível
+     * ALTERAÇÃO: Novo método auxiliar
+     */
+    getTimeAgo(date) {
+        const now = new Date();
+        const diff = now - date;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+
+        if (minutes < 1) return 'há poucos segundos';
+        if (minutes === 1) return 'há 1 minuto';
+        if (minutes < 60) return `há ${minutes} minutos`;
+        if (hours === 1) return 'há 1 hora';
+        if (hours < 24) return `há ${hours} horas`;
+        if (days === 1) return 'há 1 dia';
+        return `há ${days} dias`;
+    }
+
+    /**
+     * Inicia auto-save periódico
+     * ALTERAÇÃO: Novo método para salvar periodicamente
+     */
+    startAutoSave() {
+        // Limpar intervalo anterior se existir
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
+        // Salvar a cada 30 segundos
+        this.autoSaveInterval = setInterval(() => {
+            this.saveDraft();
+        }, 30000);
+    }
+
+    /**
+     * Para auto-save periódico
+     * ALTERAÇÃO: Novo método para parar salvamento
+     */
+    stopAutoSave() {
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+            this.autoSaveInterval = null;
+        }
     }
 
     /**
@@ -462,246 +1174,14 @@ export class CompraForm {
         return u;
     }
 
-    /**
-     * Busca e exibe informações do insumo quando selecionado
-     * @param {string} itemId - ID do item
-     */
-    async onIngredientSelected(itemId) {
-        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (!itemElement) return;
-
-        const ingredientSelect = itemElement.querySelector('.compra-item-ingredient');
-        const ingredientId = ingredientSelect ? parseInt(ingredientSelect.value) : null;
-
-        const item = this.items.find(i => i.id === itemId);
-        if (!item) return;
-
-        if (!ingredientId) {
-            // Limpar informações se nenhum insumo selecionado
-            const infoDiv = itemElement.querySelector('.compra-item-info');
-            if (infoDiv) {
-                infoDiv.style.display = 'none';
-            }
-            item.ingredient_id = null;
-            item.ingredient_data = null;
-            return;
-        }
-
-        try {
-            // ALTERAÇÃO: Cancelar requisições anteriores para o mesmo item
-            if (this.abortController) {
-                this.abortController.abort();
-            }
-            this.abortController = new AbortController();
-            
-            // ALTERAÇÃO: Usar cache para informações de ingrediente
-            const cacheKey = `ingredient:${ingredientId}`;
-            let ingredient = cacheManager.get(cacheKey);
-            
-            if (!ingredient) {
-                ingredient = await getIngredientById(ingredientId);
-                // ALTERAÇÃO: Cache por 10 minutos (dados de ingrediente mudam pouco)
-                cacheManager.set(cacheKey, ingredient, 10 * 60 * 1000);
-            }
-            
-            item.ingredient_id = ingredientId;
-            item.ingredient_data = {
-                name: ingredient.name,
-                supplier: ingredient.supplier || 'Não informado',
-                stock_unit: ingredient.stock_unit || 'un',
-                base_portion_unit: ingredient.base_portion_unit || ingredient.stock_unit || 'un',
-                price: ingredient.price || 0 // Preço de referência
-            };
-
-            // Exibir informações do insumo
-            const infoDiv = itemElement.querySelector('.compra-item-info');
-            const supplierSpan = itemElement.querySelector('.compra-item-supplier');
-            const unitSpan = itemElement.querySelector('.compra-item-unit');
-            const refPriceSpan = itemElement.querySelector('.compra-item-ref-price');
-
-            if (infoDiv) {
-                infoDiv.style.display = 'block';
-            }
-
-            if (supplierSpan) {
-                supplierSpan.textContent = item.ingredient_data.supplier;
-            }
-
-            if (unitSpan) {
-                const unit = this.normalizeUnit(item.ingredient_data.stock_unit);
-                unitSpan.textContent = unit.toUpperCase();
-            }
-
-            if (refPriceSpan && item.ingredient_data.price > 0) {
-                refPriceSpan.textContent = `R$ ${this.formatCurrency(item.ingredient_data.price)} / ${this.normalizeUnit(item.ingredient_data.stock_unit).toUpperCase()}`;
-                refPriceSpan.closest('.compra-info-item').style.display = 'block';
-            } else if (refPriceSpan) {
-                refPriceSpan.closest('.compra-info-item').style.display = 'none';
-            }
-
-            // Preencher fornecedor principal automaticamente se estiver vazio
-            const supplierInput = document.getElementById('compra-supplier-name');
-            if (supplierInput && !supplierInput.value.trim() && item.ingredient_data.supplier && item.ingredient_data.supplier !== 'Não informado' && item.ingredient_data.supplier.trim() !== '') {
-                supplierInput.value = item.ingredient_data.supplier;
-                // Atualizar label
-                const label = supplierInput.closest('.div-input')?.querySelector('label');
-                if (label) label.classList.add('active');
-            }
-        } catch (error) {
-            // ALTERAÇÃO: Ignorar erros de abort (cancelamento de requisição)
-            if (error.name === 'AbortError') {
-                return;
-            }
-            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
-            showToast('Erro ao carregar informações do insumo', {
-                type: 'error',
-                title: 'Erro'
-            });
-        }
-    }
-
-    /**
-     * Calcula preço total baseado na quantidade informada
-     * @param {string} itemId - ID do item
-     */
-    calculatePriceFromQuantity(itemId) {
-        const item = this.items.find(i => i.id === itemId);
-        if (!item || !item.ingredient_data || item.isCalculating) return;
-
-        // Prevenir loops
-        item.isCalculating = true;
-
-        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (!itemElement) {
-            item.isCalculating = false;
-            return;
-        }
-
-        const quantityInput = itemElement.querySelector('.compra-item-quantity');
-        const priceInput = itemElement.querySelector('.compra-item-price');
-
-        if (!quantityInput || !priceInput) {
-            item.isCalculating = false;
-            return;
-        }
-
-        const quantity = parseFloat(quantityInput.value);
-        
-        if (isNaN(quantity) || quantity <= 0) {
-            item.isCalculating = false;
-            return;
-        }
-
-        item.quantity = quantity;
-
-        // Se tem preço de referência, calcular preço total
-        if (item.ingredient_data.price > 0) {
-            // Usar stock_unit como unidade padrão (já está na unidade correta)
-            const stockUnit = this.normalizeUnit(item.ingredient_data.stock_unit);
-            
-            // Preço de referência já está por unidade de estoque, então multiplicar diretamente
-            const calculatedPrice = quantity * item.ingredient_data.price;
-
-            // Atualizar campo de preço
-            priceInput.value = calculatedPrice.toFixed(2);
-            item.total_price = calculatedPrice;
-            
-            // Atualizar label se necessário
-            const label = priceInput.closest('.div-input')?.querySelector('label');
-            if (label && calculatedPrice > 0) {
-                label.classList.add('active');
-            }
-        }
-
-        item.isCalculating = false;
-        this.updateGrandTotal();
-    }
-
-    /**
-     * Calcula quantidade baseada no preço total informado
-     * @param {string} itemId - ID do item
-     */
-    calculateQuantityFromPrice(itemId) {
-        const item = this.items.find(i => i.id === itemId);
-        if (!item || !item.ingredient_data || item.isCalculating) return;
-
-        // Prevenir loops
-        item.isCalculating = true;
-
-        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (!itemElement) {
-            item.isCalculating = false;
-            return;
-        }
-
-        const quantityInput = itemElement.querySelector('.compra-item-quantity');
-        const priceInput = itemElement.querySelector('.compra-item-price');
-
-        if (!quantityInput || !priceInput) {
-            item.isCalculating = false;
-            return;
-        }
-
-        const totalPrice = parseFloat(priceInput.value);
-
-        if (isNaN(totalPrice) || totalPrice <= 0) {
-            item.isCalculating = false;
-            return;
-        }
-
-        item.total_price = totalPrice;
-
-        // Se tem preço de referência, calcular quantidade
-        if (item.ingredient_data.price > 0) {
-            // Preço de referência já está por unidade de estoque, então dividir diretamente
-            const calculatedQuantity = totalPrice / item.ingredient_data.price;
-
-            // Atualizar campo de quantidade
-            quantityInput.value = calculatedQuantity.toFixed(3);
-            item.quantity = calculatedQuantity;
-            
-            // Atualizar label se necessário
-            const label = quantityInput.closest('.div-input')?.querySelector('label');
-            if (label && calculatedQuantity > 0) {
-                label.classList.add('active');
-            }
-        }
-
-        item.isCalculating = false;
-        this.updateGrandTotal();
-    }
-
-    /**
-     * Atualiza total de um item específico
-     * @param {string} itemId - ID do item
-     */
-    updateItemTotal(itemId) {
-        const item = this.items.find(i => i.id === itemId);
-        if (!item) return;
-
-        // Já está sendo atualizado pelos métodos calculatePriceFromQuantity e calculateQuantityFromPrice
-        // Este método mantém compatibilidade mas não faz cálculo
-    }
 
     /**
      * Atualiza total geral da compra
+     * ALTERAÇÃO: Simplificado para usar diretamente this.items
      */
     updateGrandTotal() {
-        // ALTERAÇÃO: Usar reduce para melhor performance
         const total = this.items.reduce((sum, item) => {
-            if (item.total_price) {
-                return sum + item.total_price;
-            }
-            // ALTERAÇÃO: Otimizar busca de elementos DOM (cachear referências)
-            const itemElement = document.querySelector(`[data-item-id="${item.id}"]`);
-            if (itemElement) {
-                const priceInput = itemElement.querySelector('.compra-item-price');
-                if (priceInput) {
-                    const price = parseFloat(priceInput.value) || 0;
-                    return sum + price;
-                }
-            }
-            return sum;
+            return sum + (item.total_price || 0);
         }, 0);
 
         const totalElement = document.getElementById('compra-total-value');
@@ -724,12 +1204,13 @@ export class CompraForm {
 
     /**
      * Valida formulário antes de submeter
+     * ALTERAÇÃO: Validar fornecedor do select
      * @returns {boolean} True se válido
      */
     validateForm() {
         // Validar campos obrigatórios
         const invoiceNumber = document.getElementById('compra-invoice-number')?.value.trim();
-        const supplierName = document.getElementById('compra-supplier-name')?.value.trim();
+        const supplierSelect = document.getElementById('compra-supplier-select')?.value.trim();
 
         if (!invoiceNumber) {
             showToast('Número da nota fiscal é obrigatório', { type: 'error', title: 'Erro' });
@@ -737,86 +1218,16 @@ export class CompraForm {
             return false;
         }
 
-        // Fornecedor pode ser obtido dos insumos se não informado
-        // Mas ainda precisa estar presente (ou preenchido manualmente ou vindo do insumo)
-        // A validação final será feita no handleSubmit
+        if (!supplierSelect) {
+            showToast('Selecione um fornecedor', { type: 'error', title: 'Erro' });
+            document.getElementById('compra-supplier-select')?.focus();
+            return false;
+        }
 
         // Validar itens
         if (this.items.length === 0) {
             showToast('Adicione pelo menos um item à nota fiscal', { type: 'error', title: 'Erro' });
             return false;
-        }
-
-        // Validar cada item
-        for (const item of this.items) {
-            const itemElement = document.querySelector(`[data-item-id="${item.id}"]`);
-            if (!itemElement) continue;
-
-            const ingredientSelect = itemElement.querySelector('.compra-item-ingredient');
-            const quantityInput = itemElement.querySelector('.compra-item-quantity');
-            const priceInput = itemElement.querySelector('.compra-item-price');
-
-            const ingredientId = ingredientSelect ? parseInt(ingredientSelect.value) : null;
-            let quantity = quantityInput ? parseFloat(quantityInput.value) : null;
-            let totalPrice = priceInput ? parseFloat(priceInput.value) : null;
-
-            if (!ingredientId) {
-                showToast(`Selecione um insumo para o Item ${this.items.indexOf(item) + 1}`, { type: 'error', title: 'Erro' });
-                ingredientSelect?.focus();
-                return false;
-            }
-
-            // Validar que pelo menos um dos campos foi preenchido
-            if ((!quantity || quantity <= 0) && (!totalPrice || totalPrice <= 0)) {
-                showToast(`Informe a quantidade OU o valor total para o Item ${this.items.indexOf(item) + 1}`, { type: 'error', title: 'Erro' });
-                quantityInput?.focus();
-                return false;
-            }
-
-            // Se tem quantidade mas não tem preço, calcular preço
-            if ((quantity && quantity > 0) && (!totalPrice || totalPrice <= 0)) {
-                if (item.ingredient_data && item.ingredient_data.price > 0) {
-                    // Preço de referência já está por unidade de estoque
-                    totalPrice = quantity * item.ingredient_data.price;
-                    if (priceInput) {
-                        priceInput.value = totalPrice.toFixed(2);
-                        // Atualizar label
-                        const label = priceInput.closest('.div-input')?.querySelector('label');
-                        if (label) label.classList.add('active');
-                    }
-                    item.total_price = totalPrice;
-                } else {
-                    showToast(`Preço de referência não encontrado para o insumo do Item ${this.items.indexOf(item) + 1}. Informe o valor total.`, { type: 'error', title: 'Erro' });
-                    priceInput?.focus();
-                    return false;
-                }
-            }
-
-            // Se tem preço mas não tem quantidade, calcular quantidade
-            if ((totalPrice && totalPrice > 0) && (!quantity || quantity <= 0)) {
-                if (item.ingredient_data && item.ingredient_data.price > 0) {
-                    // Preço de referência já está por unidade de estoque
-                    quantity = totalPrice / item.ingredient_data.price;
-                    if (quantityInput) {
-                        quantityInput.value = quantity.toFixed(3);
-                        // Atualizar label
-                        const label = quantityInput.closest('.div-input')?.querySelector('label');
-                        if (label) label.classList.add('active');
-                    }
-                    item.quantity = quantity;
-                } else {
-                    showToast(`Preço de referência não encontrado para o insumo do Item ${this.items.indexOf(item) + 1}. Informe a quantidade.`, { type: 'error', title: 'Erro' });
-                    quantityInput?.focus();
-                    return false;
-                }
-            }
-
-            // Atualizar item no array
-            item.ingredient_id = ingredientId;
-            item.quantity = quantity;
-            item.total_price = totalPrice;
-            // Calcular unit_price para o backend (preço total / quantidade)
-            item.unit_price = quantity > 0 ? totalPrice / quantity : 0;
         }
 
         return true;
@@ -832,48 +1243,11 @@ export class CompraForm {
 
         // Coletar dados do formulário
         const invoiceNumber = document.getElementById('compra-invoice-number').value.trim();
-        let supplierName = document.getElementById('compra-supplier-name').value.trim();
+        const supplierName = document.getElementById('compra-supplier-select').value.trim();
         const purchaseDate = document.getElementById('compra-purchase-date').value;
         const paymentMethod = document.getElementById('compra-payment-method').value || null;
         const paymentStatus = document.getElementById('compra-payment-status').value;
         const notes = document.getElementById('compra-notes').value.trim() || null;
-
-        // Se fornecedor não foi preenchido, tentar usar fornecedor dos insumos
-        if (!supplierName) {
-            // Verificar se todos os insumos têm o mesmo fornecedor
-            const suppliers = this.items
-                .filter(item => item.ingredient_data && item.ingredient_data.supplier && item.ingredient_data.supplier !== 'Não informado' && item.ingredient_data.supplier.trim() !== '')
-                .map(item => item.ingredient_data.supplier);
-            
-            if (suppliers.length > 0) {
-                // Usar fornecedor do primeiro insumo ou verificar se todos são iguais
-                const uniqueSuppliers = [...new Set(suppliers)];
-                if (uniqueSuppliers.length === 1) {
-                    supplierName = uniqueSuppliers[0];
-                } else if (uniqueSuppliers.length > 0) {
-                    // Se há múltiplos fornecedores, usar o mais comum ou o primeiro
-                    supplierName = uniqueSuppliers[0]; // Usar primeiro fornecedor encontrado
-                }
-                
-                // Atualizar campo se necessário
-                if (supplierName && supplierName !== 'Não informado' && supplierName.trim() !== '') {
-                    const supplierInput = document.getElementById('compra-supplier-name');
-                    if (supplierInput) {
-                        supplierInput.value = supplierName;
-                        // Atualizar label
-                        const label = supplierInput.closest('.div-input')?.querySelector('label');
-                        if (label) label.classList.add('active');
-                    }
-                }
-            }
-        }
-
-        // Validação final do fornecedor
-        if (!supplierName || supplierName.trim() === '' || supplierName === 'Não informado') {
-            showToast('Fornecedor é obrigatório. Preencha manualmente ou selecione um insumo com fornecedor cadastrado.', { type: 'error', title: 'Erro' });
-            document.getElementById('compra-supplier-name')?.focus();
-            return;
-        }
 
         // Calcular total usando preço total dos itens
         let totalAmount = 0;
@@ -917,6 +1291,10 @@ export class CompraForm {
                 title: 'Sucesso'
             });
 
+            // ALTERAÇÃO: Limpar rascunho após sucesso
+            this.clearDraft();
+            this.stopAutoSave();
+
             // Fechar modal
             fecharModal('modal-nova-compra');
 
@@ -939,9 +1317,16 @@ export class CompraForm {
 
     /**
      * Reseta o formulário
+     * ALTERAÇÃO: Parar auto-save ao resetar
      */
     resetForm() {
         this.items = [];
+        this.selectedSupplier = null;
+        this.filteredIngredients = [...this.ingredients];
+        
+        // ALTERAÇÃO: Parar auto-save
+        this.stopAutoSave();
+        
         // ALTERAÇÃO: Cancelar requisições pendentes ao resetar
         if (this.abortController) {
             this.abortController.abort();
@@ -953,6 +1338,27 @@ export class CompraForm {
         if (form) {
             form.reset();
         }
+
+        // Limpar formulário de item se estiver aberto
+        const formWrapper = document.getElementById('compra-item-form-wrapper');
+        if (formWrapper) {
+            formWrapper.innerHTML = '';
+            formWrapper.style.display = 'none';
+        }
+
+        // Limpar lista de itens cadastrados
+        const itemsList = document.getElementById('compra-items-cadastrados');
+        const noItemsMsg = document.getElementById('compra-no-items');
+        if (itemsList) {
+            itemsList.innerHTML = '';
+            if (noItemsMsg) {
+                itemsList.appendChild(noItemsMsg);
+                noItemsMsg.style.display = 'block';
+            }
+        }
+
+        // Resetar total
+        this.updateGrandTotal();
     }
 
     /**
@@ -960,6 +1366,16 @@ export class CompraForm {
      * ALTERAÇÃO: Método para cleanup adequado de event listeners
      */
     cleanupEventListeners() {
+        // ALTERAÇÃO: Remover listener do modal
+        if (this.modalClickHandler) {
+            const modalContent = document.getElementById('modal-content-nova-compra');
+            if (modalContent) {
+                modalContent.removeEventListener('click', this.modalClickHandler);
+            }
+            this.modalClickHandler = null;
+        }
+
+        // ALTERAÇÃO: Remover listeners de itens individuais
         for (const [key, { element, event, handler }] of this.eventListeners.entries()) {
             if (element && typeof handler === 'function') {
                 element.removeEventListener(event, handler);
@@ -977,9 +1393,10 @@ export class CompraForm {
 
     /**
      * Destroi a instância e limpa recursos
-     * ALTERAÇÃO: Método para cleanup completo
+     * ALTERAÇÃO: Parar auto-save ao destruir
      */
     destroy() {
+        this.stopAutoSave();
         this.cleanupEventListeners();
         if (this.abortController) {
             this.abortController.abort();

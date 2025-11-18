@@ -27,7 +27,7 @@ export class RecorrenciasManager {
      */
     async init() {
         if (!this.container) {
-            console.error('Container de recorrências não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -103,7 +103,7 @@ export class RecorrenciasManager {
 
             this.renderRulesList();
         } catch (error) {
-            console.error('Erro ao carregar regras:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar regras de recorrência', { 
                 type: 'error',
                 title: 'Erro'
@@ -476,7 +476,7 @@ export class RecorrenciasManager {
             modal.style.display = 'none';
             await this.loadRules();
         } catch (error) {
-            console.error('Erro ao atualizar regra:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao atualizar regra', { 
                 type: 'error',
                 title: 'Erro'
@@ -507,7 +507,7 @@ export class RecorrenciasManager {
             });
             await this.loadRules();
         } catch (error) {
-            console.error('Erro ao desativar regra:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao desativar regra', { 
                 type: 'error',
                 title: 'Erro'

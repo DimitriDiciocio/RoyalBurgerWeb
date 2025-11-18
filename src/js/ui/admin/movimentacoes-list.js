@@ -33,7 +33,7 @@ export class MovementsList {
      */
     async init() {
         if (!this.container) {
-            console.error('Container da lista não encontrado');
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             return;
         }
 
@@ -178,8 +178,7 @@ export class MovementsList {
                 this.loadDefaultCategories();
             }
         } catch (error) {
-            console.error('Erro ao carregar categorias:', error);
-            // Em caso de erro, usar categorias padrão
+            // ALTERAÇÃO: Removido console.error - usar categorias padrão em caso de erro
             this.loadDefaultCategories();
         }
     }
@@ -240,7 +239,7 @@ export class MovementsList {
             this.renderTable();
             this.renderPagination();
         } catch (error) {
-            console.error('Erro ao carregar movimentações:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar movimentações', { 
                 type: 'error',
                 title: 'Erro'
@@ -430,7 +429,7 @@ export class MovementsList {
             });
             await this.loadMovements();
         } catch (error) {
-            console.error('Erro ao marcar como pago:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao atualizar status', { 
                 type: 'error',
                 title: 'Erro'

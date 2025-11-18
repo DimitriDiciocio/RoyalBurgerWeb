@@ -1,0 +1,388 @@
+/* ====== Estilos para Sistema de Itens Cadastrados - Nova Compra ====== */
+
+/* Formulário de Adicionar Item */
+.compra-item-form-wrapper {
+  margin-bottom: 20px;
+}
+
+.compra-item-form {
+  background-color: #f9fafb;
+  border: 2px solid var(--color-primary);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.compra-item-form h4 {
+  margin: 0 0 16px 0;
+  color: var(--color-texto-black);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.compra-item-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.compra-item-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancelar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background-color: #6b7280;
+  color: var(--color-texto-white);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancelar-item:hover {
+  background-color: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-confirmar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background-color: #10b981;
+  color: var(--color-texto-white);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-confirmar-item:hover {
+  background-color: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Lista de Itens Cadastrados */
+.compra-items-cadastrados {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  min-height: 60px;
+}
+
+/* Item Cadastrado na Lista */
+.compra-item-cadastrado {
+  background-color: var(--color-texto-white);
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.compra-item-cadastrado:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.compra-item-cadastrado-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  gap: 16px;
+}
+
+.compra-item-info-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compra-item-nome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.compra-item-nome i {
+  color: var(--color-primary);
+  font-size: 18px;
+}
+
+.nome-insumo {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-texto-black);
+}
+
+.compra-item-detalhes {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.detalhe-item {
+  display: flex;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.detalhe-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detalhe-value {
+  color: var(--color-texto-black);
+  font-weight: 600;
+}
+
+.valor-destaque {
+  color: var(--color-primary);
+  font-size: 15px;
+}
+
+.btn-remover-item-lista {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.btn-remover-item-lista:hover {
+  background-color: #fecaca;
+  transform: scale(1.05);
+}
+
+.btn-remover-item-lista:active {
+  background-color: #dc2626;
+  color: var(--color-texto-white);
+  transform: scale(0.95);
+}
+
+/* ==== Modal de Confirmação de Rascunho ==== */
+.draft-confirmation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease;
+}
+
+.draft-confirmation-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.draft-confirmation-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.draft-confirmation-header i {
+  font-size: 32px;
+  color: var(--color-primary);
+}
+
+.draft-confirmation-header h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-texto-black);
+}
+
+.draft-confirmation-body {
+  margin-bottom: 24px;
+}
+
+.draft-confirmation-body p {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.draft-info {
+  background-color: #f9fafb;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+  border: 2px solid #e5e7eb;
+}
+
+.draft-info-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.draft-info-item:last-child {
+  border-bottom: none;
+}
+
+.draft-label {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.draft-value {
+  font-weight: 600;
+  color: var(--color-texto-black);
+  font-size: 14px;
+}
+
+.draft-question {
+  font-weight: 600;
+  color: var(--color-texto-black);
+  margin-top: 16px !important;
+  font-size: 16px;
+}
+
+.draft-confirmation-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-draft-discard,
+.btn-draft-load {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-draft-discard {
+  background-color: #ef4444;
+  color: white;
+}
+
+.btn-draft-discard:hover {
+  background-color: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-draft-load {
+  background-color: var(--color-primary);
+  color: var(--color-texto-black);
+}
+
+.btn-draft-load:hover {
+  background-color: #f7d660;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 212, 38, 0.4);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .compra-item-cadastrado-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-remover-item-lista {
+    align-self: flex-end;
+  }
+
+  .compra-item-detalhes {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .compra-item-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-cancelar-item,
+  .btn-confirmar-item {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .draft-confirmation-modal {
+    padding: 24px;
+    max-width: 90%;
+  }
+
+  .draft-confirmation-header h3 {
+    font-size: 20px;
+  }
+
+  .draft-confirmation-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-draft-discard,
+  .btn-draft-load {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

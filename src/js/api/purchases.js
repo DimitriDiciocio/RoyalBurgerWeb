@@ -43,3 +43,29 @@ export async function getPurchaseInvoiceById(invoiceId) {
     return apiRequest(`${PURCHASES_API_BASE}/invoices/${invoiceId}`, { method: 'GET' });
 }
 
+/**
+ * Atualiza uma nota fiscal de compra
+ * ALTERAÇÃO: Nova função para UPDATE
+ * @param {number} invoiceId - ID da nota fiscal
+ * @param {Object} invoiceData - Dados atualizados da nota fiscal
+ * @returns {Promise<Object>}
+ */
+export async function updatePurchaseInvoice(invoiceId, invoiceData) {
+    return apiRequest(`${PURCHASES_API_BASE}/invoices/${invoiceId}`, {
+        method: 'PUT',
+        body: invoiceData
+    });
+}
+
+/**
+ * Exclui uma nota fiscal de compra
+ * ALTERAÇÃO: Nova função para DELETE
+ * @param {number} invoiceId - ID da nota fiscal
+ * @returns {Promise<Object>}
+ */
+export async function deletePurchaseInvoice(invoiceId) {
+    return apiRequest(`${PURCHASES_API_BASE}/invoices/${invoiceId}`, {
+        method: 'DELETE'
+    });
+}
+
