@@ -1893,14 +1893,22 @@ const VALIDATION_LIMITS = {
             state.formaPagamento = "dinheiro";
             state.tipoCartao = null; // Limpar tipo de cartão se mudar de pagamento
             atualizarExibicaoTipoCartao(); // Atualizar exibição do tipo de cartão
-            // Só abrir modal de troco se o total for maior que 0
-            // Se total = 0 e há desconto por pontos, não precisa de troco
-            if (state.total > 0) {
-              abrirModalTroco();
-            } else {
-              // Se total é 0, limpar troco e não abrir modal
+            // ALTERAÇÃO: Não abrir modal de troco se for pedido de balcão (pickup)
+            const isPickup = isPickupOrder();
+            if (isPickup) {
+              // Para pedidos de balcão, não precisa de troco
               state.valorTroco = null;
               atualizarExibicaoTroco();
+            } else {
+              // Só abrir modal de troco se o total for maior que 0 e não for pickup
+              // Se total = 0 e há desconto por pontos, não precisa de troco
+              if (state.total > 0) {
+                abrirModalTroco();
+              } else {
+                // Se total é 0, limpar troco e não abrir modal
+                state.valorTroco = null;
+                atualizarExibicaoTroco();
+              }
             }
           }
         });
@@ -2607,15 +2615,23 @@ const VALIDATION_LIMITS = {
       return;
     }
 
-    // Se selecionou dinheiro mas não informou valor do troco (e há valor a pagar), abrir modal
+    // ALTERAÇÃO: Se selecionou dinheiro mas não informou valor do troco (e há valor a pagar), abrir modal
+    // Mas apenas se NÃO for pedido de balcão (pickup)
     if (state.formaPagamento === "dinheiro") {
-      // Verificar se há valor a pagar e se não foi informado o valor do troco
-      const valorTotal = state.total;
-      const temValorAPagar = Number.isFinite(valorTotal) && valorTotal > 0;
-      
-      if (temValorAPagar && (!state.valorTroco || !Number.isFinite(state.valorTroco) || state.valorTroco <= 0)) {
-        abrirModalTroco();
-        return;
+      const isPickup = isPickupOrder();
+      // Para pedidos de balcão, não exigir troco
+      if (isPickup) {
+        state.valorTroco = null;
+        atualizarExibicaoTroco();
+      } else {
+        // Verificar se há valor a pagar e se não foi informado o valor do troco
+        const valorTotal = state.total;
+        const temValorAPagar = Number.isFinite(valorTotal) && valorTotal > 0;
+        
+        if (temValorAPagar && (!state.valorTroco || !Number.isFinite(state.valorTroco) || state.valorTroco <= 0)) {
+          abrirModalTroco();
+          return;
+        }
       }
     }
 
@@ -2653,6 +2669,16 @@ const VALIDATION_LIMITS = {
   }
 
   function confirmarTroco() {
+    // ALTERAÇÃO: Validação de segurança - não processar troco para pedidos de balcão
+    const isPickup = isPickupOrder();
+    if (isPickup) {
+      state.valorTroco = null;
+      fecharModalTroco();
+      atualizarExibicaoTroco();
+      atualizarExibicaoPagamento();
+      return;
+    }
+
     const valor = el.valorTroco?.value?.trim();
     // Validação robusta: usar Number.isFinite ao invés de isNaN
     const valorPago = parseFloat(valor);
@@ -2707,8 +2733,15 @@ const VALIDATION_LIMITS = {
   function atualizarExibicaoTroco() {
     if (!el.trocoInfo) return;
 
+    const isPickup = isPickupOrder();
     const isFullyPaidWithPoints =
       state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+
+    // ALTERAÇÃO: Não mostrar troco para pedidos de balcão (pickup)
+    if (isPickup) {
+      el.trocoInfo.style.display = "none";
+      return;
+    }
 
     // Se está pago com pontos, não mostrar troco
     if (isFullyPaidWithPoints) {
@@ -3122,40 +3155,49 @@ const VALIDATION_LIMITS = {
       }
       // Nota: Para pickup, address_id não será incluído. orders.js garante remoção completa.
 
-      // Se dinheiro, enviar amount_paid (API calcula troco automaticamente)
+      // ALTERAÇÃO: Se dinheiro, enviar amount_paid (API calcula troco automaticamente)
+      // Mas apenas se NÃO for pedido de balcão (pickup)
       if (!isFullyPaidWithPoints && state.formaPagamento === "dinheiro") {
-        if (!state.valorTroco || state.valorTroco === null) {
-          showError(
-            "Para pagamento em dinheiro, é necessário informar o valor pago."
-          );
-          reabilitarBotaoConfirmar();
-          return;
-        }
+        const isPickup = isPickupOrder();
+        
+        // Para pedidos de balcão, não enviar amount_paid (não precisa de troco)
+        if (isPickup) {
+          // Não incluir amount_paid para pedidos de balcão
+        } else {
+          // Para entregas, validar e enviar amount_paid
+          if (!state.valorTroco || state.valorTroco === null) {
+            showError(
+              "Para pagamento em dinheiro, é necessário informar o valor pago."
+            );
+            reabilitarBotaoConfirmar();
+            return;
+          }
 
-        // Validar e converter amount_paid (usar parseFloat para valores decimais)
-        const amountPaid = parseFloat(state.valorTroco);
-        // Validação robusta: verificar NaN e valores inválidos
-        if (!Number.isFinite(amountPaid) || amountPaid <= 0) {
-          showError("O valor pago deve ser um número válido maior que zero.");
-          reabilitarBotaoConfirmar();
-          return;
-        }
+          // Validar e converter amount_paid (usar parseFloat para valores decimais)
+          const amountPaid = parseFloat(state.valorTroco);
+          // Validação robusta: verificar NaN e valores inválidos
+          if (!Number.isFinite(amountPaid) || amountPaid <= 0) {
+            showError("O valor pago deve ser um número válido maior que zero.");
+            reabilitarBotaoConfirmar();
+            return;
+          }
 
-        // Validar que amount_paid >= total (backend também valida, mas melhor prevenir)
-        // Usar Number.isFinite para garantir que ambos os valores são números válidos
-        if (!Number.isFinite(state.total) || amountPaid < state.total) {
-          const valorPagoFormatado = amountPaid.toFixed(2).replace(".", ",");
-          const totalFormatado = (state.total || 0)
-            .toFixed(2)
-            .replace(".", ",");
-          showError(
-            `O valor pago (R$ ${valorPagoFormatado}) deve ser maior ou igual ao total do pedido (R$ ${totalFormatado}).`
-          );
-          reabilitarBotaoConfirmar();
-          return;
-        }
+          // Validar que amount_paid >= total (backend também valida, mas melhor prevenir)
+          // Usar Number.isFinite para garantir que ambos os valores são números válidos
+          if (!Number.isFinite(state.total) || amountPaid < state.total) {
+            const valorPagoFormatado = amountPaid.toFixed(2).replace(".", ",");
+            const totalFormatado = (state.total || 0)
+              .toFixed(2)
+              .replace(".", ",");
+            showError(
+              `O valor pago (R$ ${valorPagoFormatado}) deve ser maior ou igual ao total do pedido (R$ ${totalFormatado}).`
+            );
+            reabilitarBotaoConfirmar();
+            return;
+          }
 
-        orderData.amount_paid = amountPaid;
+          orderData.amount_paid = amountPaid;
+        }
       }
 
       // Desabilitar botão para evitar duplicação
@@ -3475,9 +3517,15 @@ const VALIDATION_LIMITS = {
         if (modalDebitoText) modalDebitoText.style.display = "block";
       }
     } else if (state.formaPagamento === "dinheiro") {
+      const isPickup = isPickupOrder();
       // Verificar se o pedido está completamente pago com pontos
       const isFullyPaidWithPoints =
         state.total <= 0 && state.usarPontos && state.pontosParaUsar > 0;
+
+      // ALTERAÇÃO: Para pedidos de balcão, não mostrar informação de troco
+      if (isPickup) {
+        state.valorTroco = null;
+      }
 
       // Forçar limpeza do troco se o pedido está pago com pontos
       if (isFullyPaidWithPoints && state.valorTroco !== null) {
@@ -3497,14 +3545,20 @@ const VALIDATION_LIMITS = {
       if (modalCreditoText) modalCreditoText.style.display = "none";
       if (modalDebitoText) modalDebitoText.style.display = "none";
 
-      // Se está pago com pontos, mostrar apenas "Pago com pontos" ou "Dinheiro" sem troco
-      if (isFullyPaidWithPoints) {
+      // ALTERAÇÃO: Para pedidos de balcão, mostrar apenas "Dinheiro" sem informação de troco
+      if (isPickup) {
+        if (modalDinheiroText) {
+          modalDinheiroText.textContent = "Dinheiro";
+          modalDinheiroText.style.display = "block";
+        }
+      } else if (isFullyPaidWithPoints) {
+        // Se está pago com pontos, mostrar apenas "Pago com pontos" ou "Dinheiro" sem troco
         if (modalDinheiroText) {
           modalDinheiroText.textContent = "Dinheiro - Pago com pontos";
           modalDinheiroText.style.display = "block";
         }
       } else if (state.valorTroco) {
-        // Atualizar texto do dinheiro com troco se necessário
+        // Atualizar texto do dinheiro com troco se necessário (apenas para entregas)
         if (modalDinheiroText) {
           const troco = state.valorTroco - state.total;
           if (troco > 0) {
