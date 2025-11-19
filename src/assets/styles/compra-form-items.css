@@ -129,7 +129,7 @@
 }
 
 .compra-item-nome i {
-  color: var(--color-primary);
+  color: var(--color-tertiary);
   font-size: 18px;
 }
 
@@ -157,12 +157,12 @@
 }
 
 .detalhe-value {
-  color: var(--color-texto-black);
+  color: #4CAF50;
   font-weight: 600;
 }
 
 .valor-destaque {
-  color: var(--color-primary);
+  color:#4CAF50;
   font-size: 15px;
 }
 

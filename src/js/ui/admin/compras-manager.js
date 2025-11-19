@@ -5,7 +5,7 @@
 
 import { getPurchaseInvoices, getPurchaseInvoiceById, updatePurchaseInvoice, deletePurchaseInvoice } from '../../api/purchases.js';
 import { getIngredients, getIngredientById } from '../../api/ingredients.js';
-import { showToast } from '../alerts.js';
+import { showToast, showConfirm } from '../alerts.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
 import { abrirModal, fecharModal } from '../modais.js';
 import { debounce } from '../../utils/performance-utils.js';
@@ -381,12 +381,13 @@ export class ComprasManager {
 
     /**
      * Visualiza detalhes da nota fiscal
+     * ALTERAÇÃO: Aguardar carregamento assíncrono da modal
      * @param {number} invoiceId - ID da nota fiscal
      */
     async viewInvoice(invoiceId) {
         try {
             const invoice = await getPurchaseInvoiceById(invoiceId);
-            this.showInvoiceModal(invoice);
+            await this.showInvoiceModal(invoice);
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar nota fiscal', {
@@ -398,9 +399,10 @@ export class ComprasManager {
 
     /**
      * Exibe modal com detalhes da nota fiscal
+     * ALTERAÇÃO: Carregar dados completos dos ingredientes para exibir quantidade com unidade
      * @param {Object} invoice - Dados da nota fiscal
      */
-    showInvoiceModal(invoice) {
+    async showInvoiceModal(invoice) {
         // ALTERAÇÃO: Criar ou obter modal seguindo padrão do sistema
         let modal = document.getElementById('modal-compra-detalhes');
         if (!modal) {
@@ -419,6 +421,51 @@ export class ComprasManager {
         const paymentStatus = (invoice.payment_status || 'Pending').toLowerCase();
         const statusLabel = this.translateStatus(invoice.payment_status || 'Pending');
         const items = invoice.items || [];
+
+        // ALTERAÇÃO: Carregar dados completos dos ingredientes para obter stock_unit
+        const itemsWithIngredientData = await Promise.all((items || []).map(async (item) => {
+            const ingredientId = item.ingredient_id || item.ingredient?.id;
+            let ingredientData = item.ingredient || { name: item.ingredient_name || item.name || 'Item' };
+
+            // ALTERAÇÃO: Carregar dados completos do ingrediente para obter stock_unit
+            if (ingredientId) {
+                try {
+                    const cacheKey = `ingredient:${ingredientId}`;
+                    let fullIngredient = cacheManager.get(cacheKey);
+                    
+                    if (!fullIngredient) {
+                        fullIngredient = await getIngredientById(ingredientId);
+                        cacheManager.set(cacheKey, fullIngredient, 10 * 60 * 1000);
+                    }
+
+                    if (fullIngredient) {
+                        ingredientData = {
+                            id: fullIngredient.id,
+                            name: fullIngredient.name || ingredientData.name || item.ingredient_name || item.name || 'Item',
+                            stock_unit: fullIngredient.stock_unit || ingredientData.stock_unit || 'un'
+                        };
+                    } else {
+                        if (!ingredientData.stock_unit) {
+                            ingredientData.stock_unit = 'un';
+                        }
+                    }
+                } catch (error) {
+                    // Se não conseguir carregar, garantir que stock_unit existe
+                    if (!ingredientData.stock_unit) {
+                        ingredientData.stock_unit = 'un';
+                    }
+                }
+            } else {
+                if (!ingredientData.stock_unit) {
+                    ingredientData.stock_unit = 'un';
+                }
+            }
+
+            return {
+                ...item,
+                ingredient_data: ingredientData
+            };
+        }));
 
         // ALTERAÇÃO: Estrutura HTML seguindo padrão do sistema (div-overlay, modal-content-compra-detalhes)
         modal.innerHTML = `
@@ -456,7 +503,7 @@ export class ComprasManager {
                             </div>
                         </div>
 
-                        ${items.length > 0 ? `
+                        ${itemsWithIngredientData.length > 0 ? `
                         <div class="invoice-detail-section">
                             <h3>Itens da Nota Fiscal</h3>
                             <div class="invoice-items-list">
@@ -470,14 +517,48 @@ export class ComprasManager {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${items.map(item => `
+                                        ${itemsWithIngredientData.map(item => {
+                                            const quantity = item.quantity || 1;
+                                            const stockUnit = item.ingredient_data?.stock_unit || 'un';
+                                            const formattedQuantity = this.formatQuantity(quantity, stockUnit);
+                                            
+                                            // ALTERAÇÃO: Usar unit_price exato que vem da API (sem recalcular para evitar arredondamento)
+                                            const unitPriceFromAPI = item.unit_price || item.price || 0;
+                                            
+                                            // ALTERAÇÃO: Usar total_price que vem da API em vez de recalcular para preservar valor exato
+                                            const totalPrice = item.total_price || (unitPriceFromAPI * quantity);
+                                            
+                                            // ALTERAÇÃO: O unit_price agora é salvo na unidade de exibição (39.9 por kg)
+                                            // Se o valor for muito pequeno (< 0.1), provavelmente está na unidade base
+                                            // (dados antigos). Nesse caso, converter usando formatUnitPrice
+                                            // Caso contrário, usar o valor diretamente
+                                            const normalizedUnit = this.normalizeUnit(stockUnit);
+                                            let displayUnitPrice;
+                                            const isOldData = (normalizedUnit === 'kg' || normalizedUnit === 'l') && 
+                                                             unitPriceFromAPI < 0.1;
+                                            if (isOldData) {
+                                                // Valor muito pequeno, provavelmente está na unidade base (dados antigos)
+                                                displayUnitPrice = this.formatUnitPrice(unitPriceFromAPI, stockUnit);
+                                            } else {
+                                                // Valor já está na unidade de exibição (dados novos)
+                                                displayUnitPrice = unitPriceFromAPI;
+                                            }
+                                            
+                                            const itemName = item.ingredient_name || 
+                                                           item.ingredient_data?.name || 
+                                                           item.name || 
+                                                           item.product_name || 
+                                                           'Item';
+                                            
+                                            return `
                                             <tr>
-                                                <td>${escapeHTML(item.ingredient_name || item.name || item.product_name || 'Item')}</td>
-                                                <td>${item.quantity || 1}</td>
-                                                <td>R$ ${this.formatCurrency(item.unit_price || item.price || 0)}</td>
-                                                <td>R$ ${this.formatCurrency((item.unit_price || item.price || 0) * (item.quantity || 1))}</td>
+                                                <td>${escapeHTML(itemName)}</td>
+                                                <td>${escapeHTML(formattedQuantity)}</td>
+                                                <td>R$ ${this.formatCurrency(displayUnitPrice)}</td>
+                                                <td>R$ ${this.formatCurrency(totalPrice)}</td>
                                             </tr>
-                                        `).join('')}
+                                        `;
+                                        }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -505,6 +586,47 @@ export class ComprasManager {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }).format(value || 0);
+    }
+
+    /**
+     * ALTERAÇÃO: Formata valor monetário sem limitar casas decimais (exibe valor exato)
+     * @param {number} value - Valor a formatar
+     * @returns {string} Valor formatado em reais (pt-BR) sem arredondamento
+     */
+    formatCurrencyExact(value) {
+        if (value === null || value === undefined || isNaN(value)) return '0,00';
+        
+        // ALTERAÇÃO: Usar toFixed com número alto de casas decimais para preservar precisão
+        // Depois remover zeros à direita desnecessários, mas preservar pelo menos 2 casas
+        const valueStr = value.toFixed(20); // Usar 20 casas para capturar toda a precisão
+        const numValue = parseFloat(valueStr);
+        
+        // ALTERAÇÃO: Se não tem parte decimal significativa, formatar com 2 casas mínimas
+        if (numValue % 1 === 0) {
+            return new Intl.NumberFormat('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(numValue);
+        }
+        
+        // ALTERAÇÃO: Remover zeros à direita, mas manter pelo menos 2 casas decimais
+        let decimalStr = valueStr.split('.')[1] || '';
+        // Remover zeros à direita
+        decimalStr = decimalStr.replace(/0+$/, '');
+        // Garantir pelo menos 2 casas decimais
+        if (decimalStr.length < 2) {
+            decimalStr = decimalStr.padEnd(2, '0');
+        }
+        
+        // ALTERAÇÃO: Formatar parte inteira com separadores brasileiros
+        const integerPart = Math.floor(Math.abs(numValue));
+        const formattedInteger = new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(integerPart);
+        
+        // ALTERAÇÃO: Retornar com parte decimal preservada (sem arredondamento)
+        return `${formattedInteger},${decimalStr}`;
     }
 
     /**
@@ -649,13 +771,21 @@ export class ComprasManager {
                 }
             }
 
+            // ALTERAÇÃO: Usar total_price que vem da API diretamente (preserva valor exato)
+            // Não recalcular multiplicando unit_price * quantity pois estão em unidades diferentes
+            // unit_price está na unidade de exibição (39.9 por kg) e quantity está na base (2000g)
+            const totalPrice = item.total_price || 0;
+            
             return {
                 id: `edit-item-${Date.now()}-${index}`,
                 ingredient_id: ingredientId,
                 ingredient_data: ingredientData,
                 quantity: item.quantity || 0,
-                total_price: (item.unit_price || item.price || 0) * (item.quantity || 1),
-                unit_price: item.unit_price || item.price || 0
+                total_price: totalPrice,
+                unit_price: item.unit_price || item.price || 0,
+                // ALTERAÇÃO: Armazenar display_quantity e stock_unit para uso posterior
+                display_quantity: this.getEditableQuantity(item.quantity || 0, ingredientData.stock_unit || 'un'),
+                stock_unit: ingredientData.stock_unit || 'un'
             };
         }));
 
@@ -805,15 +935,20 @@ export class ComprasManager {
 
             this.editItems.forEach(item => {
                 const quantity = item.quantity || 0; // ALTERAÇÃO: Já está em unidade base após confirmEditItem
+                const displayQuantity = item.display_quantity || quantity; // ALTERAÇÃO: Quantidade de exibição
                 const totalPrice = item.total_price || 0;
-                const unitPrice = item.unit_price || 0; // ALTERAÇÃO: Já calculado com base na quantidade convertida
+                const unitPrice = item.unit_price || 0; // ALTERAÇÃO: Já calculado na unidade de exibição
+                const stockUnit = item.stock_unit || item.ingredient_data?.stock_unit || 'un';
 
                 totalAmount += totalPrice;
 
                 validItems.push({
                     ingredient_id: item.ingredient_id,
-                    quantity: quantity, // ALTERAÇÃO: Já está em unidade base
-                    unit_price: unitPrice
+                    quantity: quantity, // ALTERAÇÃO: Quantidade em unidade base (2000g)
+                    display_quantity: displayQuantity, // ALTERAÇÃO: Quantidade de exibição (2kg)
+                    stock_unit: stockUnit, // ALTERAÇÃO: Unidade do ingrediente
+                    unit_price: unitPrice, // ALTERAÇÃO: unit_price na unidade de exibição (39.90 por kg)
+                    total_price: totalPrice // ALTERAÇÃO: total_price exato (79.80)
                 });
             });
 
@@ -1192,8 +1327,10 @@ export class ComprasManager {
         const currentQuantity = parseFloat(quantityInput.dataset.lastQuantity || quantity) || 1;
 
         if (currentQuantity > 0 && quantity > 0) {
+            // ALTERAÇÃO: Calcular preço sem arredondamento
             const newPrice = (currentPrice / currentQuantity) * quantity;
-            priceInput.value = newPrice.toFixed(2);
+            // ALTERAÇÃO: Preservar todas as casas decimais (usar string para evitar arredondamento do JavaScript)
+            priceInput.value = String(newPrice);
         }
 
         quantityInput.dataset.lastQuantity = quantity;
@@ -1216,8 +1353,10 @@ export class ComprasManager {
         const currentPrice = parseFloat(priceInput.dataset.lastPrice || price) || 1;
 
         if (currentPrice > 0 && price > 0) {
+            // ALTERAÇÃO: Calcular quantidade sem arredondamento
             const newQuantity = (currentQuantity / currentPrice) * price;
-            quantityInput.value = newQuantity.toFixed(3);
+            // ALTERAÇÃO: Preservar todas as casas decimais (usar string para evitar arredondamento do JavaScript)
+            quantityInput.value = String(newQuantity);
         }
 
         priceInput.dataset.lastPrice = price;
@@ -1272,13 +1411,19 @@ export class ComprasManager {
         const stockUnit = ingredientData.stock_unit || 'un';
         const baseQuantity = this.convertQuantityToBase(quantity, stockUnit);
 
+        // ALTERAÇÃO: Calcular unit_price na unidade de exibição (kg/L), não na unidade base (g/ml)
+        // Isso evita valores muito pequenos (ex: 0.0399 por grama) que são arredondados incorretamente
+        const unitPrice = totalPrice / quantity; // Por kg/L, não por g/ml
+
         const item = {
             id: itemId,
             ingredient_id: ingredientId,
             ingredient_data: ingredientData,
-            quantity: baseQuantity, // ALTERAÇÃO: Salvar na unidade base
+            quantity: baseQuantity, // ALTERAÇÃO: Salvar na unidade base (2000g)
+            display_quantity: quantity, // ALTERAÇÃO: Quantidade de exibição (2kg)
+            stock_unit: stockUnit, // ALTERAÇÃO: Unidade do ingrediente
             total_price: totalPrice,
-            unit_price: totalPrice / baseQuantity // ALTERAÇÃO: Calcular preço unitário com base na quantidade convertida
+            unit_price: unitPrice // ALTERAÇÃO: unit_price na unidade de exibição (39.90 por kg)
         };
 
         this.editItems.push(item);
@@ -1502,6 +1647,7 @@ export class ComprasManager {
 
         const totalElement = document.getElementById('edit-compra-total-value');
         if (totalElement) {
+            // ALTERAÇÃO: Usar formatCurrency para arredondar valores monetários para 2 casas decimais
             totalElement.textContent = `R$ ${this.formatCurrency(total)}`;
         }
     }
@@ -1624,6 +1770,32 @@ export class ComprasManager {
     }
 
     /**
+     * ALTERAÇÃO: Converte preço unitário da unidade base para unidade de exibição
+     * O backend armazena unit_price na unidade base (por grama ou por ml)
+     * Mas na exibição, precisamos mostrar na unidade de exibição (por kg ou por L)
+     * @param {number} baseUnitPrice - Preço unitário na unidade base (por grama ou por ml)
+     * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
+     * @returns {number} Preço unitário na unidade de exibição (por kg, L, g, ml ou un)
+     */
+    formatUnitPrice(baseUnitPrice, stockUnit) {
+        if (!baseUnitPrice || baseUnitPrice === 0) return 0;
+        
+        const normalizedUnit = this.normalizeUnit(stockUnit);
+        
+        // ALTERAÇÃO: Converter da unidade base para unidade de exibição
+        if (normalizedUnit === 'kg') {
+            // Preço está por grama, converter para por kg (multiplicar por 1000)
+            return baseUnitPrice * 1000;
+        } else if (normalizedUnit === 'l') {
+            // Preço está por ml, converter para por L (multiplicar por 1000)
+            return baseUnitPrice * 1000;
+        }
+        
+        // Para g, ml, un - preço já está na unidade correta
+        return baseUnitPrice;
+    }
+
+    /**
      * Confirma exclusão de nota fiscal
      * ALTERAÇÃO: Novo método para exclusão
      * @param {number} invoiceId - ID da nota fiscal
@@ -1640,14 +1812,19 @@ export class ComprasManager {
             }
 
             const invoiceNumber = invoice.invoice_number || 'N/A';
-            const confirmed = confirm(
-                `Tem certeza que deseja excluir a nota fiscal ${invoiceNumber}?\n\n` +
-                `⚠️ ATENÇÃO: Esta ação irá:\n` +
-                `- Reverter a entrada de estoque dos ingredientes\n` +
-                `- Remover o movimento financeiro relacionado\n` +
-                `- Excluir permanentemente a nota fiscal\n\n` +
-                `Esta ação não pode ser desfeita!`
-            );
+            
+            // ALTERAÇÃO: Usar sistema de alertas do projeto em vez de confirm() nativo
+            const confirmed = await showConfirm({
+                title: 'Excluir Nota Fiscal',
+                message: `Deseja realmente excluir a nota fiscal ${escapeHTML(invoiceNumber)}?\n\n` +
+                    `Ao confirmar, serão revertidas automaticamente:\n` +
+                    `• Entradas de estoque dos ingredientes\n` +
+                    `• Movimento financeiro relacionado\n\n` +
+                    `Esta ação é permanente e não pode ser desfeita.`,
+                confirmText: 'Excluir',
+                cancelText: 'Cancelar',
+                type: 'delete'
+            });
 
             if (!confirmed) {
                 return;
@@ -1655,6 +1832,9 @@ export class ComprasManager {
 
             // ALTERAÇÃO: Excluir nota fiscal
             await deletePurchaseInvoice(invoiceId);
+
+            // ALTERAÇÃO: Fechar modal de edição antes de mostrar mensagem de sucesso
+            fecharModal('modal-compra-editar');
 
             showToast('Nota fiscal excluída com sucesso!', {
                 type: 'success',

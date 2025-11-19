@@ -658,7 +658,8 @@ export class CompraForm {
             const data = JSON.parse(ingredientData);
             if (data.price > 0) {
                 const calculatedPrice = quantity * data.price;
-                priceInput.value = calculatedPrice.toFixed(2);
+                // ALTERAÇÃO: Preservar todas as casas decimais sem arredondamento
+                priceInput.value = String(calculatedPrice);
                 const label = priceInput.closest('.div-input')?.querySelector('label');
                 if (label) label.classList.add('active');
             }
@@ -690,7 +691,8 @@ export class CompraForm {
             const data = JSON.parse(ingredientData);
             if (data.price > 0) {
                 const calculatedQuantity = totalPrice / data.price;
-                quantityInput.value = calculatedQuantity.toFixed(3);
+                // ALTERAÇÃO: Preservar todas as casas decimais sem arredondamento
+                quantityInput.value = String(calculatedQuantity);
                 const label = quantityInput.closest('.div-input')?.querySelector('label');
                 if (label) label.classList.add('active');
             }
@@ -1270,6 +1272,7 @@ export class CompraForm {
 
         const totalElement = document.getElementById('compra-total-value');
         if (totalElement) {
+            // ALTERAÇÃO: Usar formatCurrency para arredondar valores monetários para 2 casas decimais
             totalElement.textContent = `R$ ${this.formatCurrency(total)}`;
         }
     }
@@ -1284,6 +1287,47 @@ export class CompraForm {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }).format(value || 0);
+    }
+
+    /**
+     * ALTERAÇÃO: Formata valor monetário sem limitar casas decimais (exibe valor exato)
+     * @param {number} value - Valor a formatar
+     * @returns {string} Valor formatado em reais (pt-BR) sem arredondamento
+     */
+    formatCurrencyExact(value) {
+        if (value === null || value === undefined || isNaN(value)) return '0,00';
+        
+        // ALTERAÇÃO: Usar toFixed com número alto de casas decimais para preservar precisão
+        // Depois remover zeros à direita desnecessários, mas preservar pelo menos 2 casas
+        const valueStr = value.toFixed(20); // Usar 20 casas para capturar toda a precisão
+        const numValue = parseFloat(valueStr);
+        
+        // ALTERAÇÃO: Se não tem parte decimal significativa, formatar com 2 casas mínimas
+        if (numValue % 1 === 0) {
+            return new Intl.NumberFormat('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(numValue);
+        }
+        
+        // ALTERAÇÃO: Remover zeros à direita, mas manter pelo menos 2 casas decimais
+        let decimalStr = valueStr.split('.')[1] || '';
+        // Remover zeros à direita
+        decimalStr = decimalStr.replace(/0+$/, '');
+        // Garantir pelo menos 2 casas decimais
+        if (decimalStr.length < 2) {
+            decimalStr = decimalStr.padEnd(2, '0');
+        }
+        
+        // ALTERAÇÃO: Formatar parte inteira com separadores brasileiros
+        const integerPart = Math.floor(Math.abs(numValue));
+        const formattedInteger = new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(integerPart);
+        
+        // ALTERAÇÃO: Retornar com parte decimal preservada (sem arredondamento)
+        return `${formattedInteger},${decimalStr}`;
     }
 
     /**
@@ -1337,23 +1381,86 @@ export class CompraForm {
         let totalAmount = 0;
         const validItems = [];
         
-        this.items.forEach(item => {
+        // ALTERAÇÃO: Usar for...of ao invés de forEach para permitir throw adequado
+        for (const item of this.items) {
             const displayQuantity = item.quantity || 0;
             const totalPrice = item.total_price || 0;
             const stockUnit = item.ingredient_data?.stock_unit || 'un';
             
             // ALTERAÇÃO: Converter quantidade da unidade de exibição para unidade base antes de salvar
             const baseQuantity = this.convertQuantityToBase(displayQuantity, stockUnit);
-            const unitPrice = totalPrice / baseQuantity; // Preço unitário calculado com base na quantidade convertida
+            
+            // ALTERAÇÃO: Validar quantidade e preço antes de calcular unit_price
+            if (baseQuantity <= 0) {
+                showToast(`Quantidade inválida para o item ${item.ingredient_data?.name || 'desconhecido'}`, { 
+                    type: 'error', 
+                    title: 'Erro' 
+                });
+                throw new Error('Quantidade inválida');
+            }
+            
+            if (totalPrice <= 0) {
+                showToast(`Preço total inválido para o item ${item.ingredient_data?.name || 'desconhecido'}`, { 
+                    type: 'error', 
+                    title: 'Erro' 
+                });
+                throw new Error('Preço total inválido');
+            }
+            
+            // ALTERAÇÃO: Calcular unit_price na unidade de exibição (kg/L), não na unidade base (g/ml)
+            // Isso evita valores muito pequenos (ex: 0.0399 por grama) que são arredondados incorretamente
+            let unitPrice = totalPrice / displayQuantity;
+            
+            // ALTERAÇÃO: Validar que unit_price é válido (> 0) após cálculo
+            if (unitPrice <= 0 || !isFinite(unitPrice)) {
+                const itemName = item.ingredient_data?.name || 'desconhecido';
+                showToast(
+                    `Erro ao calcular preço unitário para o item ${itemName}. ` +
+                    `Verifique quantidade e valor total.`, 
+                    { 
+                        type: 'error', 
+                        title: 'Erro' 
+                    }
+                );
+                throw new Error('Preço unitário inválido');
+            }
+            
+            // ALTERAÇÃO: Validar valor mínimo (0.01 para permitir valores monetários válidos)
+            // unit_price agora está na unidade de exibição, então valores mínimos são maiores
+            if (unitPrice < 0.01) {
+                const itemName = item.ingredient_data?.name || 'este item';
+                const quantityDisplay = this.formatQuantity(displayQuantity, stockUnit);
+                const minTotal = (0.01 * displayQuantity).toFixed(2);
+                const currentTotal = totalPrice.toFixed(2);
+                
+                showToast(
+                    `O preço unitário para "${itemName}" é muito pequeno. ` +
+                    `Para ${quantityDisplay}, o valor total deve ser pelo menos R$ ${minTotal}. ` +
+                    `Valor atual: R$ ${currentTotal}.`, 
+                    { 
+                        type: 'error', 
+                        title: 'Valor unitário muito pequeno',
+                        duration: 10000
+                    }
+                );
+                throw new Error('Preço unitário muito pequeno');
+            }
             
             totalAmount += totalPrice;
             
             validItems.push({
                 ingredient_id: item.ingredient_id,
-                quantity: baseQuantity, // ALTERAÇÃO: Salvar na unidade base
-                unit_price: unitPrice // Preço unitário para o backend
+                quantity: baseQuantity, // ALTERAÇÃO: Salvar na unidade base (2000g)
+                // ALTERAÇÃO: Enviar quantidade de exibição (2kg) para cálculo correto no backend
+                display_quantity: displayQuantity,
+                // ALTERAÇÃO: Enviar unidade do ingrediente para referência
+                stock_unit: stockUnit,
+                // ALTERAÇÃO: Enviar unit_price na unidade de exibição (39.90 por kg)
+                unit_price: unitPrice,
+                // ALTERAÇÃO: Enviar total_price exato (79.80)
+                total_price: totalPrice
             });
-        });
+        }
 
         const formData = {
             invoice_number: invoiceNumber,

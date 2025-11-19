@@ -75,7 +75,6 @@
     gap: 0.5rem;
     margin-bottom: 2rem;
     border-bottom: 2px solid #e5e7eb;
-    overflow-x: auto;
 }
 
 .financeiro-tab {
@@ -429,37 +428,65 @@
 }
 
 .financial-badge.type-revenue {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: #d1fae5;
     color: #065f46;
 }
 
 .financial-badge.type-expense {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: #fee2e2;
     color: #991b1b;
 }
 
 .financial-badge.type-cmv {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: #fef3c7;
     color: #92400e;
 }
 
 .financial-badge.type-tax {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: #ede9fe;
     color: #5b21b6;
 }
 
 .financial-badge.status-pending {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: #fef3c7;
     color: #92400e;
 }
 
 .financial-badge.status-paid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: #d1fae5;
     color: #065f46;
 }
 
 /* ALTERAÇÃO: Badge reconciliado com cores padronizadas */
 .financial-badge.reconciled {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
     background: rgba(255, 199, 0, 0.2); /* Amarelo claro */
     color: var(--color-tertiary);
 }
@@ -772,12 +799,12 @@
 /* ALTERAÇÃO: Borda colorida baseada no status de pagamento */
 .compra-card[data-payment-status="pending"],
 .compra-card[data-payment-status="Pending"] {
-    border-left: 4px solid var(--color-quaternary);
+    border: 2px solid var(--color-secondary);
 }
 
 .compra-card[data-payment-status="paid"],
 .compra-card[data-payment-status="Paid"] {
-    border-left: 4px solid #4CAF50;
+    border: 2px solid #4CAF50;
 }
 
 .compra-card-header {
@@ -808,7 +835,6 @@
 
 .compra-card-header h4 i {
     font-size: 0.9rem;
-    color: var(--color-primary);
 }
 
 .compra-supplier {
@@ -914,7 +940,7 @@
 .compra-info .info-item.total .value {
     font-size: 1.1rem;
     font-weight: 700;
-    color: var(--color-primary);
+    color:#4CAF50;
 }
 
 .compra-card-footer {

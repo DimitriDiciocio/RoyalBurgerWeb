@@ -975,6 +975,7 @@
         gap: 15px;
 
         & .div-input {
+
           & input,
           & select,
           & textarea {
@@ -2902,7 +2903,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 2000; /* ALTERAÇÃO: Z-index maior para aparecer acima da modal de revisão */
+  z-index: 2000;
+  /* ALTERAÇÃO: Z-index maior para aparecer acima da modal de revisão */
   display: none;
   justify-content: center;
   align-items: center;
@@ -3608,6 +3610,7 @@
         gap: 15px;
 
         & .div-input {
+
           & input,
           & select,
           & textarea {
@@ -7736,7 +7739,7 @@
       /* ALTERAÇÃO: Restaurados estilos completos de .div-input que foram removidos acidentalmente */
       & .div-input {
         & label {
-            background: var(--cor-div-primary);
+          background: var(--cor-div-primary);
         }
 
         &:focus {
@@ -8159,6 +8162,7 @@
         gap: 15px;
 
         & .div-input {
+
           & input,
           & select,
           & textarea {
@@ -8192,7 +8196,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 2000; /* ALTERAÇÃO: Z-index maior para aparecer acima da modal de revisão */
+  z-index: 2000;
+  /* ALTERAÇÃO: Z-index maior para aparecer acima da modal de revisão */
   display: none;
   justify-content: center;
   align-items: center;
@@ -8527,7 +8532,7 @@
 .total-value {
   font-size: 24px;
   font-weight: 700;
-  color: var(--color-primary);
+  color: #4CAF50;
 }
 
 /* Responsividade */
@@ -8773,7 +8778,7 @@
             & .total-value {
               font-size: 24px;
               font-weight: 700;
-              color: var(--color-primary);
+              color: #4CAF50;
             }
           }
         }
@@ -8961,6 +8966,7 @@
         gap: 15px;
 
         & .div-input {
+
           & input,
           & select,
           & textarea {
@@ -9013,6 +9019,7 @@
     }
   }
 }
+
 /* ============================================================================ */
 /* MODAL COMPRA DETALHES */
 /* ============================================================================ */
@@ -9152,7 +9159,7 @@
           &.highlight {
             font-size: 18px;
             font-weight: 700;
-            color: var(--color-primary);
+            color: #4CAF50;
           }
         }
       }
@@ -9214,7 +9221,6 @@
               &:nth-child(2),
               &:nth-child(3),
               &:nth-child(4) {
-                text-align: right;
                 font-weight: 600;
               }
             }
@@ -9498,7 +9504,7 @@
                 color: var(--color-texto-black);
 
                 & i {
-                  color: var(--color-primary);
+                  color: var(--color-tertiary);
                 }
               }
 
@@ -9522,7 +9528,7 @@
                     color: var(--color-texto-black);
 
                     &.valor-destaque {
-                      color: var(--color-primary);
+                      color: #4CAF50;
                       font-size: 16px;
                     }
                   }
@@ -9552,7 +9558,6 @@
               }
 
               & .btn-editar-item-lista {
-                background-color: #fef3c7;
                 color: #d97706;
 
                 &:hover {
@@ -9568,7 +9573,6 @@
               }
 
               & .btn-remover-item-lista {
-                background-color: #fee2e2;
                 color: #dc2626;
 
                 &:hover {
@@ -9764,6 +9768,7 @@
         gap: 15px;
 
         & .div-input {
+
           & input,
           & select,
           & textarea {
@@ -9782,6 +9787,7 @@
           padding: 12px;
           justify-content: center;
         }
+
         & .btn-cancelar,
         & .btn-salvar {
           width: 100%;
