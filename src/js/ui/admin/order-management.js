@@ -1570,11 +1570,14 @@ const isDevelopment = () => {
   async function displayOrderFinancialInfo(orderId) {
     try {
       // Buscar movimentações relacionadas ao pedido
-      const movements = await getFinancialMovements({
+      const response = await getFinancialMovements({
         related_entity_type: "order",
         related_entity_id: orderId,
       });
 
+      // ALTERAÇÃO: A API retorna objeto com items, não array direto
+      const movements = Array.isArray(response) ? response : (response?.items || []);
+      
       if (!movements || movements.length === 0) {
         return;
       }

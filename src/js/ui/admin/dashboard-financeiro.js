@@ -3,11 +3,15 @@
  * Exibe métricas e gráficos do fluxo de caixa
  */
 
-import { getCashFlowSummary, getFinancialMovements } from '../../api/financial-movements.js';
+import { getCashFlowSummary, getFinancialMovements, updatePaymentStatus, getFinancialMovementById } from '../../api/financial-movements.js';
 import { showToast } from '../alerts.js';
 import { renderFinancialMovementCards } from '../components/financial-card.js';
 import { cacheManager } from '../../utils/cache-manager.js';
 import { formatDateForAPI } from '../../utils/date-formatter.js';
+// ALTERAÇÃO: Importar utilities compartilhadas para reduzir duplicação
+import { openRelatedEntityModal, refreshPurchasesIfNeeded } from '../../utils/financial-entity-utils.js';
+// ALTERAÇÃO: Importar cliente de eventos em tempo real
+import { getRealtimeClient } from '../../utils/realtime-events.js';
 
 export class FinancialDashboard {
     constructor(containerId) {
@@ -40,6 +44,8 @@ export class FinancialDashboard {
         this.render();
         await this.loadData();
         this.setupEventListeners();
+        // ALTERAÇÃO: Configurar eventos em tempo real
+        this.setupRealtimeEvents();
     }
 
     /**
@@ -422,18 +428,14 @@ export class FinancialDashboard {
      */
     async loadRecentMovements() {
         try {
-            // Buscar movimentações recentes sem filtros de data
-            // A API pode ter problemas com validação de datas, então buscamos todas e filtramos no frontend
-            const movements = await getFinancialMovements({});
+            // ALTERAÇÃO: Usar paginação da API para buscar apenas 5 movimentações recentes
+            const response = await getFinancialMovements({ 
+                page: 1, 
+                page_size: 5 
+            });
             
-            // Ordenar por data mais recente e pegar apenas os 5 primeiros
-            const recentMovements = (movements || [])
-                .sort((a, b) => {
-                    const dateA = new Date(a.movement_date || a.date || 0);
-                    const dateB = new Date(b.movement_date || b.date || 0);
-                    return dateB - dateA;
-                })
-                .slice(0, 5);
+            // ALTERAÇÃO: Extrair items da resposta paginada
+            const recentMovements = response?.items || response || [];
 
             const container = document.getElementById('recent-movements-list');
             if (!container) return;
@@ -450,17 +452,103 @@ export class FinancialDashboard {
 
             // Renderizar cards de movimentações
             renderFinancialMovementCards(recentMovements, container, {
-                onEdit: (movementId) => {
-                    // TODO: REVISAR Implementar edição de movimentação
-                    // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
+                onEdit: async (movementId) => {
+                    // ALTERAÇÃO: Abrir modal de edição baseada no tipo de entidade relacionada
+                    const { openEditModalForMovement } = await import('../../utils/financial-entity-utils.js');
+                    await openEditModalForMovement(movementId);
+                    // Recarregar após edição
+                    await this.loadRecentMovements();
                 },
-                onDelete: (movementId) => {
-                    // TODO: REVISAR Implementar exclusão de movimentação
-                    // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
+                onDelete: async (movementId) => {
+                    // ALTERAÇÃO: Implementar exclusão de movimentação com proteção contra múltiplos cliques
+                    if (this._deletingMovement) return; // Prevenir múltiplas requisições
+                    
+                    const { showConfirm } = await import('../alerts.js');
+                    const { deleteFinancialMovement } = await import('../../api/financial-movements.js');
+                    
+                    const confirmed = await showConfirm({
+                        title: 'Excluir Movimentação',
+                        message: 'Tem certeza que deseja excluir esta movimentação?\n\nEsta ação não pode ser desfeita.',
+                        confirmText: 'Excluir',
+                        cancelText: 'Cancelar',
+                        type: 'delete'
+                    });
+                    
+                    if (!confirmed) return; // ALTERAÇÃO: Retornar se usuário cancelou
+                    
+                    this._deletingMovement = true;
+                    try {
+                        await deleteFinancialMovement(movementId);
+                        showToast('Movimentação excluída com sucesso', {
+                            type: 'success',
+                            title: 'Sucesso'
+                        });
+                        await this.loadRecentMovements();
+                    } catch (error) {
+                        // ALTERAÇÃO: Extrair mensagem de erro do backend corretamente
+                        let errorMessage = 'Erro ao excluir movimentação';
+                        
+                        // ALTERAÇÃO: Tratar 404 como sucesso silencioso (movimentação já foi excluída)
+                        if (error?.status === 404) {
+                            // Movimentação já foi excluída - tratar como sucesso
+                            showToast('Movimentação excluída com sucesso', {
+                                type: 'success',
+                                title: 'Sucesso'
+                            });
+                            await this.loadRecentMovements();
+                            return;
+                        }
+                        
+                        if (error?.userMessage) {
+                            errorMessage = error.userMessage;
+                        } else if (error?.payload?.error) {
+                            errorMessage = error.payload.error;
+                        } else if (error?.message) {
+                            errorMessage = error.message;
+                        } else if (typeof error === 'string') {
+                            errorMessage = error;
+                        }
+                        
+                        showToast(errorMessage, {
+                            type: 'error',
+                            title: 'Erro ao Excluir'
+                        });
+                    } finally {
+                        this._deletingMovement = false;
+                    }
                 },
-                onViewRelated: (entityType, entityId) => {
-                    // TODO: REVISAR Implementar navegação para entidade relacionada
-                    // ALTERAÇÃO: Removido console.log - implementar funcionalidade real
+                onViewRelated: async (entityType, entityId) => {
+                    // ALTERAÇÃO: Usar utility compartilhada para reduzir duplicação
+                    await openRelatedEntityModal(entityType, entityId);
+                },
+                onMarkAsPaid: async (movementId) => {
+                    // ALTERAÇÃO: Marcar movimentação como paga
+                    try {
+                        // ALTERAÇÃO: Buscar movimentação para verificar se está vinculada a uma compra
+                        const movement = await getFinancialMovementById(movementId);
+                        const relatedEntityType = movement?.related_entity_type || '';
+                        const relatedEntityId = movement?.related_entity_id;
+                        
+                        // ALTERAÇÃO: API espera 'Paid' com P maiúsculo
+                        await updatePaymentStatus(movementId, 'Paid', formatDateForAPI(new Date()));
+                        showToast('Movimentação marcada como paga com sucesso!', {
+                            type: 'success',
+                            title: 'Sucesso'
+                        });
+                        
+                        // Recarregar dados para atualizar os cards
+                        await this.loadRecentMovements();
+                        
+                        // ALTERAÇÃO: Usar utility compartilhada para atualizar compras se necessário
+                        await refreshPurchasesIfNeeded(relatedEntityType, relatedEntityId);
+                    } catch (error) {
+                        // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
+                        const errorMessage = error.message || 'Erro ao marcar movimentação como paga';
+                        showToast(errorMessage, {
+                            type: 'error',
+                            title: 'Erro'
+                        });
+                    }
                 }
             });
         } catch (error) {
@@ -532,6 +620,40 @@ export class FinancialDashboard {
     calculatePercentageChange(previous, current) {
         if (!previous || previous === 0) return null;
         return ((current - previous) / previous) * 100;
+    }
+
+    /**
+     * Configura eventos em tempo real para atualização automática
+     * ALTERAÇÃO: Implementado para atualizar dashboard quando há mudanças
+     */
+    setupRealtimeEvents() {
+        const client = getRealtimeClient();
+        
+        // ALTERAÇÃO: Escutar eventos de compras criadas/atualizadas
+        client.on('purchase.created', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+        });
+
+        client.on('purchase.updated', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+        });
+
+        // ALTERAÇÃO: Escutar eventos de movimentações financeiras
+        client.on('financial_movement.created', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+        });
+
+        client.on('financial_movement.payment_status_updated', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+        });
     }
 }
 

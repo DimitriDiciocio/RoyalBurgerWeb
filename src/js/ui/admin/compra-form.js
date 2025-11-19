@@ -1178,8 +1178,12 @@ export class CompraForm {
 
     /**
      * ALTERAÇÃO: Formata quantidade com base na unidade de medida do ingrediente
-     * Converte automaticamente da unidade base (g/ml) para a unidade de exibição (kg/L) quando necessário
-     * @param {number} quantity - Quantidade armazenada (pode estar em unidade base ou exibição)
+     * 
+     * REGRA CRÍTICA: O banco armazena na mesma unidade do ingrediente
+     * Se o ingrediente tem stock_unit = 'kg', o banco armazena em kg, não em gramas
+     * Portanto, NÃO deve converter dividindo por 1000 quando a unidade já é kg ou L
+     * 
+     * @param {number} quantity - Quantidade armazenada no banco (na mesma unidade do ingrediente)
      * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
      * @returns {string} Quantidade formatada com unidade
      */
@@ -1190,43 +1194,28 @@ export class CompraForm {
         let displayQuantity = quantity;
         let displayUnit = normalizedUnit;
 
-        // ALTERAÇÃO: Se a unidade é kg ou L, assumir que quantidade pode estar em unidade base
-        // Para exibição, sempre mostrar na unidade do ingrediente
-        if (normalizedUnit === 'kg') {
-            // Se quantidade >= 1000, provavelmente está em gramas, converter para kg
-            if (quantity >= 1000) {
-                displayQuantity = quantity / 1000;
-                displayUnit = 'kg';
-            } else {
-                displayQuantity = quantity;
-                displayUnit = 'kg';
-            }
-        } else if (normalizedUnit === 'l') {
-            // Se quantidade >= 1000, provavelmente está em ml, converter para L
-            if (quantity >= 1000) {
-                displayQuantity = quantity / 1000;
-                displayUnit = 'L';
-            } else {
-                displayQuantity = quantity;
-                displayUnit = 'L';
-            }
-        } else {
-            // Para g, ml, un - quantidade já está na unidade correta
-            displayQuantity = quantity;
-            displayUnit = normalizedUnit;
-        }
+        // ALTERAÇÃO CRÍTICA: Não converter quando unidade já é kg ou L
+        // O banco armazena na mesma unidade do ingrediente
+        // Se stock_unit = 'kg', quantity já está em kg (não precisa dividir por 1000)
+        
+        // Apenas usar a quantidade como está - banco armazena na mesma unidade do ingrediente
+        displayQuantity = quantity;
+        displayUnit = normalizedUnit;
 
         // ALTERAÇÃO: Formatar quantidade com decimais apropriados
         let formattedQuantity;
         if (displayUnit === 'kg' || displayUnit === 'L') {
+            // ALTERAÇÃO: Para kg e L, exibir com até 3 casas decimais se necessário
             formattedQuantity = displayQuantity % 1 === 0 
                 ? displayQuantity.toFixed(0) 
                 : parseFloat(displayQuantity.toFixed(3)).toString();
         } else if (displayUnit === 'g' || displayUnit === 'ml') {
+            // ALTERAÇÃO: Para g e ml, exibir com até 1 casa decimal se necessário
             formattedQuantity = displayQuantity % 1 === 0 
                 ? displayQuantity.toFixed(0) 
                 : parseFloat(displayQuantity.toFixed(1)).toString();
         } else {
+            // ALTERAÇÃO: Para unidades (un), exibir sem decimais ou com até 3 casas se necessário
             formattedQuantity = displayQuantity % 1 === 0 
                 ? displayQuantity.toFixed(0) 
                 : parseFloat(displayQuantity.toFixed(3)).toString();
@@ -1238,25 +1227,25 @@ export class CompraForm {
     /**
      * ALTERAÇÃO: Converte quantidade da unidade de exibição para unidade base
      * Usado ao salvar itens (o usuário digita na unidade de exibição, mas o backend espera unidade base)
+     * 
+     * REGRA CRÍTICA: NÃO converter quando unidade compra = unidade insumo
+     * Se o ingrediente tem unidade base 'kg', o banco armazena em kg, não em gramas!
+     * 
      * @param {number} quantity - Quantidade digitada pelo usuário (na unidade de exibição: kg, L, etc)
      * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
-     * @returns {number} Quantidade na unidade base (g para peso, ml para volume, un para unidades)
+     * @returns {number} Quantidade na unidade base do banco (mesma unidade do ingrediente)
      */
     convertQuantityToBase(quantity, stockUnit) {
         if (!quantity || quantity === 0) return 0;
         
         const normalizedUnit = this.normalizeUnit(stockUnit);
         
-        // ALTERAÇÃO: Converter da unidade de exibição para unidade base
-        if (normalizedUnit === 'kg') {
-            // Usuário digitou em kg, converter para gramas (unidade base)
-            return quantity * 1000;
-        } else if (normalizedUnit === 'l') {
-            // Usuário digitou em L, converter para ml (unidade base)
-            return quantity * 1000;
-        }
+        // ALTERAÇÃO CRÍTICA: O banco armazena na mesma unidade do ingrediente
+        // Se o ingrediente tem stock_unit = 'kg', o banco armazena em kg, NÃO em gramas
+        // Portanto, NÃO deve converter quando a unidade do ingrediente já é kg ou L
         
-        // Para g, ml, un - quantidade já está na unidade base
+        // Para kg, L, g, ml, un - quantidade já está na unidade correta
+        // Não fazer conversão - o banco armazena na mesma unidade do ingrediente
         return quantity;
     }
 
@@ -1388,6 +1377,8 @@ export class CompraForm {
             const stockUnit = item.ingredient_data?.stock_unit || 'un';
             
             // ALTERAÇÃO: Converter quantidade da unidade de exibição para unidade base antes de salvar
+            // ALTERAÇÃO CRÍTICA: Não deve converter quando unidade compra = unidade insumo
+            // O banco armazena na mesma unidade do ingrediente (ex: se stock_unit = 'kg', armazena em kg)
             const baseQuantity = this.convertQuantityToBase(displayQuantity, stockUnit);
             
             // ALTERAÇÃO: Validar quantidade e preço antes de calcular unit_price

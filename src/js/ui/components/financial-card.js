@@ -13,7 +13,8 @@ export function createFinancialMovementCard(movement, options = {}) {
     const {
         onEdit = null,
         onDelete = null,
-        onViewRelated = null
+        onViewRelated = null,
+        onMarkAsPaid = null
     } = options;
 
     // Normalizar dados da movimentação
@@ -127,9 +128,22 @@ export function createFinancialMovementCard(movement, options = {}) {
             
             ${relatedEntityType && relatedEntityId ? `
                 <div class="financial-movement-card-footer">
-                    <a href="#" class="related-link" data-entity-type="${escapeHtml(relatedEntityType)}" data-entity-id="${relatedEntityId}" aria-label="Ver ${escapeHtml(relatedEntityType)} #${relatedEntityId}">
-                        Ver ${escapeHtml(relatedEntityType)} #${relatedEntityId}
-                    </a>
+                    ${paymentStatus !== 'paid' && onMarkAsPaid ? `
+                        <button type="button" class="financial-btn financial-btn-pay" 
+                                data-action="mark-paid" 
+                                data-movement-id="${id}"
+                                aria-label="Marcar movimentação como paga">
+                            <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                            <span>Marcar como Pago</span>
+                        </button>
+                    ` : ''}
+                    <button type="button" class="related-link financial-btn financial-btn-secondary" 
+                            data-entity-type="${escapeHtml(relatedEntityType)}" 
+                            data-entity-id="${relatedEntityId}" 
+                            aria-label="Ver mais detalhes">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>Ver mais</span>
+                    </button>
                 </div>
             ` : ''}
         </div>
@@ -172,7 +186,7 @@ export function renderFinancialMovementCards(movements, container, options = {})
     containerElement.innerHTML = cardsHTML;
 
     // Configurar event listeners se necessário
-    if (options.onEdit || options.onDelete || options.onViewRelated) {
+    if (options.onEdit || options.onDelete || options.onViewRelated || options.onMarkAsPaid) {
         setupCardEventListeners(containerElement, options);
     }
 }
@@ -183,34 +197,102 @@ export function renderFinancialMovementCards(movements, container, options = {})
  * @param {Object} options - Opções com callbacks
  */
 function setupCardEventListeners(container, options) {
-    // Event delegation para botões de ação
-    container.addEventListener('click', (e) => {
+    // ALTERAÇÃO: Remover listeners anteriores para evitar duplicação
+    const existingHandler = container._financialCardClickHandler;
+    if (existingHandler) {
+        container.removeEventListener('click', existingHandler);
+    }
+    
+    // ALTERAÇÃO: Flags para prevenir múltiplos cliques
+    let isProcessing = false;
+    
+    // ALTERAÇÃO: Criar handler único e armazenar referência
+    const clickHandler = async (e) => {
         const button = e.target.closest('[data-action]');
         if (!button) return;
+
+        // ALTERAÇÃO: Prevenir múltiplos cliques simultâneos
+        if (isProcessing) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
 
         const action = button.dataset.action;
         const movementId = parseInt(button.dataset.movementId);
 
         if (action === 'edit' && options.onEdit) {
             e.preventDefault();
-            options.onEdit(movementId);
+            e.stopPropagation();
+            isProcessing = true;
+            try {
+                await options.onEdit(movementId);
+            } finally {
+                // ALTERAÇÃO: Liberar após um pequeno delay para evitar cliques rápidos
+                setTimeout(() => { isProcessing = false; }, 300);
+            }
         } else if (action === 'delete' && options.onDelete) {
             e.preventDefault();
-            options.onDelete(movementId);
+            e.stopPropagation();
+            isProcessing = true;
+            try {
+                // ALTERAÇÃO: Aguardar callback terminar completamente antes de liberar
+                await options.onDelete(movementId);
+            } finally {
+                // ALTERAÇÃO: Liberar apenas após callback terminar completamente (sem timeout fixo)
+                isProcessing = false;
+            }
+        } else if (action === 'mark-paid' && options.onMarkAsPaid) {
+            e.preventDefault();
+            e.stopPropagation();
+            isProcessing = true;
+            try {
+                await options.onMarkAsPaid(movementId);
+            } finally {
+                setTimeout(() => { isProcessing = false; }, 300);
+            }
         }
-    });
+    };
+    
+    // ALTERAÇÃO: Armazenar referência do handler para possível remoção futura
+    container._financialCardClickHandler = clickHandler;
+    
+    // Event delegation para botões de ação
+    container.addEventListener('click', clickHandler);
 
-    // Event listener para links relacionados
+    // ALTERAÇÃO: Event listener para botão de visualizar entidade relacionada
     if (options.onViewRelated) {
-        container.addEventListener('click', (e) => {
-            const link = e.target.closest('.related-link');
-            if (!link) return;
+        // ALTERAÇÃO: Remover listener anterior se existir
+        const existingRelatedHandler = container._financialCardRelatedHandler;
+        if (existingRelatedHandler) {
+            container.removeEventListener('click', existingRelatedHandler, true);
+        }
+        
+        const relatedHandler = (e) => {
+            // Verificar se o clique foi no botão relacionado ou em seus filhos
+            const button = e.target.closest('.related-link');
+            if (!button) return;
 
             e.preventDefault();
-            const entityType = link.dataset.entityType;
-            const entityId = link.dataset.entityId;
-            options.onViewRelated(entityType, entityId);
-        });
+            e.stopPropagation();
+            
+            const entityType = button.getAttribute('data-entity-type');
+            const entityId = button.getAttribute('data-entity-id');
+            
+            // Verificar se os dados estão presentes antes de chamar o callback
+            if (entityType && entityId) {
+                try {
+                    options.onViewRelated(entityType, entityId);
+                } catch (error) {
+                    // ALTERAÇÃO: Removido console.error - erro será tratado pelo callback ou silenciosamente
+                }
+            }
+        };
+        
+        // ALTERAÇÃO: Armazenar referência do handler
+        container._financialCardRelatedHandler = relatedHandler;
+        
+        container.addEventListener('click', relatedHandler, true); // Usar capture phase para garantir que o evento seja capturado
     }
 }
 

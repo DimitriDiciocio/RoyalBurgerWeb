@@ -261,8 +261,15 @@ export function classifyNetworkError(error) {
   // Erro 404 - Não encontrado
   if (error?.status === 404) {
     classification.type = "not_found";
-    classification.userMessage =
-      "O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.";
+    // ALTERAÇÃO: Mensagem mais específica para DELETE de movimentações financeiras
+    if (error?.payload?.error) {
+      classification.userMessage = error.payload.error;
+    } else if (error?.message && error.message.includes("Movimentação")) {
+      classification.userMessage = error.message;
+    } else {
+      classification.userMessage =
+        "O serviço solicitado não foi encontrado. Verifique se o servidor está rodando corretamente.";
+    }
     classification.retryable = false;
     return classification;
   }
@@ -282,6 +289,18 @@ export function classifyNetworkError(error) {
     classification.userMessage =
       "O servidor está temporariamente indisponível. Tente novamente em alguns minutos.";
     classification.retryable = true;
+    return classification;
+  }
+
+  // ALTERAÇÃO: Erro 400 - Bad Request (validação, entidade relacionada, etc.)
+  if (error?.status === 400) {
+    classification.type = "validation_error";
+    classification.userMessage =
+      error?.message ||
+      error?.payload?.error ||
+      error?.payload?.message ||
+      "Erro na requisição. Verifique os dados enviados.";
+    classification.retryable = false;
     return classification;
   }
 

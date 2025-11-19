@@ -13,6 +13,10 @@ import { formatDateForAPI } from '../../utils/date-formatter.js';
 import { CompraForm } from './compra-form.js';
 import { gerenciarInputsEspecificos } from '../../utils.js';
 import { cacheManager } from '../../utils/cache-manager.js';
+// ALTERAÇÃO: Importar utility compartilhada para modal de compra
+import { showPurchaseInvoiceModal } from '../../utils/purchase-modal-utils.js';
+// ALTERAÇÃO: Importar cliente de eventos em tempo real
+import { getRealtimeClient } from '../../utils/realtime-events.js';
 
 export class ComprasManager {
     constructor(containerId) {
@@ -52,6 +56,8 @@ export class ComprasManager {
         await this.loadInvoices();
         this.setupEventListeners();
         await this.initCompraForm();
+        // ALTERAÇÃO: Configurar eventos em tempo real
+        this.setupRealtimeEvents();
     }
 
     /**
@@ -199,6 +205,13 @@ export class ComprasManager {
                                     title="Editar">
                                 <i class="fa-solid fa-edit" aria-hidden="true"></i>
                             </button>
+                            <button class="btn-excluir-compra" 
+                                    data-action="delete" 
+                                    data-invoice-id="${invoiceId}"
+                                    aria-label="Excluir nota fiscal ${invoiceNumber}"
+                                    title="Excluir">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                            </button>
                             <span class="financial-badge status-${paymentStatus}">
                                 ${escapeHTML(statusLabel)}
                             </span>
@@ -242,9 +255,9 @@ export class ComprasManager {
                         <button class="financial-btn financial-btn-secondary" 
                                 data-action="view" 
                                 data-invoice-id="${invoiceId}"
-                                aria-label="Ver detalhes da nota fiscal ${invoiceNumber}">
+                                aria-label="Ver mais detalhes da nota fiscal ${invoiceNumber}">
                             <i class="fa-solid fa-eye" aria-hidden="true"></i>
-                            <span>Detalhes</span>
+                            <span>Ver mais</span>
                         </button>
                     </div>
                 </div>
@@ -399,181 +412,12 @@ export class ComprasManager {
 
     /**
      * Exibe modal com detalhes da nota fiscal
-     * ALTERAÇÃO: Carregar dados completos dos ingredientes para exibir quantidade com unidade
+     * ALTERAÇÃO: Usar utility compartilhada
      * @param {Object} invoice - Dados da nota fiscal
      */
     async showInvoiceModal(invoice) {
-        // ALTERAÇÃO: Criar ou obter modal seguindo padrão do sistema
-        let modal = document.getElementById('modal-compra-detalhes');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'modal-compra-detalhes';
-            modal.className = 'modal';
-            document.body.appendChild(modal);
-        }
-
-        const invoiceNumber = escapeHTML(invoice.invoice_number || 'N/A');
-        const supplierName = escapeHTML(invoice.supplier_name || 'Fornecedor não informado');
-        const totalAmount = parseFloat(invoice.total_amount || invoice.total || 0);
-        const purchaseDate = invoice.purchase_date || invoice.date || invoice.created_at;
-        // ALTERAÇÃO: Formatar método de pagamento para exibição
-        const paymentMethod = this.formatPaymentMethod(invoice.payment_method || '-');
-        const paymentStatus = (invoice.payment_status || 'Pending').toLowerCase();
-        const statusLabel = this.translateStatus(invoice.payment_status || 'Pending');
-        const items = invoice.items || [];
-
-        // ALTERAÇÃO: Carregar dados completos dos ingredientes para obter stock_unit
-        const itemsWithIngredientData = await Promise.all((items || []).map(async (item) => {
-            const ingredientId = item.ingredient_id || item.ingredient?.id;
-            let ingredientData = item.ingredient || { name: item.ingredient_name || item.name || 'Item' };
-
-            // ALTERAÇÃO: Carregar dados completos do ingrediente para obter stock_unit
-            if (ingredientId) {
-                try {
-                    const cacheKey = `ingredient:${ingredientId}`;
-                    let fullIngredient = cacheManager.get(cacheKey);
-                    
-                    if (!fullIngredient) {
-                        fullIngredient = await getIngredientById(ingredientId);
-                        cacheManager.set(cacheKey, fullIngredient, 10 * 60 * 1000);
-                    }
-
-                    if (fullIngredient) {
-                        ingredientData = {
-                            id: fullIngredient.id,
-                            name: fullIngredient.name || ingredientData.name || item.ingredient_name || item.name || 'Item',
-                            stock_unit: fullIngredient.stock_unit || ingredientData.stock_unit || 'un'
-                        };
-                    } else {
-                        if (!ingredientData.stock_unit) {
-                            ingredientData.stock_unit = 'un';
-                        }
-                    }
-                } catch (error) {
-                    // Se não conseguir carregar, garantir que stock_unit existe
-                    if (!ingredientData.stock_unit) {
-                        ingredientData.stock_unit = 'un';
-                    }
-                }
-            } else {
-                if (!ingredientData.stock_unit) {
-                    ingredientData.stock_unit = 'un';
-                }
-            }
-
-            return {
-                ...item,
-                ingredient_data: ingredientData
-            };
-        }));
-
-        // ALTERAÇÃO: Estrutura HTML seguindo padrão do sistema (div-overlay, modal-content-compra-detalhes)
-        modal.innerHTML = `
-            <div class="div-overlay" data-close-modal="modal-compra-detalhes"></div>
-            <div class="modal-content-compra-detalhes">
-                <div class="header-modal">
-                    <h2>Detalhes da Nota Fiscal ${invoiceNumber}</h2>
-                    <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-compra-detalhes" aria-label="Fechar modal"></i>
-                </div>
-                <div class="conteudo-modal">
-                    <div class="invoice-details">
-                        <div class="invoice-detail-section">
-                            <h3>Informações Gerais</h3>
-                            <div class="invoice-detail-grid">
-                                <div class="invoice-detail-item">
-                                    <span class="label">Fornecedor:</span>
-                                    <span class="value">${supplierName}</span>
-                                </div>
-                                <div class="invoice-detail-item">
-                                    <span class="label">Data de Compra:</span>
-                                    <span class="value">${this.formatDate(purchaseDate)}</span>
-                                </div>
-                                <div class="invoice-detail-item">
-                                    <span class="label">Valor Total:</span>
-                                    <span class="value highlight">R$ ${this.formatCurrency(totalAmount)}</span>
-                                </div>
-                                <div class="invoice-detail-item">
-                                    <span class="label">Método de Pagamento:</span>
-                                    <span class="value">${escapeHTML(paymentMethod)}</span>
-                                </div>
-                                <div class="invoice-detail-item">
-                                    <span class="label">Status:</span>
-                                    <span class="financial-badge status-${paymentStatus}">${escapeHTML(statusLabel)}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        ${itemsWithIngredientData.length > 0 ? `
-                        <div class="invoice-detail-section">
-                            <h3>Itens da Nota Fiscal</h3>
-                            <div class="invoice-items-list">
-                                <table class="invoice-items-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Item</th>
-                                            <th>Quantidade</th>
-                                            <th>Valor Unitário</th>
-                                            <th>Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${itemsWithIngredientData.map(item => {
-                                            const quantity = item.quantity || 1;
-                                            const stockUnit = item.ingredient_data?.stock_unit || 'un';
-                                            const formattedQuantity = this.formatQuantity(quantity, stockUnit);
-                                            
-                                            // ALTERAÇÃO: Usar unit_price exato que vem da API (sem recalcular para evitar arredondamento)
-                                            const unitPriceFromAPI = item.unit_price || item.price || 0;
-                                            
-                                            // ALTERAÇÃO: Usar total_price que vem da API em vez de recalcular para preservar valor exato
-                                            const totalPrice = item.total_price || (unitPriceFromAPI * quantity);
-                                            
-                                            // ALTERAÇÃO: O unit_price agora é salvo na unidade de exibição (39.9 por kg)
-                                            // Se o valor for muito pequeno (< 0.1), provavelmente está na unidade base
-                                            // (dados antigos). Nesse caso, converter usando formatUnitPrice
-                                            // Caso contrário, usar o valor diretamente
-                                            const normalizedUnit = this.normalizeUnit(stockUnit);
-                                            let displayUnitPrice;
-                                            const isOldData = (normalizedUnit === 'kg' || normalizedUnit === 'l') && 
-                                                             unitPriceFromAPI < 0.1;
-                                            if (isOldData) {
-                                                // Valor muito pequeno, provavelmente está na unidade base (dados antigos)
-                                                displayUnitPrice = this.formatUnitPrice(unitPriceFromAPI, stockUnit);
-                                            } else {
-                                                // Valor já está na unidade de exibição (dados novos)
-                                                displayUnitPrice = unitPriceFromAPI;
-                                            }
-                                            
-                                            const itemName = item.ingredient_name || 
-                                                           item.ingredient_data?.name || 
-                                                           item.name || 
-                                                           item.product_name || 
-                                                           'Item';
-                                            
-                                            return `
-                                            <tr>
-                                                <td>${escapeHTML(itemName)}</td>
-                                                <td>${escapeHTML(formattedQuantity)}</td>
-                                                <td>R$ ${this.formatCurrency(displayUnitPrice)}</td>
-                                                <td>R$ ${this.formatCurrency(totalPrice)}</td>
-                                            </tr>
-                                        `;
-                                        }).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
-                <div class="footer-modal">
-                    <button type="button" class="btn-cancelar" data-close-modal="modal-compra-detalhes">Fechar</button>
-                </div>
-            </div>
-        `;
-
-        // ALTERAÇÃO: Usar sistema de modais.js para abrir modal
-        abrirModal('modal-compra-detalhes');
+        // ALTERAÇÃO: Delegar para utility compartilhada
+        return showPurchaseInvoiceModal(invoice);
     }
 
     /**
@@ -868,16 +712,8 @@ export class ComprasManager {
                     </form>
                 </div>
                 <div class="footer-modal">
-
-                        <button type="button" class="btn-cancelar" data-close-modal="modal-compra-editar">Cancelar</button>
-                                                <button type="button" class="btn-excluir-compra" 
-                            data-action="delete" 
-                            data-invoice-id="${invoice.id}"
-                            aria-label="Excluir nota fiscal ${invoiceNumber}">
-                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                            <span>Excluir</span>
-                        </button>
-                        <button type="button" class="btn-salvar" id="btn-save-edit-compra" data-invoice-id="${invoice.id}">
+                    <button type="button" class="btn-cancelar" data-close-modal="modal-compra-editar">Cancelar</button>
+                    <button type="button" class="btn-salvar" id="btn-save-edit-compra" data-invoice-id="${invoice.id}">
                         Salvar Alterações
                     </button>
                 </div>
@@ -1102,17 +938,7 @@ export class ComprasManager {
             });
         }
 
-        // ALTERAÇÃO: Botão excluir na modal
-        const btnDelete = modal.querySelector('.btn-excluir-compra');
-        if (btnDelete) {
-            btnDelete.addEventListener('click', (e) => {
-                e.preventDefault();
-                const invoiceId = parseInt(btnDelete.dataset.invoiceId);
-                if (invoiceId) {
-                    this.confirmDeleteInvoice(invoiceId);
-                }
-            });
-        }
+        // ALTERAÇÃO: Botão excluir removido da modal - agora está no card
 
         // Event delegation para ações dos itens
         const itemsList = document.getElementById('compra-items-cadastrados-edit');
@@ -1668,8 +1494,12 @@ export class ComprasManager {
 
     /**
      * ALTERAÇÃO: Formata quantidade com base na unidade de medida do ingrediente
-     * Converte automaticamente da unidade base (g/ml) para a unidade de exibição (kg/L) quando necessário
-     * @param {number} quantity - Quantidade armazenada no banco (sempre em unidade base: g para peso, ml para volume, un para unidades)
+     * 
+     * REGRA CRÍTICA: O banco armazena na mesma unidade do ingrediente
+     * Se o ingrediente tem stock_unit = 'kg', o banco armazena em kg, não em gramas
+     * Portanto, NÃO deve converter dividindo por 1000 quando a unidade já é kg ou L
+     * 
+     * @param {number} quantity - Quantidade armazenada no banco (na mesma unidade do ingrediente)
      * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
      * @returns {string} Quantidade formatada com unidade
      */
@@ -1680,36 +1510,28 @@ export class ComprasManager {
         let displayQuantity = quantity;
         let displayUnit = normalizedUnit;
 
-        // ALTERAÇÃO: O backend sempre armazena quantidades em unidades base (g para peso, ml para volume)
-        // Precisamos converter para a unidade de exibição do ingrediente
-        if (normalizedUnit === 'kg') {
-            // Se o ingrediente usa kg, a quantidade está em gramas (unidade base), converter para kg
-            displayQuantity = quantity / 1000;
-            displayUnit = 'kg';
-        } else if (normalizedUnit === 'l') {
-            // Se o ingrediente usa L, a quantidade está em ml (unidade base), converter para L
-            displayQuantity = quantity / 1000;
-            displayUnit = 'L';
-        } else {
-            // Para g, ml, un - quantidade já está na unidade correta
-            displayQuantity = quantity;
-            displayUnit = normalizedUnit;
-        }
+        // ALTERAÇÃO CRÍTICA: Não converter quando unidade já é kg ou L
+        // O banco armazena na mesma unidade do ingrediente
+        // Se stock_unit = 'kg', quantity já está em kg (não precisa dividir por 1000)
+        
+        // Apenas usar a quantidade como está - banco armazena na mesma unidade do ingrediente
+        displayQuantity = quantity;
+        displayUnit = normalizedUnit;
 
         // ALTERAÇÃO: Formatar quantidade com decimais apropriados
         let formattedQuantity;
         if (displayUnit === 'kg' || displayUnit === 'L') {
-            // Para kg e L, mostrar até 3 decimais, removendo zeros à direita
+            // ALTERAÇÃO: Para kg e L, exibir com até 3 casas decimais se necessário
             formattedQuantity = displayQuantity % 1 === 0 
                 ? displayQuantity.toFixed(0) 
                 : parseFloat(displayQuantity.toFixed(3)).toString();
         } else if (displayUnit === 'g' || displayUnit === 'ml') {
-            // Para g e ml, mostrar como inteiro se possível, senão 1 decimal
+            // ALTERAÇÃO: Para g e ml, exibir com até 1 casa decimal se necessário
             formattedQuantity = displayQuantity % 1 === 0 
                 ? displayQuantity.toFixed(0) 
                 : parseFloat(displayQuantity.toFixed(1)).toString();
         } else {
-            // Para un, mostrar como inteiro se possível, senão até 3 decimais
+            // ALTERAÇÃO: Para unidades (un), exibir sem decimais ou com até 3 casas se necessário
             formattedQuantity = displayQuantity % 1 === 0 
                 ? displayQuantity.toFixed(0) 
                 : parseFloat(displayQuantity.toFixed(3)).toString();
@@ -1719,53 +1541,52 @@ export class ComprasManager {
     }
 
     /**
-     * ALTERAÇÃO: Obtém quantidade editável (converte da unidade base para unidade de exibição)
+     * ALTERAÇÃO: Obtém quantidade editável para exibição em campos de input
+     * 
+     * REGRA CRÍTICA: O banco armazena na mesma unidade do ingrediente
+     * Se o ingrediente tem stock_unit = 'kg', o banco armazena em kg, não em gramas
+     * Portanto, NÃO deve converter dividindo por 1000 quando a unidade já é kg ou L
+     * 
      * Usado para preencher campos de input ao editar itens
-     * @param {number} quantity - Quantidade armazenada no banco (sempre em unidade base: g para peso, ml para volume)
+     * @param {number} quantity - Quantidade armazenada no banco (na mesma unidade do ingrediente)
      * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
-     * @returns {number} Quantidade para exibição no input (na unidade do ingrediente)
+     * @returns {number} Quantidade para exibição no input (na mesma unidade do ingrediente)
      */
     getEditableQuantity(quantity, stockUnit) {
         if (!quantity || quantity === 0) return 0;
         
         const normalizedUnit = this.normalizeUnit(stockUnit);
         
-        // ALTERAÇÃO: O backend sempre armazena em unidades base (g para peso, ml para volume)
-        // Converter para a unidade de exibição do ingrediente
-        if (normalizedUnit === 'kg') {
-            // Quantidade está em gramas, converter para kg
-            return quantity / 1000;
-        } else if (normalizedUnit === 'l') {
-            // Quantidade está em ml, converter para L
-            return quantity / 1000;
-        }
+        // ALTERAÇÃO CRÍTICA: Não converter quando unidade já é kg ou L
+        // O banco armazena na mesma unidade do ingrediente
+        // Se stock_unit = 'kg', quantity já está em kg (não precisa dividir por 1000)
         
-        // Para g, ml, un - quantidade já está na unidade correta
+        // Para kg, L, g, ml, un - quantidade já está na unidade correta
         return quantity;
     }
 
     /**
      * ALTERAÇÃO: Converte quantidade da unidade de exibição para unidade base
      * Usado ao salvar itens (o usuário digita na unidade de exibição, mas o backend espera unidade base)
+     * 
+     * REGRA CRÍTICA: NÃO converter quando unidade compra = unidade insumo
+     * Se o ingrediente tem unidade base 'kg', o banco armazena em kg, não em gramas!
+     * 
      * @param {number} quantity - Quantidade digitada pelo usuário (na unidade de exibição: kg, L, etc)
      * @param {string} stockUnit - Unidade de estoque do ingrediente (kg, g, L, ml, un)
-     * @returns {number} Quantidade na unidade base (g para peso, ml para volume, un para unidades)
+     * @returns {number} Quantidade na unidade base do banco (mesma unidade do ingrediente)
      */
     convertQuantityToBase(quantity, stockUnit) {
         if (!quantity || quantity === 0) return 0;
         
         const normalizedUnit = this.normalizeUnit(stockUnit);
         
-        // ALTERAÇÃO: Converter da unidade de exibição para unidade base
-        if (normalizedUnit === 'kg') {
-            // Usuário digitou em kg, converter para gramas (unidade base)
-            return quantity * 1000;
-        } else if (normalizedUnit === 'l') {
-            // Usuário digitou em L, converter para ml (unidade base)
-            return quantity * 1000;
-        }
+        // ALTERAÇÃO CRÍTICA: O banco armazena na mesma unidade do ingrediente
+        // Se o ingrediente tem stock_unit = 'kg', o banco armazena em kg, NÃO em gramas
+        // Portanto, NÃO deve converter quando a unidade do ingrediente já é kg ou L
         
-        // Para g, ml, un - quantidade já está na unidade base
+        // Para kg, L, g, ml, un - quantidade já está na unidade correta
+        // Não fazer conversão - o banco armazena na mesma unidade do ingrediente
         return quantity;
     }
 
@@ -1851,6 +1672,25 @@ export class ComprasManager {
                 title: 'Erro'
             });
         }
+    }
+
+    /**
+     * Configura eventos em tempo real para atualização automática
+     * ALTERAÇÃO: Implementado para atualizar lista de compras quando há mudanças
+     */
+    setupRealtimeEvents() {
+        const client = getRealtimeClient();
+        
+        // ALTERAÇÃO: Escutar eventos de compras criadas/atualizadas
+        client.on('purchase.created', async (data) => {
+            // Recarregar lista de compras
+            await this.loadInvoices();
+        });
+
+        client.on('purchase.updated', async (data) => {
+            // Recarregar lista de compras quando atualizada
+            await this.loadInvoices();
+        });
     }
 }
 

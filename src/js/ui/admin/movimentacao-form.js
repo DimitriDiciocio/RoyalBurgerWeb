@@ -10,6 +10,7 @@ import { formatDateForAPI, formatDateForDisplay, parseDateFromAPI } from '../../
 import { cacheManager } from '../../utils/cache-manager.js';
 import { abrirModal, fecharModal } from '../modais.js';
 import { gerenciarInputsEspecificos } from '../../utils.js';
+import { validateRequired, validateNumber, validateLength, applyFieldValidation, clearFieldValidation } from '../../utils/validators.js';
 
 export class MovimentacaoForm {
     constructor(modalId) {
@@ -121,11 +122,12 @@ export class MovimentacaoForm {
 
                             <div class="form-field-wrapper">
                                 <div class="div-input">
-                                    <input type="number" id="mov-value" step="0.01" min="0" 
-                                           value="${data.value || data.amount || ''}" required>
+                                    <input type="text" id="mov-value" 
+                                           value="${this.formatCurrencyInput(data.value || data.amount || '')}" 
+                                           placeholder="0,00" required>
                                     <label for="mov-value" class="${(data.value || data.amount) ? 'active' : ''}">Valor *</label>
                                 </div>
-                                <small class="form-text">Digite o valor em reais (exemplo: 150.50)</small>
+                                <small class="form-text">Digite o valor em reais (exemplo: 150,50)</small>
                             </div>
 
                             <div class="form-field-wrapper">
@@ -140,10 +142,11 @@ export class MovimentacaoForm {
                             <div class="form-field-wrapper">
                                 <div class="div-input">
                                     <textarea id="mov-description" rows="3" 
+                                              maxlength="500"
                                               required>${escapeHTML(data.description || data.description_text || '')}</textarea>
                                     <label for="mov-description" class="${(data.description || data.description_text) ? 'active' : ''}">Descrição *</label>
                                 </div>
-                                <small class="form-text">Descreva a movimentação (exemplo: "Compra de ingredientes" ou "Venda de produtos")</small>
+                                <small class="form-text">Descreva a movimentação (exemplo: "Compra de ingredientes" ou "Venda de produtos") - máximo 500 caracteres</small>
                             </div>
 
                             <div class="form-field-wrapper">
@@ -193,10 +196,13 @@ export class MovimentacaoForm {
                             <div class="form-field-wrapper">
                                 <div class="div-input">
                                     <input type="text" id="mov-sender-receiver" 
-                                           value="${escapeHTML(data.sender_receiver || data.sender || data.receiver || '')}">
+                                           value="${escapeHTML(data.sender_receiver || data.sender || data.receiver || '')}"
+                                           maxlength="100"
+                                           pattern="[A-Za-zÀ-ÿ\\s\\.\\-']+"
+                                           title="Apenas letras, espaços e caracteres especiais permitidos">
                                     <label for="mov-sender-receiver" class="${(data.sender_receiver || data.sender || data.receiver) ? 'active' : ''}">Remetente/Destinatário</label>
                                 </div>
-                                <small class="form-text">Nome de quem enviou ou recebeu o pagamento (opcional)</small>
+                                <small class="form-text">Nome de quem enviou ou recebeu o pagamento (opcional) - máximo 100 caracteres</small>
                             </div>
                         </form>
                     </div>
@@ -221,6 +227,9 @@ export class MovimentacaoForm {
             
             // ALTERAÇÃO: Adicionar listener para tipo de movimentação para filtrar categorias
             this.setupCategoryFilter();
+            
+            // ALTERAÇÃO: Configurar máscaras e validações
+            this.setupMasksAndValidations();
         }
     }
 
@@ -350,8 +359,10 @@ export class MovimentacaoForm {
      */
     async handleSubmit() {
         const form = document.getElementById('form-movimentacao');
-        if (!form || !form.checkValidity()) {
-            form?.reportValidity();
+        if (!form) return;
+
+        // ALTERAÇÃO: Validar todos os campos antes de submeter
+        if (!this.validateAllFields()) {
             return;
         }
 
@@ -381,9 +392,14 @@ export class MovimentacaoForm {
             }
         }
 
+        // ALTERAÇÃO: Converter valor monetário formatado para número
+        const valueInput = document.getElementById('mov-value');
+        const valueText = valueInput.value.replace(/[^\d,]/g, '').replace(',', '.');
+        const numericValue = parseFloat(valueText) || 0;
+
         const formData = {
             type: typeValue,
-            value: parseFloat(document.getElementById('mov-value').value),
+            value: numericValue,
             movement_date: formatDateForAPI(document.getElementById('mov-date').value),
             description: document.getElementById('mov-description').value.trim(),
             category: categoryValue,
@@ -430,18 +446,32 @@ export class MovimentacaoForm {
     }
 
     /**
-     * Exibe o modal usando o sistema de modais
+     * ALTERAÇÃO: Exibe o modal usando o sistema de modais (previne piscar)
      */
     showModal() {
-        if (this.modal) {
-            // ALTERAÇÃO: Usar sistema de modais para abertura fluida
-            abrirModal(this.modal.id);
-            // Focar no primeiro campo após animação
-            setTimeout(() => {
-                const firstInput = this.modal.querySelector('input, select, textarea');
-                if (firstInput) firstInput.focus();
-            }, 250);
+        if (!this.modal) return;
+        
+        // ALTERAÇÃO: Verificar se modal já está aberta/visível para evitar piscar
+        const computedStyle = window.getComputedStyle(this.modal);
+        const isVisible = computedStyle.display !== 'none' && 
+                         computedStyle.opacity !== '0' && 
+                         computedStyle.visibility !== 'hidden';
+        
+        if (isVisible) {
+            // Modal já está aberta, apenas focar nela
+            const firstInput = this.modal.querySelector('input, select, textarea');
+            if (firstInput) firstInput.focus();
+            return;
         }
+        
+        // ALTERAÇÃO: Usar sistema de modais para abertura fluida
+        abrirModal(this.modal.id);
+        
+        // Focar no primeiro campo após animação
+        setTimeout(() => {
+            const firstInput = this.modal.querySelector('input, select, textarea');
+            if (firstInput) firstInput.focus();
+        }, 250);
     }
 
     /**
@@ -624,5 +654,271 @@ export class MovimentacaoForm {
             attributes: true,
             attributeFilter: ['style']
         });
+    }
+
+    /**
+     * ALTERAÇÃO: Configura máscaras e validações para os campos do formulário
+     */
+    setupMasksAndValidations() {
+        // Máscara monetária para campo de valor
+        const valueInput = document.getElementById('mov-value');
+        if (valueInput) {
+            valueInput.addEventListener('input', (e) => {
+                this.applyCurrencyMask(e.target);
+                this.validateValue(e.target);
+            });
+            valueInput.addEventListener('blur', (e) => {
+                this.validateValue(e.target);
+            });
+            valueInput.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+        }
+
+        // ALTERAÇÃO: Validação de data (permite datas futuras)
+        const dateInput = document.getElementById('mov-date');
+        if (dateInput) {
+            dateInput.addEventListener('change', (e) => {
+                this.validateDate(e.target);
+            });
+            dateInput.addEventListener('blur', (e) => {
+                this.validateDate(e.target);
+            });
+        }
+
+        // Validação de descrição
+        const descriptionInput = document.getElementById('mov-description');
+        if (descriptionInput) {
+            descriptionInput.addEventListener('input', (e) => {
+                this.validateDescription(e.target);
+            });
+            descriptionInput.addEventListener('blur', (e) => {
+                this.validateDescription(e.target);
+            });
+        }
+
+        // Validação de tipo (obrigatório)
+        const typeSelect = document.getElementById('mov-type');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', (e) => {
+                this.validateType(e.target);
+            });
+            typeSelect.addEventListener('blur', (e) => {
+                this.validateType(e.target);
+            });
+        }
+
+        // Validação de remetente/destinatário (formato de nome)
+        const senderReceiverInput = document.getElementById('mov-sender-receiver');
+        if (senderReceiverInput) {
+            senderReceiverInput.addEventListener('input', (e) => {
+                this.applyNameMask(e.target);
+                this.validateSenderReceiver(e.target);
+            });
+            senderReceiverInput.addEventListener('blur', (e) => {
+                this.validateSenderReceiver(e.target);
+            });
+        }
+    }
+
+    /**
+     * ALTERAÇÃO: Aplica máscara monetária brasileira (R$ 0,00)
+     * @param {HTMLInputElement} input - Campo de input
+     */
+    applyCurrencyMask(input) {
+        let value = input.value.replace(/\D/g, '');
+        
+        if (value === '') {
+            input.value = '';
+            return;
+        }
+
+        // Converter para formato monetário brasileiro
+        value = (parseInt(value) / 100).toFixed(2);
+        value = value.replace('.', ',');
+        value = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+        input.value = value;
+    }
+
+    /**
+     * ALTERAÇÃO: Formata valor monetário para exibição no input
+     * @param {number|string} value - Valor a formatar
+     * @returns {string} Valor formatado
+     */
+    formatCurrencyInput(value) {
+        if (!value || value === '') return '';
+        const numValue = parseFloat(value) || 0;
+        return numValue.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    /**
+     * ALTERAÇÃO: Aplica máscara de nome (apenas letras, espaços e alguns caracteres especiais)
+     * @param {HTMLInputElement} input - Campo de input
+     */
+    applyNameMask(input) {
+        let value = input.value;
+        // Permitir apenas letras (incluindo acentos), espaços, pontos, hífens e apóstrofos
+        value = value.replace(/[^A-Za-zÀ-ÿ\s\.\-\']/g, '');
+        input.value = value;
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de valor
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateValue(input) {
+        const value = input.value.replace(/[^\d,]/g, '').replace(',', '.');
+        const numValue = parseFloat(value) || 0;
+        
+        return applyFieldValidation(input, (val) => {
+            if (!val || val.trim() === '') {
+                return { valid: false, message: 'Valor é obrigatório' };
+            }
+            if (numValue <= 0) {
+                return { valid: false, message: 'Valor deve ser maior que zero' };
+            }
+            if (numValue > 999999999.99) {
+                return { valid: false, message: 'Valor muito alto (máximo: R$ 999.999.999,99)' };
+            }
+            return { valid: true, message: '' };
+        });
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de data (permite datas futuras)
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateDate(input) {
+        return applyFieldValidation(input, (val) => {
+            if (!val || val.trim() === '') {
+                return { valid: false, message: 'Data é obrigatória' };
+            }
+            
+            const selectedDate = new Date(val);
+            
+            // Verificar se a data é válida
+            if (isNaN(selectedDate.getTime())) {
+                return { valid: false, message: 'Data inválida' };
+            }
+            
+            // ALTERAÇÃO: Removida validação de data futura - permite cadastrar movimentações futuras
+            // ALTERAÇÃO: Removida validação de data muito antiga para não restringir demais
+            
+            return { valid: true, message: '' };
+        });
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de descrição
+     * @param {HTMLTextAreaElement} input - Campo de textarea
+     * @returns {boolean} True se válido
+     */
+    validateDescription(input) {
+        return applyFieldValidation(input, (val) => {
+            const trimmed = val.trim();
+            if (!trimmed) {
+                return { valid: false, message: 'Descrição é obrigatória' };
+            }
+            if (trimmed.length < 3) {
+                return { valid: false, message: 'Descrição deve ter pelo menos 3 caracteres' };
+            }
+            if (trimmed.length > 500) {
+                return { valid: false, message: 'Descrição deve ter no máximo 500 caracteres' };
+            }
+            return { valid: true, message: '' };
+        });
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de tipo
+     * @param {HTMLSelectElement} input - Campo de select
+     * @returns {boolean} True se válido
+     */
+    validateType(input) {
+        return applyFieldValidation(input, (val) => {
+            if (!val || val.trim() === '') {
+                return { valid: false, message: 'Tipo é obrigatório' };
+            }
+            return { valid: true, message: '' };
+        });
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de remetente/destinatário
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateSenderReceiver(input) {
+        const value = input.value.trim();
+        
+        // Campo é opcional, então se estiver vazio, é válido
+        if (!value) {
+            clearFieldValidation(input);
+            return true;
+        }
+
+        return applyFieldValidation(input, (val) => {
+            const trimmed = val.trim();
+            if (trimmed.length < 2) {
+                return { valid: false, message: 'Nome deve ter pelo menos 2 caracteres' };
+            }
+            if (trimmed.length > 100) {
+                return { valid: false, message: 'Nome deve ter no máximo 100 caracteres' };
+            }
+            // Verificar se contém apenas caracteres permitidos
+            if (!/^[A-Za-zÀ-ÿ\s\.\-\']+$/.test(trimmed)) {
+                return { valid: false, message: 'Nome contém caracteres inválidos' };
+            }
+            return { valid: true, message: '' };
+        });
+    }
+
+    /**
+     * ALTERAÇÃO: Valida todos os campos do formulário
+     * @returns {boolean} True se todos os campos são válidos
+     */
+    validateAllFields() {
+        const typeSelect = document.getElementById('mov-type');
+        const valueInput = document.getElementById('mov-value');
+        const dateInput = document.getElementById('mov-date');
+        const descriptionInput = document.getElementById('mov-description');
+        const senderReceiverInput = document.getElementById('mov-sender-receiver');
+
+        let isValid = true;
+
+        // Validar cada campo
+        if (typeSelect && !this.validateType(typeSelect)) {
+            isValid = false;
+        }
+        if (valueInput && !this.validateValue(valueInput)) {
+            isValid = false;
+        }
+        if (dateInput && !this.validateDate(dateInput)) {
+            isValid = false;
+        }
+        if (descriptionInput && !this.validateDescription(descriptionInput)) {
+            isValid = false;
+        }
+        if (senderReceiverInput && senderReceiverInput.value.trim() && !this.validateSenderReceiver(senderReceiverInput)) {
+            isValid = false;
+        }
+
+        // Se houver erros, focar no primeiro campo inválido
+        if (!isValid) {
+            const firstError = this.modal.querySelector('.error');
+            if (firstError) {
+                firstError.focus();
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            showToast('Por favor, corrija os erros no formulário antes de continuar', {
+                type: 'error',
+                title: 'Erro de Validação'
+            });
+        }
+
+        return isValid;
     }
 }

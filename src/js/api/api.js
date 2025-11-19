@@ -165,6 +165,8 @@ export async function apiRequest(
         const isCartEndpoint = path.includes("/cart");
         const isProductIngredientEndpoint = path.includes("/products") && path.includes("/ingredients");
         const isPromotionEndpoint = path.includes("/promotions/product/");
+        // ALTERAÇÃO: Detectar DELETE de movimentações financeiras
+        const isFinancialMovementDelete = method === "DELETE" && path.includes("/financial-movements/movements/");
         
         if (isLoginEndpoint && data?.error) {
           // É um erro de login - usar a mensagem do backend
@@ -195,6 +197,11 @@ export async function apiRequest(
           // ALTERAÇÃO: 404 em endpoints de promoção por produto não é um erro - significa apenas que não há promoção
           // Retornar null silenciosamente sem lançar erro
           return null;
+        } else if (isFinancialMovementDelete) {
+          // ALTERAÇÃO: 404 em DELETE de movimentação - pode significar que já foi excluída
+          errorMessage =
+            (data && (data.error || data.message)) ||
+            "Movimentação não encontrada. Ela pode já ter sido excluída.";
         } else {
           // Endpoint não encontrado
           errorMessage =
@@ -229,6 +236,12 @@ export async function apiRequest(
         // Redirecionamento permanente - problema de CORS
         errorMessage =
           "Erro de configuração do servidor. Verifique se o CORS está configurado corretamente.";
+      } else if (response.status === 400) {
+        // ALTERAÇÃO: Tratamento específico para erros 400 (Bad Request)
+        // Pode ser erro de validação, entidade relacionada, etc.
+        errorMessage =
+          (data && (data.error || data.message)) ||
+          "Erro na requisição. Verifique os dados enviados.";
       } else if (response.status === 422) {
         // Unprocessable Entity - usado para erros de validação de estoque, ingredientes indisponíveis, etc.
         // A mensagem do backend já vem formatada com detalhes (ex: unidades, quantidades)
