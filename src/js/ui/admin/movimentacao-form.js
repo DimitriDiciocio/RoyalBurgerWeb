@@ -4,6 +4,7 @@
  */
 
 import { createFinancialMovement, getFinancialMovementById, updateFinancialMovement, getFinancialMovements } from '../../api/financial-movements.js';
+import { getCategories } from '../../api/categories.js';
 import { showToast } from '../alerts.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
 import { formatDateForAPI, formatDateForDisplay, parseDateFromAPI } from '../../utils/date-formatter.js';
@@ -122,12 +123,15 @@ export class MovimentacaoForm {
 
                             <div class="form-field-wrapper">
                                 <div class="div-input">
-                                    <input type="text" id="mov-value" 
+                                    <input type="text" 
+                                           id="mov-value" 
+                                           inputmode="decimal"
                                            value="${this.formatCurrencyInput(data.value || data.amount || '')}" 
-                                           placeholder="0,00" required>
+                                           placeholder="0,00" 
+                                           required>
                                     <label for="mov-value" class="${(data.value || data.amount) ? 'active' : ''}">Valor *</label>
                                 </div>
-                                <small class="form-text">Digite o valor em reais (exemplo: 150,50)</small>
+                                <small class="form-text">Digite o valor em reais. Use vírgula para centavos (exemplo: 150,50 ou 1.234,56)</small>
                             </div>
 
                             <div class="form-field-wrapper">
@@ -141,12 +145,15 @@ export class MovimentacaoForm {
 
                             <div class="form-field-wrapper">
                                 <div class="div-input">
-                                    <textarea id="mov-description" rows="3" 
+                                    <textarea id="mov-description" 
+                                              rows="3" 
                                               maxlength="500"
+                                              placeholder="Descreva detalhadamente a movimentação financeira"
                                               required>${escapeHTML(data.description || data.description_text || '')}</textarea>
                                     <label for="mov-description" class="${(data.description || data.description_text) ? 'active' : ''}">Descrição *</label>
+                                    <span class="char-counter" id="mov-description-counter" style="display: none;">0 / 500</span>
                                 </div>
-                                <small class="form-text">Descreva a movimentação (exemplo: "Compra de ingredientes" ou "Venda de produtos") - máximo 500 caracteres</small>
+                                <small class="form-text">Descreva detalhadamente a movimentação. Exemplos: "Compra de ingredientes para estoque", "Venda de produtos ao cliente X" - máximo 500 caracteres</small>
                             </div>
 
                             <div class="form-field-wrapper">
@@ -195,14 +202,16 @@ export class MovimentacaoForm {
 
                             <div class="form-field-wrapper">
                                 <div class="div-input">
-                                    <input type="text" id="mov-sender-receiver" 
+                                    <input type="text" 
+                                           id="mov-sender-receiver" 
                                            value="${escapeHTML(data.sender_receiver || data.sender || data.receiver || '')}"
                                            maxlength="100"
-                                           pattern="[A-Za-zÀ-ÿ\\s\\.\\-']+"
-                                           title="Apenas letras, espaços e caracteres especiais permitidos">
+                                           placeholder="Nome completo da pessoa ou empresa"
+                                           pattern="[A-Za-zÀ-ÿ0-9\\s\\.\\-',&()]+"
+                                           title="Apenas letras, números, espaços e caracteres especiais permitidos">
                                     <label for="mov-sender-receiver" class="${(data.sender_receiver || data.sender || data.receiver) ? 'active' : ''}">Remetente/Destinatário</label>
                                 </div>
-                                <small class="form-text">Nome de quem enviou ou recebeu o pagamento (opcional) - máximo 100 caracteres</small>
+                                <small class="form-text">Nome completo de quem enviou ou recebeu o pagamento. Para empresas, inclua a razão social completa (opcional) - máximo 100 caracteres</small>
                             </div>
                         </form>
                     </div>
@@ -392,9 +401,13 @@ export class MovimentacaoForm {
             }
         }
 
-        // ALTERAÇÃO: Converter valor monetário formatado para número
+        // ALTERAÇÃO: Converter valor monetário formatado para número (formato brasileiro)
         const valueInput = document.getElementById('mov-value');
-        const valueText = valueInput.value.replace(/[^\d,]/g, '').replace(',', '.');
+        let valueText = valueInput.value.trim();
+        
+        // Remover pontos de milhar e substituir vírgula por ponto
+        valueText = valueText.replace(/\./g, '').replace(',', '.');
+        
         const numericValue = parseFloat(valueText) || 0;
 
         const formData = {
@@ -490,8 +503,8 @@ export class MovimentacaoForm {
     }
 
     /**
-     * ALTERAÇÃO: Carrega categorias financeiras corretas
-     * Busca categorias únicas das movimentações existentes e adiciona categorias padrão
+     * ALTERAÇÃO: Carrega categorias financeiras usando API de categorias
+     * Busca categorias da API e adiciona categorias padrão se necessário
      * @returns {Promise<Array>} Lista de categorias financeiras com informações de compatibilidade
      */
     async loadFinancialCategories() {
@@ -510,24 +523,20 @@ export class MovimentacaoForm {
                     { name: 'Compras de Estoque', typeCompatible: 'EXPENSE' }
                 ];
 
-                // Buscar categorias únicas das movimentações existentes
+                // ALTERAÇÃO: Buscar categorias da API de categorias
                 try {
-                    const response = await getFinancialMovements({});
+                    const response = await getCategories({ page_size: 100 });
                     
-                    let movements = [];
+                    let apiCategories = [];
                     if (Array.isArray(response)) {
-                        movements = response;
+                        apiCategories = response;
                     } else if (response && response.items) {
-                        movements = response.items || [];
+                        apiCategories = response.items || [];
+                    } else if (response && response.data) {
+                        apiCategories = response.data || [];
                     }
                     
-                    // Extrair categorias únicas
-                    const existingCategories = [...new Set(movements
-                        .map(m => m.category)
-                        .filter(cat => cat && cat.trim() !== '')
-                    )];
-                    
-                    // Combinar categorias padrão com existentes
+                    // Combinar categorias da API com padrão
                     const categoryMap = new Map();
                     
                     // Adicionar categorias padrão primeiro
@@ -538,16 +547,15 @@ export class MovimentacaoForm {
                         });
                     });
                     
-                    // Adicionar categorias existentes que não estão nas padrão
-                    existingCategories.forEach(catName => {
-                        if (!categoryMap.has(catName)) {
+                    // Adicionar categorias da API
+                    apiCategories.forEach(cat => {
+                        const categoryName = cat.name || cat;
+                        if (!categoryMap.has(categoryName)) {
                             // Tentar inferir tipo compatível baseado em movimentações existentes
-                            const movementsWithCategory = movements.filter(m => m.category === catName);
-                            const types = [...new Set(movementsWithCategory.map(m => m.type))];
-                            
-                            categoryMap.set(catName, {
-                                name: catName,
-                                typeCompatible: types.join(',') // Todos os tipos que já usaram esta categoria
+                            // ou usar como compatível com todos os tipos por padrão
+                            categoryMap.set(categoryName, {
+                                name: categoryName,
+                                typeCompatible: cat.typeCompatible || 'REVENUE,EXPENSE,CMV,TAX'
                             });
                         }
                     });
@@ -567,8 +575,7 @@ export class MovimentacaoForm {
             
             return categories || [];
         } catch (error) {
-            // ALTERAÇÃO: Removido console.warn - retornar categorias padrão em caso de erro
-            // Retornar categorias padrão em caso de erro
+            // ALTERAÇÃO: Retornar categorias padrão em caso de erro
             return [
                 { name: 'Vendas', typeCompatible: 'REVENUE' },
                 { name: 'Custos Variáveis', typeCompatible: 'EXPENSE,CMV' },
@@ -686,14 +693,44 @@ export class MovimentacaoForm {
             });
         }
 
-        // Validação de descrição
+        // Validação de descrição com contador de caracteres
         const descriptionInput = document.getElementById('mov-description');
+        const descriptionCounter = document.getElementById('mov-description-counter');
         if (descriptionInput) {
+            // ALTERAÇÃO: Adicionar contador de caracteres
+            const updateCharCounter = () => {
+                if (descriptionCounter) {
+                    const length = descriptionInput.value.length;
+                    const maxLength = parseInt(descriptionInput.getAttribute('maxlength')) || 500;
+                    descriptionCounter.textContent = `${length} / ${maxLength}`;
+                    descriptionCounter.style.display = descriptionInput === document.activeElement || length > 0 ? 'block' : 'none';
+                    
+                    // Mudar cor quando próximo do limite
+                    if (length > maxLength * 0.9) {
+                        descriptionCounter.style.color = '#f44336';
+                    } else if (length > maxLength * 0.75) {
+                        descriptionCounter.style.color = '#f59e0b';
+                    } else {
+                        descriptionCounter.style.color = '#6b7280';
+                    }
+                }
+            };
+            
             descriptionInput.addEventListener('input', (e) => {
+                updateCharCounter();
                 this.validateDescription(e.target);
+            });
+            descriptionInput.addEventListener('focus', () => {
+                updateCharCounter();
             });
             descriptionInput.addEventListener('blur', (e) => {
                 this.validateDescription(e.target);
+                // Ocultar contador após um breve delay
+                setTimeout(() => {
+                    if (descriptionCounter && descriptionInput.value.length === 0) {
+                        descriptionCounter.style.display = 'none';
+                    }
+                }, 200);
             });
         }
 
@@ -722,23 +759,42 @@ export class MovimentacaoForm {
     }
 
     /**
-     * ALTERAÇÃO: Aplica máscara monetária brasileira (R$ 0,00)
+     * ALTERAÇÃO: Aplica máscara monetária brasileira melhorada (R$ 0,00)
      * @param {HTMLInputElement} input - Campo de input
      */
     applyCurrencyMask(input) {
-        let value = input.value.replace(/\D/g, '');
+        let value = input.value;
         
-        if (value === '') {
+        // Remover tudo exceto números e vírgula
+        value = value.replace(/[^\d,]/g, '');
+        
+        // Garantir apenas uma vírgula
+        const parts = value.split(',');
+        if (parts.length > 2) {
+            value = parts[0] + ',' + parts.slice(1).join('');
+        }
+        
+        // Limitar a 2 casas decimais após a vírgula
+        if (parts.length === 2 && parts[1].length > 2) {
+            value = parts[0] + ',' + parts[1].substring(0, 2);
+        }
+        
+        if (value === '' || value === ',') {
             input.value = '';
             return;
         }
-
-        // Converter para formato monetário brasileiro
-        value = (parseInt(value) / 100).toFixed(2);
-        value = value.replace('.', ',');
-        value = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-        input.value = value;
+        
+        // Separar parte inteira e decimal
+        let [integerPart, decimalPart = ''] = value.split(',');
+        
+        // Remover zeros à esquerda da parte inteira
+        integerPart = integerPart.replace(/^0+/, '') || '0';
+        
+        // Formatar parte inteira com pontos de milhar
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        
+        // Combinar partes
+        input.value = decimalPart ? `${integerPart},${decimalPart}` : integerPart;
     }
 
     /**
@@ -753,13 +809,13 @@ export class MovimentacaoForm {
     }
 
     /**
-     * ALTERAÇÃO: Aplica máscara de nome (apenas letras, espaços e alguns caracteres especiais)
+     * ALTERAÇÃO: Aplica máscara de nome melhorada (letras, números e caracteres especiais permitidos)
      * @param {HTMLInputElement} input - Campo de input
      */
     applyNameMask(input) {
         let value = input.value;
-        // Permitir apenas letras (incluindo acentos), espaços, pontos, hífens e apóstrofos
-        value = value.replace(/[^A-Za-zÀ-ÿ\s\.\-\']/g, '');
+        // Permitir letras (incluindo acentos), números, espaços, pontos, hífens, apóstrofos, vírgulas, & e parênteses
+        value = value.replace(/[^A-Za-zÀ-ÿ0-9\s\.\-\',&()]/g, '');
         input.value = value;
     }
 
@@ -847,7 +903,7 @@ export class MovimentacaoForm {
     }
 
     /**
-     * ALTERAÇÃO: Valida campo de remetente/destinatário
+     * ALTERAÇÃO: Valida campo de remetente/destinatário melhorado
      * @param {HTMLInputElement} input - Campo de input
      * @returns {boolean} True se válido
      */
@@ -868,9 +924,13 @@ export class MovimentacaoForm {
             if (trimmed.length > 100) {
                 return { valid: false, message: 'Nome deve ter no máximo 100 caracteres' };
             }
-            // Verificar se contém apenas caracteres permitidos
-            if (!/^[A-Za-zÀ-ÿ\s\.\-\']+$/.test(trimmed)) {
-                return { valid: false, message: 'Nome contém caracteres inválidos' };
+            // Verificar se contém apenas caracteres permitidos (letras, números, espaços e caracteres especiais)
+            if (!/^[A-Za-zÀ-ÿ0-9\s\.\-\',&()]+$/.test(trimmed)) {
+                return { valid: false, message: 'Nome contém caracteres inválidos. Use apenas letras, números, espaços e caracteres especiais básicos' };
+            }
+            // Verificar se não contém apenas números
+            if (/^\d+$/.test(trimmed)) {
+                return { valid: false, message: 'Nome não pode conter apenas números' };
             }
             return { valid: true, message: '' };
         });

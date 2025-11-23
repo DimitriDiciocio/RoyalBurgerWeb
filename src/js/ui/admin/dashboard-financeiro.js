@@ -517,9 +517,10 @@ export class FinancialDashboard {
                         this._deletingMovement = false;
                     }
                 },
-                onViewRelated: async (entityType, entityId) => {
+                onViewRelated: async (entityType, entityId, movementType) => {
                     // ALTERAÇÃO: Usar utility compartilhada para reduzir duplicação
-                    await openRelatedEntityModal(entityType, entityId);
+                    // ALTERAÇÃO: movementType já vem do card (CMV ou REVENUE)
+                    await openRelatedEntityModal(entityType, entityId, movementType);
                 },
                 onMarkAsPaid: async (movementId) => {
                     // ALTERAÇÃO: Marcar movimentação como paga

@@ -17,9 +17,14 @@ import { RecorrenciasManager } from './recorrencias-manager.js';
 import { ContasPagarManager } from './contas-pagar.js';
 import { ConciliacaoBancariaManager } from './conciliacao-bancaria.js';
 import { MovimentacaoForm } from './movimentacao-form.js';
+// ALTERAÇÃO: Importar DashboardManager para gerenciar o dashboard principal
+import DashboardManager from './dashboard-manager.js';
+// ALTERAÇÃO: Importar RelatoriosManager para gerenciar seção de relatórios
+import RelatoriosManager from './relatorios-manager.js';
 
 import { showToast } from '../alerts.js';
 import { fetchMe } from '../../api/auth.js';
+import { reaplicarGerenciamentoInputs, gerenciarInputsEspecificos } from '../../utils.js';
 
 /**
  * Configurações do painel administrativo
@@ -74,7 +79,11 @@ class AdminPanelManager {
             recorrenciasManager: null,
             contasPagarManager: null,
             conciliacaoBancariaManager: null,
-            movimentacaoForm: null
+            movimentacaoForm: null,
+            // ALTERAÇÃO: Adicionar referência ao DashboardManager
+            dashboard: null,
+            // ALTERAÇÃO: Adicionar referência ao RelatoriosManager
+            relatorios: null
         };
         this.isInitialized = false;
     }
@@ -295,8 +304,38 @@ class AdminPanelManager {
         try {
             // Validar seção
             if (!this.isValidSection(sectionId)) {
-                console.error('❌ Seção inválida:', sectionId);
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.error('❌ Seção inválida:', sectionId);
+                }
                 return;
+            }
+
+            // ALTERAÇÃO: Cleanup ao sair de seções para evitar vazamento de memória
+            if (this.currentSection && this.currentSection !== sectionId) {
+                // Cleanup do dashboard
+                if (this.currentSection === 'dashboard' && this.managers.dashboard) {
+                    this.managers.dashboard.cleanup();
+                }
+                // ALTERAÇÃO: Cleanup de promoções (para auto-refresh)
+                if (this.currentSection === 'promocoes') {
+                    const promocoesManager = window.promocaoManager;
+                    if (promocoesManager && typeof promocoesManager.cleanup === 'function') {
+                        promocoesManager.cleanup();
+                    }
+                }
+                // ALTERAÇÃO: Cleanup de usuários (para auto-refresh)
+                if (this.currentSection === 'funcionarios' && this.managers.usuarios) {
+                    if (typeof this.managers.usuarios.cleanup === 'function') {
+                        this.managers.usuarios.cleanup();
+                    }
+                }
+                // ALTERAÇÃO: Cleanup de relatórios
+                if (this.currentSection === 'relatorios' && this.managers.relatorios) {
+                    if (typeof this.managers.relatorios.cleanup === 'function') {
+                        this.managers.relatorios.cleanup();
+                    }
+                }
             }
 
             // Esconder todas as seções
@@ -304,9 +343,6 @@ class AdminPanelManager {
             
             // Mostrar seção alvo
             this.showTargetSection(sectionId);
-            
-            // Atualizar navegação
-            this.updateNavigation(sectionId);
             
             // Salvar seção ativa
             this.saveActiveSection(sectionId);
@@ -317,7 +353,10 @@ class AdminPanelManager {
             this.currentSection = sectionId;
             
         } catch (error) {
-            console.error('❌ Erro ao mostrar seção:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('❌ Erro ao mostrar seção:', error);
+            }
             this.handleSectionError(sectionId, error);
         }
     }
@@ -355,22 +394,6 @@ class AdminPanelManager {
             targetSection.style.display = 'block';
         } else {
             console.error('❌ Seção não encontrada:', targetSectionId);
-        }
-    }
-
-    /**
-     * Atualiza navegação
-     */
-    updateNavigation(sectionId) {
-        // Remover classe ativa de todos os itens
-        document.querySelectorAll('.navegacao__item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // Adicionar classe ativa ao item correspondente
-        const navItem = document.getElementById(`nav-${sectionId}`);
-        if (navItem) {
-            navItem.classList.add('active');
         }
     }
 
@@ -424,6 +447,9 @@ class AdminPanelManager {
                     break;
                 case 'financeiro':
                     await this.initializeFinancialSection();
+                    break;
+                case 'relatorios':
+                    await this.initializeRelatoriosSection();
                     break;
                 default:
                     // Seção não requer inicialização específica
@@ -663,41 +689,102 @@ class AdminPanelManager {
 
     /**
      * Inicializa seção de dashboard
+     * Fase 8: Integração completa com DashboardManager
+     * 
+     * @async
+     * @returns {Promise<void>}
      */
     async initializeDashboardSection() {
         try {
-            await this.loadDashboardData();
+            // ALTERAÇÃO: Inicializar DashboardManager se ainda não foi inicializado
+            if (!this.managers.dashboard) {
+                this.managers.dashboard = new DashboardManager();
+            }
+            
+            // ALTERAÇÃO: Inicializar o dashboard (carrega dados e configura auto-refresh)
+            await this.managers.dashboard.init();
         } catch (error) {
-            console.error('Erro ao carregar dados do dashboard:', error);
+            // ALTERAÇÃO: Tratar erro de forma consistente
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao inicializar dashboard:', error);
+            }
+            this.showErrorMessage('Erro ao carregar dashboard');
+        }
+    }
+
+    /**
+     * Inicializa seção de relatórios
+     * Fase 6: Integração completa com RelatoriosManager
+     * 
+     * @async
+     * @returns {Promise<void>}
+     */
+    async initializeRelatoriosSection() {
+        try {
+            // ALTERAÇÃO: Inicializar RelatoriosManager se ainda não foi inicializado
+            if (!this.managers.relatorios) {
+                this.managers.relatorios = new RelatoriosManager();
+            }
+            
+            // ALTERAÇÃO: Inicializar o manager de relatórios
+            await this.managers.relatorios.init();
+        } catch (error) {
+            // ALTERAÇÃO: Tratar erro de forma consistente
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao inicializar seção de relatórios:', error);
+            }
+            this.showErrorMessage('Erro ao carregar seção de relatórios');
         }
     }
 
     /**
      * Carrega dados do dashboard
+     * Fase 8: Delegar completamente para DashboardManager
+     * 
+     * @async
+     * @returns {Promise<void>}
      */
     async loadDashboardData() {
         try {
-            // Implementar carregamento de dados do dashboard
+            // ALTERAÇÃO: Verificar se DashboardManager está inicializado
+            if (!this.managers.dashboard) {
+                // ALTERAÇÃO: Inicializar se necessário
+                await this.initializeDashboardSection();
+                return;
+            }
             
-            // Exemplo de métricas que podem ser carregadas
-            const metrics = {
-                totalPedidos: 0,
-                totalVendas: 0,
-                totalUsuarios: 0,
-                totalProdutos: 0
-            };
-            
-            this.updateDashboardMetrics(metrics);
+            // ALTERAÇÃO: Delegar carregamento para DashboardManager
+            await this.managers.dashboard.loadAllData();
         } catch (error) {
-            console.error('Erro ao carregar dados do dashboard:', error);
+            // ALTERAÇÃO: Tratar erro de forma consistente
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('Erro ao carregar dados do dashboard:', error);
+            }
+            // ALTERAÇÃO: Não mostrar erro ao usuário (DashboardManager já trata erros internamente)
         }
     }
 
     /**
      * Atualiza métricas do dashboard
+     * Fase 8: Método mantido para compatibilidade, mas DashboardManager atualiza o DOM diretamente
+     * 
+     * @param {Object} [metrics] - Métricas a serem atualizadas (opcional, não utilizado)
+     * @deprecated Este método é mantido apenas para compatibilidade. 
+     * DashboardManager atualiza o DOM diretamente através de loadAllData()
      */
     updateDashboardMetrics(metrics) {
-        // Implementar atualização das métricas no dashboard
+        // ALTERAÇÃO: DashboardManager já atualiza o DOM diretamente
+        // Este método pode ser removido no futuro se não for mais necessário
+        // ALTERAÇÃO: Se DashboardManager tiver método updateMetrics, usar (para compatibilidade futura)
+        if (this.managers.dashboard && typeof this.managers.dashboard.updateMetrics === 'function') {
+            this.managers.dashboard.updateMetrics(metrics);
+        } else if (this.managers.dashboard && typeof this.managers.dashboard.loadAllData === 'function') {
+            // ALTERAÇÃO: Fallback: recarregar dados se método updateMetrics não existir
+            this.managers.dashboard.loadAllData();
+        }
     }
 
     /**
@@ -1145,6 +1232,8 @@ class ProdutoFormManager {
     }
 
     previousPart() {
+        // ALTERAÇÃO: Salvar dados da parte atual antes de mudar
+        this.saveCurrentPartData();
         this.currentPart--;
         this.showPart(this.currentPart);
         this.updateNavigation();
@@ -1165,6 +1254,9 @@ class ProdutoFormManager {
             if (modalContent) {
                 modalContent.classList.remove('hide-image');
             }
+            
+            // ALTERAÇÃO: Restaurar dados da parte 1 quando voltar para ela
+            this.restorePart1Data();
         } else if (partNumber === 2) {
             parteInformacoes.style.display = 'none';
             parteInformacoes.setAttribute('aria-expanded', 'false');
@@ -1252,6 +1344,51 @@ class ProdutoFormManager {
         } else if (this.currentPart === 2) {
             this.formData.receita = this.getReceitaData();
             this.formData.extras = this.selectedGroups;
+        }
+    }
+
+    /**
+     * Restaura os dados da parte 1 nos campos do formulário
+     * ALTERAÇÃO: Método adicionado para restaurar valores quando voltar para a parte 1
+     */
+    restorePart1Data() {
+        if (this.formData.informacoes && Object.keys(this.formData.informacoes).length > 0) {
+            const informacoes = this.formData.informacoes;
+            
+            const nomeField = document.getElementById('nome-produto');
+            if (nomeField && informacoes.nome) {
+                nomeField.value = informacoes.nome;
+            }
+            
+            const descricaoField = document.getElementById('descricao-produto');
+            if (descricaoField && informacoes.descricao) {
+                descricaoField.value = informacoes.descricao;
+            }
+            
+            const precoField = document.getElementById('preco-produto');
+            if (precoField && informacoes.preco) {
+                precoField.value = informacoes.preco;
+            }
+            
+            // ALTERAÇÃO: Restaurar categoria - este era o problema principal
+            const categoriaField = document.getElementById('categoria-produto');
+            if (categoriaField && informacoes.categoria) {
+                categoriaField.value = informacoes.categoria;
+                // Disparar evento change para atualizar labels e validações
+                categoriaField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            
+            const tempoPreparoField = document.getElementById('tempo-preparo-produto');
+            if (tempoPreparoField && informacoes.tempoPreparo) {
+                tempoPreparoField.value = informacoes.tempoPreparo;
+            }
+            
+            // ALTERAÇÃO: Reaplicar gerenciamento de inputs para atualizar labels
+            const parteInformacoes = document.getElementById('parte-informacoes');
+            if (parteInformacoes) {
+                const inputs = parteInformacoes.querySelectorAll('input, select, textarea');
+                gerenciarInputsEspecificos(inputs);
+            }
         }
     }
 

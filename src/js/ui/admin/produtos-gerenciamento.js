@@ -32,6 +32,7 @@ import { getMenuDashboardMetrics } from "../../api/dashboard.js";
 import { escapeHTML } from "../../utils/html-sanitizer.js";
 import { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } from "../../utils/pagination-utils.js";
 import { showLoadingOverlay, hideLoadingOverlay } from "../../utils/loading-indicator.js";
+import { reaplicarGerenciamentoInputs, gerenciarInputsEspecificos } from "../../utils.js";
 
 /**
  * Gerenciador de dados de produtos
@@ -59,8 +60,8 @@ class ProdutoDataManager {
   }
 
   /**
-   * Limpa o cache
-   * ALTERAÇÃO: Agora limpa também o cache por filtros
+   * ALTERAÇÃO: Limpa o cache
+   * Agora limpa também o cache por filtros
    */
   clearCache() {
     this.cache.data = null;
@@ -75,15 +76,49 @@ class ProdutoDataManager {
   }
 
   /**
+   * ALTERAÇÃO: Limpar cache antigo quando exceder limite (LRU)
+   * Previne vazamento de memória quando muitos filtros são usados
+   * @private
+   */
+  clearOldCache() {
+    const MAX_CACHE_SIZE = 50; // ALTERAÇÃO: Limite máximo de caches por filtros
+    if (!this.cacheByFilters || !this.cacheTimestamps) {
+      return;
+    }
+
+    const keys = Object.keys(this.cacheByFilters);
+    
+    if (keys.length > MAX_CACHE_SIZE) {
+      // ALTERAÇÃO: Ordenar por timestamp (mais antigo primeiro)
+      keys.sort((a, b) => {
+        const timeA = this.cacheTimestamps[a] || 0;
+        const timeB = this.cacheTimestamps[b] || 0;
+        return timeA - timeB;
+      });
+      
+      // ALTERAÇÃO: Remover cache mais antigo (LRU)
+      const toRemove = keys.slice(0, keys.length - MAX_CACHE_SIZE);
+      toRemove.forEach(key => {
+        delete this.cacheByFilters[key];
+        delete this.cacheTimestamps[key];
+      });
+    }
+  }
+
+  /**
    * Busca todos os produtos
    * ALTERAÇÃO: Cache agora considera os filtros para evitar retornar dados incorretos
    */
   async getAllProdutos(options = {}) {
     try {
       // ALTERAÇÃO: Criar chave de cache baseada nos filtros para evitar usar cache incorreto
+      // Incluir novos parâmetros padronizados (search, category, status) além dos legados
       const cacheKey = JSON.stringify({
-        name: options.name || null,
-        category_id: options.category_id || null,
+        search: options.search || null,
+        name: options.name || null, // Mantido para compatibilidade
+        category: options.category || null,
+        category_id: options.category_id || null, // Mantido para compatibilidade
+        status: options.status || null,
         page: options.page || 1,
         page_size: options.page_size || 10,
         include_inactive: options.include_inactive !== undefined ? options.include_inactive : false,
@@ -108,7 +143,18 @@ class ProdutoDataManager {
         return cachedData;
       }
 
-      const response = await getProducts(options);
+      // ALTERAÇÃO: Limpar cache antigo antes de adicionar novo (previne vazamento)
+      this.clearOldCache();
+
+      // ALTERAÇÃO: getProducts agora retorna { success, data, error? }
+      const result = await getProducts(options);
+      
+      // ALTERAÇÃO: Tratar resposta no formato padronizado
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao buscar produtos');
+      }
+      
+      const response = result.data;
       
       // ALTERAÇÃO: Armazenar cache por chave de filtros
       if (!this.cacheByFilters) {
@@ -552,10 +598,11 @@ class ProdutoDataManager {
 
   /**
    * Busca ingredientes
+   * ALTERAÇÃO: Carregar todos os insumos com page_size: 1000
    */
   async getIngredientes() {
     try {
-      const response = await getIngredients();
+      const response = await getIngredients({ page_size: 1000 });
       return response;
     } catch (error) {
       // ALTERAÇÃO: Log condicional apenas em modo debug
@@ -725,11 +772,12 @@ class ProdutoManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-produto");
     if (searchInput) {
+      // ALTERAÇÃO: Debounce padronizado de 300ms conforme roteiro
       const debouncedSearch = debounce(async () => {
         this.currentSearchTerm = searchInput.value.trim();
         this.currentPage = 1; // Resetar para primeira página ao buscar
         await this.loadProdutos(); // Recarregar da API
-      }, 500);
+      }, 300);
 
       searchInput.addEventListener("input", (e) => {
         debouncedSearch();
@@ -757,28 +805,37 @@ class ProdutoManager {
         include_inactive: true, // Sempre incluir inativos para filtro funcionar
       };
 
-      // Adicionar busca se houver termo de busca
+      // ALTERAÇÃO: Adicionar busca usando parâmetro padronizado 'search' (compatibilidade com 'name')
       if (this.currentSearchTerm) {
+        options.search = this.currentSearchTerm;
+        // Manter 'name' para compatibilidade com backend legado
         options.name = this.currentSearchTerm;
       }
 
-      // ALTERAÇÃO: Adicionar filtro de categoria se houver - usar ID diretamente do select
+      // ALTERAÇÃO: Adicionar filtro de categoria usando parâmetro padronizado 'category' (compatibilidade com 'category_id')
       if (this.currentCategoryFilter && this.currentCategoryFilter !== "" && this.currentCategoryFilter !== "todos") {
-        // ALTERAÇÃO: currentCategoryFilter já contém o ID da categoria (select usa categoria.id como value)
-        // Converter para número para garantir tipo correto
-        const categoriaId = parseInt(this.currentCategoryFilter);
+        // ALTERAÇÃO: Tentar usar como slug primeiro (padrão), depois como ID (compatibilidade)
+        const categoriaValue = this.currentCategoryFilter;
+        const categoriaId = parseInt(categoriaValue);
+        
         if (!isNaN(categoriaId) && categoriaId > 0) {
+          // Se for número, usar como ID (compatibilidade)
           options.category_id = categoriaId;
+        } else {
+          // Se for string, usar como slug (padrão padronizado)
+          options.category = categoriaValue;
         }
       }
 
-      // ALTERAÇÃO: Adicionar filtro de status - usar valor do estado e tratar corretamente
-      if (this.currentStatusFilter && this.currentStatusFilter !== "todos") {
-        // Se for "ativo", buscar apenas ativos (não incluir inativos)
+      // ALTERAÇÃO: Adicionar filtro de status usando parâmetro padronizado 'status'
+      if (this.currentStatusFilter && this.currentStatusFilter !== "todos" && this.currentStatusFilter !== "") {
+        // ALTERAÇÃO: Usar parâmetro padronizado 'status' (ativo, inativo)
+        options.status = this.currentStatusFilter;
+        
+        // ALTERAÇÃO: Manter lógica legada para compatibilidade
         if (this.currentStatusFilter === "ativo") {
           options.include_inactive = false;
         } else if (this.currentStatusFilter === "inativo") {
-          // ALTERAÇÃO: Para filtrar apenas inativos, usar parâmetro only_inactive
           options.include_inactive = true;
           options.only_inactive = true;
         }
@@ -847,11 +904,23 @@ class ProdutoManager {
 
   /**
    * Carrega ingredientes disponíveis
+   * ALTERAÇÃO: Processar corretamente a resposta da API no formato { success, data: { items: [...] } }
    */
   async loadIngredientesDisponiveis() {
     try {
       const response = await this.dataManager.getIngredientes();
-      const ingredientesRaw = response.items || response || [];
+      
+      // ALTERAÇÃO: Acessar response.data.items quando response.success === true
+      let ingredientesRaw = [];
+      if (response && response.success && response.data && response.data.items) {
+        ingredientesRaw = response.data.items;
+      } else if (response && response.items) {
+        // Fallback para formato antigo
+        ingredientesRaw = response.items;
+      } else if (Array.isArray(response)) {
+        // Fallback para array direto
+        ingredientesRaw = response;
+      }
 
       // Mapear dados para garantir campos corretos
       this.ingredientesDisponiveis = ingredientesRaw.map((ingrediente) => ({
@@ -1853,23 +1922,25 @@ class ProdutoManager {
         this.clearProdutoForm();
       }
 
-      // Garantir que a modal está completamente fechada antes de abrir
-      modal.style.display = 'none';
-      modal.style.opacity = '0';
-      modal.style.pointerEvents = 'none';
-
-      // Usar sistema centralizado de modais
+      // ALTERAÇÃO: Usar sistema centralizado de modais
+      // O sistema modais.js já gerencia o estado visual da modal
       abrirModal("modal-produto");
+      
+      // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+      if (modal) {
+        const inputs = modal.querySelectorAll("input, select, textarea");
+        gerenciarInputsEspecificos(inputs);
+      }
+      
       await this.setupProdutoModalListeners(produtoData);
     } catch (error) {
       // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao abrir modal de produto:", error);
       }
-      // Garantir que a modal está fechada em caso de erro
+      // ALTERAÇÃO: Fechar modal em caso de erro usando sistema centralizado
       if (modal) {
-        modal.style.display = 'none';
-        modal.style.pointerEvents = 'none';
+        fecharModal("modal-produto");
       }
     } finally {
       // Reset da flag após um pequeno delay
@@ -1881,32 +1952,18 @@ class ProdutoManager {
 
   /**
    * Fecha modal de produto
+   * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+   * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
    */
   closeProdutoModal() {
-    const modal = document.getElementById("modal-produto");
-    if (!modal) return;
-
-    // Desabilitar interações imediatamente
-    modal.style.pointerEvents = 'none';
-
-    // Usar sistema centralizado de modais
-    fecharModal("modal-produto");
-    
-    // Limpar estado
+    // Limpar estado antes de fechar
     this.currentEditingId = null;
     this.newImageFile = null;
     this.imageToRemove = false;
     this.modalOpening = false;
-
-    // Garantir que a modal está completamente fechada
-    setTimeout(() => {
-      if (modal) {
-        modal.style.display = 'none';
-        modal.style.opacity = '0';
-        modal.style.pointerEvents = 'none';
-        document.body.style.overflow = '';
-      }
-    }, 200);
+    
+    // Usar sistema centralizado de modais
+    fecharModal("modal-produto");
   }
 
   /**
@@ -1987,10 +2044,17 @@ class ProdutoManager {
       await this.extrasManager.init();
     }
 
-    // Botão cancelar
+    // ALTERAÇÃO: Removido listener manual do botão cancelar
+    // O sistema modais.js já gerencia fechamento via data-close-modal
+    // Mas ainda precisamos limpar estado ao fechar
     const btnCancelar = document.getElementById("cancelar-produto");
     if (btnCancelar) {
-      btnCancelar.addEventListener("click", () => this.closeProdutoModal());
+      btnCancelar.addEventListener("click", () => {
+        // Limpar estado ao cancelar
+        this.currentEditingId = null;
+        this.newImageFile = null;
+        this.imageToRemove = false;
+      });
     }
 
     // Botão salvar
@@ -2081,6 +2145,8 @@ class ProdutoManager {
 
   /**
    * Configura listeners da modal de ingrediente da receita
+   * ALTERAÇÃO: Removidos listeners manuais de fechamento - modais.js já gerencia isso
+   * ALTERAÇÃO: Gerenciamento de inputs será feito via utils.js
    */
   setupModalIngredienteReceitaListeners() {
     // Select de ingrediente - atualizar info da porção base
@@ -2112,32 +2178,18 @@ class ProdutoManager {
       });
     }
 
-    // Botões fechar modal
-    const modal = document.getElementById("modal-ingrediente-receita");
-    if (modal) {
-      const btnsCancelar = modal.querySelectorAll(
-        '[data-close-modal="modal-ingrediente-receita"]'
-      );
-      btnsCancelar.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          this.fecharModalIngredienteReceita();
-        });
-      });
-
-      // Fechar ao clicar no overlay
-      const overlay = modal.querySelector(".div-overlay");
-      if (overlay) {
-        overlay.addEventListener("click", () => {
-          this.fecharModalIngredienteReceita();
-        });
-      }
-    }
+    // ALTERAÇÃO: Removidos listeners manuais de fechamento
+    // O sistema modais.js já gerencia fechamento via:
+    // - data-close-modal nos botões
+    // - Clique no overlay (.div-overlay)
+    // - Tecla ESC
   }
 
   /**
    * Abre modal para adicionar ingrediente à receita
+   * ALTERAÇÃO: Garantir que ingredientes estejam carregados antes de abrir o modal
    */
-  abrirModalIngredienteReceita(ingredienteId = null, quantidade = null, nomeIngrediente = null) {
+  async abrirModalIngredienteReceita(ingredienteId = null, quantidade = null, nomeIngrediente = null) {
     const modal = document.getElementById("modal-ingrediente-receita");
     const titulo = document.getElementById("titulo-modal-ingrediente-receita");
     const textoBotao = document.getElementById("texto-btn-salvar-ingrediente");
@@ -2163,6 +2215,14 @@ class ProdutoManager {
       }
       return;
     }
+
+    // ALTERAÇÃO: Garantir que ingredientes estejam carregados antes de abrir o modal
+    if (this.ingredientesDisponiveis.length === 0) {
+      await this.loadIngredientesDisponiveis();
+    }
+
+    // ALTERAÇÃO: Recarregar select com todos os insumos
+    this.loadIngredientesInSelect();
 
     // Definir modo (adicionar ou editar)
     if (ingredienteId && quantidade) {
@@ -2246,8 +2306,15 @@ class ProdutoManager {
       document.getElementById("custo-total-modal").textContent = "R$ 0,00";
     }
 
-    // Mostrar modal usando sistema centralizado
+    // ALTERAÇÃO: Mostrar modal usando sistema centralizado
     abrirModal("modal-ingrediente-receita");
+    
+    // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+    // ALTERAÇÃO: Reutilizar variável 'modal' já declarada no início da função
+    if (modal) {
+      const inputs = modal.querySelectorAll("input, select, textarea");
+      gerenciarInputsEspecificos(inputs);
+    }
     
     // Focar no select após a modal estar visível
     setTimeout(() => {
@@ -2259,23 +2326,11 @@ class ProdutoManager {
 
   /**
    * Fecha modal de ingrediente da receita
+   * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+   * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
    */
   fecharModalIngredienteReceita() {
-    const modal = document.getElementById("modal-ingrediente-receita");
-    if (modal) {
-      // Desabilitar interações imediatamente
-      modal.style.pointerEvents = 'none';
-      // Fechar usando o sistema centralizado
-      fecharModal("modal-ingrediente-receita");
-      // Garantir que está completamente fechada
-      setTimeout(() => {
-        if (modal) {
-          modal.style.display = 'none';
-          modal.style.opacity = '0';
-          modal.style.pointerEvents = 'none';
-        }
-      }, 200);
-    }
+    fecharModal("modal-ingrediente-receita");
   }
 
   /**
@@ -2767,7 +2822,27 @@ class ProdutoManager {
     try {
       // Buscar ingredientes do produto
       const response = await this.dataManager.getIngredientesProduto(productId);
+      
+      // ALTERAÇÃO: Log de debug para verificar dados retornados da API
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.log('[loadExistingIngredients] Resposta completa da API:', response);
+      }
+      
       const ingredientes = response.items || [];
+      
+      // ALTERAÇÃO: Log de debug para verificar items processados
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.log('[loadExistingIngredients] Items extraídos:', ingredientes);
+        ingredientes.forEach(item => {
+          console.log(`[loadExistingIngredients] Item ${item.ingredient_id} (${item.name}):`, {
+            portions: item.portions,
+            min_quantity: item.min_quantity,
+            max_quantity: item.max_quantity,
+            type_min: typeof item.min_quantity,
+            type_max: typeof item.max_quantity
+          });
+        });
+      }
 
       // Limpar lista atual de ingredientes
       const ingredientesContainer = document.querySelector(
@@ -2850,7 +2925,45 @@ class ProdutoManager {
 
       // Passar extras para o extrasManager
       if (this.extrasManager && extrasIngredientes.length > 0) {
-        this.extrasManager.setExtrasFromAPI(extrasIngredientes);
+        // ALTERAÇÃO: Log de debug para verificar dados antes de passar
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.log('[loadExistingIngredients] Extras ingredientes antes de processar:', extrasIngredientes);
+        }
+        
+        // ALTERAÇÃO: Garantir que min_quantity e max_quantity sejam preservados dos dados da API
+        const extrasComValores = extrasIngredientes.map(ing => {
+          // ALTERAÇÃO: Preservar valores do banco, convertendo para número se necessário
+          const minQty = ing.min_quantity !== null && ing.min_quantity !== undefined 
+            ? Number(ing.min_quantity) 
+            : 0;
+          const maxQty = ing.max_quantity !== null && ing.max_quantity !== undefined 
+            ? Number(ing.max_quantity) 
+            : 0;
+          
+          // ALTERAÇÃO: Log de debug para cada ingrediente
+          if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.log(`[loadExistingIngredients] Ingrediente ${ing.ingredient_id} (${ing.name}):`, {
+              original_min: ing.min_quantity,
+              original_max: ing.max_quantity,
+              processed_min: minQty,
+              processed_max: maxQty,
+              portions: ing.portions
+            });
+          }
+          
+          return {
+            ...ing,
+            min_quantity: minQty,
+            max_quantity: maxQty
+          };
+        });
+        
+        // ALTERAÇÃO: Log de debug para verificar dados processados
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.log('[loadExistingIngredients] Extras ingredientes processados:', extrasComValores);
+        }
+        
+        this.extrasManager.setExtrasFromAPI(extrasComValores);
       }
 
       // Atualizar custo estimado

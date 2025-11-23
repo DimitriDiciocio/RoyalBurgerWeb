@@ -14,7 +14,6 @@ const STORAGE_KEYS = {
 // Alternativa: implementar refresh tokens com armazenamento mais seguro.
 
 // Ajuste se necessário. Mantém flexível para backends montados em outras portas.
-// TODO: REVISAR - URL hardcoded
 // Considerar usar variável de ambiente ou configuração dinâmica baseada no ambiente
 // (desenvolvimento/produção). Para produção, usar HTTPS obrigatoriamente.
 export const API_BASE_URL = (() => {
@@ -196,6 +195,8 @@ export async function apiRequest(
         } else if (isPromotionEndpoint) {
           // ALTERAÇÃO: 404 em endpoints de promoção por produto não é um erro - significa apenas que não há promoção
           // Retornar null silenciosamente sem lançar erro
+          // NOTA: O navegador pode logar 404 no console do DevTools, mas isso é comportamento padrão
+          // e não indica um problema - é esperado que alguns produtos não tenham promoção
           return null;
         } else if (isFinancialMovementDelete) {
           // ALTERAÇÃO: 404 em DELETE de movimentação - pode significar que já foi excluída
@@ -239,9 +240,29 @@ export async function apiRequest(
       } else if (response.status === 400) {
         // ALTERAÇÃO: Tratamento específico para erros 400 (Bad Request)
         // Pode ser erro de validação, entidade relacionada, etc.
-        errorMessage =
-          (data && (data.error || data.message)) ||
-          "Erro na requisição. Verifique os dados enviados.";
+        // ALTERAÇÃO: Capturar mensagem de erro mais detalhada
+        let detailedMessage = "Erro na requisição. Verifique os dados enviados.";
+        
+        if (data) {
+          // Tentar diferentes formatos de mensagem de erro
+          detailedMessage = data.error || 
+                           data.message || 
+                           data.detail ||
+                           (data.errors && Array.isArray(data.errors) ? data.errors.join(', ') : null) ||
+                           (typeof data === 'string' ? data : null) ||
+                           detailedMessage;
+          
+          // ALTERAÇÃO: Log detalhado em modo debug
+          if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.error('[API] Erro 400 - Bad Request:', {
+              path,
+              data,
+              errorMessage: detailedMessage
+            });
+          }
+        }
+        
+        errorMessage = detailedMessage;
       } else if (response.status === 422) {
         // Unprocessable Entity - usado para erros de validação de estoque, ingredientes indisponíveis, etc.
         // A mensagem do backend já vem formatada com detalhes (ex: unidades, quantidades)

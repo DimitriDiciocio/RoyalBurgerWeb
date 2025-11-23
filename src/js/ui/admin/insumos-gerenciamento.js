@@ -19,6 +19,10 @@ import { showToast, showConfirm, toastFromApiError } from "../alerts.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { escapeHTML } from "../../utils/html-sanitizer.js";
 import { getStockDashboardMetrics } from "../../api/dashboard.js";
+import { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } from "../../utils/pagination-utils.js";
+// ALTERAÇÃO: Importar funções de modal e gerenciamento de inputs
+import { abrirModal, fecharModal } from "../modais.js";
+import { reaplicarGerenciamentoInputs } from "../../utils.js";
 
 /**
  * Gerenciador de dados de insumos
@@ -57,13 +61,27 @@ class InsumoDataManager {
     try {
       // Com paginação, busca, filtros de categoria ou status, não usar cache (sempre buscar dados atualizados)
       // Cache só seria útil se não houvesse paginação/busca/filtros
-      const hasPaginationOrFilters = options.page || options.name || options.status || options.category;
+      const hasPaginationOrFilters = options.page || options.search || options.name || options.status || options.category;
       
       if (!hasPaginationOrFilters && this.isCacheValid() && !options.forceRefresh) {
         return this.cache.data;
       }
 
-      const response = await getIngredients(options);
+      // ALTERAÇÃO: getIngredients agora retorna { success, data, error? }
+      const result = await getIngredients(options);
+      
+      // ALTERAÇÃO: Tratar resposta no formato padronizado
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao buscar ingredientes');
+      }
+      
+      // ALTERAÇÃO: result.data já contém { items: [...], pagination: {...} }
+      const response = result.data;
+      
+      // ALTERAÇÃO: Validar estrutura da resposta antes de retornar
+      if (!response || typeof response !== 'object') {
+        throw new Error('Resposta inválida da API de ingredientes');
+      }
       
       // Só atualizar cache se não houver paginação/busca/filtros
       if (!hasPaginationOrFilters) {
@@ -73,9 +91,11 @@ class InsumoDataManager {
 
       return response;
     } catch (error) {
-      // ALTERAÇÃO: Log condicional apenas em modo debug
+      // ALTERAÇÃO: Log mais detalhado para diagnóstico
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-        console.error("Erro ao buscar insumos:", error);
+        console.error("[InsumoDataManager] Erro ao buscar insumos:", error);
+        console.error("[InsumoDataManager] Stack trace:", error.stack);
+        console.error("[InsumoDataManager] Opções:", options);
       }
       throw error;
     }
@@ -383,10 +403,14 @@ class InsumoManager {
         e.target.matches(".btn-editar-estoque, .fa-edit") ||
         e.target.closest(".btn-editar-estoque")
       ) {
+        // ALTERAÇÃO: Validar se o botão foi encontrado antes de usar
         const button = e.target.matches(".btn-editar-estoque")
           ? e.target
           : e.target.closest(".btn-editar-estoque");
-        this.handleEditEstoqueClick(button);
+        
+        if (button) {
+          this.handleEditEstoqueClick(button);
+        }
       }
     });
 
@@ -428,11 +452,12 @@ class InsumoManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-ingrediente");
     if (searchInput) {
+      // ALTERAÇÃO: Debounce padronizado de 300ms conforme roteiro
       const debouncedSearch = debounce(async () => {
         this.currentSearchTerm = searchInput.value.trim();
         this.currentPage = 1; // Resetar para primeira página ao buscar
         await this.loadInsumos();
-      }, 500); // Aumentar debounce para evitar muitas requisições
+      }, 300);
 
       searchInput.addEventListener("input", (e) => {
         debouncedSearch();
@@ -456,8 +481,10 @@ class InsumoManager {
         page_size: this.pageSize, // Usar pageSize do estado
       };
 
-      // Adicionar busca se houver termo de busca
+      // ALTERAÇÃO: Adicionar busca usando parâmetro padronizado 'search' (compatibilidade com 'name')
       if (this.currentSearchTerm) {
+        options.search = this.currentSearchTerm;
+        // Manter 'name' para compatibilidade com backend legado
         options.name = this.currentSearchTerm;
       }
 
@@ -479,15 +506,34 @@ class InsumoManager {
       }
 
       const response = await this.dataManager.getAllInsumos(options);
-      const insumos = response.items || [];
-
-      // Atualizar informações de paginação (preservar currentPage que foi definido antes da chamada)
-      if (response.pagination) {
-        this.totalPages = response.pagination.total_pages || 1;
-        this.totalItems = response.pagination.total || 0;
-        // NÃO sobrescrever currentPage - manter o valor que foi definido antes da chamada
-        // A API retorna a página que foi solicitada, então não precisamos atualizar
+      
+      // ALTERAÇÃO: Validar estrutura da resposta antes de processar
+      if (!response || typeof response !== 'object') {
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('[InsumoManager] Resposta inválida da API:', response);
+        }
+        throw new Error('Resposta inválida da API de ingredientes');
       }
+      
+      // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
+      // O response já é { items: [...], pagination: {...} } do backend
+      const normalizedResponse = normalizePaginationResponse(response, 'items');
+      
+      // ALTERAÇÃO: Validar resposta normalizada
+      if (!normalizedResponse || !Array.isArray(normalizedResponse.items)) {
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+          console.error('[InsumoManager] Resposta normalizada inválida:', normalizedResponse);
+        }
+        throw new Error('Erro ao normalizar resposta da API de ingredientes');
+      }
+      
+      const insumos = getItemsFromResponse(normalizedResponse);
+      const paginationInfo = getPaginationFromResponse(normalizedResponse);
+      
+      // ALTERAÇÃO: Atualizar informações de paginação usando dados normalizados
+      this.totalPages = paginationInfo.total_pages || 1;
+      this.totalItems = paginationInfo.total || 0;
+      // NÃO sobrescrever currentPage - manter o valor que foi definido antes da chamada
 
       // Mapear dados para o formato esperado pelo createInsumoCard
       const insumosMapeados = insumos.map((insumo) => ({
@@ -518,11 +564,15 @@ class InsumoManager {
       this.renderPagination();
       // Não precisa mais aplicar filtros locais - tudo é filtrado pela API
     } catch (error) {
-      // ALTERAÇÃO: Log condicional apenas em modo debug
+      // ALTERAÇÃO: Log mais detalhado para diagnóstico
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao carregar insumos:", error);
+        console.error("Stack trace:", error.stack);
+        console.error("Opções usadas:", options);
       }
-      this.showErrorMessage("Erro ao carregar insumos");
+      // ALTERAÇÃO: Mostrar mensagem de erro mais específica
+      const errorMessage = error.message || "Erro ao carregar insumos";
+      this.showErrorMessage(errorMessage);
     } finally {
       this.isLoading = false;
       this.hideLoadingState();
@@ -878,8 +928,28 @@ class InsumoManager {
    * Trata clique no botão de editar estoque
    */
   async handleEditEstoqueClick(button) {
+    // ALTERAÇÃO: Validar se o botão existe antes de usar
+    if (!button) {
+      console.warn("Botão de editar estoque não encontrado");
+      return;
+    }
+    
     const card = button.closest(".card-ingrediente");
+    
+    // ALTERAÇÃO: Validar se o card foi encontrado antes de usar
+    if (!card) {
+      console.warn("Card do ingrediente não encontrado");
+      return;
+    }
+    
     const insumoId = parseInt(card.dataset.ingredientId);
+    
+    // ALTERAÇÃO: Validar se o ID do insumo é válido
+    if (!insumoId || isNaN(insumoId)) {
+      console.warn("ID do insumo inválido:", card.dataset.ingredientId);
+      this.showErrorMessage("Erro: ID do insumo inválido");
+      return;
+    }
 
     try {
       const insumo = await this.dataManager.getInsumoById(insumoId);
@@ -920,12 +990,13 @@ class InsumoManager {
     // Configurar event listeners da modal
     this.setupEditarEstoqueModalListeners();
 
-    // Mostrar modal usando função global se disponível
-    if (window.abrirModal) {
-      window.abrirModal("modal-editar-estoque");
-    } else {
-      modal.style.display = "flex";
-    }
+    // ALTERAÇÃO: Usar abrirModal de modais.js ao invés de window.abrirModal
+    abrirModal("modal-editar-estoque");
+    
+    // ALTERAÇÃO: Reaplicar gerenciamento de inputs após abrir a modal
+    setTimeout(() => {
+      reaplicarGerenciamentoInputs();
+    }, 100);
   }
 
   /**
@@ -935,19 +1006,14 @@ class InsumoManager {
     const modal = document.getElementById("modal-editar-estoque");
     if (!modal) return;
 
+    // ALTERAÇÃO: Simplificar listeners - modais.js já gerencia overlay e ESC
     // Remover listeners anteriores para evitar duplicação
     const cancelarBtn = document.getElementById("cancelar-editar-estoque");
     const salvarBtn = document.getElementById("salvar-editar-estoque");
-    const overlay = modal.querySelector(".div-overlay");
 
     // Criar novos handlers
     const cancelarHandler = () => this.closeEditarEstoqueModal();
     const salvarHandler = () => this.saveEditarEstoque();
-    const overlayHandler = (e) => {
-      if (e.target === overlay) {
-        this.closeEditarEstoqueModal();
-      }
-    };
 
     // Remover listeners antigos se existirem
     if (cancelarBtn) {
@@ -962,21 +1028,9 @@ class InsumoManager {
         .getElementById("salvar-editar-estoque")
         .addEventListener("click", salvarHandler);
     }
-    if (overlay) {
-      overlay.replaceWith(overlay.cloneNode(true));
-      modal
-        .querySelector(".div-overlay")
-        .addEventListener("click", overlayHandler);
-    }
-
-    // Fechar modal ao pressionar ESC
-    const escHandler = (e) => {
-      if (e.key === "Escape" && modal.style.display === "flex") {
-        this.closeEditarEstoqueModal();
-      }
-    };
-    document.addEventListener("keydown", escHandler);
-    modal.dataset.escHandler = "true";
+    
+    // ALTERAÇÃO: Removido handler de overlay e ESC - modais.js já gerencia isso
+    // O botão fechar com data-close-modal já está configurado no HTML
   }
 
   /**
@@ -986,12 +1040,8 @@ class InsumoManager {
     const modal = document.getElementById("modal-editar-estoque");
     if (!modal) return;
 
-    // Fechar modal usando função global se disponível
-    if (window.fecharModal) {
-      window.fecharModal("modal-editar-estoque");
-    } else {
-      modal.style.display = "none";
-    }
+    // ALTERAÇÃO: Usar fecharModal de modais.js ao invés de window.fecharModal
+    fecharModal("modal-editar-estoque");
 
     // Limpar dados
     const nomeInput = document.getElementById("nome-insumo-estoque");
@@ -2052,8 +2102,14 @@ class InsumoManager {
       this.clearInsumoForm();
     }
 
-    modal.style.display = "flex";
-    document.body.style.overflow = "hidden";
+    // ALTERAÇÃO: Usar abrirModal de modais.js ao invés de manipular style diretamente
+    abrirModal("modal-ingrediente");
+    
+    // ALTERAÇÃO: Reaplicar gerenciamento de inputs após abrir a modal
+    setTimeout(() => {
+      reaplicarGerenciamentoInputs();
+    }, 100);
+    
     this.setupInsumoModalListeners(insumoData);
   }
 
@@ -2061,11 +2117,8 @@ class InsumoManager {
    * Fecha modal de insumo
    */
   closeInsumoModal() {
-    const modal = document.getElementById("modal-ingrediente");
-    if (modal) {
-      modal.style.display = "none";
-      document.body.style.overflow = "auto";
-    }
+    // ALTERAÇÃO: Usar fecharModal de modais.js ao invés de manipular style diretamente
+    fecharModal("modal-ingrediente");
     this.currentEditingId = null;
   }
 

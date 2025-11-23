@@ -7,6 +7,8 @@ import { showToast, showActionModal } from '../alerts.js';
 import { getIngredients } from '../../api/ingredients.js';
 import { getGroups, getGroupById } from '../../api/groups.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
+import { abrirModal, fecharModal } from '../modais.js';
+import { gerenciarInputsEspecificos } from '../../utils.js';
 
 // Constantes de configuração
 const CONFIG = {
@@ -64,10 +66,8 @@ export class ProdutoExtrasManager {
             this.abrirModalGruposExtras();
         });
 
+        // ALTERAÇÃO: Removidos listeners manuais de cancelar - modais.js já gerencia via data-close-modal
         // Modal Insumos Extras
-        this.addListener('cancelar-insumos-extras-produto', 'click', () => {
-            this.fecharModalInsumosExtras();
-        });
         this.addListener('adicionar-insumos-extras-produto', 'click', () => {
             this.confirmarSelecaoInsumos();
         });
@@ -75,18 +75,14 @@ export class ProdutoExtrasManager {
             this.filtrarInsumosExtras(e.target.value);
         });
 
+        // ALTERAÇÃO: Removidos listeners manuais de cancelar - modais.js já gerencia via data-close-modal
         // Modal Grupos Extras
-        this.addListener('cancelar-grupos-extras-produto', 'click', () => {
-            this.fecharModalGruposExtras();
-        });
         this.addListener('adicionar-grupos-extras-produto', 'click', () => {
             this.confirmarSelecaoGrupos();
         });
 
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
         // Modal Configurar Extra
-        this.addListener('cancelar-config-extra', 'click', () => {
-            this.fecharModalConfigExtra();
-        });
         this.addListener('salvar-config-extra', 'click', () => {
             this.salvarConfigExtra();
         });
@@ -127,37 +123,18 @@ export class ProdutoExtrasManager {
 
     /**
      * Configura listeners para fechar ao clicar no overlay
+     * ALTERAÇÃO: Removido completamente - todas as modais agora usam o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia fechamento via overlay automaticamente
      */
     setupOverlayListeners() {
-        const modais = [
-            'modal-insumos-extras-produto',
-            'modal-grupos-extras-produto',
-            'modal-config-extra'
-        ];
-
-        modais.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            const overlay = modal?.querySelector('.div-overlay');
-            if (overlay) {
-                const handler = () => {
-                    modal.style.display = 'none';
-                };
-                overlay.addEventListener('click', handler);
-                // Armazena para cleanup
-                if (!this.eventListeners.has(`${modalId}-overlay`)) {
-                    this.eventListeners.set(`${modalId}-overlay`, []);
-                }
-                this.eventListeners.get(`${modalId}-overlay`).push({ 
-                    element: overlay, 
-                    event: 'click', 
-                    handler 
-                });
-            }
-        });
+        // ALTERAÇÃO: Método vazio - todas as modais agora usam modais.js
+        // O sistema modais.js gerencia fechamento via overlay automaticamente
+        // Mantido método vazio para compatibilidade, mas não faz nada
     }
 
     /**
      * Carrega dados iniciais com tratamento de erro apropriado
+     * ALTERAÇÃO: Processar corretamente a resposta da API no formato { success, data: { items: [...] } }
      */
     async carregarDados() {
         if (this.isLoading) {
@@ -171,7 +148,16 @@ export class ProdutoExtrasManager {
             const responseInsumos = await getIngredients({ 
                 page_size: CONFIG.MAX_INGREDIENTS_PER_PAGE 
             });
-            this.insumosDisponiveis = responseInsumos.items || [];
+            
+            // ALTERAÇÃO: Acessar response.data.items quando response.success === true
+            if (responseInsumos && responseInsumos.success && responseInsumos.data && responseInsumos.data.items) {
+                this.insumosDisponiveis = responseInsumos.data.items;
+            } else if (responseInsumos && responseInsumos.items) {
+                // Fallback para formato antigo
+                this.insumosDisponiveis = responseInsumos.items;
+            } else {
+                this.insumosDisponiveis = [];
+            }
 
             // Carregar grupos disponíveis
             this.gruposDisponiveis = await getGroups({ active_only: true });
@@ -185,6 +171,7 @@ export class ProdutoExtrasManager {
 
     /**
      * Abre modal de seleção de insumos extras
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     async abrirModalInsumosExtras() {
         // Garantir que os dados foram carregados
@@ -201,28 +188,28 @@ export class ProdutoExtrasManager {
         this.insumosSelecionados.clear();
         this.renderizarInsumosExtrasModal();
         
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-insumos-extras-produto');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
         const modal = document.getElementById('modal-insumos-extras-produto');
         if (modal) {
-            modal.style.display = 'flex';
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            gerenciarInputsEspecificos(inputs);
         }
     }
 
     /**
      * Fecha modal de insumos extras com cleanup
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharModalInsumosExtras() {
-        const modal = document.getElementById('modal-insumos-extras-produto');
-        if (modal) {
-            modal.style.display = 'none';
-        }
-        
-        // Safe cleanup do campo de busca
-        const buscaInput = document.getElementById('busca-insumo-extra-produto');
-        if (buscaInput) {
-            buscaInput.value = '';
-        }
-        
+        // Limpar seleções antes de fechar
         this.insumosSelecionados.clear();
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-insumos-extras-produto');
     }
 
     /**
@@ -363,6 +350,7 @@ export class ProdutoExtrasManager {
 
     /**
      * Abre modal de seleção de grupos
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     async abrirModalGruposExtras() {
         // Garantir que os dados foram carregados
@@ -378,23 +366,30 @@ export class ProdutoExtrasManager {
         
         this.gruposSelecionados.clear();
         
-        const modal = document.getElementById('modal-grupos-extras-produto');
-        if (modal) {
-            modal.style.display = 'flex';
-        }
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-grupos-extras-produto');
         
         await this.renderizarGruposModal();
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+        const modal = document.getElementById('modal-grupos-extras-produto');
+        if (modal) {
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            gerenciarInputsEspecificos(inputs);
+        }
     }
 
     /**
      * Fecha modal de grupos
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharModalGruposExtras() {
-        const modal = document.getElementById('modal-grupos-extras-produto');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        // Limpar seleções antes de fechar
         this.gruposSelecionados.clear();
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-grupos-extras-produto');
     }
 
     /**
@@ -599,6 +594,26 @@ export class ProdutoExtrasManager {
         );
 
         lista.innerHTML = todosItens.map(item => {
+            // ALTERAÇÃO: Garantir que min_quantity e max_quantity sejam números válidos
+            const minQty = item.min_quantity !== null && item.min_quantity !== undefined 
+                ? Number(item.min_quantity) 
+                : 0;
+            const maxQty = item.max_quantity !== null && item.max_quantity !== undefined 
+                ? Number(item.max_quantity) 
+                : 0;
+            
+            // ALTERAÇÃO: Log de debug para verificar valores antes de renderizar
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.log(`[renderizarListaExtras] Item ${item.ingredient_id} (${item.name}):`, {
+                    original_min: item.min_quantity,
+                    original_max: item.max_quantity,
+                    processed_min: minQty,
+                    processed_max: maxQty,
+                    type_min: typeof item.min_quantity,
+                    type_max: typeof item.max_quantity
+                });
+            }
+            
             const statusClass = item.is_available ? 'ativo' : 'inativo';
             const statusTexto = item.is_available ? 'Disponível' : 'Indisponível';
             const precoTexto = item.additional_price > 0 
@@ -625,7 +640,7 @@ export class ProdutoExtrasManager {
                     <div class="extra-body">
                         <div class="extra-config">
                             <span class="config-label">Regras:</span>
-                            <span class="config-valor">Mín: ${item.min_quantity} | Máx: ${item.max_quantity}</span>
+                            <span class="config-valor">Mín: ${minQty} | Máx: ${maxQty}</span>
                         </div>
                         <div class="extra-acoes">
                             <button class="btn-acao btn-config" 
@@ -635,7 +650,7 @@ export class ProdutoExtrasManager {
                             </button>
                             ${!isDaReceita ? `
                             <button class="btn-acao btn-remover" 
-                                    data-id="${item.ingredient_id}" 
+                                    data-id="${item.ingredient_id}"
                                     title="Remover extra">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
@@ -674,6 +689,7 @@ export class ProdutoExtrasManager {
 
     /**
      * Abre modal para configurar regras do extra
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     abrirModalConfigExtra(ingredientId) {
         // Procurar em ingredientes da receita ou extras
@@ -705,21 +721,28 @@ export class ProdutoExtrasManager {
         if (minInput) minInput.value = item.min_quantity;
         if (maxInput) maxInput.value = item.max_quantity;
 
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-config-extra');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
         const modal = document.getElementById('modal-config-extra');
         if (modal) {
-            modal.style.display = 'flex';
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            gerenciarInputsEspecificos(inputs);
         }
     }
 
     /**
      * Fecha modal de configuração
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharModalConfigExtra() {
-        const modal = document.getElementById('modal-config-extra');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        // Limpar estado antes de fechar
         this.insumoEditandoConfig = null;
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-config-extra');
     }
 
     /**
@@ -814,12 +837,21 @@ export class ProdutoExtrasManager {
                 i => i.id === ing.ingredient_id
             );
             
+            // ALTERAÇÃO: Preservar valores de min_quantity e max_quantity do banco de dados
+            // Converter para número e usar valores padrão apenas se for null/undefined
+            const minQuantity = ing.min_quantity !== null && ing.min_quantity !== undefined 
+                ? safeParseInt(ing.min_quantity, 0) 
+                : CONFIG.DEFAULT_MIN_QUANTITY;
+            const maxQuantity = ing.max_quantity !== null && ing.max_quantity !== undefined 
+                ? safeParseInt(ing.max_quantity, CONFIG.DEFAULT_MAX_QUANTITY) 
+                : CONFIG.DEFAULT_MAX_QUANTITY;
+            
             return {
                 ingredient_id: ing.ingredient_id,
                 name: ing.name || insumoCompleto?.name || 'Ingrediente',
                 portions: 0,
-                min_quantity: ing.min_quantity ?? CONFIG.DEFAULT_MIN_QUANTITY,
-                max_quantity: ing.max_quantity ?? CONFIG.DEFAULT_MIN_QUANTITY,
+                min_quantity: minQuantity,
+                max_quantity: maxQuantity,
                 additional_price: ing.additional_price ?? insumoCompleto?.additional_price ?? 0,
                 is_available: ing.is_available ?? insumoCompleto?.is_available ?? true
             };
@@ -839,23 +871,70 @@ export class ProdutoExtrasManager {
         }
 
         // Filtrar apenas os extras (portions = 0)
-        const filtrados = ingredients.filter(ing => ing.portions === 0);
+        const filtrados = ingredients.filter(ing => {
+            // ALTERAÇÃO: Verificar portions como número (pode vir como string ou número)
+            const portions = Number(ing.portions) || 0;
+            const isExtra = portions === 0;
+            
+            // ALTERAÇÃO: Log de debug para verificar filtro
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.log(`[setExtrasFromAPI] Ingrediente ${ing.ingredient_id} (${ing.name}):`, {
+                    portions: ing.portions,
+                    portionsNumber: portions,
+                    isExtra: isExtra,
+                    min_quantity: ing.min_quantity,
+                    max_quantity: ing.max_quantity
+                });
+            }
+            
+            return isExtra;
+        });
+        
+        // ALTERAÇÃO: Log de debug para verificar dados recebidos
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.log('[setExtrasFromAPI] Ingredientes recebidos:', ingredients);
+            console.log('[setExtrasFromAPI] Extras filtrados (portions = 0):', filtrados);
+        }
         
         this.insumosExtras = filtrados.map(ing => {
             const insumoCompleto = this.insumosDisponiveis.find(
                 i => i.id === ing.ingredient_id
             );
             
+            // ALTERAÇÃO: Preservar valores de min_quantity e max_quantity do banco de dados
+            // Converter para número e usar valores padrão apenas se for null/undefined
+            const minQuantity = ing.min_quantity !== null && ing.min_quantity !== undefined 
+                ? safeParseInt(ing.min_quantity, 0) 
+                : CONFIG.DEFAULT_MIN_QUANTITY;
+            const maxQuantity = ing.max_quantity !== null && ing.max_quantity !== undefined 
+                ? safeParseInt(ing.max_quantity, CONFIG.DEFAULT_MAX_QUANTITY) 
+                : CONFIG.DEFAULT_MAX_QUANTITY;
+            
+            // ALTERAÇÃO: Log de debug para verificar valores processados
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.log(`[setExtrasFromAPI] Ingrediente ${ing.ingredient_id} (${ing.name}):`, {
+                    original_min: ing.min_quantity,
+                    original_max: ing.max_quantity,
+                    processed_min: minQuantity,
+                    processed_max: maxQuantity
+                });
+            }
+            
             return {
                 ingredient_id: ing.ingredient_id,
                 name: ing.name || insumoCompleto?.name || 'Ingrediente',
                 portions: 0,
-                min_quantity: ing.min_quantity ?? CONFIG.DEFAULT_MIN_QUANTITY,
-                max_quantity: ing.max_quantity ?? CONFIG.DEFAULT_MAX_QUANTITY,
+                min_quantity: minQuantity,
+                max_quantity: maxQuantity,
                 additional_price: ing.additional_price ?? insumoCompleto?.additional_price ?? 0,
                 is_available: ing.is_available ?? insumoCompleto?.is_available ?? true
             };
         });
+        
+        // ALTERAÇÃO: Log de debug para verificar resultado final
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            console.log('[setExtrasFromAPI] Extras processados:', this.insumosExtras);
+        }
         
         this.renderizarListaExtras();
     }
@@ -878,14 +957,21 @@ export class ProdutoExtrasManager {
             return; // Não adicionar duplicado
         }
         
+        // ALTERAÇÃO: Preservar valores de min_quantity e max_quantity corretamente
+        const minQuantity = ingredienteData.min_quantity !== null && ingredienteData.min_quantity !== undefined 
+            ? safeParseInt(ingredienteData.min_quantity, 0) 
+            : CONFIG.DEFAULT_MIN_QUANTITY;
+        const maxQuantity = ingredienteData.max_quantity !== null && ingredienteData.max_quantity !== undefined 
+            ? safeParseInt(ingredienteData.max_quantity, CONFIG.DEFAULT_MAX_QUANTITY) 
+            : CONFIG.DEFAULT_MAX_QUANTITY;
+        
         // Adicionar aos ingredientes da receita
-        // Valores padrão para receita: min=0, max=0
         this.ingredientesReceita.push({
             ingredient_id: ingredienteData.ingredient_id,
             name: ingredienteData.name || 'Ingrediente',
             portions: ingredienteData.portions || 0,
-            min_quantity: ingredienteData.min_quantity ?? CONFIG.DEFAULT_MIN_QUANTITY,
-            max_quantity: ingredienteData.max_quantity ?? CONFIG.DEFAULT_MIN_QUANTITY,
+            min_quantity: minQuantity,
+            max_quantity: maxQuantity,
             additional_price: ingredienteData.additional_price || 0,
             is_available: ingredienteData.is_available !== false
         });

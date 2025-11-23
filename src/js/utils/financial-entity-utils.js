@@ -4,8 +4,11 @@
  */
 
 import { getPurchaseInvoiceById } from '../api/purchases.js';
+import { getFinancialMovementById } from '../api/financial-movements.js';
 import { showToast } from '../ui/alerts.js';
 import { showPurchaseInvoiceModal } from './purchase-modal-utils.js';
+import { showCmvPedidoModal } from './modal-content-cmv-pedido.js';
+import { showVendaPedidoModal } from './modal-content-venda-pedido.js';
 
 /**
  * Verifica se o tipo de entidade é uma compra
@@ -27,15 +30,31 @@ function isPurchaseType(entityType) {
 }
 
 /**
+ * Verifica se o tipo de entidade é um pedido
+ * @param {string} entityType - Tipo da entidade
+ * @returns {boolean} True se for um pedido
+ */
+function isOrderType(entityType) {
+    if (!entityType) return false;
+    
+    const normalizedType = entityType.toLowerCase().trim();
+    return normalizedType === 'order' || 
+           normalizedType === 'pedido' || 
+           normalizedType === 'orders';
+}
+
+/**
  * Abre modal de compra quando entidade relacionada for uma compra
  * ALTERAÇÃO: Utility compartilhada para reduzir duplicação
+ * ALTERAÇÃO: Suporte para pedidos (CMV e VENDA)
  * @param {string} entityType - Tipo da entidade relacionada
  * @param {number|string} entityId - ID da entidade relacionada
+ * @param {string} [movementType] - Tipo da movimentação (opcional, usado para pedidos)
  * @returns {Promise<boolean>} True se o modal foi aberto com sucesso
  */
-export async function openRelatedEntityModal(entityType, entityId) {
+export async function openRelatedEntityModal(entityType, entityId, movementType = null) {
     if (!entityType || !entityId) {
-        showToast('Dados da entidade relacionada não encontrados', 'error');
+        showToast('Dados da entidade relacionada não encontrados', { type: 'error' });
         return false;
     }
     
@@ -43,7 +62,7 @@ export async function openRelatedEntityModal(entityType, entityId) {
         try {
             const invoiceId = parseInt(entityId);
             if (isNaN(invoiceId)) {
-                showToast('ID da compra inválido', 'error');
+                showToast('ID da compra inválido', { type: 'error' });
                 return false;
             }
             
@@ -52,17 +71,61 @@ export async function openRelatedEntityModal(entityType, entityId) {
                 await showPurchaseInvoiceModal(invoice);
                 return true;
             } else {
-                showToast('Compra não encontrada', 'error');
+                showToast('Compra não encontrada', { type: 'error' });
                 return false;
             }
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
-            showToast('Erro ao carregar detalhes da compra', 'error');
+            showToast('Erro ao carregar detalhes da compra', { type: 'error' });
+            return false;
+        }
+    } else if (isOrderType(entityType)) {
+        try {
+            const orderId = parseInt(entityId);
+            if (isNaN(orderId)) {
+                showToast('ID do pedido inválido', { type: 'error' });
+                return false;
+            }
+            
+            // ALTERAÇÃO: Se movementType não foi fornecido, buscar da movimentação
+            let finalMovementType = movementType;
+            if (!finalMovementType) {
+                // Tentar buscar o tipo da movimentação através do contexto
+                // Se não conseguir, usar o tipo padrão baseado no entityType
+                finalMovementType = 'revenue'; // Padrão para pedidos
+            }
+            
+            // ALTERAÇÃO: Determinar qual modal abrir baseado no tipo da movimentação
+            const normalizedMovementType = (finalMovementType || '').toLowerCase().trim();
+            if (normalizedMovementType === 'cmv') {
+                await showCmvPedidoModal(orderId);
+                return true;
+            } else if (normalizedMovementType === 'revenue' || normalizedMovementType === 'receita') {
+                await showVendaPedidoModal(orderId);
+                return true;
+            } else {
+                // ALTERAÇÃO: Se tipo não identificado, tentar inferir do contexto ou usar padrão
+                showToast('Tipo de movimentação não identificado', { type: 'info' });
+                return false;
+            }
+        } catch (error) {
+            showToast('Erro ao carregar detalhes do pedido', { type: 'error' });
             return false;
         }
     } else {
-        // TODO: REVISAR Implementar navegação para outros tipos de entidades relacionadas
-        showToast(`Navegação para ${entityType} ainda não implementada`, 'info');
+        // ALTERAÇÃO: Se não há entidade relacionada ou tipo não reconhecido, abrir modal genérica de detalhes
+        try {
+            // Tentar buscar o ID da movimentação através do entityId (pode ser o ID da movimentação)
+            const movementId = parseInt(entityId);
+            if (!isNaN(movementId)) {
+                const { showMovimentacaoDetalhesModal } = await import('./modal-content-movimentacao-detalhes.js');
+                await showMovimentacaoDetalhesModal(movementId);
+                return true;
+            }
+        } catch (error) {
+            // Se falhar, mostrar mensagem informativa
+            showToast(`Modal para ${entityType} ainda não implementada`, { type: 'info' });
+        }
         return false;
     }
 }

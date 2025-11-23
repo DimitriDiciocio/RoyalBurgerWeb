@@ -9,6 +9,7 @@ import { getAllSettings, updateSettings } from "../../api/settings.js";
 import { getStoreHours, bulkUpdateStoreHours } from "../../api/store.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { escapeHTML } from "../../utils/html-sanitizer.js";
+import { gerenciarInputsEspecificos } from "../../utils.js";
 import {
   validateCNPJ,
   validatePhone,
@@ -1705,6 +1706,15 @@ class ConfiguracoesManager {
 
     // Abrir modal
     abrirModal("modal-configuracao");
+    
+    // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+    const modal = this.el.modal;
+    if (modal) {
+      const inputs = modal.querySelectorAll('input, select, textarea');
+      if (inputs.length > 0) {
+        gerenciarInputsEspecificos(inputs);
+      }
+    }
   }
 
   /**
@@ -2212,6 +2222,15 @@ class ConfiguracoesManager {
 
     // Abrir modal
     abrirModal("modal-horarios-funcionamento");
+    
+    // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+    const modal = this.el.modalHorarios;
+    if (modal) {
+      const inputs = modal.querySelectorAll('input, select, textarea');
+      if (inputs.length > 0) {
+        gerenciarInputsEspecificos(inputs);
+      }
+    }
   }
 
   /**

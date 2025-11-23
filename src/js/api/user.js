@@ -73,30 +73,58 @@ const USERS_BASE = '/api/users';
 
 /**
  * Lista todos os usuários com paginação e filtros
+ * ALTERAÇÃO: Atualizado para seguir padrão de filtros padronizados
  * @param {Object} options - Opções de paginação e filtros
  * @param {number} options.page - Página atual (padrão: 1)
- * @param {number} options.limit - Itens por página (padrão: 20)
- * @param {string} options.search - Termo de busca geral
+ * @param {number} options.page_size - Itens por página (padrão: 20) - ALTERAÇÃO: renomeado de 'limit' para 'page_size'
+ * @param {string} options.search - Termo de busca (nome)
  * @param {string} options.role - Filtro por cargo
- * @param {boolean} options.status - Filtro por status (ativo/inativo)
+ * @param {string} options.status - Filtro por status (ativo, inativo) - ALTERAÇÃO: agora aceita string
+ * @param {number} options.limit - Itens por página - mantido para compatibilidade
+ * @param {boolean} options.status - Filtro por status (boolean) - mantido para compatibilidade
  * @param {string} options.sort_by - Campo para ordenação
  * @param {string} options.sort_order - Ordem (asc/desc)
+ * @returns {Promise<Object>} Lista de usuários com paginação no formato { success, data }
  */
 export async function getUsers(options = {}) {
     const params = new URLSearchParams();
     
     if (options.page) params.append('page', options.page);
-    if (options.limit) params.append('limit', options.limit);
+    // ALTERAÇÃO: Priorizar page_size, com fallback para limit (compatibilidade)
+    if (options.page_size) {
+        params.append('page_size', options.page_size);
+    } else if (options.limit) {
+        params.append('limit', options.limit);
+    }
     if (options.search) params.append('search', options.search);
     if (options.role) params.append('role', options.role);
-    if (options.status !== undefined) params.append('status', options.status);
+    // ALTERAÇÃO: Aceitar status como string ou boolean
+    if (options.status !== undefined) {
+        if (typeof options.status === 'string') {
+            params.append('status', options.status);
+        } else {
+            params.append('status', options.status.toString());
+        }
+    }
     if (options.sort_by) params.append('sort_by', options.sort_by);
     if (options.sort_order) params.append('sort_order', options.sort_order);
     
     const queryString = params.toString();
     const url = queryString ? `${USERS_BASE}?${queryString}` : USERS_BASE;
     
-    return apiRequest(url, { method: 'GET' });
+    try {
+        const response = await apiRequest(url, { method: 'GET' });
+        // ALTERAÇÃO: Retornar no formato padronizado { success, data }
+        return {
+            success: true,
+            data: response
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message || 'Erro ao buscar usuários'
+        };
+    }
 }
 
 /**

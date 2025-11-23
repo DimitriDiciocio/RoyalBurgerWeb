@@ -176,10 +176,15 @@ class PromocaoManager {
         this.totalPages = 1;
         this.totalItems = 0;
         this.isLoading = false;
+        // ALTERAÇÃO: Auto-refresh opcional para atualizar promoções expiradas
+        this.autoRefreshEnabled = false;
+        this.refreshInterval = null;
+        this.AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
     }
 
     /**
-     * Inicializa o módulo
+     * ALTERAÇÃO: Inicializa o módulo
+     * Adiciona auto-refresh opcional para atualizar promoções expiradas
      */
     async init() {
         try {
@@ -187,6 +192,8 @@ class PromocaoManager {
             await this.loadPromocoes();
             this.setupEventListeners();
             await this.updateMetrics();
+            // ALTERAÇÃO: Iniciar auto-refresh opcional (pode ser desabilitado por configuração)
+            this.startAutoRefresh();
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
@@ -197,12 +204,66 @@ class PromocaoManager {
     }
 
     /**
+     * ALTERAÇÃO: Iniciar auto-refresh para atualizar promoções automaticamente
+     * Atualiza promoções expiradas sem necessidade de recarregar manualmente
+     * @private
+     */
+    startAutoRefresh() {
+        // ALTERAÇÃO: Auto-refresh opcional - verificar se está habilitado por configuração
+        // TODO: REVISAR - Permitir configuração pelo usuário
+        if (this.autoRefreshEnabled || this.refreshInterval) {
+            return;
+        }
+
+        this.autoRefreshEnabled = true;
+        this.refreshInterval = setInterval(async () => {
+            // ALTERAÇÃO: Verificar se seção está visível antes de atualizar
+            const section = document.getElementById('secao-promocoes');
+            if (section && section.style.display !== 'none' && 
+                document.visibilityState === 'visible' && !this.isLoading) {
+                // ALTERAÇÃO: Limpar cache e recarregar promoções
+                this.dataManager.clearCache();
+                await this.loadPromocoes();
+                await this.updateMetrics();
+            }
+        }, this.AUTO_REFRESH_INTERVAL);
+    }
+
+    /**
+     * ALTERAÇÃO: Parar auto-refresh
+     * @private
+     */
+    stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+            this.autoRefreshEnabled = false;
+        }
+    }
+
+    /**
      * Carrega produtos disponíveis
+     * ALTERAÇÃO: Garante que todos os produtos sejam carregados (sem limite de paginação)
      */
     async loadProdutos() {
         try {
+            // ALTERAÇÃO: Buscar todos os produtos ativos com page_size alto para garantir que todos sejam retornados
             const response = await getProducts({ page_size: 1000, include_inactive: false });
-            this.produtos = response.items || [];
+            
+            // ALTERAÇÃO: Tratar diferentes formatos de resposta da API
+            let produtosRaw = [];
+            if (response && response.success && response.data) {
+                // Formato padronizado: { success, data: { items } }
+                produtosRaw = response.data.items || response.data || [];
+            } else if (response && response.items) {
+                // Fallback para formato antigo: { items }
+                produtosRaw = response.items;
+            } else if (Array.isArray(response)) {
+                // Fallback para resposta direta como array
+                produtosRaw = response;
+            }
+            
+            this.produtos = produtosRaw;
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
@@ -251,7 +312,14 @@ class PromocaoManager {
 
             // ALTERAÇÃO: Buscar promoções com paginação e filtros diretamente da API
             const { getPromotions } = await import('../../api/promotions.js');
-            const response = await getPromotions(options);
+            const result = await getPromotions(options);
+            
+            // ALTERAÇÃO: Tratar resposta no formato padronizado { success, data, error? }
+            if (!result.success) {
+                throw new Error(result.error || 'Erro ao buscar promoções');
+            }
+            
+            const response = result.data;
             
             // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
             const normalizedResponse = normalizePaginationResponse(response, 'items');
@@ -295,11 +363,12 @@ class PromocaoManager {
         // Busca
         const buscaInput = document.getElementById('busca-promocao');
         if (buscaInput) {
+            // ALTERAÇÃO: Debounce padronizado de 300ms conforme roteiro
             const handler = debounce(async (e) => {
-                this.termoBusca = e.target.value.toLowerCase();
+                this.termoBusca = e.target.value.trim();
                 this.currentPage = 1; // Resetar para primeira página ao buscar
                 await this.loadPromocoes(); // ALTERAÇÃO: Recarregar da API
-            }, 500);
+            }, 300);
             buscaInput.addEventListener('input', handler);
             this.eventListeners.push({ element: buscaInput, event: 'input', handler });
         }
@@ -330,6 +399,14 @@ class PromocaoManager {
             });
             this.eventListeners = [];
         }
+    }
+
+    /**
+     * ALTERAÇÃO: Cleanup - Para auto-refresh e remove listeners
+     */
+    cleanup() {
+        this.stopAutoRefresh();
+        this.removeEventListeners();
     }
 
     /**
@@ -764,9 +841,9 @@ class PromocaoManager {
     /**
      * Abre modal para nova promoção
      */
-    handleNovaPromocao() {
+    async handleNovaPromocao() {
         this.currentPromocaoId = null;
-        this.openModal();
+        await this.openModal();
     }
 
     /**
@@ -776,7 +853,7 @@ class PromocaoManager {
         try {
             const promocao = await this.dataManager.getPromocaoById(promocaoId);
             this.currentPromocaoId = promocaoId;
-            this.openModal(promocao);
+            await this.openModal(promocao);
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
@@ -820,7 +897,7 @@ class PromocaoManager {
     /**
      * Abre modal
      */
-    openModal(promocao = null) {
+    async openModal(promocao = null) {
         const modal = document.getElementById('modal-promocao');
         if (!modal) return;
 
@@ -850,7 +927,10 @@ class PromocaoManager {
             dataExpiracao.classList.remove('error', 'success');
         }
 
-        // Preencher produtos
+        // ALTERAÇÃO: Sempre recarregar produtos antes de preencher o select para garantir que todos estejam disponíveis
+        await this.loadProdutos();
+        
+        // ALTERAÇÃO: Preencher produtos no select com todos os produtos disponíveis
         if (selectProduto) {
             selectProduto.innerHTML = '<option value="">Selecione um produto</option>' +
                 this.produtos.map(p => 
@@ -1337,11 +1417,33 @@ export async function initPromocoesManager() {
     await promocaoManager.init();
 }
 
-// Inicializa automaticamente se a seção estiver visível
+// ALTERAÇÃO: Inicializa automaticamente se a seção estiver visível
 document.addEventListener('DOMContentLoaded', () => {
     const secaoPromocoes = document.getElementById('secao-promocoes');
     if (secaoPromocoes && secaoPromocoes.style.display !== 'none') {
         initPromocoesManager();
+    }
+});
+
+// ALTERAÇÃO: Cleanup ao sair da página
+window.addEventListener('beforeunload', () => {
+    if (promocaoManager) {
+        promocaoManager.cleanup();
+    }
+});
+
+// ALTERAÇÃO: Pausar auto-refresh quando página fica oculta
+document.addEventListener('visibilitychange', () => {
+    if (promocaoManager) {
+        if (document.hidden) {
+            promocaoManager.stopAutoRefresh();
+        } else {
+            // ALTERAÇÃO: Reiniciar auto-refresh quando página volta a ficar visível
+            const section = document.getElementById('secao-promocoes');
+            if (section && section.style.display !== 'none') {
+                promocaoManager.startAutoRefresh();
+            }
+        }
     }
 });
 

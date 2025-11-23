@@ -126,26 +126,36 @@ export function createFinancialMovementCard(movement, options = {}) {
                 </div>
             </div>
             
-            ${relatedEntityType && relatedEntityId ? `
-                <div class="financial-movement-card-footer">
-                    ${paymentStatus !== 'paid' && onMarkAsPaid ? `
-                        <button type="button" class="financial-btn financial-btn-pay" 
-                                data-action="mark-paid" 
-                                data-movement-id="${id}"
-                                aria-label="Marcar movimentação como paga">
-                            <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
-                            <span>Marcar como Pago</span>
-                        </button>
-                    ` : ''}
+            <div class="financial-movement-card-footer">
+                ${paymentStatus !== 'paid' && onMarkAsPaid ? `
+                    <button type="button" class="financial-btn financial-btn-pay" 
+                            data-action="mark-paid" 
+                            data-movement-id="${id}"
+                            aria-label="Marcar movimentação como paga">
+                        <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                        <span>Marcar como Pago</span>
+                    </button>
+                ` : ''}
+                ${relatedEntityType && relatedEntityId ? `
                     <button type="button" class="related-link financial-btn financial-btn-secondary" 
                             data-entity-type="${escapeHtml(relatedEntityType)}" 
-                            data-entity-id="${relatedEntityId}" 
+                            data-entity-id="${relatedEntityId}"
+                            data-movement-type="${escapeHtml(type)}"
+                            data-movement-id="${id}"
                             aria-label="Ver mais detalhes">
                         <i class="fa-solid fa-eye" aria-hidden="true"></i>
                         <span>Ver mais</span>
                     </button>
-                </div>
-            ` : ''}
+                ` : `
+                    <button type="button" class="view-details-link financial-btn financial-btn-secondary" 
+                            data-action="view-details"
+                            data-movement-id="${id}"
+                            aria-label="Ver mais detalhes">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>Ver mais</span>
+                    </button>
+                `}
+            </div>
         </div>
     `;
 
@@ -251,6 +261,22 @@ function setupCardEventListeners(container, options) {
             } finally {
                 setTimeout(() => { isProcessing = false; }, 300);
             }
+        } else if (action === 'view-details') {
+            e.preventDefault();
+            e.stopPropagation();
+            isProcessing = true;
+            try {
+                // ALTERAÇÃO: Importar e abrir modal de detalhes da movimentação
+                const { showMovimentacaoDetalhesModal } = await import('../../utils/modal-content-movimentacao-detalhes.js');
+                await showMovimentacaoDetalhesModal(movementId);
+            } catch (error) {
+                // ALTERAÇÃO: Se houver erro, tentar usar callback se disponível
+                if (options.onViewDetails) {
+                    await options.onViewDetails(movementId);
+                }
+            } finally {
+                setTimeout(() => { isProcessing = false; }, 300);
+            }
         }
     };
     
@@ -278,11 +304,25 @@ function setupCardEventListeners(container, options) {
             
             const entityType = button.getAttribute('data-entity-type');
             const entityId = button.getAttribute('data-entity-id');
+            const movementType = button.getAttribute('data-movement-type');
+            const movementId = button.getAttribute('data-movement-id');
             
             // Verificar se os dados estão presentes antes de chamar o callback
             if (entityType && entityId) {
                 try {
-                    options.onViewRelated(entityType, entityId);
+                    // ALTERAÇÃO: Buscar movimento completo se necessário para passar tipo
+                    const card = button.closest('.financial-movement-card');
+                    let movement = null;
+                    if (card && movementId) {
+                        // ALTERAÇÃO: Tentar encontrar o movimento original nos dados renderizados
+                        // Por enquanto, passar apenas o tipo que já está no atributo
+                        movement = {
+                            type: movementType,
+                            id: movementId
+                        };
+                    }
+                    // ALTERAÇÃO: Passar movimentoType como terceiro parâmetro
+                    options.onViewRelated(entityType, entityId, movementType);
                 } catch (error) {
                     // ALTERAÇÃO: Removido console.error - erro será tratado pelo callback ou silenciosamente
                 }

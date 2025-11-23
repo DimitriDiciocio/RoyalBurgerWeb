@@ -15,6 +15,8 @@ import {
     removeIngredientFromGroup,
     addMultipleIngredientsToGroup
 } from '../../api/groups.js';
+import { abrirModal, fecharModal } from '../modais.js';
+import { gerenciarInputsEspecificos } from '../../utils.js';
 
 export class GruposInsumosManager {
     constructor() {
@@ -56,23 +58,23 @@ export class GruposInsumosManager {
             btnGruposAdicionais.addEventListener('click', () => this.abrirModalGrupos());
         }
 
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
         // Modal Grupos - Botões principais
-        document.getElementById('cancelar-grupos-insumos')?.addEventListener('click', () => this.fecharModalGrupos());
         document.getElementById('salvar-grupos-insumos')?.addEventListener('click', () => this.salvarAlteracoes());
         document.getElementById('btn-adicionar-grupo-insumo')?.addEventListener('click', () => this.abrirFormularioGrupo());
 
         // Modal Insumos do Grupo
         document.getElementById('voltar-grupos-insumos')?.addEventListener('click', () => this.voltarParaGrupos());
-        document.getElementById('cancelar-insumos-grupo')?.addEventListener('click', () => this.fecharModalInsumosGrupo());
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
         document.getElementById('salvar-insumos-grupo')?.addEventListener('click', () => this.salvarInsumosGrupo());
         document.getElementById('btn-adicionar-insumo-grupo')?.addEventListener('click', () => this.abrirModalSelecaoInsumos());
 
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
         // Modal Formulário Grupo
-        document.getElementById('cancelar-grupo-insumo-form')?.addEventListener('click', () => this.fecharFormularioGrupo());
         document.getElementById('salvar-grupo-insumo-form')?.addEventListener('click', () => this.salvarGrupo());
 
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
         // Modal Seleção de Insumos
-        document.getElementById('cancelar-selecao-insumos')?.addEventListener('click', () => this.fecharModalSelecaoInsumos());
         document.getElementById('adicionar-insumos-selecionados')?.addEventListener('click', () => this.confirmarSelecaoInsumos());
         
         // Busca de insumos
@@ -87,24 +89,13 @@ export class GruposInsumosManager {
 
     /**
      * Configura listeners para fechar ao clicar no overlay
+     * ALTERAÇÃO: Removido completamente - todas as modais agora usam o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia fechamento via overlay automaticamente
      */
     setupOverlayListeners() {
-        const modals = [
-            'modal-grupos-insumos',
-            'modal-insumos-grupo',
-            'modal-grupo-insumo-form',
-            'modal-selecao-insumos'
-        ];
-
-        modals.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            const overlay = modal?.querySelector('.div-overlay');
-            if (overlay) {
-                overlay.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-            }
-        });
+        // ALTERAÇÃO: Método vazio - todas as modais agora usam modais.js
+        // O sistema modais.js gerencia fechamento via overlay automaticamente
+        // Mantido método vazio para compatibilidade, mas não faz nada
     }
 
     /**
@@ -155,23 +146,32 @@ export class GruposInsumosManager {
 
     /**
      * Abre modal principal de grupos
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     abrirModalGrupos() {
         this.renderizarGrupos();
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-grupos-insumos');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
         const modal = document.getElementById('modal-grupos-insumos');
         if (modal) {
-            modal.style.display = 'flex';
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            if (inputs.length > 0) {
+                gerenciarInputsEspecificos(inputs);
+            }
         }
     }
 
     /**
      * Fecha modal de grupos
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharModalGrupos() {
-        const modal = document.getElementById('modal-grupos-insumos');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-grupos-insumos');
     }
 
     /**
@@ -240,6 +240,7 @@ export class GruposInsumosManager {
 
     /**
      * Abre formulário para adicionar/editar grupo
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     abrirFormularioGrupo(grupo = null) {
         this.editandoGrupo = grupo;
@@ -255,25 +256,31 @@ export class GruposInsumosManager {
             input.value = '';
         }
 
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-grupo-insumo-form');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
         if (modal) {
-            modal.style.display = 'flex';
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            if (inputs.length > 0) {
+                gerenciarInputsEspecificos(inputs);
+            }
         }
+        
         input?.focus();
     }
 
     /**
      * Fecha formulário de grupo
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharFormularioGrupo() {
-        const modal = document.getElementById('modal-grupo-insumo-form');
-        const input = document.getElementById('nome-grupo-insumo-input');
-        if (modal) {
-            modal.style.display = 'none';
-        }
-        if (input) {
-            input.value = '';
-        }
+        // Limpar estado antes de fechar
         this.editandoGrupo = null;
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-grupo-insumo-form');
     }
 
     /**
@@ -369,8 +376,14 @@ export class GruposInsumosManager {
             if (modal) {
                 // Fechar modal de grupos
                 this.fecharModalGrupos();
-                // Abrir modal de insumos
-                modal.style.display = 'flex';
+                // ALTERAÇÃO: Usar sistema centralizado de modais
+                abrirModal('modal-insumos-grupo');
+                
+                // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+                const inputs = modal.querySelectorAll('input, select, textarea');
+                if (inputs.length > 0) {
+                    gerenciarInputsEspecificos(inputs);
+                }
             }
         } catch (error) {
             console.error('Erro ao abrir modal de insumos:', error);
@@ -380,13 +393,15 @@ export class GruposInsumosManager {
 
     /**
      * Fecha modal de insumos do grupo
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharModalInsumosGrupo() {
-        const modal = document.getElementById('modal-insumos-grupo');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        // Limpar estado antes de fechar
         this.grupoAtual = null;
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-insumos-grupo');
     }
 
     /**
@@ -483,26 +498,36 @@ export class GruposInsumosManager {
 
     /**
      * Abre modal de seleção de insumos
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     abrirModalSelecaoInsumos() {
         this.insumosSelecionados.clear();
         this.renderizarInsumosDisponiveis();
         
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-selecao-insumos');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
         const modal = document.getElementById('modal-selecao-insumos');
         if (modal) {
-            modal.style.display = 'flex';
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            if (inputs.length > 0) {
+                gerenciarInputsEspecificos(inputs);
+            }
         }
     }
 
     /**
      * Fecha modal de seleção de insumos
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     fecharModalSelecaoInsumos() {
-        const modal = document.getElementById('modal-selecao-insumos');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        // Limpar seleções antes de fechar
         this.insumosSelecionados.clear();
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-selecao-insumos');
     }
 
     /**

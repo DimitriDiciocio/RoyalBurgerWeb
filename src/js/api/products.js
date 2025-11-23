@@ -7,11 +7,15 @@ import { apiRequest } from './api.js';
 
 /**
  * Lista todos os produtos com filtros opcionais
+ * ALTERAÇÃO: Atualizado para seguir padrão de filtros padronizados
  * @param {Object} options - Opções de filtro e paginação
- * @param {string} options.name - Filtro por nome
- * @param {number} options.category_id - Filtro por categoria
- * @param {number} options.page - Página
- * @param {number} options.page_size - Itens por página
+ * @param {string} options.search - Termo de busca (nome do produto) - ALTERAÇÃO: renomeado de 'name' para 'search'
+ * @param {string} options.category - Filtro por categoria (slug) - ALTERAÇÃO: renomeado de 'category_id' para 'category'
+ * @param {string} options.status - Filtro por status (ativo, inativo) - ALTERAÇÃO: novo parâmetro padronizado
+ * @param {number} options.page - Página atual (padrão: 1)
+ * @param {number} options.page_size - Itens por página (padrão: 20)
+ * @param {number} options.category_id - Filtro por categoria (ID) - mantido para compatibilidade
+ * @param {string} options.name - Filtro por nome - mantido para compatibilidade
  * @param {boolean} options.include_inactive - Incluir produtos inativos
  * @param {boolean} options.only_inactive - Filtrar apenas produtos inativos (requer include_inactive=true)
  * @param {boolean} options.filter_unavailable - Filtrar produtos indisponíveis (padrão: false para admin, true para frontend)
@@ -20,8 +24,24 @@ import { apiRequest } from './api.js';
 export const getProducts = async (options = {}) => {
     const params = new URLSearchParams();
     
-    if (options.name) params.append('name', options.name);
-    if (options.category_id) params.append('category_id', options.category_id);
+    // ALTERAÇÃO: Priorizar novos parâmetros padronizados, com fallback para compatibilidade
+    if (options.search) {
+        params.append('search', options.search);
+    } else if (options.name) {
+        params.append('name', options.name);
+    }
+    
+    if (options.category) {
+        params.append('category', options.category);
+    } else if (options.category_id) {
+        params.append('category_id', options.category_id);
+    }
+    
+    // ALTERAÇÃO: Novo parâmetro padronizado de status
+    if (options.status) {
+        params.append('status', options.status);
+    }
+    
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
     if (options.include_inactive !== undefined) params.append('include_inactive', options.include_inactive);
@@ -41,9 +61,16 @@ export const getProducts = async (options = {}) => {
         const response = await apiRequest(url, {
             method: 'GET'
         });
-        return response;
+        // ALTERAÇÃO: Retornar no formato padronizado { success, data }
+        return {
+            success: true,
+            data: response
+        };
     } catch (error) {
-        throw error;
+        return {
+            success: false,
+            error: error.message || 'Erro ao buscar produtos'
+        };
     }
 };
 
@@ -78,39 +105,298 @@ export const getProductById = async (productId, quantity = 1) => {
  * @returns {Promise<Object>} Produto criado
  */
 export const createProduct = async (productData) => {
+    // ALTERAÇÃO: Log de debug para identificar problemas - apenas em desenvolvimento
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+        if (isDev) {
+            // eslint-disable-next-line no-console
+            console.log('[createProduct] Dados recebidos:', {
+            name: productData.name,
+            description: productData.description,
+            price: productData.price,
+            cost_price: productData.cost_price,
+            preparation_time_minutes: productData.preparation_time_minutes,
+            category_id: productData.category_id,
+            is_active: productData.is_active,
+            hasImage: !!productData.image,
+            ingredientsCount: productData.ingredients?.length || 0
+            });
+        }
+    }
     
     // Se há imagem, usa FormData, senão JSON
     if (productData.image) {
         const formData = new FormData();
         
-        // Adiciona campos de texto
-        if (productData.name) formData.append('name', productData.name);
-        if (productData.description) formData.append('description', productData.description);
-        if (productData.price) formData.append('price', productData.price);
-        if (productData.cost_price !== undefined) formData.append('cost_price', productData.cost_price);
-        if (productData.preparation_time_minutes) formData.append('preparation_time_minutes', productData.preparation_time_minutes);
-        if (productData.category_id) formData.append('category_id', productData.category_id);
-        
-        // Adiciona ingredientes se fornecidos (como JSON string)
-        if (productData.ingredients && Array.isArray(productData.ingredients)) {
-            formData.append('ingredients', JSON.stringify(productData.ingredients));
+        // ALTERAÇÃO: Adicionar campos obrigatórios primeiro
+        // ALTERAÇÃO: Validar campos obrigatórios
+        if (!productData.name || productData.name.trim().length === 0) {
+            throw new Error('Nome do produto é obrigatório');
         }
         
+        formData.append('name', productData.name.trim());
+        
+        if (productData.description !== undefined) {
+            formData.append('description', (productData.description || '').trim());
+        }
+        
+        // ALTERAÇÃO: Garantir que price seja número válido
+        if (productData.price === undefined || productData.price === null || isNaN(productData.price)) {
+            throw new Error('Preço do produto é obrigatório e deve ser um número válido');
+        }
+        formData.append('price', Number(productData.price));
+        
+        // ALTERAÇÃO: Garantir que cost_price seja número válido
+        if (productData.cost_price !== undefined && productData.cost_price !== null) {
+            formData.append('cost_price', Number(productData.cost_price));
+        }
+        if (productData.preparation_time_minutes !== undefined && productData.preparation_time_minutes !== null) {
+            formData.append('preparation_time_minutes', productData.preparation_time_minutes);
+        }
+        // ALTERAÇÃO: Sempre enviar category_id (mesmo que seja null ou string vazia)
+        // A API espera este campo, então convertemos string vazia para null
+        const categoryId = productData.category_id === '' || productData.category_id === null || productData.category_id === undefined
+            ? null
+            : productData.category_id;
+        formData.append('category_id', categoryId === null ? '' : categoryId);
+        // ALTERAÇÃO: Sempre enviar is_active (padrão true se não especificado)
+        formData.append('is_active', productData.is_active !== undefined ? productData.is_active : true);
+        
+        // ALTERAÇÃO: Adicionar ingredientes ANTES da imagem (o backend pode processar na ordem)
+        // Adiciona ingredientes se fornecidos (como JSON string)
+        if (productData.ingredients && Array.isArray(productData.ingredients) && productData.ingredients.length > 0) {
+            // ALTERAÇÃO: Normalizar ingredientes com validação robusta
+            const ingredientesNormalizados = productData.ingredients.map((ing, idx) => {
+                // ALTERAÇÃO: Validar ingredient_id
+                const ingredientId = Number(ing.ingredient_id);
+                if (isNaN(ingredientId) || !isFinite(ingredientId) || ingredientId <= 0) {
+                    throw new Error(`Ingrediente ${idx}: ingredient_id inválido (${ing.ingredient_id})`);
+                }
+                
+                // ALTERAÇÃO: Validar portions
+                const portions = Number(ing.portions);
+                if (isNaN(portions) || !isFinite(portions) || portions < 0) {
+                    throw new Error(`Ingrediente ${idx}: portions inválido (${ing.portions})`);
+                }
+                if (portions > 999999.99) {
+                    throw new Error(`Ingrediente ${idx}: portions muito grande (máximo: 999999.99)`);
+                }
+                
+                // ALTERAÇÃO: Validar min_quantity
+                const minQuantity = Number(ing.min_quantity || 0);
+                if (isNaN(minQuantity) || !isFinite(minQuantity) || minQuantity < 0) {
+                    throw new Error(`Ingrediente ${idx}: min_quantity inválido (${ing.min_quantity})`);
+                }
+                
+                // ALTERAÇÃO: Validar max_quantity
+                const maxQuantity = Number(ing.max_quantity || 0);
+                if (isNaN(maxQuantity) || !isFinite(maxQuantity) || maxQuantity < 0) {
+                    throw new Error(`Ingrediente ${idx}: max_quantity inválido (${ing.max_quantity})`);
+                }
+                
+                // ALTERAÇÃO: Validar max_quantity >= min_quantity
+                if (maxQuantity > 0 && minQuantity > 0 && maxQuantity < minQuantity) {
+                    throw new Error(`Ingrediente ${idx}: max_quantity não pode ser menor que min_quantity`);
+                }
+                
+                return {
+                    ingredient_id: ingredientId,
+                    portions: portions,
+                    min_quantity: minQuantity,
+                    max_quantity: maxQuantity
+                };
+            });
+            
+            // ALTERAÇÃO: Validar que pelo menos um ingrediente tenha portions > 0
+            const ingredientesObrigatorios = ingredientesNormalizados.filter(ing => {
+                const portions = Number(ing.portions);
+                return !isNaN(portions) && portions > 0;
+            });
+            
+            if (ingredientesObrigatorios.length === 0) {
+                throw new Error('Produto deve ter pelo menos um ingrediente obrigatório (PORTIONS > 0) na receita');
+            }
+            
+            // ALTERAÇÃO: Log de debug - apenas em desenvolvimento
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+                if (isDev) {
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] Ingredientes normalizados a serem enviados:', {
+                        total: ingredientesNormalizados.length,
+                        obrigatorios: ingredientesObrigatorios.length,
+                        ingredientes: ingredientesNormalizados.map(ing => ({
+                            ingredient_id: ing.ingredient_id,
+                            portions: ing.portions,
+                            portionsType: typeof ing.portions, // ALTERAÇÃO: Verificar tipo
+                            min_quantity: ing.min_quantity,
+                            max_quantity: ing.max_quantity
+                        }))
+                    });
+                    const jsonString = JSON.stringify(ingredientesNormalizados);
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] JSON stringificado:', jsonString);
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] JSON parseado de volta (teste):', JSON.parse(jsonString));
+                    
+                    // ALTERAÇÃO: Verificar se o FormData está sendo criado corretamente
+                    const testFormData = new FormData();
+                    testFormData.append('ingredients', jsonString);
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] FormData test - ingredientes value:', testFormData.get('ingredients'));
+                }
+            }
+            
+            // ALTERAÇÃO: Enviar ingredientes normalizados
+            // ALTERAÇÃO: Garantir que o JSON seja uma string válida e bem formatada
+            const ingredientsJson = JSON.stringify(ingredientesNormalizados);
+            
+            // ALTERAÇÃO: Enviar como string JSON simples (o backend deve fazer o parse)
+            formData.append('ingredients', ingredientsJson);
+            
+            // ALTERAÇÃO: Log final do FormData antes de enviar - apenas em desenvolvimento
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+                if (isDev) {
+                    const ingredientsValue = formData.get('ingredients');
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] FormData final - ingredientes:', ingredientsValue);
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] FormData final - tipo do ingredientes:', typeof ingredientsValue);
+                    // eslint-disable-next-line no-console
+                    console.log('[createProduct] FormData final - todos os campos:', Array.from(formData.keys()));
+                    
+                    // ALTERAÇÃO: Verificar se podemos parsear de volta
+                    try {
+                        const parsed = JSON.parse(ingredientsValue);
+                        // eslint-disable-next-line no-console
+                        console.log('[createProduct] FormData - ingredientes parseados de volta:', parsed);
+                        // eslint-disable-next-line no-console
+                        console.log('[createProduct] FormData - verificação portions:', parsed.map(ing => ({ id: ing.ingredient_id, portions: ing.portions, type: typeof ing.portions })));
+                    } catch (e) {
+                        // eslint-disable-next-line no-console
+                        console.error('[createProduct] Erro ao parsear ingredientes do FormData:', e);
+                    }
+                }
+            }
+        }
+        
+        // ALTERAÇÃO: Adicionar imagem por último (o backend pode processar na ordem)
         // Adiciona imagem (o backend gerará o image_url automaticamente)
         if (productData.image) {
             formData.append('image', productData.image);
         }
         
-        return await apiRequest('/api/products/', {
-            method: 'POST',
-            body: formData,
-            headers: {} // Remove Content-Type para FormData
-        });
+        // ALTERAÇÃO: Log FormData para debug - apenas em desenvolvimento
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+            if (isDev) {
+                // eslint-disable-next-line no-console
+                console.log('[createProduct] FormData criado, campos:', Array.from(formData.keys()));
+            }
+        }
+        
+        try {
+            return await apiRequest('/api/products/', {
+                method: 'POST',
+                body: formData,
+                headers: {} // Remove Content-Type para FormData
+            });
+        } catch (error) {
+            // ALTERAÇÃO: Log detalhado do erro - apenas em desenvolvimento
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+                if (isDev) {
+                    // eslint-disable-next-line no-console
+                    console.error('[createProduct] Erro ao criar produto com imagem:', error);
+                    if (error.response) {
+                        // eslint-disable-next-line no-console
+                        console.error('[createProduct] Resposta do servidor:', error.response);
+                    }
+                }
+            }
+            throw error;
+        }
     } else {
-        return await apiRequest('/api/products/', {
-            method: 'POST',
-            body: JSON.stringify(productData)
+        // ALTERAÇÃO: Remover campos null/undefined antes de enviar JSON
+        const cleanData = {};
+        Object.keys(productData).forEach(key => {
+            const value = productData[key];
+            // Incluir apenas valores válidos (não null, não undefined)
+            if (value !== null && value !== undefined) {
+                // Para arrays vazios, incluir apenas se não for ingredients
+                if (Array.isArray(value)) {
+                    if (value.length > 0 || key !== 'ingredients') {
+                        cleanData[key] = value;
+                    }
+                } else {
+                    cleanData[key] = value;
+                }
+            }
         });
+        
+        // ALTERAÇÃO: Validação adicional antes de enviar
+        if (!cleanData.name || cleanData.name.trim().length === 0) {
+            throw new Error('Nome do produto é obrigatório');
+        }
+        
+        if (!cleanData.price || isNaN(cleanData.price) || cleanData.price <= 0) {
+            throw new Error('Preço do produto é obrigatório e deve ser maior que zero');
+        }
+        
+        // ALTERAÇÃO: Garantir que price seja número
+        cleanData.price = Number(cleanData.price);
+        if (cleanData.cost_price !== undefined) {
+            cleanData.cost_price = Number(cleanData.cost_price);
+        }
+        
+        // ALTERAÇÃO: Garantir que is_active seja boolean (padrão true)
+        if (cleanData.is_active === undefined) {
+            cleanData.is_active = true;
+        } else {
+            cleanData.is_active = Boolean(cleanData.is_active);
+        }
+        
+        // ALTERAÇÃO: Log de debug - apenas em desenvolvimento
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+            if (isDev) {
+                // eslint-disable-next-line no-console
+                console.log('[createProduct] JSON limpo a ser enviado:', cleanData);
+                // eslint-disable-next-line no-console
+                console.log('[createProduct] Tipo dos valores:', {
+                    name: typeof cleanData.name,
+                    price: typeof cleanData.price,
+                    cost_price: typeof cleanData.cost_price,
+                    is_active: typeof cleanData.is_active
+                });
+            }
+        }
+        
+        try {
+            return await apiRequest('/api/products/', {
+                method: 'POST',
+                body: JSON.stringify(cleanData)
+            });
+        } catch (error) {
+            // ALTERAÇÃO: Log detalhado do erro - apenas em desenvolvimento
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+                if (isDev) {
+                    // eslint-disable-next-line no-console
+                    console.error('[createProduct] Erro ao criar produto sem imagem:', error);
+                    // eslint-disable-next-line no-console
+                    console.error('[createProduct] Dados que causaram erro:', cleanData);
+                    // eslint-disable-next-line no-console
+                    console.error('[createProduct] JSON stringificado:', JSON.stringify(cleanData));
+                    if (error.payload) {
+                        // eslint-disable-next-line no-console
+                        console.error('[createProduct] Payload do erro:', error.payload);
+                    }
+                }
+            }
+            throw error;
+        }
     }
 };
 

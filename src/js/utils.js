@@ -48,11 +48,20 @@ export function gerenciarEstadoInputs() {
       const temValor = temValorOuPlaceholder();
       const estaFocado = document.activeElement === input;
 
-      // Adicionar/remover classe 'active' baseado no valor
-      if (temValor) {
+      // ALTERAÇÃO: SELECT sempre deve ter label no estado ativo
+      // ALTERAÇÃO: Inputs de data também devem sempre ter label no estado ativo
+      const tiposData = ["date", "time", "datetime-local", "month", "week"];
+      const ehInputData = tiposData.includes(input.type);
+      
+      if (input.tagName === "SELECT" || ehInputData) {
         label.classList.add("active");
       } else {
-        label.classList.remove("active");
+        // Adicionar/remover classe 'active' baseado no valor para outros inputs
+        if (temValor) {
+          label.classList.add("active");
+        } else {
+          label.classList.remove("active");
+        }
       }
 
       // Adicionar/remover classe 'focused' baseado no foco
@@ -223,10 +232,20 @@ export function gerenciarInputsEspecificos(inputs) {
       const temValor = temValorOuPlaceholder();
       const estaFocado = document.activeElement === input;
 
-      if (temValor) {
+      // ALTERAÇÃO: SELECT sempre deve ter label no estado ativo
+      // ALTERAÇÃO: Inputs de data também devem sempre ter label no estado ativo
+      const tiposData = ["date", "time", "datetime-local", "month", "week"];
+      const ehInputData = tiposData.includes(input.type);
+      
+      if (input.tagName === "SELECT" || ehInputData) {
         label.classList.add("active");
       } else {
-        label.classList.remove("active");
+        // Adicionar/remover classe 'active' baseado no valor para outros inputs
+        if (temValor) {
+          label.classList.add("active");
+        } else {
+          label.classList.remove("active");
+        }
       }
 
       if (estaFocado) {

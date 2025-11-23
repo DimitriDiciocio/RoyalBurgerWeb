@@ -14,6 +14,8 @@ import {
 
 import { getProducts, updateProduct, getProductById } from '../../api/products.js';
 import { showToast, showConfirm } from '../alerts.js';
+import { abrirModal, fecharModal } from '../modais.js';
+import { gerenciarInputsEspecificos } from '../../utils.js';
 
 /**
  * Gerenciador de dados de categorias
@@ -154,7 +156,11 @@ class CategoriaDataManager {
     async getItensByCategoria(categoriaId) {
         try {
             const response = await getProducts({ category_id: categoriaId, include_inactive: true, page_size: 1000 });
-            const itens = response.items || [];
+            // ALTERAÇÃO: Corrigido acesso à resposta - getProducts retorna { success, data }
+            if (!response.success || !response.data) {
+                throw new Error(response.error || 'Erro ao buscar produtos');
+            }
+            const itens = response.data.items || [];
             return itens;
         } catch (error) {
             console.error('Erro ao buscar itens da categoria:', error);
@@ -257,15 +263,34 @@ class CategoriaManager {
      * Configura handlers específicos de categorias
      */
     setupCategoriaHandlers() {
-        // Event delegation centralizado para todos os botões de categoria
+        // ALTERAÇÃO: Event delegation melhorado para garantir que sempre pegamos o botão correto
         const handler = (e) => {
-            if (e.target.matches('#btn-editar-categoria, .fa-edit')) {
-                this.handleEditCategoria(e.target);
-            } else if (e.target.matches('#btn-excluir-categoria, .fa-trash')) {
-                this.handleDeleteCategoria(e.target);
-            } else if (e.target.matches('#btn-acessar-itens, .fa-list')) {
-                this.handleGerenciarItens(e.target);
-            } else if (e.target.matches('#btn-adicionar-categoria')) {
+            // Se clicou no ícone, encontrar o botão pai
+            let target = e.target;
+            if (target.matches('.fa-edit, .fa-trash, .fa-list')) {
+                target = target.closest('button');
+            }
+            
+            if (!target) return;
+            
+            if (target.matches('#btn-editar-categoria, .editar-categoria') || 
+                target.closest('#btn-editar-categoria, .editar-categoria')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleEditCategoria(target);
+            } else if (target.matches('#btn-excluir-categoria, .excluir-categoria') || 
+                       target.closest('#btn-excluir-categoria, .excluir-categoria')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleDeleteCategoria(target);
+            } else if (target.matches('#btn-acessar-itens, .gerenciar-itens') || 
+                       target.closest('#btn-acessar-itens, .gerenciar-itens')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleGerenciarItens(target);
+            } else if (target.matches('#btn-adicionar-categoria')) {
+                e.preventDefault();
+                e.stopPropagation();
                 this.handleNovaCategoria();
             }
         };
@@ -291,11 +316,7 @@ class CategoriaManager {
         const modal = document.getElementById('modal-categorias');
         if (!modal) return;
 
-        // Botão fechar
-        const btnFechar = modal.querySelector('#cancelar-categorias');
-        if (btnFechar) {
-            btnFechar.addEventListener('click', () => this.closeCategoriasModal());
-        }
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
 
         // Botão salvar ordem
         const btnSalvar = modal.querySelector('#salvar-categorias');
@@ -317,11 +338,7 @@ class CategoriaManager {
         const modal = document.getElementById('modal-itens');
         if (!modal) return;
 
-        // Botão fechar
-        const btnFechar = modal.querySelector('#cancelar-itens');
-        if (btnFechar) {
-            btnFechar.addEventListener('click', () => this.closeItensModal());
-        }
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
 
         // Botão voltar
         const btnVoltar = modal.querySelector('#voltar-categorias');
@@ -349,11 +366,7 @@ class CategoriaManager {
         const modal = document.getElementById('modal-categoria-form');
         if (!modal) return;
 
-        // Botão fechar
-        const btnFechar = modal.querySelector('#cancelar-categoria-form');
-        if (btnFechar) {
-            btnFechar.addEventListener('click', () => this.closeCategoriaFormModal());
-        }
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
 
         // Botão salvar
         const btnSalvar = modal.querySelector('#salvar-categoria-form');
@@ -375,11 +388,7 @@ class CategoriaManager {
         const modal = document.getElementById('modal-produtos');
         if (!modal) return;
 
-        // Botão fechar
-        const btnFechar = modal.querySelector('#cancelar-produtos');
-        if (btnFechar) {
-            btnFechar.addEventListener('click', () => this.closeProdutosModal());
-        }
+        // ALTERAÇÃO: Removido listener manual de cancelar - modais.js já gerencia via data-close-modal
 
         // Botão adicionar selecionados
         const btnAdicionar = modal.querySelector('#adicionar-produtos');
@@ -577,9 +586,26 @@ class CategoriaManager {
      * Trata edição de categoria
      */
     handleEditCategoria(button) {
-        const element = button.closest('.categoria-item');
+        // ALTERAÇÃO: Garantir que pegamos o botão, não o ícone
+        const btn = button.closest('button') || button;
+        const element = btn.closest('.categoria-item');
+        
+        // ALTERAÇÃO: Validação para evitar erro quando element é null
+        if (!element) {
+            console.error('Elemento categoria-item não encontrado');
+            this.showErrorMessage('Erro ao identificar categoria. Tente novamente.');
+            return;
+        }
+        
         const categoriaId = parseInt(element.dataset.categoriaId);
-        const nome = element.querySelector('h3').textContent;
+        const nomeElement = element.querySelector('h3');
+        const nome = nomeElement ? nomeElement.textContent : '';
+        
+        if (!categoriaId || isNaN(categoriaId)) {
+            console.error('ID de categoria inválido');
+            this.showErrorMessage('Erro ao identificar categoria. Tente novamente.');
+            return;
+        }
         
         this.openCategoriaFormModal(categoriaId, nome);
     }
@@ -588,9 +614,26 @@ class CategoriaManager {
      * Trata exclusão de categoria
      */
     async handleDeleteCategoria(button) {
-        const element = button.closest('.categoria-item');
+        // ALTERAÇÃO: Garantir que pegamos o botão, não o ícone
+        const btn = button.closest('button') || button;
+        const element = btn.closest('.categoria-item');
+        
+        // ALTERAÇÃO: Validação para evitar erro quando element é null
+        if (!element) {
+            console.error('Elemento categoria-item não encontrado');
+            this.showErrorMessage('Erro ao identificar categoria. Tente novamente.');
+            return;
+        }
+        
         const categoriaId = parseInt(element.dataset.categoriaId);
-        const nome = element.querySelector('h3').textContent;
+        const nomeElement = element.querySelector('h3');
+        const nome = nomeElement ? nomeElement.textContent : '';
+
+        if (!categoriaId || isNaN(categoriaId)) {
+            console.error('ID de categoria inválido');
+            this.showErrorMessage('Erro ao identificar categoria. Tente novamente.');
+            return;
+        }
 
         try {
             const confirmed = await showConfirm({
@@ -616,8 +659,24 @@ class CategoriaManager {
      * Trata gerenciamento de itens
      */
     async handleGerenciarItens(button) {
-        const element = button.closest('.categoria-item');
+        // ALTERAÇÃO: Garantir que pegamos o botão, não o ícone
+        const btn = button.closest('button') || button;
+        const element = btn.closest('.categoria-item');
+        
+        // ALTERAÇÃO: Validação para evitar erro quando element é null
+        if (!element) {
+            console.error('Elemento categoria-item não encontrado');
+            this.showErrorMessage('Erro ao identificar categoria. Tente novamente.');
+            return;
+        }
+        
         const categoriaId = parseInt(element.dataset.categoriaId);
+        
+        if (!categoriaId || isNaN(categoriaId)) {
+            console.error('ID de categoria inválido');
+            this.showErrorMessage('Erro ao identificar categoria. Tente novamente.');
+            return;
+        }
         
         this.currentCategoriaId = categoriaId;
         await this.openItensModal(categoriaId);
@@ -625,29 +684,37 @@ class CategoriaManager {
 
     /**
      * Abre modal de categorias
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     async openCategoriasModal() {
         const modal = document.getElementById('modal-categorias');
         if (!modal) return;
 
         await this.loadCategorias();
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-    }
-
-    /**
-     * Fecha modal de categorias
-     */
-    closeCategoriasModal() {
-        const modal = document.getElementById('modal-categorias');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-categorias');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+        const inputs = modal.querySelectorAll('input, select, textarea');
+        if (inputs.length > 0) {
+            gerenciarInputsEspecificos(inputs);
         }
     }
 
     /**
+     * Fecha modal de categorias
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
+     */
+    closeCategoriasModal() {
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-categorias');
+    }
+
+    /**
      * Abre modal de itens
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     async openItensModal(categoriaId) {
         const modal = document.getElementById('modal-itens');
@@ -662,8 +729,15 @@ class CategoriaManager {
             }
 
             await this.loadItens(categoriaId);
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
+            
+            // ALTERAÇÃO: Usar sistema centralizado de modais
+            abrirModal('modal-itens');
+            
+            // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            if (inputs.length > 0) {
+                gerenciarInputsEspecificos(inputs);
+            }
         } catch (error) {
             console.error('Erro ao abrir modal de itens:', error);
             this.showErrorMessage('Erro ao carregar itens da categoria');
@@ -672,14 +746,15 @@ class CategoriaManager {
 
     /**
      * Fecha modal de itens
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     closeItensModal() {
-        const modal = document.getElementById('modal-itens');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
+        // Limpar estado antes de fechar
         this.currentCategoriaId = null;
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-itens');
     }
 
     /**
@@ -770,6 +845,7 @@ class CategoriaManager {
 
     /**
      * Abre modal de formulário de categoria
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     openCategoriaFormModal(categoriaId = null, nome = '') {
         const modal = document.getElementById('modal-categoria-form');
@@ -791,19 +867,24 @@ class CategoriaManager {
             btnSalvar.dataset.categoriaId = '';
         }
 
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        abrirModal('modal-categoria-form');
+        
+        // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+        const inputs = modal.querySelectorAll('input, select, textarea');
+        if (inputs.length > 0) {
+            gerenciarInputsEspecificos(inputs);
+        }
     }
 
     /**
      * Fecha modal de formulário de categoria
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     closeCategoriaFormModal() {
-        const modal = document.getElementById('modal-categoria-form');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-categoria-form');
     }
 
     /**
@@ -859,6 +940,7 @@ class CategoriaManager {
 
     /**
      * Abre modal de produtos
+     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
      */
     async openProdutosModal() {
         const modal = document.getElementById('modal-produtos');
@@ -866,8 +948,15 @@ class CategoriaManager {
 
         try {
             await this.loadProdutosDisponiveis();
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
+            
+            // ALTERAÇÃO: Usar sistema centralizado de modais
+            abrirModal('modal-produtos');
+            
+            // ALTERAÇÃO: Gerenciar inputs da modal usando utils.js
+            const inputs = modal.querySelectorAll('input, select, textarea');
+            if (inputs.length > 0) {
+                gerenciarInputsEspecificos(inputs);
+            }
         } catch (error) {
             console.error('Erro ao abrir modal de produtos:', error);
             this.showErrorMessage('Erro ao carregar produtos disponíveis');
@@ -876,14 +965,15 @@ class CategoriaManager {
 
     /**
      * Fecha modal de produtos
+     * ALTERAÇÃO: Simplificado para usar apenas o sistema centralizado de modais.js
+     * O sistema modais.js já gerencia o fechamento e reset dos campos (via data-reset-on-close)
      */
     closeProdutosModal() {
-        const modal = document.getElementById('modal-produtos');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
+        // Limpar seleções antes de fechar
         this.produtosSelecionados.clear();
+        
+        // ALTERAÇÃO: Usar sistema centralizado de modais
+        fecharModal('modal-produtos');
     }
 
     /**
@@ -892,8 +982,12 @@ class CategoriaManager {
     async loadProdutosDisponiveis() {
         try {
             const response = await getProducts({ include_inactive: true, page_size: 1000 });
+            // ALTERAÇÃO: Corrigido acesso à resposta - getProducts retorna { success, data }
+            if (!response.success || !response.data) {
+                throw new Error(response.error || 'Erro ao buscar produtos');
+            }
             // Filtrar produtos sem categoria OU que não sejam da categoria atual
-            this.produtosDisponiveis = (response.items || []).filter(produto => 
+            this.produtosDisponiveis = (response.data.items || []).filter(produto => 
                 !produto.category_id || produto.category_id !== this.currentCategoriaId
             );
             this.renderProdutosDisponiveis();

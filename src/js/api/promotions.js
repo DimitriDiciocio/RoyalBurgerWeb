@@ -7,24 +7,27 @@ import { apiRequest } from './api.js';
 
 /**
  * Lista todas as promoções ativas
+ * ALTERAÇÃO: Atualizado para seguir padrão de filtros padronizados
  * @param {Object} options - Opções de filtro e paginação
- * @param {boolean} options.include_expired - Incluir promoções expiradas (padrão: false)
- * @param {number} options.page - Página atual (padrão: 1)
- * @param {number} options.page_size - Itens por página (padrão: 20)
  * @param {string} options.search - Termo de busca (nome do produto, ID da promoção)
  * @param {string} options.status - Filtro por status (ativas, expiradas, todas)
- * @returns {Promise<Object>} Lista de promoções com detalhes dos produtos e paginação
+ * @param {number} options.page - Página atual (padrão: 1)
+ * @param {number} options.page_size - Itens por página (padrão: 20)
+ * @param {boolean} options.include_expired - Incluir promoções expiradas (padrão: false) - mantido para compatibilidade
+ * @returns {Promise<Object>} Lista de promoções com detalhes dos produtos e paginação no formato { success, data }
  */
 export const getPromotions = async (options = {}) => {
     const params = new URLSearchParams();
     
-    if (options.include_expired !== undefined) {
-        params.append('include_expired', options.include_expired.toString());
-    }
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
     if (options.search) params.append('search', options.search);
     if (options.status) params.append('status', options.status);
+    
+    // ALTERAÇÃO: Mantido para compatibilidade
+    if (options.include_expired !== undefined) {
+        params.append('include_expired', options.include_expired.toString());
+    }
     
     const queryString = params.toString();
     const url = `/api/promotions${queryString ? `?${queryString}` : ''}`;
@@ -33,9 +36,16 @@ export const getPromotions = async (options = {}) => {
         const response = await apiRequest(url, {
             method: 'GET'
         });
-        return response;
+        // ALTERAÇÃO: Retornar no formato padronizado { success, data }
+        return {
+            success: true,
+            data: response
+        };
     } catch (error) {
-        throw error;
+        return {
+            success: false,
+            error: error.message || 'Erro ao buscar promoções'
+        };
     }
 };
 
@@ -58,20 +68,26 @@ export const getPromotionById = async (promotionId) => {
  * Busca promoção de um produto específico
  * @param {number} productId - ID do produto
  * @param {boolean} includeExpired - Se true, inclui promoções expiradas (padrão: false)
- * @returns {Promise<Object>} Dados da promoção ou null se não houver
+ * @returns {Promise<Object|null>} Dados da promoção ou null se não houver
  */
 export const getPromotionByProductId = async (productId, includeExpired = false) => {
     if (!productId || isNaN(productId) || productId <= 0) {
         throw new Error('ID do produto é obrigatório e deve ser um número positivo');
     }
     
+    // ALTERAÇÃO: apiRequest já trata 404 para endpoints de promoção retornando null
+    // Não é necessário tratamento adicional aqui, mas mantemos try/catch para outros erros
     try {
         const url = `/api/promotions/product/${productId}${includeExpired ? '?include_expired=true' : ''}`;
-        return await apiRequest(url, {
+        const result = await apiRequest(url, {
             method: 'GET'
         });
+        // apiRequest retorna null para 404 em endpoints de promoção
+        return result;
     } catch (error) {
-        // Se retornar 404, não há promoção para este produto
+        // ALTERAÇÃO: Tratamento adicional apenas para erros não-404
+        // Se retornar 404, apiRequest já retornou null, então não chegará aqui
+        // Mas mantemos para garantir tratamento de outros erros
         if (error.status === 404) {
             return null;
         }

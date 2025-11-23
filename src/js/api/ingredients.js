@@ -16,18 +16,26 @@ const MAX_PAGE_SIZE = 1000; // TODO: Implementar paginação adequada no backend
 
 /**
  * Lista todos os ingredientes com filtros opcionais
+ * ALTERAÇÃO: Atualizado para seguir padrão de filtros padronizados
  * @param {Object} options - Opções de filtro e paginação
- * @param {string} options.name - Filtro por nome
- * @param {string} options.status - Filtro por status (low_stock, out_of_stock, in_stock, unavailable, available, overstock)
+ * @param {string} options.search - Termo de busca (nome do ingrediente) - ALTERAÇÃO: renomeado de 'name' para 'search'
  * @param {string} options.category - Filtro por categoria
- * @param {number} options.page - Página
- * @param {number} options.page_size - Itens por página
- * @returns {Promise<Object>} Lista de ingredientes com paginação
+ * @param {string} options.status - Filtro por status (em-estoque, estoque-baixo, sem-estoque) ou (low_stock, out_of_stock, in_stock, unavailable, available, overstock)
+ * @param {number} options.page - Página atual (padrão: 1)
+ * @param {number} options.page_size - Itens por página (padrão: 20)
+ * @param {string} options.name - Filtro por nome - mantido para compatibilidade
+ * @returns {Promise<Object>} Lista de ingredientes com paginação no formato { success, data }
  */
 export const getIngredients = async (options = {}) => {
     const params = new URLSearchParams();
     
-    if (options.name) params.append('name', options.name);
+    // ALTERAÇÃO: Priorizar novo parâmetro padronizado, com fallback para compatibilidade
+    if (options.search) {
+        params.append('search', options.search);
+    } else if (options.name) {
+        params.append('name', options.name);
+    }
+    
     if (options.status) params.append('status', options.status);
     if (options.category) params.append('category', options.category);
     if (options.page) params.append('page', options.page);
@@ -36,9 +44,21 @@ export const getIngredients = async (options = {}) => {
     const queryString = params.toString();
     const url = `/api/ingredients${queryString ? `?${queryString}` : ''}`;
     
-    return await apiRequest(url, {
-        method: 'GET'
-    });
+    try {
+        const response = await apiRequest(url, {
+            method: 'GET'
+        });
+        // ALTERAÇÃO: Retornar no formato padronizado { success, data }
+        return {
+            success: true,
+            data: response
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message || 'Erro ao buscar ingredientes'
+        };
+    }
 };
 
 /**
@@ -52,13 +72,24 @@ export const getIngredientById = async (ingredientId) => {
         // vamos buscar todos os ingredientes e filtrar pela ID
         const response = await getIngredients({ page_size: MAX_PAGE_SIZE }); // TODO: Implementar endpoint específico
         
-        if (!response || !response.items) {
-            throw new Error('Resposta inválida da API');
+        // ALTERAÇÃO: Verificar formato de resposta { success, data } e acessar data.items
+        if (!response || !response.success) {
+            throw new Error('Erro ao buscar ingredientes da API');
+        }
+        
+        // ALTERAÇÃO: Acessar response.data.items ao invés de response.items
+        const ingredientsData = response.data;
+        if (!ingredientsData || !ingredientsData.items) {
+            throw new Error('Resposta inválida da API: items não encontrado');
         }
         
         // Converter ingredientId para número para comparação
         const targetId = parseInt(ingredientId);
-        const ingredient = response.items.find(ing => parseInt(ing.id) === targetId);
+        if (isNaN(targetId)) {
+            throw new Error(`ID do ingrediente inválido: ${ingredientId}`);
+        }
+        
+        const ingredient = ingredientsData.items.find(ing => parseInt(ing.id) === targetId);
         
         if (!ingredient) {
             const error = new Error(`Ingrediente com ID ${ingredientId} não encontrado`);
@@ -68,6 +99,14 @@ export const getIngredientById = async (ingredientId) => {
         
         return ingredient;
     } catch (error) {
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+            if (isDev) {
+                // eslint-disable-next-line no-console
+                console.error('Erro em getIngredientById:', error);
+            }
+        }
         throw error;
     }
 };
@@ -215,7 +254,10 @@ export const addIngredientQuantity = async (ingredientId, quantity) => {
 export const getStockSummary = async () => {
     try {
         // Usar cálculo local diretamente (endpoint não implementado no backend)
-        const ingredients = await getIngredients({ page_size: MAX_PAGE_SIZE }); // TODO: Implementar endpoint de resumo
+        const response = await getIngredients({ page_size: MAX_PAGE_SIZE }); // TODO: Implementar endpoint de resumo
+        
+        // ALTERAÇÃO: Acessar response.data.items ao invés de response.items
+        const ingredients = response && response.success && response.data ? response.data.items : [];
         
         let totalValue = 0;
         let outOfStock = 0;
@@ -223,8 +265,8 @@ export const getStockSummary = async () => {
         let inStock = 0;
         let totalItems = 0;
         
-        if (ingredients.items && ingredients.items.length > 0) {
-            ingredients.items.forEach(ingredient => {
+        if (ingredients && ingredients.length > 0) {
+            ingredients.forEach(ingredient => {
                 // Considerar apenas insumos ativos (is_available = true)
                 const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
                 
@@ -260,7 +302,14 @@ export const getStockSummary = async () => {
         
         return summary;
     } catch (error) {
-        console.error('Erro ao obter resumo do estoque:', error);
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+            const isDev = typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+            if (isDev) {
+                // eslint-disable-next-line no-console
+                console.error('Erro ao obter resumo do estoque:', error);
+            }
+        }
         // Retornar valores padrão em caso de erro
         return {
             total_stock_value: 0,
@@ -278,10 +327,11 @@ export const getStockSummary = async () => {
  */
 export const getLowStockIngredients = async () => {
     const response = await getIngredients({ page_size: MAX_PAGE_SIZE });
-    if (!response.items) return [];
+    // ALTERAÇÃO: Acessar response.data.items ao invés de response.items
+    if (!response || !response.success || !response.data || !response.data.items) return [];
     
     // Filtrar apenas insumos ativos com estoque baixo
-    return response.items.filter(ingredient => {
+    return response.data.items.filter(ingredient => {
         const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
         if (!isActive) return false;
         
@@ -298,10 +348,11 @@ export const getLowStockIngredients = async () => {
  */
 export const getOutOfStockIngredients = async () => {
     const response = await getIngredients({ page_size: MAX_PAGE_SIZE });
-    if (!response.items) return [];
+    // ALTERAÇÃO: Acessar response.data.items ao invés de response.items
+    if (!response || !response.success || !response.data || !response.data.items) return [];
     
     // Filtrar apenas insumos ativos sem estoque
-    return response.items.filter(ingredient => {
+    return response.data.items.filter(ingredient => {
         const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
         if (!isActive) return false;
         
@@ -316,10 +367,11 @@ export const getOutOfStockIngredients = async () => {
  */
 export const getInStockIngredients = async () => {
     const response = await getIngredients({ page_size: MAX_PAGE_SIZE });
-    if (!response.items) return [];
+    // ALTERAÇÃO: Acessar response.data.items ao invés de response.items
+    if (!response || !response.success || !response.data || !response.data.items) return [];
     
     // Filtrar apenas insumos ativos com estoque adequado
-    return response.items.filter(ingredient => {
+    return response.data.items.filter(ingredient => {
         const isActive = ingredient.is_available !== undefined ? ingredient.is_available : true;
         if (!isActive) return false;
         

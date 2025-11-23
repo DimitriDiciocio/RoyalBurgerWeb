@@ -14,12 +14,25 @@ import { showToast, showConfirm } from '../alerts.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
 import { cacheManager } from '../../utils/cache-manager.js';
 
+import { abrirModal, fecharModal } from '../modais.js';
+import { getNewRuleModalTemplate, getEditRuleModalTemplate } from '../../utils/recurrence-modal-templates.js';
+
 export class RecorrenciasManager {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.rules = [];
         this.isInitialized = false;
         this.isLoading = false;
+        // ALTERAÇÃO: Armazenar referências aos event listeners para cleanup
+        this.modalEventListeners = {
+            newRule: [],
+            editRule: []
+        };
+        // ALTERAÇÃO: Armazenar referências aos listeners de validação
+        this.validationListeners = {
+            newRule: null,
+            editRule: null
+        };
     }
 
     /**
@@ -227,6 +240,85 @@ export class RecorrenciasManager {
     }
 
     /**
+     * Configura validação dinâmica do dia de recorrência
+     * @param {string} typeSelectId - ID do select de tipo de recorrência
+     * @param {string} dayInputId - ID do input de dia
+     * @param {string} helpTextId - ID do elemento de ajuda
+     * @param {string} modalType - Tipo do modal ('newRule' ou 'editRule') para cleanup
+     */
+    setupRecurrenceDayValidation(typeSelectId, dayInputId, helpTextId, modalType = null) {
+        const typeSelect = document.getElementById(typeSelectId);
+        const dayInput = document.getElementById(dayInputId);
+        const helpText = document.getElementById(helpTextId);
+
+        if (!typeSelect || !dayInput) return;
+
+        // ALTERAÇÃO: Remover listener anterior se existir (cleanup)
+        if (modalType && this.validationListeners[modalType]) {
+            const { element, event, handler } = this.validationListeners[modalType];
+            if (element && typeof handler === 'function') {
+                element.removeEventListener(event, handler);
+            }
+        }
+
+        const updateDayValidation = () => {
+            const recurrenceType = typeSelect.value;
+            let min = 1;
+            let max = 31;
+            let helpMessage = '';
+
+            switch (recurrenceType) {
+                case 'MONTHLY':
+                    min = 1;
+                    max = 31;
+                    helpMessage = 'Dia do mês (1-31)';
+                    break;
+                case 'WEEKLY':
+                    min = 1;
+                    max = 7;
+                    helpMessage = 'Dia da semana (1=Segunda, 7=Domingo)';
+                    break;
+                case 'YEARLY':
+                    min = 1;
+                    max = 365;
+                    helpMessage = 'Dia do ano (1-365)';
+                    break;
+                default:
+                    helpMessage = 'Selecione o tipo de recorrência primeiro';
+            }
+
+            dayInput.min = min;
+            dayInput.max = max;
+            dayInput.placeholder = helpMessage;
+            
+            if (helpText) {
+                helpText.textContent = helpMessage;
+            }
+
+            // Validar valor atual se já tiver sido preenchido
+            const currentValue = parseInt(dayInput.value, 10);
+            if (currentValue && (currentValue < min || currentValue > max)) {
+                dayInput.value = '';
+            }
+        };
+
+        // Aplicar validação inicial
+        updateDayValidation();
+
+        // Adicionar listener para mudanças no tipo
+        typeSelect.addEventListener('change', updateDayValidation);
+        
+        // ALTERAÇÃO: Armazenar referência para cleanup
+        if (modalType) {
+            this.validationListeners[modalType] = {
+                element: typeSelect,
+                event: 'change',
+                handler: updateDayValidation
+            };
+        }
+    }
+
+    /**
      * Gera movimentações recorrentes do mês atual
      */
     async generateMovements() {
@@ -247,7 +339,7 @@ export class RecorrenciasManager {
             // Recarregar regras para atualizar status
             await this.loadRules();
         } catch (error) {
-            console.error('Erro ao gerar movimentações:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao gerar movimentações', { 
                 type: 'error',
                 title: 'Erro'
@@ -299,12 +391,97 @@ export class RecorrenciasManager {
     /**
      * Abre modal de nova regra
      */
-    openNewRuleModal() {
-        // TODO: Implementar modal de nova regra
-        showToast('Funcionalidade em desenvolvimento', { 
-            type: 'info',
-            title: 'Em desenvolvimento'
+    async openNewRuleModal() {
+        await this.showNewRuleModal();
+    }
+
+    /**
+     * Exibe modal de criação de nova regra
+     */
+    async showNewRuleModal() {
+        // ALTERAÇÃO: Cleanup de event listeners anteriores para evitar vazamento de memória
+        this.cleanupModalListeners('newRule');
+
+        // Criar ou obter modal
+        let modal = document.getElementById('modal-recorrencia-nova');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modal-recorrencia-nova';
+            modal.className = 'modal';
+            document.body.appendChild(modal);
+        }
+
+        // ALTERAÇÃO: Usar template externo
+        modal.innerHTML = getNewRuleModalTemplate();
+
+        // ALTERAÇÃO: Usar sistema de modais.js
+        abrirModal('modal-recorrencia-nova');
+
+        // ALTERAÇÃO: Configurar validação dinâmica com tipo para cleanup
+        this.setupRecurrenceDayValidation('rec-new-recurrence-type', 'rec-new-recurrence-day', 'rec-new-day-help', 'newRule');
+
+        // ALTERAÇÃO: Gerenciar inputs padronizados usando utils.js
+        const inputs = modal.querySelectorAll('.div-input input, .div-input select, .div-input textarea');
+        if (inputs.length > 0) {
+            const { gerenciarInputsEspecificos } = await import('../../utils.js');
+            gerenciarInputsEspecificos(inputs);
+        }
+
+        // ALTERAÇÃO: Armazenar referência ao event listener para cleanup
+        const btnSave = document.getElementById('btn-save-new-recorrencia');
+        if (btnSave) {
+            const saveHandler = async () => {
+                await this.handleCreateRule(modal);
+            };
+            btnSave.addEventListener('click', saveHandler);
+            this.modalEventListeners.newRule.push({ element: btnSave, event: 'click', handler: saveHandler });
+        }
+    }
+
+    /**
+     * Remove event listeners de um modal específico
+     * @param {string} modalType - Tipo do modal ('newRule' ou 'editRule')
+     */
+    cleanupModalListeners(modalType) {
+        // Cleanup de event listeners de botões
+        const listeners = this.modalEventListeners[modalType] || [];
+        listeners.forEach(({ element, event, handler }) => {
+            if (element && typeof handler === 'function') {
+                element.removeEventListener(event, handler);
+            }
         });
+        // Limpar array de listeners
+        this.modalEventListeners[modalType] = [];
+
+        // ALTERAÇÃO: Cleanup de listeners de validação
+        if (this.validationListeners[modalType]) {
+            const { element, event, handler } = this.validationListeners[modalType];
+            if (element && typeof handler === 'function') {
+                element.removeEventListener(event, handler);
+            }
+            this.validationListeners[modalType] = null;
+        }
+    }
+
+    /**
+     * Limpa todos os event listeners e recursos
+     * Útil quando a instância não será mais usada
+     */
+    destroy() {
+        // Cleanup de todos os modais
+        this.cleanupModalListeners('newRule');
+        this.cleanupModalListeners('editRule');
+        
+        // Fechar modais se estiverem abertos
+        const newModal = document.getElementById('modal-recorrencia-nova');
+        if (newModal) {
+            fecharModal('modal-recorrencia-nova');
+        }
+        
+        const editModal = document.getElementById('modal-recorrencia-editar');
+        if (editModal) {
+            fecharModal('modal-recorrencia-editar');
+        }
     }
 
     /**
@@ -321,9 +498,9 @@ export class RecorrenciasManager {
                 });
                 return;
             }
-            this.showEditRuleModal(rule);
+            await this.showEditRuleModal(rule);
         } catch (error) {
-            console.error('Erro ao carregar regra:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar regra', { 
                 type: 'error',
                 title: 'Erro'
@@ -335,7 +512,10 @@ export class RecorrenciasManager {
      * Exibe modal de edição de regra
      * @param {Object} rule - Dados da regra
      */
-    showEditRuleModal(rule) {
+    async showEditRuleModal(rule) {
+        // ALTERAÇÃO: Cleanup de event listeners anteriores para evitar vazamento de memória
+        this.cleanupModalListeners('editRule');
+
         // Criar ou obter modal
         let modal = document.getElementById('modal-recorrencia-editar');
         if (!modal) {
@@ -346,96 +526,32 @@ export class RecorrenciasManager {
         }
 
         const ruleId = rule.id || rule.rule_id;
-        const ruleName = escapeHTML(rule.name || '');
-        const description = escapeHTML(rule.description || '');
-        const value = parseFloat(rule.value || rule.amount || 0);
-        const type = rule.type || 'EXPENSE';
-        const category = escapeHTML(rule.category || '');
-        const recurrenceType = rule.recurrence_type || rule.recurrenceType || 'MONTHLY';
-        const recurrenceDay = rule.recurrence_day || rule.recurrenceDay || 1;
 
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
-                <div class="header-modal">
-                    <h2>Editar Regra de Recorrência</h2>
-                    <i class="fa-solid fa-xmark fechar-modal" onclick="document.getElementById('modal-recorrencia-editar').style.display='none'" aria-label="Fechar modal"></i>
-                </div>
-                <div class="conteudo-modal">
-                    <form id="form-edit-recorrencia" class="form-modal">
-                        <div class="form-group">
-                            <label for="rec-name">Nome *</label>
-                            <input type="text" id="rec-name" class="form-input" 
-                                   value="${ruleName}" required placeholder="Ex: Aluguel, Salário, etc.">
-                        </div>
+        // ALTERAÇÃO: Usar template externo
+        modal.innerHTML = getEditRuleModalTemplate(rule);
 
-                        <div class="form-group">
-                            <label for="rec-description">Descrição</label>
-                            <textarea id="rec-description" class="form-input" rows="3" 
-                                      placeholder="Descrição da regra">${description}</textarea>
-                        </div>
+        // ALTERAÇÃO: Usar sistema de modais.js
+        abrirModal('modal-recorrencia-editar');
 
-                        <div class="form-group">
-                            <label for="rec-type">Tipo *</label>
-                            <select id="rec-type" class="form-input" required>
-                                <option value="REVENUE" ${type === 'REVENUE' ? 'selected' : ''}>Receita</option>
-                                <option value="EXPENSE" ${type === 'EXPENSE' ? 'selected' : ''}>Despesa</option>
-                                <option value="CMV" ${type === 'CMV' ? 'selected' : ''}>CMV</option>
-                                <option value="TAX" ${type === 'TAX' ? 'selected' : ''}>Imposto</option>
-                            </select>
-                        </div>
+        // ALTERAÇÃO: Configurar validação dinâmica com tipo para cleanup
+        this.setupRecurrenceDayValidation('rec-recurrence-type', 'rec-recurrence-day', null, 'editRule');
 
-                        <div class="form-group">
-                            <label for="rec-value">Valor *</label>
-                            <input type="number" id="rec-value" class="form-input" step="0.01" min="0" 
-                                   value="${value}" required placeholder="0.00">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="rec-category">Categoria</label>
-                            <input type="text" id="rec-category" class="form-input" 
-                                   value="${category}" placeholder="Ex: Alimentação, Salário, etc.">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="rec-recurrence-type">Tipo de Recorrência *</label>
-                            <select id="rec-recurrence-type" class="form-input" required>
-                                <option value="MONTHLY" ${recurrenceType === 'MONTHLY' ? 'selected' : ''}>Mensal</option>
-                                <option value="WEEKLY" ${recurrenceType === 'WEEKLY' ? 'selected' : ''}>Semanal</option>
-                                <option value="YEARLY" ${recurrenceType === 'YEARLY' ? 'selected' : ''}>Anual</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="rec-recurrence-day">Dia da Recorrência *</label>
-                            <input type="number" id="rec-recurrence-day" class="form-input" 
-                                   min="1" max="31" value="${recurrenceDay}" required 
-                                   placeholder="Dia do mês (1-31) ou dia da semana (1-7)">
-                        </div>
-                    </form>
-                </div>
-                <div class="footer-modal">
-                    <button type="button" class="btn-cancelar" onclick="document.getElementById('modal-recorrencia-editar').style.display='none'">Cancelar</button>
-                    <button type="button" class="btn-salvar" id="btn-save-recorrencia">Atualizar</button>
-                </div>
-            </div>
-        `;
-
-        modal.style.display = 'block';
-
-        // Configurar event listener do botão salvar
-        const btnSave = document.getElementById('btn-save-recorrencia');
-        if (btnSave) {
-            btnSave.addEventListener('click', async () => {
-                await this.handleUpdateRule(ruleId, modal);
-            });
+        // ALTERAÇÃO: Gerenciar inputs padronizados usando utils.js
+        const inputs = modal.querySelectorAll('.div-input input, .div-input select, .div-input textarea');
+        if (inputs.length > 0) {
+            const { gerenciarInputsEspecificos } = await import('../../utils.js');
+            gerenciarInputsEspecificos(inputs);
         }
 
-        // Fechar ao clicar fora
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
+        // ALTERAÇÃO: Armazenar referência ao event listener para cleanup
+        const btnSave = document.getElementById('btn-save-recorrencia');
+        if (btnSave) {
+            const saveHandler = async () => {
+                await this.handleUpdateRule(ruleId, modal);
+            };
+            btnSave.addEventListener('click', saveHandler);
+            this.modalEventListeners.editRule.push({ element: btnSave, event: 'click', handler: saveHandler });
+        }
     }
 
     /**
@@ -456,8 +572,11 @@ export class RecorrenciasManager {
             type: document.getElementById('rec-type').value,
             value: parseFloat(document.getElementById('rec-value').value),
             category: document.getElementById('rec-category').value.trim() || null,
+            subcategory: document.getElementById('rec-subcategory')?.value.trim() || null,
             recurrence_type: document.getElementById('rec-recurrence-type').value,
-            recurrence_day: parseInt(document.getElementById('rec-recurrence-day').value, 10)
+            recurrence_day: parseInt(document.getElementById('rec-recurrence-day').value, 10),
+            sender_receiver: document.getElementById('rec-sender-receiver')?.value.trim() || null,
+            notes: document.getElementById('rec-notes')?.value.trim() || null
         };
 
         // Remover campos null
@@ -473,11 +592,104 @@ export class RecorrenciasManager {
                 type: 'success',
                 title: 'Sucesso'
             });
-            modal.style.display = 'none';
+            // ALTERAÇÃO: Usar sistema de modais.js
+            fecharModal('modal-recorrencia-editar');
+            // ALTERAÇÃO: Cleanup após fechar modal
+            this.cleanupModalListeners('editRule');
             await this.loadRules();
         } catch (error) {
-            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
-            showToast('Erro ao atualizar regra', { 
+            // ALTERAÇÃO: Melhorar tratamento de erros na API
+            let errorMessage = 'Erro ao atualizar regra';
+            
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.error) {
+                errorMessage = error.error;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            showToast(errorMessage, { 
+                type: 'error',
+                title: 'Erro'
+            });
+        }
+    }
+
+    /**
+     * Processa criação de nova regra
+     * @param {HTMLElement} modal - Elemento do modal
+     */
+    async handleCreateRule(modal) {
+        const form = document.getElementById('form-new-recorrencia');
+        if (!form || !form.checkValidity()) {
+            form?.reportValidity();
+            return;
+        }
+
+        const formData = {
+            name: document.getElementById('rec-new-name').value.trim(),
+            description: document.getElementById('rec-new-description').value.trim() || null,
+            type: document.getElementById('rec-new-type').value,
+            value: parseFloat(document.getElementById('rec-new-value').value),
+            category: document.getElementById('rec-new-category').value.trim(),
+            subcategory: document.getElementById('rec-new-subcategory').value.trim() || null,
+            recurrence_type: document.getElementById('rec-new-recurrence-type').value,
+            recurrence_day: parseInt(document.getElementById('rec-new-recurrence-day').value, 10),
+            sender_receiver: document.getElementById('rec-new-sender-receiver').value.trim() || null,
+            notes: document.getElementById('rec-new-notes').value.trim() || null
+        };
+
+        // Validar campos obrigatórios
+        if (!formData.name || !formData.type || !formData.category || !formData.value || 
+            !formData.recurrence_type || !formData.recurrence_day) {
+            showToast('Preencha todos os campos obrigatórios', { 
+                type: 'error',
+                title: 'Validação'
+            });
+            return;
+        }
+
+        // Validar valor
+        if (formData.value <= 0) {
+            showToast('O valor deve ser maior que zero', { 
+                type: 'error',
+                title: 'Validação'
+            });
+            return;
+        }
+
+        // Remover campos null
+        Object.keys(formData).forEach(key => {
+            if (formData[key] === null || formData[key] === '') {
+                delete formData[key];
+            }
+        });
+
+        try {
+            await createRecurrenceRule(formData);
+            showToast('Regra criada com sucesso', { 
+                type: 'success',
+                title: 'Sucesso'
+            });
+            // ALTERAÇÃO: Usar sistema de modais.js
+            fecharModal('modal-recorrencia-nova');
+            // ALTERAÇÃO: Cleanup após fechar modal
+            this.cleanupModalListeners('newRule');
+            await this.loadRules();
+        } catch (error) {
+            // ALTERAÇÃO: Melhorar tratamento de erros na API
+            let errorMessage = 'Erro ao criar regra';
+            
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.error) {
+                errorMessage = error.error;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            showToast(errorMessage, { 
                 type: 'error',
                 title: 'Erro'
             });

@@ -25,6 +25,7 @@ import {
   validatePassword,
   applyFieldValidation,
 } from "../../utils/validators.js";
+import { gerenciarInputsEspecificos } from "../../utils.js";
 
 // Constantes de configuração
 const CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
@@ -73,7 +74,15 @@ class UsuarioDataManager {
         return this.cache.data;
       }
 
-      const response = await getUsers(options);
+      // ALTERAÇÃO: getUsers agora retorna { success, data, error? }
+      const apiResult = await getUsers(options);
+      
+      // ALTERAÇÃO: Tratar resposta no formato padronizado
+      if (!apiResult.success) {
+        throw new Error(apiResult.error || 'Erro ao buscar usuários');
+      }
+      
+      const response = apiResult.data;
 
       // ALTERAÇÃO: Retornar resposta completa com paginação
       // A API pode retornar {users: [...], pagination: {...}} ou formato legado
@@ -136,13 +145,16 @@ class UsuarioDataManager {
         throw new Error("Dados do usuário estão incompletos");
       }
 
+      // ALTERAÇÃO: Mapear todos os campos preservando valores da API
       const usuarioMapeado = {
         id: usuario.id,
         nome: usuario.full_name,
         email: usuario.email,
         cargo: this.mapRoleToCargo(usuario.role),
-        telefone: usuario.phone || "",
-        cpf: usuario.cpf || "",
+        // ALTERAÇÃO: Preservar telefone mesmo se for null/undefined
+        telefone: usuario.phone !== null && usuario.phone !== undefined ? usuario.phone : "",
+        // ALTERAÇÃO: Preservar CPF mesmo se for null/undefined
+        cpf: usuario.cpf !== null && usuario.cpf !== undefined ? usuario.cpf : "",
         ativo: usuario.is_active !== undefined ? usuario.is_active : true,
         dataCriacao:
           usuario.created_at || new Date().toISOString().split("T")[0],
@@ -150,9 +162,10 @@ class UsuarioDataManager {
           usuario.updated_at || new Date().toISOString().split("T")[0],
         full_name: usuario.full_name,
         role: usuario.role,
-        phone: usuario.phone,
-        date_of_birth: usuario.date_of_birth,
-        nascimento: usuario.date_of_birth,
+        // ALTERAÇÃO: Preservar phone e date_of_birth para uso na modal de métricas
+        phone: usuario.phone !== null && usuario.phone !== undefined ? usuario.phone : null,
+        date_of_birth: usuario.date_of_birth !== null && usuario.date_of_birth !== undefined ? usuario.date_of_birth : null,
+        nascimento: usuario.date_of_birth !== null && usuario.date_of_birth !== undefined ? usuario.date_of_birth : null,
         senha: "", // Sempre vazio para edição
         confirmarSenha: "", // Sempre vazio para edição
       };
@@ -343,6 +356,10 @@ class UsuarioManager {
     this.currentCargoFilter = "";
     this.currentStatusFilter = "";
     this.isLoading = false;
+    // ALTERAÇÃO: Auto-refresh opcional para atualizar lista de usuários
+    this.autoRefreshEnabled = false;
+    this.refreshInterval = null;
+    this.AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
   }
 
   /**
@@ -402,12 +419,15 @@ class UsuarioManager {
   }
 
   /**
-   * Inicializa o módulo
+   * ALTERAÇÃO: Inicializa o módulo
+   * Adiciona auto-refresh opcional para atualizar lista de usuários
    */
   async init() {
     try {
       await this.loadUsuarios();
       this.setupEventListeners();
+      // ALTERAÇÃO: Iniciar auto-refresh opcional (pode ser desabilitado por configuração)
+      this.startAutoRefresh();
     } catch (error) {
       // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
@@ -415,6 +435,51 @@ class UsuarioManager {
       }
       this.showErrorMessage("Erro ao carregar dados dos usuários");
     }
+  }
+
+  /**
+   * ALTERAÇÃO: Iniciar auto-refresh para atualizar usuários automaticamente
+   * Atualiza lista sem necessidade de recarregar manualmente
+   * @private
+   */
+  startAutoRefresh() {
+    // ALTERAÇÃO: Auto-refresh opcional - verificar se está habilitado por configuração
+    // TODO: REVISAR - Permitir configuração pelo usuário
+    if (this.autoRefreshEnabled || this.refreshInterval) {
+      return;
+    }
+
+    this.autoRefreshEnabled = true;
+    this.refreshInterval = setInterval(async () => {
+      // ALTERAÇÃO: Verificar se seção está visível antes de atualizar
+      const section = document.getElementById('secao-funcionarios');
+      if (section && section.style.display !== 'none' && 
+          document.visibilityState === 'visible' && !this.isLoading) {
+        // ALTERAÇÃO: Limpar cache e recarregar usuários
+        this.dataManager.clearCache();
+        await this.loadUsuarios();
+      }
+    }, this.AUTO_REFRESH_INTERVAL);
+  }
+
+  /**
+   * ALTERAÇÃO: Parar auto-refresh
+   * @private
+   */
+  stopAutoRefresh() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+      this.autoRefreshEnabled = false;
+    }
+  }
+
+  /**
+   * ALTERAÇÃO: Cleanup - Para auto-refresh e limpa recursos
+   */
+  cleanup() {
+    this.stopAutoRefresh();
+    this.clearDomCache();
   }
 
   /**
@@ -541,11 +606,12 @@ class UsuarioManager {
   setupSearchHandlers() {
     const searchInput = document.getElementById("busca-funcionario");
     if (searchInput) {
+      // ALTERAÇÃO: Debounce padronizado de 300ms conforme roteiro
       const debouncedSearch = debounce(async () => {
         this.currentSearchTerm = searchInput.value.trim();
         this.currentPage = 1; // Resetar para primeira página ao buscar
         await this.loadUsuarios(); // Recarregar da API
-      }, 500);
+      }, 300);
 
       searchInput.addEventListener("input", (e) => {
         debouncedSearch();
@@ -569,7 +635,8 @@ class UsuarioManager {
       // ALTERAÇÃO: Preparar opções de paginação e filtros para enviar à API
       const options = {
         page: this.currentPage,
-        limit: this.pageSize, // API usa 'limit' ao invés de 'page_size'
+        page_size: this.pageSize, // ALTERAÇÃO: Usar parâmetro padronizado 'page_size'
+        limit: this.pageSize, // Manter 'limit' para compatibilidade com backend legado
       };
 
       // Adicionar busca se houver termo de busca
@@ -593,9 +660,14 @@ class UsuarioManager {
         }
       }
 
-      // Adicionar filtro de status se houver
+      // ALTERAÇÃO: Adicionar filtro de status usando parâmetro padronizado (string)
       if (this.currentStatusFilter && this.currentStatusFilter !== "") {
-        options.status = this.currentStatusFilter === "ativo";
+        // ALTERAÇÃO: Usar status como string (padrão padronizado)
+        options.status = this.currentStatusFilter;
+        // Manter compatibilidade com backend legado que espera boolean
+        if (this.currentStatusFilter === "ativo") {
+          // Backend legado pode esperar boolean, mas priorizar string
+        }
       }
 
       const response = await this.dataManager.getAllUsuarios(options);
@@ -737,7 +809,7 @@ class UsuarioManager {
             
             <div class="footer-card">
                 <a href="#" class="link-metricas metricas-link">
-                    Exibir métricas
+                    Ver mais
                 </a>
             </div>
         `;
@@ -953,6 +1025,9 @@ class UsuarioManager {
       this.clearUsuarioForm();
     }
 
+    // ALTERAÇÃO: Configurar listeners ANTES de abrir a modal para evitar re-renderizações
+    this.setupUsuarioModalListeners(usuarioData);
+
     // Usar o sistema universal de modais se disponível
     if (window.abrirModal) {
       window.abrirModal("modal-funcionario");
@@ -961,7 +1036,24 @@ class UsuarioManager {
       document.body.style.overflow = "hidden";
     }
 
-    this.setupUsuarioModalListeners(usuarioData);
+    // ALTERAÇÃO: Atualizar labels dos inputs após a modal ser aberta
+    // Usar requestAnimationFrame para garantir que a renderização foi concluída
+    requestAnimationFrame(() => {
+      const inputsModal = modal.querySelectorAll("input, select");
+      if (inputsModal.length > 0) {
+        gerenciarInputsEspecificos(inputsModal);
+      }
+      
+      // ALTERAÇÃO: Aplicar máscara de telefone se houver valor (modo edição)
+      const telefoneField = document.getElementById("telefone-funcionario");
+      if (telefoneField && telefoneField.value) {
+        // Aplicar máscara se o telefone não estiver formatado
+        const telefoneLimpo = telefoneField.value.replace(/\D/g, "");
+        if (telefoneLimpo.length >= 10 && !telefoneField.value.includes("(")) {
+          this.formatPhoneInput(telefoneField);
+        }
+      }
+    });
   }
 
   /**
@@ -1000,9 +1092,19 @@ class UsuarioManager {
     const cargoField = document.getElementById("cargo-funcionario");
     const nascimentoField = document.getElementById("nascimento-funcionario");
 
+    // ALTERAÇÃO: Preencher campos e aplicar máscaras/validações
     if (nomeField) nomeField.value = nome;
     if (emailField) emailField.value = email;
-    if (telefoneField) telefoneField.value = telefone;
+    
+    // ALTERAÇÃO: Aplicar máscara de telefone quando preenchido programaticamente
+    if (telefoneField) {
+      telefoneField.value = telefone;
+      // Aplicar máscara se o telefone não estiver formatado
+      if (telefone && !telefone.includes("(") && !telefone.includes("-")) {
+        this.formatPhoneInput(telefoneField);
+      }
+    }
+    
     if (cargoField) cargoField.value = cargo;
 
     // Data de nascimento - garantir que está no formato correto
@@ -1041,6 +1143,9 @@ class UsuarioManager {
 
     // Limpar erros de validação
     this.clearAllFieldErrors();
+    
+    // ALTERAÇÃO: A atualização dos labels será feita após a modal ser aberta
+    // para evitar múltiplas atualizações e o efeito de "piscar"
   }
 
   /**
@@ -1155,6 +1260,7 @@ class UsuarioManager {
    * Configura formatação de campos
    */
   setupFieldFormatting() {
+    const nomeField = document.getElementById("nome-funcionario");
     const telefoneField = document.getElementById("telefone-funcionario");
     const emailField = document.getElementById("email-funcionario");
     const senhaField = document.getElementById("senha-funcionario");
@@ -1163,7 +1269,19 @@ class UsuarioManager {
     );
     const nascimentoField = document.getElementById("nascimento-funcionario");
 
-    // Formatação e validação de telefone
+    // ALTERAÇÃO: Validação de nome completo em tempo real
+    if (nomeField) {
+      nomeField.addEventListener("input", (e) => {
+        // Permitir apenas letras, espaços e caracteres acentuados
+        e.target.value = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, "");
+      });
+
+      nomeField.addEventListener("blur", (e) => {
+        this.validateNameField(e.target);
+      });
+    }
+
+    // ALTERAÇÃO: Formatação e validação de telefone melhorada
     if (telefoneField) {
       telefoneField.addEventListener("input", (e) => {
         this.formatPhoneInput(e.target);
@@ -1174,15 +1292,24 @@ class UsuarioManager {
       });
     }
 
-    // Validação de email
+    // ALTERAÇÃO: Validação de email em tempo real
     if (emailField) {
+      emailField.addEventListener("input", (e) => {
+        // Limpar espaços
+        e.target.value = e.target.value.trim();
+      });
+
       emailField.addEventListener("blur", (e) => {
         this.validateEmailField(e.target);
       });
     }
 
-    // Validação de data de nascimento
+    // ALTERAÇÃO: Validação de data de nascimento
     if (nascimentoField) {
+      nascimentoField.addEventListener("change", (e) => {
+        this.validateBirthDateField(e.target);
+      });
+
       nascimentoField.addEventListener("blur", (e) => {
         this.validateBirthDateField(e.target);
       });
@@ -1199,8 +1326,16 @@ class UsuarioManager {
       });
     }
 
-    // Validação de confirmação de senha
+    // ALTERAÇÃO: Validação de confirmação de senha em tempo real
     if (confirmarSenhaField) {
+      confirmarSenhaField.addEventListener("input", (e) => {
+        // Validar em tempo real se a senha principal já foi preenchida
+        const senha = senhaField ? senhaField.value : "";
+        if (senha && e.target.value) {
+          this.validateConfirmPasswordField(e.target);
+        }
+      });
+
       confirmarSenhaField.addEventListener("blur", (e) => {
         this.validateConfirmPasswordField(e.target);
       });
@@ -1272,7 +1407,7 @@ class UsuarioManager {
   }
 
   /**
-   * Formata input de telefone
+   * ALTERAÇÃO: Formata input de telefone (melhorado para funcionar com valores programáticos)
    */
   formatPhoneInput(input) {
     let value = input.value.replace(/\D/g, "");
@@ -1302,15 +1437,57 @@ class UsuarioManager {
   }
 
   /**
-   * Valida campo de telefone com feedback visual
+   * ALTERAÇÃO: Valida campo de telefone com feedback visual
    */
   validatePhoneField(input) {
     if (input.value.trim() === "") {
       this.clearFieldError(input);
-      return true;
+      return false;
     }
 
     return applyFieldValidation(input, (value) => validatePhone(value));
+  }
+
+  /**
+   * ALTERAÇÃO: Valida campo de nome completo
+   */
+  validateNameField(input) {
+    const nome = input.value.trim();
+
+    if (!nome) {
+      this.showFieldError(input, "Nome completo é obrigatório");
+      return false;
+    }
+
+    // Verificar se tem pelo menos 3 caracteres
+    if (nome.length < 3) {
+      this.showFieldError(input, "Nome deve ter pelo menos 3 caracteres");
+      return false;
+    }
+
+    // Verificar se tem pelo menos nome e sobrenome (pelo menos 2 palavras)
+    const palavras = nome.split(/\s+/).filter(p => p.length > 0);
+    if (palavras.length < 2) {
+      this.showFieldError(input, "Digite o nome completo (nome e sobrenome)");
+      return false;
+    }
+
+    // Verificar se cada palavra tem pelo menos 2 caracteres
+    const palavrasInvalidas = palavras.filter(p => p.length < 2);
+    if (palavrasInvalidas.length > 0) {
+      this.showFieldError(input, "Cada parte do nome deve ter pelo menos 2 caracteres");
+      return false;
+    }
+
+    // Verificar se não excede o limite máximo
+    if (nome.length > 100) {
+      this.showFieldError(input, "Nome muito longo (máximo 100 caracteres)");
+      return false;
+    }
+
+    this.clearFieldError(input);
+    input.classList.add("valid");
+    return true;
   }
 
   /**
@@ -1567,6 +1744,7 @@ class UsuarioManager {
   validateUsuarioForm() {
     const nomeField = document.getElementById("nome-funcionario");
     const emailField = document.getElementById("email-funcionario");
+    const telefoneField = document.getElementById("telefone-funcionario");
     const cargoField = document.getElementById("cargo-funcionario");
     const dataNascimentoField = document.getElementById(
       "nascimento-funcionario"
@@ -1578,33 +1756,69 @@ class UsuarioManager {
 
     const nome = nomeField ? nomeField.value.trim() : "";
     const email = emailField ? emailField.value.trim() : "";
+    const telefone = telefoneField ? telefoneField.value.trim() : "";
     const cargo = cargoField ? cargoField.value : "";
     const dataNascimento = dataNascimentoField ? dataNascimentoField.value : "";
     const senha = senhaField ? senhaField.value : "";
     const confirmarSenha = confirmarSenhaField ? confirmarSenhaField.value : "";
 
+    // ALTERAÇÃO: Validação completa de nome
     if (!nome) {
-      this.showErrorMessage("Nome é obrigatório");
+      if (nomeField) this.showFieldError(nomeField, "Nome completo é obrigatório");
+      this.showErrorMessage("Nome completo é obrigatório");
       return false;
     }
 
+    // Validar nome completo
+    if (nomeField && !this.validateNameField(nomeField)) {
+      return false;
+    }
+
+    // ALTERAÇÃO: Validação de email
     if (!email) {
+      if (emailField) this.showFieldError(emailField, "Email é obrigatório");
       this.showErrorMessage("Email é obrigatório");
       return false;
     }
 
     const emailValidation = validateEmail(email);
     if (!emailValidation.valid) {
+      if (emailField) this.showFieldError(emailField, emailValidation.message || "Email inválido");
       this.showErrorMessage(emailValidation.message || "Email inválido");
       return false;
     }
 
+    // ALTERAÇÃO: Validação de telefone
+    if (!telefone) {
+      if (telefoneField) this.showFieldError(telefoneField, "Telefone é obrigatório");
+      this.showErrorMessage("Telefone é obrigatório");
+      return false;
+    }
+
+    const telefoneValidation = validatePhone(telefone);
+    if (!telefoneValidation.valid) {
+      if (telefoneField) this.showFieldError(telefoneField, telefoneValidation.message || "Telefone inválido");
+      this.showErrorMessage(telefoneValidation.message || "Telefone inválido");
+      return false;
+    }
+
+    // ALTERAÇÃO: Validação de data de nascimento
     if (!dataNascimento) {
+      if (dataNascimentoField) this.showFieldError(dataNascimentoField, "Data de nascimento é obrigatória");
       this.showErrorMessage("Data de nascimento é obrigatória");
       return false;
     }
 
+    const dataValidation = validateBirthDate(dataNascimento);
+    if (!dataValidation.valid) {
+      if (dataNascimentoField) this.showFieldError(dataNascimentoField, dataValidation.message || "Data inválida");
+      this.showErrorMessage(dataValidation.message || "Data inválida");
+      return false;
+    }
+
+    // ALTERAÇÃO: Validação de cargo
     if (!cargo) {
+      if (cargoField) this.showFieldError(cargoField, "Cargo é obrigatório");
       this.showErrorMessage("Cargo é obrigatório");
       return false;
     }
@@ -1725,15 +1939,25 @@ class UsuarioManager {
    * Popula dados do usuário na modal de métricas
    */
   populateUsuarioMetricas(usuario) {
-    // Validação e sanitização dos dados (XSS Protection)
+    // ALTERAÇÃO: Validação e sanitização dos dados (XSS Protection)
+    // Garantir que todos os campos sejam buscados corretamente do objeto mapeado
     const nome = escapeHTML(
       usuario.nome || usuario.full_name || "Nome não informado"
     );
     const email = escapeHTML(usuario.email || "Email não informado");
-    const telefone = usuario.telefone || usuario.phone || "Não informado";
-    const cpf = usuario.cpf || "Não informado";
+    
+    // ALTERAÇÃO: Buscar telefone de múltiplas fontes possíveis
+    const telefone = usuario.telefone || usuario.phone || null;
+    
+    // ALTERAÇÃO: Buscar CPF (pode vir como string vazia da API)
+    const cpf = usuario.cpf && usuario.cpf !== "" ? usuario.cpf : null;
+    
     const roleAPI = usuario.role || usuario.cargo || "attendant";
+    
+    // ALTERAÇÃO: Buscar data de nascimento de múltiplas fontes
     const dataNascimento = usuario.date_of_birth || usuario.nascimento || null;
+    
+    // ALTERAÇÃO: Buscar data de criação
     const dataCriacao = usuario.created_at || usuario.dataCriacao || null;
 
     // 1. Iniciais do avatar
@@ -1773,22 +1997,34 @@ class UsuarioManager {
       tempoAtividadeElement.textContent = "Não informado";
     }
 
-    // 6. CPF
-    const cpfElement = document.getElementById("cpf-funcionario");
+    // ALTERAÇÃO: 6. CPF - usar ID específico da modal de métricas
+    const cpfElement = document.getElementById("cpf-funcionario-metricas");
     if (cpfElement) {
-      cpfElement.textContent = this.formatarCPF(cpf);
+      if (cpf && cpf !== "Não informado" && cpf !== "") {
+        cpfElement.textContent = this.formatarCPF(cpf);
+      } else {
+        cpfElement.textContent = "Não informado";
+      }
     }
 
-    // 7. Data de nascimento
-    const nascimentoElement = document.getElementById("nascimento-funcionario");
+    // ALTERAÇÃO: 7. Data de nascimento - usar ID específico da modal de métricas
+    const nascimentoElement = document.getElementById("nascimento-funcionario-metricas");
     if (nascimentoElement) {
-      nascimentoElement.textContent = this.formatarDataBR(dataNascimento);
+      if (dataNascimento && dataNascimento !== "Não informado" && dataNascimento !== "" && dataNascimento !== null) {
+        nascimentoElement.textContent = this.formatarDataBR(dataNascimento);
+      } else {
+        nascimentoElement.textContent = "Não informado";
+      }
     }
 
-    // 8. Telefone
-    const telefoneElement = document.getElementById("telefone-funcionario");
+    // ALTERAÇÃO: 8. Telefone - usar ID específico da modal de métricas
+    const telefoneElement = document.getElementById("telefone-funcionario-metricas");
     if (telefoneElement) {
-      telefoneElement.textContent = this.formatarTelefone(telefone);
+      if (telefone && telefone !== "Não informado" && telefone !== "" && telefone !== null) {
+        telefoneElement.textContent = this.formatarTelefone(telefone);
+      } else {
+        telefoneElement.textContent = "Não informado";
+      }
     }
 
     // 9. Ocultar métricas de performance por enquanto
@@ -1848,25 +2084,35 @@ class UsuarioManager {
   }
 
   /**
-   * Formata CPF para exibição
+   * ALTERAÇÃO: Formata CPF para exibição (melhorado para tratar valores nulos/vazios)
    */
   formatarCPF(cpf) {
-    if (!cpf || cpf === "Não informado") {
+    // ALTERAÇÃO: Tratar null, undefined, string vazia e "Não informado"
+    if (!cpf || cpf === "Não informado" || cpf === "" || cpf === null || cpf === undefined) {
       return "Não informado";
     }
 
     const cpfLimpo = String(cpf).replace(/\D/g, "");
+    
+    // ALTERAÇÃO: Verificar se após limpar ainda tem conteúdo
+    if (!cpfLimpo || cpfLimpo.length === 0) {
+      return "Não informado";
+    }
+    
     if (cpfLimpo.length === 11) {
       return cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     }
-    return cpf;
+    
+    // ALTERAÇÃO: Se não tem 11 dígitos, retornar "Não informado" em vez do valor original
+    return "Não informado";
   }
 
   /**
-   * Formata data para formato brasileiro (DD/MM/YYYY)
+   * ALTERAÇÃO: Formata data para formato brasileiro (DD/MM/YYYY) - melhorado para tratar valores nulos
    */
   formatarDataBR(data) {
-    if (!data) {
+    // ALTERAÇÃO: Tratar null, undefined, string vazia
+    if (!data || data === null || data === undefined || data === "" || data === "Não informado") {
       return "Não informado";
     }
 
@@ -1909,8 +2155,12 @@ class UsuarioManager {
   /**
    * Formata telefone para exibição
    */
+  /**
+   * ALTERAÇÃO: Formata telefone para exibição (melhorado para tratar valores nulos/vazios)
+   */
   formatarTelefone(telefone) {
-    if (!telefone || telefone === "Não informado") {
+    // ALTERAÇÃO: Tratar null, undefined, string vazia e "Não informado"
+    if (!telefone || telefone === "Não informado" || telefone === "" || telefone === null || telefone === undefined) {
       return "Não informado";
     }
 
@@ -1920,13 +2170,19 @@ class UsuarioManager {
 
     const telefoneLimpo = String(telefone).replace(/\D/g, "");
 
+    // ALTERAÇÃO: Verificar se após limpar ainda tem conteúdo válido
+    if (!telefoneLimpo || telefoneLimpo.length < 10) {
+      return "Não informado";
+    }
+
     if (telefoneLimpo.length === 11) {
       return telefoneLimpo.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
     } else if (telefoneLimpo.length === 10) {
       return telefoneLimpo.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
     }
 
-    return telefone;
+    // ALTERAÇÃO: Se não tem 10 ou 11 dígitos, retornar "Não informado"
+    return "Não informado";
   }
 
   /**

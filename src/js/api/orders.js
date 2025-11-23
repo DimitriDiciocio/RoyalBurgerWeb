@@ -257,9 +257,20 @@ export async function getAllOrders(options = {}) {
     if (options.page) params.append('page', options.page);
     if (options.page_size) params.append('page_size', options.page_size);
     if (options.search) params.append('search', options.search);
-    if (options.status) params.append('status', options.status);
+    // ALTERAÇÃO: Fase Futura - Suportar múltiplos status (array ou string separada por vírgula)
+    if (options.status) {
+        // ALTERAÇÃO: Se for array, converter para string separada por vírgula
+        if (Array.isArray(options.status)) {
+            params.append('status', options.status.join(','));
+        } else {
+            params.append('status', options.status);
+        }
+    }
     if (options.channel) params.append('channel', options.channel);
     if (options.period && options.period !== 'all') params.append('period', options.period);
+    // ALTERAÇÃO: Fase Futura - Suportar filtros de data customizados
+    if (options.start_date) params.append('start_date', options.start_date);
+    if (options.end_date) params.append('end_date', options.end_date);
     
     const queryString = params.toString();
     const url = `/api/orders/all${queryString ? `?${queryString}` : ''}`;
@@ -283,13 +294,37 @@ export async function getAllOrders(options = {}) {
 
 /**
  * Busca pedidos do dia (admin/manager)
+ * ALTERAÇÃO: Fase Futura - Usa endpoint específico /api/orders/today quando disponível, fallback para /api/orders/all?period=today
  * @returns {Promise<Object>} Lista de pedidos do dia
  */
 export async function getTodayOrders() {
     try {
-        const data = await apiRequest('/api/orders/today', {
-            method: 'GET'
-        });
+        // ALTERAÇÃO: Fase Futura - Tentar usar endpoint específico primeiro
+        try {
+            const data = await apiRequest('/api/orders/today', {
+                method: 'GET'
+            });
+            
+            return {
+                success: true,
+                data: data
+            };
+        } catch (error) {
+            // ALTERAÇÃO: Se endpoint não existir (404), usar fallback
+            if (error.status === 404) {
+                // ALTERAÇÃO: Fallback para rota antiga
+                const data = await apiRequest('/api/orders/all?period=today', {
+                    method: 'GET'
+                });
+                
+                return {
+                    success: true,
+                    data: data
+                };
+            }
+            // ALTERAÇÃO: Se for outro erro, relançar
+            throw error;
+        }
 
         return {
             success: true,
@@ -466,3 +501,4 @@ export function getStatusColor(status) {
 
     return colorMap[status] || 'status-default';
 }
+

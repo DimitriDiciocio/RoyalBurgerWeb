@@ -86,6 +86,7 @@ const isDevelopment = () => {
     autoRefresh: true,
     refreshInterval: null,
     visibilityCheckInterval: null,
+    visibilityObserver: null, // ALTERAÇÃO: MutationObserver para verificação de visibilidade
     userPhoneCache: {}, // Cache para telefones dos usuários (evita múltiplas requisições)
   };
 
@@ -1514,11 +1515,6 @@ const isDevelopment = () => {
                         : ""
                     }
 
-                    <div class="order-financial-info-placeholder" data-order-id="${escapeHTML(
-                      String(orderId)
-                    )}">
-                        <!-- Informações financeiras serão carregadas aqui -->
-                    </div>
 
                     <div class="order-footer">
                         <div class="order-total">
@@ -1557,7 +1553,8 @@ const isDevelopment = () => {
       if (order && typeof order === "object") {
         const orderId = order.order_id || order.id;
         if (orderId) {
-          displayOrderFinancialInfo(orderId);
+          // ALTERAÇÃO: Removido - informações financeiras agora são exibidas na modal
+          // displayOrderFinancialInfo(orderId);
         }
       }
     });
@@ -1712,12 +1709,17 @@ const isDevelopment = () => {
   }
 
   /**
-   * Limpar intervalo de verificação de visibilidade
+   * ALTERAÇÃO: Limpar intervalo de verificação de visibilidade e observer
    */
   function clearVisibilityCheck() {
     if (state.visibilityCheckInterval) {
       clearInterval(state.visibilityCheckInterval);
       state.visibilityCheckInterval = null;
+    }
+    // ALTERAÇÃO: Desconectar MutationObserver se existir
+    if (state.visibilityObserver) {
+      state.visibilityObserver.disconnect();
+      state.visibilityObserver = null;
     }
   }
 
@@ -2012,24 +2014,51 @@ const isDevelopment = () => {
   }
 
   /**
-   * Inicializar quando a seção for exibida
+   * ALTERAÇÃO: Inicializar quando a seção for exibida
+   * Otimizado para usar MutationObserver em vez de setInterval
    */
   async function init() {
     if (!isSectionVisible()) {
-      // Aguardar a seção ser exibida com limite de tentativas para evitar vazamento
-      let attempts = 0;
+      // ALTERAÇÃO: Usar MutationObserver para detectar mudanças na visibilidade da seção
+      // Mais eficiente que setInterval
+      const section = document.getElementById('secao-pedidos');
+      if (!section) {
+        return;
+      }
 
+      const observer = new MutationObserver((mutations) => {
+        if (isSectionVisible()) {
+          observer.disconnect();
+          if (state.visibilityCheckInterval) {
+            clearInterval(state.visibilityCheckInterval);
+            state.visibilityCheckInterval = null;
+          }
+          initializeSection();
+        }
+      });
+
+      // ALTERAÇÃO: Observar mudanças no atributo style
+      observer.observe(section, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+
+      // ALTERAÇÃO: Timeout de fallback para evitar observação infinita
+      let attempts = 0;
       state.visibilityCheckInterval = setInterval(() => {
         attempts++;
-
         if (isSectionVisible()) {
+          observer.disconnect();
           clearVisibilityCheck();
           initializeSection();
         } else if (attempts >= MAX_VISIBILITY_CHECK_ATTEMPTS) {
-          // Timeout: parar de tentar para evitar vazamento
+          observer.disconnect();
           clearVisibilityCheck();
         }
       }, VISIBILITY_CHECK_INTERVAL);
+
+      // ALTERAÇÃO: Armazenar observer para cleanup
+      state.visibilityObserver = observer;
       return;
     }
 

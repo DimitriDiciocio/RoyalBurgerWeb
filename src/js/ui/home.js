@@ -77,7 +77,9 @@ async function loadProducts() {
       filter_unavailable: true,
     });
 
-    const allProducts = response?.items || [];
+    // ALTERAÇÃO: A API retorna {success: true, data: {items: [...]}}
+    // Precisamos acessar response.data.items, não response.items
+    const allProducts = response?.data?.items || response?.items || [];
     
     // CORREÇÃO: Backend já filtra produtos indisponíveis com filter_unavailable=true
     // Simplificar: apenas verificar se o produto está ativo
@@ -553,7 +555,8 @@ async function loadActivePromotions() {
     }
 
     const response = await getPromotions({ include_expired: false });
-    const promotions = response?.items || [];
+    // ALTERAÇÃO: getPromotions retorna { success, data }, onde data pode ter items ou ser o array direto
+    const promotions = response?.data?.items || response?.data || response?.items || [];
     
     cacheManager.set(CACHE_KEYS.promotions, promotions, CACHE_TTL);
     return promotions;
@@ -566,6 +569,29 @@ async function loadActivePromotions() {
     const cached = cacheManager.get(CACHE_KEYS.promotions);
     return cached || [];
   }
+}
+
+/**
+ * ALTERAÇÃO: Cria um mapa de promoções ativas por product_id
+ * Isso evita requisições individuais e elimina 404s no console
+ * @param {Array} promotions - Array de promoções
+ * @returns {Map<number, Object>} Mapa de product_id -> promoção ativa
+ */
+function createPromotionsMap(promotions) {
+  const map = new Map();
+  if (!promotions || !Array.isArray(promotions)) {
+    return map;
+  }
+  
+  const now = new Date();
+  promotions.forEach(promo => {
+    // Verificar se a promoção está ativa e não expirada
+    if (promo && promo.product_id && isPromotionActive(promo)) {
+      map.set(promo.product_id, promo);
+    }
+  });
+  
+  return map;
 }
 
 /**
@@ -594,18 +620,24 @@ async function updateProductSections() {
     const recentlyAdded = results[3].status === 'fulfilled' ? results[3].value : [];
     const promotions = results[4].status === 'fulfilled' ? results[4].value : [];
 
+    // ALTERAÇÃO: Criar mapa de promoções por product_id para evitar requisições individuais
+    // Isso elimina os 404s no console para produtos sem promoção
+    const promotionsMap = createPromotionsMap(promotions);
+    
     // Atualizar seções horizontais
     // ALTERAÇÃO: Aguardar validação de estoque antes de renderizar
     await Promise.allSettled([
-      updateMostOrderedSection(mostOrdered),
+      updateMostOrderedSection(mostOrdered, promotionsMap),
       updatePromotionsSection(promotions),
-      updateRecentlyAddedSection(recentlyAdded)
+      updateRecentlyAddedSection(recentlyAdded, promotionsMap)
     ]);
 
     // ALTERAÇÃO: Atualizar seções e obter apenas categorias com produtos
-    const categoriesWithProducts = await updateCategorySectionsWithProducts(products, categories);
+    // Passar mapa de promoções para evitar requisições individuais
+    const categoriesWithProducts = await updateCategorySectionsWithProducts(products, categories, promotionsMap);
 
     // ALTERAÇÃO: Atualizar menu de categorias apenas com categorias que têm produtos
+    // A lista já inclui a categoria especial "Sem Categoria" se houver produtos sem categoria
     updateCategoryMenu(categoriesWithProducts || []);
 
     // Atualizar imagens existentes de forma inteligente
@@ -623,12 +655,19 @@ let incrementalRenderers = new Map();
 /**
  * Atualiza as seções de categorias com produtos organizados por categoria
  * ALTERAÇÃO: Retorna apenas as categorias que têm produtos vinculados
+ * @param {Array} products - Array de produtos
+ * @param {Array} categories - Array de categorias
+ * @param {Map<number, Object>} promotionsMap - Mapa de promoções por product_id (opcional)
  * @returns {Array} Lista de categorias que têm produtos
  */
-async function updateCategorySectionsWithProducts(products, categories) {
-  const rolagemInfinita = $q(".rolagem-infinita");
+async function updateCategorySectionsWithProducts(products, categories, promotionsMap = null) {
+  // ALTERAÇÃO: Usar seletor mais específico para garantir que encontre o elemento
+  const mostruarioVertical = $q(".mostruario-vertical");
+  const rolagemInfinita = mostruarioVertical ? mostruarioVertical.querySelector(".rolagem-infinita") : $q(".rolagem-infinita");
 
-  if (!rolagemInfinita) return [];
+  if (!rolagemInfinita) {
+    return [];
+  }
 
   // Limpar renderizadores anteriores
   incrementalRenderers.forEach((renderer) => {
@@ -641,24 +680,46 @@ async function updateCategorySectionsWithProducts(products, categories) {
   // Limpar conteúdo existente
   rolagemInfinita.innerHTML = "";
 
-  // ALTERAÇÃO: Buscar promoções para todos os produtos em paralelo
-  const productsWithPromotions = await Promise.all(
-    products.map(async (product) => {
-      let promotion = null;
-      try {
-        const promo = await getPromotionByProductId(product.id, false);
-        if (promo && isPromotionActive(promo)) {
-          promotion = promo;
-        }
-      } catch (error) {
-        // Se não houver promoção, continuar sem ela
-        promotion = null;
-      }
-      return { product, promotion };
-    })
-  );
+  // ALTERAÇÃO: Validar se há produtos e categorias antes de processar
+  if (!products || products.length === 0) {
+    if (mostruarioVertical) {
+      mostruarioVertical.style.display = "none";
+    }
+    return [];
+  }
+
+  if (!categories || categories.length === 0) {
+    if (mostruarioVertical) {
+      mostruarioVertical.style.display = "none";
+    }
+    return [];
+  }
+
+  // ALTERAÇÃO: Filtrar produtos com estoque disponível antes de processar
+  const productsWithStock = await filterProductsWithStock(products);
+  
+  // ALTERAÇÃO: Se não houver produtos com estoque, ocultar seção e não exibir nada
+  if (!productsWithStock || productsWithStock.length === 0) {
+    if (mostruarioVertical) {
+      mostruarioVertical.style.display = "none";
+    }
+    return [];
+  }
+
+  // ALTERAÇÃO: Exibir seção se houver produtos
+  if (mostruarioVertical) {
+    mostruarioVertical.style.display = "block";
+  }
+
+  // ALTERAÇÃO: Usar mapa de promoções em vez de fazer requisições individuais
+  // Isso elimina os 404s no console para produtos sem promoção
+  const productsWithPromotions = productsWithStock.map((product) => {
+    const promotion = promotionsMap?.get(product.id) || null;
+    return { product, promotion };
+  });
 
   // Agrupar produtos por categoria (mantendo promoções)
+  // ALTERAÇÃO: Incluir categoria especial para produtos sem categoria
   const groupedProducts = groupProductsByCategoryWithPromotions(productsWithPromotions, categories);
 
   // ALTERAÇÃO: Coletar apenas categorias que têm produtos
@@ -666,6 +727,8 @@ async function updateCategorySectionsWithProducts(products, categories) {
 
   // Criar seções para cada categoria que tem produtos
   let categoryIndex = 0;
+  let firstSectionCreated = false;
+  
   categories.forEach((category) => {
     const categoryProducts = groupedProducts[category.id] || [];
 
@@ -677,73 +740,56 @@ async function updateCategorySectionsWithProducts(products, categories) {
       // Criar container da seção
       const sectionDiv = document.createElement("div");
       sectionDiv.id = sectionId;
-      sectionDiv.style.display = categoryIndex === 0 ? "block" : "none";
+      // ALTERAÇÃO: Mostrar primeira seção criada, não apenas a primeira categoria
+      sectionDiv.style.display = !firstSectionCreated ? "block" : "none";
+      if (!firstSectionCreated) {
+        firstSectionCreated = true;
+      }
       rolagemInfinita.appendChild(sectionDiv);
 
-      // Renderizar em chunks para não bloquear a UI
-      const totalPairs = Math.ceil(categoryProducts.length / 2);
-      const ITEM_THRESHOLD = 50; // Threshold para usar renderização incremental
-
-      if (categoryProducts.length > ITEM_THRESHOLD) {
-        // Renderização incremental para listas grandes
-        const pairs = [];
-        for (let i = 0; i < categoryProducts.length; i += 2) {
-          pairs.push({
-            first: categoryProducts[i],
-            second: categoryProducts[i + 1],
-          });
-        }
-
-        // Template para renderizar uma "dupla"
-        const pairTemplate = (pair, index) => {
-          let html = '<div class="dupla">';
-          if (pair.first) {
-            // ALTERAÇÃO: Passar promoção se disponível
-            const promotion1 = pair.first._promotion || null;
-            html += createProductHTML(pair.first, promotion1);
-          }
-          if (pair.second) {
-            // ALTERAÇÃO: Passar promoção se disponível
-            const promotion2 = pair.second._promotion || null;
-            html += createProductHTML(pair.second, promotion2);
-          }
-          html += "</div>";
-          return html;
-        };
-
-        // Renderizar em chunks
-        renderListInChunks(sectionDiv, pairs, pairTemplate, {
-          chunkSize: 10, // 10 pares por chunk = 20 produtos
-          delay: 0, // Usar requestAnimationFrame
-        });
-      } else {
-        // Renderização direta para listas pequenas (melhor performance para poucos itens)
-        let productsHTML = "";
-        for (let i = 0; i < categoryProducts.length; i += 2) {
-          productsHTML += '<div class="dupla">';
-
-          // Primeiro produto do par
-          if (categoryProducts[i]) {
-            // ALTERAÇÃO: Passar promoção se disponível
-            const promotion1 = categoryProducts[i]._promotion || null;
-            productsHTML += createProductHTML(categoryProducts[i], promotion1);
-          }
-
-          // Segundo produto do par
-          if (categoryProducts[i + 1]) {
-            // ALTERAÇÃO: Passar promoção se disponível
-            const promotion2 = categoryProducts[i + 1]._promotion || null;
-            productsHTML += createProductHTML(categoryProducts[i + 1], promotion2);
-          }
-
-          productsHTML += "</div>";
-        }
-        sectionDiv.innerHTML = productsHTML;
-      }
+      // Renderizar produtos da categoria
+      renderCategoryProducts(sectionDiv, categoryProducts);
 
       categoryIndex++;
     }
   });
+
+  // ALTERAÇÃO: Adicionar categoria especial para produtos sem categoria
+  const uncategorizedProducts = groupedProducts['sem_categoria'] || [];
+  if (uncategorizedProducts.length > 0) {
+    // Criar categoria especial (não cadastrada no banco)
+    const uncategorizedCategory = {
+      id: 'sem_categoria',
+      name: 'Sem Categoria',
+      is_special: true // Marcar como categoria especial
+    };
+    
+    categoriesWithProducts.push(uncategorizedCategory);
+    const sectionId = `secao-cat-${categoryIndex + 1}`;
+
+    // Criar container da seção
+    const sectionDiv = document.createElement("div");
+    sectionDiv.id = sectionId;
+    // ALTERAÇÃO: Mostrar se for a primeira seção criada
+    sectionDiv.style.display = !firstSectionCreated ? "block" : "none";
+    if (!firstSectionCreated) {
+      firstSectionCreated = true;
+    }
+    rolagemInfinita.appendChild(sectionDiv);
+
+    // Renderizar produtos sem categoria
+    renderCategoryProducts(sectionDiv, uncategorizedProducts);
+
+    categoryIndex++;
+  }
+
+  // ALTERAÇÃO: Verificar se pelo menos uma seção foi criada
+  if (categoriesWithProducts.length === 0) {
+    if (mostruarioVertical) {
+      mostruarioVertical.style.display = "none";
+    }
+    return [];
+  }
 
   // ALTERAÇÃO: Retornar apenas categorias que têm produtos
   return categoriesWithProducts;
@@ -773,6 +819,7 @@ function groupProductsByCategory(products, categories) {
 /**
  * Agrupa produtos com promoções por categoria
  * ALTERAÇÃO: Versão que mantém promoções associadas aos produtos
+ * ALTERAÇÃO: Inclui categoria especial para produtos sem categoria
  */
 function groupProductsByCategoryWithPromotions(productsWithPromotions, categories) {
   const grouped = {};
@@ -782,12 +829,23 @@ function groupProductsByCategoryWithPromotions(productsWithPromotions, categorie
     grouped[category.id] = [];
   });
 
+  // ALTERAÇÃO: Inicializar grupo para produtos sem categoria
+  grouped['sem_categoria'] = [];
+
+  // Criar mapa de IDs de categorias para busca rápida
+  const categoryIds = new Set(categories.map(cat => cat.id));
+
   // Agrupar produtos por categoria (mantendo promoções)
   productsWithPromotions.forEach(({ product, promotion }) => {
-    if (grouped[product.category_id]) {
-      // Criar objeto produto com promoção associada
-      const productWithPromo = { ...product, _promotion: promotion };
+    // Criar objeto produto com promoção associada
+    const productWithPromo = { ...product, _promotion: promotion };
+    
+    // ALTERAÇÃO: Se produto tem category_id válido e a categoria existe, agrupar normalmente
+    if (product.category_id && categoryIds.has(product.category_id)) {
       grouped[product.category_id].push(productWithPromo);
+    } else {
+      // ALTERAÇÃO: Produtos sem categoria ou com categoria inválida vão para "Sem Categoria"
+      grouped['sem_categoria'].push(productWithPromo);
     }
   });
 
@@ -795,10 +853,78 @@ function groupProductsByCategoryWithPromotions(productsWithPromotions, categorie
 }
 
 /**
+ * ALTERAÇÃO: Função helper para renderizar produtos de uma categoria
+ * Evita duplicação de código e garante consistência
+ */
+function renderCategoryProducts(sectionDiv, categoryProducts) {
+  // Renderizar em chunks para não bloquear a UI
+  const ITEM_THRESHOLD = 50; // Threshold para usar renderização incremental
+
+  if (categoryProducts.length > ITEM_THRESHOLD) {
+    // Renderização incremental para listas grandes
+    const pairs = [];
+    for (let i = 0; i < categoryProducts.length; i += 2) {
+      pairs.push({
+        first: categoryProducts[i],
+        second: categoryProducts[i + 1],
+      });
+    }
+
+    // Template para renderizar uma "dupla"
+    const pairTemplate = (pair, index) => {
+      let html = '<div class="dupla">';
+      if (pair.first) {
+        // ALTERAÇÃO: Passar promoção se disponível
+        const promotion1 = pair.first._promotion || null;
+        html += createProductHTML(pair.first, promotion1);
+      }
+      if (pair.second) {
+        // ALTERAÇÃO: Passar promoção se disponível
+        const promotion2 = pair.second._promotion || null;
+        html += createProductHTML(pair.second, promotion2);
+      }
+      html += "</div>";
+      return html;
+    };
+
+    // Renderizar em chunks
+    renderListInChunks(sectionDiv, pairs, pairTemplate, {
+      chunkSize: 10, // 10 pares por chunk = 20 produtos
+      delay: 0, // Usar requestAnimationFrame
+    });
+  } else {
+    // Renderização direta para listas pequenas (melhor performance para poucos itens)
+    let productsHTML = "";
+    for (let i = 0; i < categoryProducts.length; i += 2) {
+      productsHTML += '<div class="dupla">';
+
+      // Primeiro produto do par
+      if (categoryProducts[i]) {
+        // ALTERAÇÃO: Passar promoção se disponível
+        const promotion1 = categoryProducts[i]._promotion || null;
+        productsHTML += createProductHTML(categoryProducts[i], promotion1);
+      }
+
+      // Segundo produto do par
+      if (categoryProducts[i + 1]) {
+        // ALTERAÇÃO: Passar promoção se disponível
+        const promotion2 = categoryProducts[i + 1]._promotion || null;
+        productsHTML += createProductHTML(categoryProducts[i + 1], promotion2);
+      }
+
+      productsHTML += "</div>";
+    }
+    sectionDiv.innerHTML = productsHTML;
+  }
+}
+
+/**
  * Atualiza a seção "Os mais pedidos"
  * ALTERAÇÃO: Só exibe se houver produtos retornando e com estoque disponível
+ * @param {Array} products - Array de produtos
+ * @param {Map<number, Object>} promotionsMap - Mapa de promoções por product_id (opcional)
  */
-async function updateMostOrderedSection(products) {
+async function updateMostOrderedSection(products, promotionsMap = null) {
   const containers = $qa(".mostruario-horizontal .container");
   const targetContainer = containers[0]; // Primeiro container é "Os mais pedidos"
   
@@ -822,21 +948,12 @@ async function updateMostOrderedSection(products) {
     return;
   }
   
-  // ALTERAÇÃO: Buscar promoções para produtos mais pedidos
-  const productsWithPromotions = await Promise.all(
-    productsWithStock.map(async (product) => {
-      let promotion = null;
-      try {
-        const promo = await getPromotionByProductId(product.id, false);
-        if (promo && isPromotionActive(promo)) {
-          promotion = promo;
-        }
-      } catch (error) {
-        promotion = null;
-      }
-      return { product, promotion };
-    })
-  );
+  // ALTERAÇÃO: Usar mapa de promoções em vez de fazer requisições individuais
+  // Isso elimina os 404s no console para produtos sem promoção
+  const productsWithPromotions = productsWithStock.map((product) => {
+    const promotion = promotionsMap?.get(product.id) || null;
+    return { product, promotion };
+  });
 
   // Exibir container e renderizar produtos
   // ALTERAÇÃO: Passar isHorizontal=true para badge de estoque aparecer sobre a imagem
@@ -964,8 +1081,10 @@ async function updatePromotionsSection(promotions) {
 /**
  * Atualiza a seção "Novidades"
  * ALTERAÇÃO: Só exibe se houver produtos retornando e com estoque disponível
+ * @param {Array} products - Array de produtos
+ * @param {Map<number, Object>} promotionsMap - Mapa de promoções por product_id (opcional)
  */
-async function updateRecentlyAddedSection(products) {
+async function updateRecentlyAddedSection(products, promotionsMap = null) {
   const containers = $qa(".mostruario-horizontal .container");
   const targetContainer = containers[2]; // Terceiro container é "Novidades"
   
@@ -989,21 +1108,12 @@ async function updateRecentlyAddedSection(products) {
     return;
   }
   
-  // ALTERAÇÃO: Buscar promoções para produtos recentemente adicionados
-  const productsWithPromotions = await Promise.all(
-    productsWithStock.map(async (product) => {
-      let promotion = null;
-      try {
-        const promo = await getPromotionByProductId(product.id, false);
-        if (promo && isPromotionActive(promo)) {
-          promotion = promo;
-        }
-      } catch (error) {
-        promotion = null;
-      }
-      return { product, promotion };
-    })
-  );
+  // ALTERAÇÃO: Usar mapa de promoções em vez de fazer requisições individuais
+  // Isso elimina os 404s no console para produtos sem promoção
+  const productsWithPromotions = productsWithStock.map((product) => {
+    const promotion = promotionsMap?.get(product.id) || null;
+    return { product, promotion };
+  });
 
   // Exibir container e renderizar produtos
   // ALTERAÇÃO: Passar isHorizontal=true para badge de estoque aparecer sobre a imagem
@@ -1092,7 +1202,9 @@ function updateCategoryMenu(categories) {
     categories.forEach((category, index) => {
       const categoryId = `categoria${index + 1}`;
       const isSelected = index === 0 ? "selecionado" : "";
-      menuHTML += `<p class="${isSelected}" id="${categoryId}">${category.name}</p>`;
+      // ALTERAÇÃO: Sanitizar nome da categoria para prevenir XSS
+      const safeCategoryName = escapeHTML(category.name);
+      menuHTML += `<p class="${isSelected}" id="${categoryId}">${safeCategoryName}</p>`;
     });
   } else {
     // Fallback: se não houver categorias, mostrar as originais
@@ -1119,8 +1231,16 @@ function updateCategoryMenu(categories) {
 
   categoryMenu.innerHTML = menuHTML;
 
-  // Adicionar event listeners para troca de categoria
-  addCategoryListeners();
+  // ALTERAÇÃO: Verificar se há categorias antes de adicionar listeners
+  if (categories && categories.length > 0) {
+    // Adicionar event listeners para troca de categoria
+    addCategoryListeners();
+  } else {
+    // ALTERAÇÃO: Se não houver categorias, ocultar menu
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+      console.warn('[HOME] Nenhuma categoria para exibir no menu');
+    }
+  }
 }
 
 let categoryListenerCleanup = null;

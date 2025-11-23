@@ -105,6 +105,12 @@ export class ConciliacaoBancariaManager {
 
         this.isLoading = true;
         try {
+            // ALTERAÇÃO: Mostrar loading no container de lista
+            const listContainer = document.getElementById('conciliacao-list');
+            if (listContainer) {
+                listContainer.innerHTML = '<div class="financial-loading">Carregando relatório...</div>';
+            }
+            
             this.report = await getReconciliationReport(this.filters);
             this.renderSummary();
             this.renderMovements();
@@ -146,9 +152,12 @@ export class ConciliacaoBancariaManager {
             return;
         }
 
-        const total = this.report.total || 0;
-        const reconciled = this.report.reconciled || 0;
-        const pending = total - reconciled;
+        // ALTERAÇÃO: Corrigir referências aos campos do relatório
+        const total = this.report.total_movements || 0;
+        const reconciled = this.report.reconciled_count || 0;
+        const pending = this.report.unreconciled_count || 0;
+        const reconciledAmount = this.report.reconciled_amount || 0;
+        const unreconciledAmount = this.report.unreconciled_amount || 0;
         const percentage = total > 0 ? ((reconciled / total) * 100).toFixed(1) : 0;
 
         // ALTERAÇÃO: Renderizar apenas no container antes das tabs usando estrutura padrão (.quadro)
@@ -194,6 +203,26 @@ export class ConciliacaoBancariaManager {
                         <p class="grande">${percentage}%</p>
                     </div>
                 </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Valor Reconciliado</p>
+                        <i class="fa-solid fa-check-circle" style="color: var(--reconciled-color, #10b981);" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">R$ ${this.formatCurrency(reconciledAmount)}</p>
+                    </div>
+                </div>
+
+                <div class="quadro">
+                    <div class="titulo">
+                        <p>Valor Pendente</p>
+                        <i class="fa-solid fa-clock" style="color: var(--pending-color, #f59e0b);" aria-hidden="true"></i>
+                    </div>
+                    <div class="valor">
+                        <p class="grande">R$ ${this.formatCurrency(unreconciledAmount)}</p>
+                    </div>
+                </div>
             `;
         }
     }
@@ -215,29 +244,124 @@ export class ConciliacaoBancariaManager {
             return;
         }
 
-        // TODO: Implementar renderização completa com opção de marcar como reconciliada
-        listContainer.innerHTML = `
-            <div style="padding: 2rem; text-align: center; color: #6b7280;">
-                <p>Lista de movimentações para conciliação será implementada em breve.</p>
-            </div>
-        `;
+        // ALTERAÇÃO: Implementar renderização completa de movimentações
+        listContainer.innerHTML = this.report.movements.map(movement => {
+            const movementId = movement.id;
+            const type = (movement.type || '').toLowerCase();
+            const value = parseFloat(movement.value || 0);
+            const description = escapeHTML(movement.description || '');
+            const movementDate = movement.movement_date ? this.formatDate(movement.movement_date) : 'Data não informada';
+            const paymentMethod = this.formatPaymentMethod(movement.payment_method);
+            const reconciled = movement.reconciled || false;
+            const reconciledAt = movement.reconciled_at ? this.formatDate(movement.reconciled_at) : null;
+            const transactionId = escapeHTML(movement.transaction_id || '');
+            const bankAccount = escapeHTML(movement.bank_account || '');
+            const gatewayId = escapeHTML(movement.payment_gateway_id || '');
+
+            const typeClass = `type-${type}`;
+            const typeLabel = this.translateType(movement.type || '');
+            const valueSign = type === 'revenue' ? '+' : '-';
+            const valueClass = type === 'revenue' ? 'positive' : 'negative';
+
+            return `
+                <div class="financial-movement-card ${typeClass} ${reconciled ? 'reconciled' : ''}" 
+                     data-movement-id="${movementId}">
+                    <div class="financial-movement-card-header">
+                        <div class="financial-movement-card-type">
+                            <span class="financial-badge ${typeClass}">${typeLabel}</span>
+                            ${reconciled ? '<span class="financial-badge reconciled"><i class="fa-solid fa-check-double"></i> Reconciliada</span>' : ''}
+                        </div>
+                        <div class="financial-movement-card-actions">
+                            <button class="financial-btn ${reconciled ? 'financial-btn-secondary' : 'financial-btn-success'}" 
+                                    data-action="reconcile" 
+                                    data-movement-id="${movementId}"
+                                    data-reconciled="${reconciled}"
+                                    title="${reconciled ? 'Desmarcar como reconciliada' : 'Marcar como reconciliada'}"
+                                    aria-label="${reconciled ? 'Desmarcar conciliação' : 'Marcar como reconciliada'}">
+                                <i class="fa-solid ${reconciled ? 'fa-undo' : 'fa-check-double'}" aria-hidden="true"></i>
+                                <span>${reconciled ? 'Desmarcar' : 'Reconciliar'}</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="financial-movement-card-body">
+                        <div class="financial-movement-card-value">
+                            <span class="value-sign ${valueClass}">${valueSign}</span>
+                            <span class="value-amount">R$ ${this.formatCurrency(value)}</span>
+                        </div>
+                        
+                        <div class="financial-movement-card-description">
+                            <p class="description-text">${description}</p>
+                        </div>
+                        
+                        <div class="financial-movement-card-details">
+                            <div class="detail-item">
+                                <i class="fa-solid fa-calendar" aria-hidden="true"></i>
+                                <span>${movementDate}</span>
+                            </div>
+                            ${paymentMethod ? `
+                                <div class="detail-item">
+                                    <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+                                    <span>${paymentMethod}</span>
+                                </div>
+                            ` : ''}
+                            ${transactionId ? `
+                                <div class="detail-item">
+                                    <i class="fa-solid fa-hashtag" aria-hidden="true"></i>
+                                    <span>Transação: ${transactionId}</span>
+                                </div>
+                            ` : ''}
+                            ${gatewayId ? `
+                                <div class="detail-item">
+                                    <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                                    <span>Gateway: ${gatewayId}</span>
+                                </div>
+                            ` : ''}
+                            ${bankAccount ? `
+                                <div class="detail-item">
+                                    <i class="fa-solid fa-university" aria-hidden="true"></i>
+                                    <span>Conta: ${bankAccount}</span>
+                                </div>
+                            ` : ''}
+                            ${reconciledAt ? `
+                                <div class="detail-item">
+                                    <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                                    <span>Reconciliada em: ${reconciledAt}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // ALTERAÇÃO: Configurar event listeners para botões de conciliação
+        this.setupReconciliationListeners();
     }
 
     /**
-     * Marca movimentação como reconciliada
+     * Marca movimentação como reconciliada ou não
      * @param {number} movementId - ID da movimentação
+     * @param {boolean} reconciled - true para reconciliada, false para desmarcar
      */
-    async markAsReconciled(movementId) {
+    async markAsReconciled(movementId, reconciled = true) {
         try {
-            await reconcileMovement(movementId, true);
-            showToast('Movimentação marcada como reconciliada', { 
-                type: 'success',
-                title: 'Sucesso'
-            });
+            await reconcileMovement(movementId, reconciled);
+            showToast(
+                reconciled 
+                    ? 'Movimentação marcada como reconciliada' 
+                    : 'Conciliação removida da movimentação',
+                { 
+                    type: 'success',
+                    title: 'Sucesso'
+                }
+            );
+            // ALTERAÇÃO: Recarregar relatório para atualizar dados
             await this.loadReport();
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
-            showToast('Erro ao reconciliar movimentação', { 
+            const errorMessage = error.message || 'Erro ao reconciliar movimentação';
+            showToast(errorMessage, { 
                 type: 'error',
                 title: 'Erro'
             });
@@ -305,6 +429,117 @@ export class ConciliacaoBancariaManager {
         };
 
         this.loadReport();
+    }
+
+    /**
+     * Formata valor monetário
+     * @param {number} value - Valor a formatar
+     * @returns {string} Valor formatado
+     */
+    formatCurrency(value) {
+        return new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value || 0);
+    }
+
+    /**
+     * Formata data para exibição
+     * @param {string} dateString - Data em formato ISO
+     * @returns {string} Data formatada
+     */
+    formatDate(dateString) {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            return new Intl.DateTimeFormat('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        } catch (e) {
+            return dateString;
+        }
+    }
+
+    /**
+     * Formata método de pagamento
+     * @param {string} method - Método de pagamento
+     * @returns {string} Método formatado
+     */
+    formatPaymentMethod(method) {
+        if (!method) return '';
+        const m = String(method).toLowerCase();
+        if (m === 'credit' || m.includes('credito')) return 'Cartão de Crédito';
+        if (m === 'debit' || m.includes('debito')) return 'Cartão de Débito';
+        if (m === 'pix') return 'PIX';
+        if (m === 'money' || m.includes('dinheiro') || m.includes('cash')) return 'Dinheiro';
+        if (m === 'bank_transfer' || m.includes('transfer')) return 'Transferência Bancária';
+        return method;
+    }
+
+    /**
+     * Traduz tipo de movimentação
+     * @param {string} type - Tipo em inglês
+     * @returns {string} Tipo em português
+     */
+    translateType(type) {
+        const translations = {
+            'REVENUE': 'Receita',
+            'EXPENSE': 'Despesa',
+            'CMV': 'CMV',
+            'TAX': 'Imposto'
+        };
+        return translations[type] || type;
+    }
+
+    /**
+     * Configura event listeners para botões de conciliação
+     */
+    setupReconciliationListeners() {
+        const listContainer = document.getElementById('conciliacao-list');
+        if (!listContainer) return;
+
+        // ALTERAÇÃO: Remover listeners anteriores para evitar vazamento de memória
+        const existingHandler = listContainer._reconciliationClickHandler;
+        if (existingHandler) {
+            listContainer.removeEventListener('click', existingHandler);
+        }
+
+        // ALTERAÇÃO: Criar novo handler
+        const clickHandler = async (e) => {
+            const button = e.target.closest('[data-action="reconcile"]');
+            if (!button) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const movementId = parseInt(button.dataset.movementId);
+            const isReconciled = button.dataset.reconciled === 'true';
+
+            if (!movementId) return;
+
+            // ALTERAÇÃO: Desabilitar botão durante processamento
+            button.disabled = true;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+
+            try {
+                await this.markAsReconciled(movementId, !isReconciled);
+            } catch (error) {
+                // ALTERAÇÃO: Erro já é tratado em markAsReconciled
+            } finally {
+                // ALTERAÇÃO: Reabilitar botão
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        };
+
+        // ALTERAÇÃO: Armazenar referência ao handler para cleanup
+        listContainer._reconciliationClickHandler = clickHandler;
+        listContainer.addEventListener('click', clickHandler);
     }
 }
 

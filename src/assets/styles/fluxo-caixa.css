@@ -75,6 +75,14 @@
     gap: 0.5rem;
     margin-bottom: 2rem;
     border-bottom: 2px solid #e5e7eb;
+    justify-content: flex-start;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
 }
 
 .financeiro-tab {
@@ -101,8 +109,8 @@
 
 /* ALTERAÇÃO: Tab ativa usa amarelo para detalhes */
 .financeiro-tab.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    color: var(--color-texto-black);
+    border-bottom-color: var(--color-texto-black);
 }
 
 .financeiro-tab i {
@@ -1322,38 +1330,147 @@
 }
 
 .conciliacao-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
     margin-top: 2rem;
 }
 
 /* === RESPONSIVIDADE === */
-@media (max-width: 768px) {
+
+/* Tablets e telas médias (max-width: 1024px) */
+@media (max-width: 1024px) {
     .fluxo-caixa-container {
-        padding: 1rem;
+        padding: 1.5rem;
     }
-    
+
     .financial-summary-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
     }
-    
-    .financial-movements-table-container {
-        overflow-x: auto;
-    }
-    
-    .financial-movements-table {
-        min-width: 800px;
+
+    .financial-filters-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .dashboard-charts {
         grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .compras-list {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .recorrencias-list {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .conciliacao-list {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .conciliacao-summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    #recent-movements-list {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+}
+
+/* Tablets pequenos e móveis grandes (max-width: 768px) */
+@media (max-width: 768px) {
+    .fluxo-caixa-container {
+        padding: 1rem;
+    }
+
+    .fluxo-caixa-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .fluxo-caixa-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .fluxo-caixa-actions {
+        width: 100%;
+    }
+
+    .fluxo-caixa-actions .financial-btn {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+    }
+    
+    .financial-summary-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .financial-summary-card {
+        padding: 1.25rem;
+    }
+
+    .financial-summary-card-value {
+        font-size: 1.75rem;
+    }
+    
+    .financial-movements-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .financial-movements-table {
+        min-width: 800px;
+        font-size: 0.8125rem;
+    }
+
+    .financial-movements-table th,
+    .financial-movements-table td {
+        padding: 0.75rem;
+    }
+
+    .financial-filters {
+        padding: 1.25rem;
+    }
+
+    .financial-filters-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .dashboard-charts {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .chart-container {
+        padding: 1.25rem;
     }
 
     .financeiro-tabs {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        gap: 0.25rem;
+    }
+
+    .financeiro-tab {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.8125rem;
+        white-space: nowrap;
     }
 
     .compras-list {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
     /* ALTERAÇÃO: Estilos responsivos para cards de compra */
@@ -1395,13 +1512,22 @@
         align-items: flex-start;
     }
 
+    .compras-header h3 {
+        font-size: 1.25rem;
+    }
+
     .recorrencias-list {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
     .recorrencias-header {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .recorrencias-header h3 {
+        font-size: 1.25rem;
     }
 
     .recorrencias-actions {
@@ -1411,15 +1537,241 @@
     .recorrencias-actions .financial-btn {
         flex: 1;
         min-width: 0;
+        justify-content: center;
     }
 
     .conciliacao-summary-cards {
         grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .conciliacao-list {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .conciliacao-header h3 {
+        font-size: 1.25rem;
     }
 
     .contas-pagar-header {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .contas-pagar-header h3 {
+        font-size: 1.25rem;
+    }
+
+    .contas-pagar-list {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .financial-movement-card {
+        padding: 1.25rem;
+    }
+
+    .financial-movement-card-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .financial-movement-card-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .financial-movement-card-value {
+        font-size: 1.25rem;
+    }
+
+    .financial-movement-card-details {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .financial-movement-card-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .financial-movement-card-footer .financial-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .pagination-wrapper {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .pagination-controls {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #recent-movements-list {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+/* Móveis (max-width: 480px) */
+@media (max-width: 480px) {
+    .fluxo-caixa-container {
+        padding: 0.75rem;
+    }
+
+    .fluxo-caixa-header h1 {
+        font-size: 1.25rem;
+    }
+
+    .fluxo-caixa-actions {
+        flex-direction: column;
+    }
+
+    .fluxo-caixa-actions .financial-btn {
+        width: 100%;
+        font-size: 0.8125rem;
+        padding: 0.625rem 1rem;
+    }
+
+    .financial-summary-card {
+        padding: 1rem;
+    }
+
+    .financial-summary-card-value {
+        font-size: 1.5rem;
+    }
+
+    .financial-summary-card-title {
+        font-size: 0.75rem;
+    }
+
+    .financeiro-tab {
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+    }
+
+    .financeiro-tab i {
+        font-size: 0.875rem;
+    }
+
+    .financial-filters {
+        padding: 1rem;
+    }
+
+    .financial-movements-table {
+        min-width: 700px;
+        font-size: 0.75rem;
+    }
+
+    .financial-movements-table th,
+    .financial-movements-table td {
+        padding: 0.5rem;
+    }
+
+    .financial-movement-card {
+        padding: 1rem;
+    }
+
+    .financial-movement-card-value {
+        font-size: 1.125rem;
+    }
+
+    .financial-movement-card-description .description-text {
+        font-size: 0.9375rem;
+    }
+
+    .financial-movement-card-details {
+        font-size: 0.8125rem;
+    }
+
+    .compra-card {
+        padding: 12px;
+    }
+
+    .compra-card-header h4 {
+        font-size: 0.9375rem;
+    }
+
+    .compra-info .info-item .value {
+        font-size: 0.8125rem;
+    }
+
+    .compra-info .info-item.total .value {
+        font-size: 1rem;
+    }
+
+    .compra-card-footer .financial-btn {
+        font-size: 0.8125rem;
+        padding: 0.625rem 1rem;
+    }
+
+    .recorrencia-card {
+        padding: 1rem;
+    }
+
+    .recorrencia-card-header h4 {
+        font-size: 1rem;
+    }
+
+    .dashboard-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .dashboard-controls {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .dashboard-select {
+        width: 100%;
+    }
+
+    .chart-container {
+        padding: 1rem;
+    }
+
+    .chart-container h3 {
+        font-size: 1rem;
+    }
+
+    .pagination-btn {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.8125rem;
+        min-width: auto;
+    }
+
+    .pagination-btn-nav {
+        min-width: auto;
+        padding: 0.375rem 0.75rem;
+    }
+
+    .financial-btn {
+        font-size: 0.8125rem;
+        padding: 0.625rem 1rem;
+    }
+
+    .financial-badge {
+        font-size: 0.6875rem;
+        padding: 0.25rem 0.625rem;
+    }
+
+    .contas-pagar-info {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .info-badge {
+        width: 100%;
+        justify-content: center;
+        font-size: 0.8125rem;
     }
 }
 
@@ -1589,24 +1941,7 @@
 }
 
 /* === ESTILOS PARA GRÁFICOS === */
-.chart-container {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-}
 
-.chart-container h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin: 0 0 1rem 0;
-}
-
-.chart-container canvas {
-    max-height: 300px;
-}
 
 .dashboard-charts {
     display: grid;
@@ -1619,6 +1954,12 @@
 /* Os estilos de formulário seguem o padrão do modais.css usando .div-input */
 
 /* === RESPONSIVIDADE PARA MODAIS === */
+@media (max-width: 1024px) {
+    .invoice-detail-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .invoice-detail-grid {
         grid-template-columns: 1fr;
@@ -1635,6 +1976,40 @@
     .invoice-items-table th,
     .invoice-items-table td {
         padding: 0.5rem;
+    }
+
+    .invoice-detail-section h3 {
+        font-size: 1rem;
+    }
+
+    .invoice-detail-item .value {
+        font-size: 0.9375rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .invoice-detail-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .invoice-detail-item .label {
+        font-size: 0.8125rem;
+    }
+
+    .invoice-detail-item .value {
+        font-size: 0.875rem;
+    }
+
+    .invoice-items-table {
+        font-size: 0.6875rem;
+        overflow-x: auto;
+        display: block;
+    }
+
+    .invoice-items-table th,
+    .invoice-items-table td {
+        padding: 0.375rem;
     }
 }
 

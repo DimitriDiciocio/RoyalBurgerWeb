@@ -130,13 +130,17 @@ export class MovementsList {
     }
 
     /**
-     * Carrega categorias únicas das movimentações
+     * ALTERAÇÃO: Carrega categorias únicas das movimentações
+     * Otimizado para limitar busca e evitar sobrecarga na API
      */
     async loadCategories() {
         try {
-            // ALTERAÇÃO: Buscar movimentações com limite maior para obter categorias únicas
-            // Usar um limite razoável (ex: 1000) para não sobrecarregar a API
-            const response = await getFinancialMovements({});
+            // ALTERAÇÃO: Limitar busca a 100 itens para obter categorias (suficiente para categorias únicas)
+            // Reduz carga na API quando há muitos registros
+            const response = await getFinancialMovements({
+                page: 1,
+                page_size: 100
+            });
             
             // Extrair categorias únicas
             let movements = [];
