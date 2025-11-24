@@ -194,26 +194,56 @@ class UsuarioDataManager {
         throw new Error("Nome, email e senha são obrigatórios");
       }
 
-      // Se role já está em inglês (admin, manager, etc.), usa direto. Senão, mapeia.
+      // ALTERAÇÃO: Validar se o cargo/role foi informado
+      if (!role || role.trim() === "") {
+        throw new Error("Cargo é obrigatório");
+      }
+
+      // ALTERAÇÃO: Se role já está em inglês (admin, manager, etc.), usa direto. Senão, mapeia.
       const mappedRole = [
         "admin",
         "manager",
         "attendant",
-        "delivery",
+        "deliverer",
         "customer",
-      ].includes(role)
-        ? role
+      ].includes(role.toLowerCase())
+        ? role.toLowerCase()
         : this.mapCargoToRole(role);
 
-      // Converter data de YYYY-MM-DD para DD-MM-YYYY se necessário
+      // ALTERAÇÃO: Garantir que o role mapeado é válido
+      if (!mappedRole || mappedRole === "attendant") {
+        // Se o mapeamento falhou, usar o role original ou lançar erro
+        const validRoles = ["admin", "manager", "attendant", "deliverer", "customer"];
+        if (!validRoles.includes(mappedRole)) {
+          throw new Error(`Cargo "${role}" inválido. Cargos válidos: ${validRoles.join(", ")}`);
+        }
+      }
+
+      // ALTERAÇÃO: Manter data no formato YYYY-MM-DD (padrão da API)
+      // Não converter para DD-MM-YYYY pois a API espera YYYY-MM-DD
       let dateOfBirth =
         usuarioData.date_of_birth || usuarioData.dataNascimento || null;
-      if (dateOfBirth && dateOfBirth.includes("-")) {
-        const parts = dateOfBirth.split("-");
-        if (parts.length === 3 && parts[0].length === 4) {
-          // Formato YYYY-MM-DD -> DD-MM-YYYY
-          dateOfBirth = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      
+      // ALTERAÇÃO: Garantir que string vazia seja tratada como null
+      if (dateOfBirth && typeof dateOfBirth === 'string') {
+        dateOfBirth = dateOfBirth.trim();
+        if (dateOfBirth === "") {
+          dateOfBirth = null;
         }
+      }
+      
+      // ALTERAÇÃO: Normalizar para formato DD-MM-YYYY, que é o aceito pelo backend
+      const dateOfBirthForApi = this.normalizeDateForBackend(dateOfBirth);
+
+      // ALTERAÇÃO: Garantir que phone seja null ao invés de string vazia
+      let phone = usuarioData.phone || usuarioData.telefone || "";
+      if (phone && typeof phone === 'string') {
+        phone = phone.trim();
+        if (phone === "") {
+          phone = null;
+        }
+      } else if (!phone) {
+        phone = null;
       }
 
       const apiData = {
@@ -221,18 +251,46 @@ class UsuarioDataManager {
         email: email,
         password: password,
         role: mappedRole,
-        phone: usuarioData.phone || usuarioData.telefone || "",
-        date_of_birth: dateOfBirth,
+        phone: phone,
+        date_of_birth: dateOfBirthForApi,
       };
+
+      // ALTERAÇÃO: Log de debug para rastrear dados enviados
+      // Habilitar temporariamente para diagnóstico
+      // ALTERAÇÃO: Removidos logs de debug para evitar ruído em produção
 
       await createUser(apiData);
       this.clearCache();
     } catch (error) {
-      // ALTERAÇÃO: Log condicional apenas em modo debug
-      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-        console.error("Erro ao adicionar usuário:", error);
+      // ALTERAÇÃO: Log detalhado do erro para diagnóstico
+      console.error("Erro ao adicionar usuário:", error);
+      console.error("Dados do usuário enviados:", usuarioData);
+      console.error("Resposta completa do erro:", {
+        message: error.message,
+        status: error.status,
+        response: error.response,
+        payload: error.payload
+      });
+      
+      // ALTERAÇÃO: Extrair mensagem de erro mais detalhada
+      let errorMessage = error.message || "Erro ao adicionar usuário";
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.payload?.error) {
+        errorMessage = error.payload.error;
+      } else if (error.payload?.message) {
+        errorMessage = error.payload.message;
       }
-      throw error;
+      
+      // ALTERAÇÃO: Criar erro com mensagem mais detalhada
+      const detailedError = new Error(errorMessage);
+      detailedError.status = error.status;
+      detailedError.response = error.response;
+      detailedError.payload = error.payload;
+      throw detailedError;
     }
   }
 
@@ -308,16 +366,60 @@ class UsuarioDataManager {
 
   /**
    * Mapeia cargo para role
+   * ALTERAÇÃO: Normaliza o cargo para lowercase antes de mapear
    */
   mapCargoToRole(cargo) {
+    if (!cargo || typeof cargo !== 'string') {
+      return "attendant"; // Fallback padrão
+    }
+    
+    // ALTERAÇÃO: Normalizar para lowercase para garantir mapeamento correto
+    const cargoNormalizado = cargo.toLowerCase().trim();
+    
     const mapping = {
       admin: "admin",
       gerente: "manager",
       atendente: "attendant",
-      entregador: "delivery",
+      entregador: "deliverer",
       cliente: "customer",
     };
-    return mapping[cargo] || "attendant";
+    
+    return mapping[cargoNormalizado] || "attendant";
+  }
+
+  /**
+   * ALTERAÇÃO: Normaliza data para formato DD-MM-YYYY aceito pelo backend
+   */
+  normalizeDateForBackend(dateString) {
+    if (!dateString || typeof dateString !== 'string') {
+      return null;
+    }
+
+    const cleanedDate = dateString.trim();
+    if (!cleanedDate) {
+      return null;
+    }
+
+    if (!cleanedDate.includes("-")) {
+      return cleanedDate;
+    }
+
+    const parts = cleanedDate.split("-");
+    if (parts.length !== 3) {
+      return cleanedDate;
+    }
+
+    if (parts[0].length === 4 && parts[2].length === 2) {
+      // ALTERAÇÃO: ISO (YYYY-MM-DD) -> DD-MM-YYYY
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      // Já está em DD-MM-YYYY
+      return cleanedDate;
+    }
+
+    return cleanedDate;
   }
 
   /**
@@ -1673,8 +1775,33 @@ class UsuarioManager {
       // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
         console.error("Erro ao adicionar usuário:", error);
+        console.error("Dados do formulário:", usuarioData);
       }
-      this.showErrorMessage("Erro ao adicionar usuário. Tente novamente.");
+      
+      // ALTERAÇÃO: Exibir mensagem de erro mais específica
+      let errorMessage = "Erro ao adicionar usuário. Tente novamente.";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.payload?.error) {
+        errorMessage = error.payload.error;
+      } else if (error.payload?.message) {
+        errorMessage = error.payload.message;
+      }
+      
+      this.showErrorMessage(errorMessage);
+      
+      // ALTERAÇÃO: Se o erro for relacionado ao cargo, destacar o campo
+      if (errorMessage.toLowerCase().includes("cargo") || errorMessage.toLowerCase().includes("role")) {
+        const cargoField = document.getElementById("cargo-funcionario");
+        if (cargoField) {
+          this.showFieldError(cargoField, errorMessage);
+        }
+      }
     } finally {
       this.isSubmitting = false;
       const btnSalvar = document.getElementById("salvar-funcionario");
@@ -1877,10 +2004,14 @@ class UsuarioManager {
     const nascimentoField = document.getElementById("nascimento-funcionario");
     const senhaField = document.getElementById("senha-funcionario");
 
+    // ALTERAÇÃO: Capturar cargo corretamente, garantindo que não seja undefined
+    const cargo = cargoField ? (cargoField.value || "").trim() : "";
+
     const formData = {
       full_name: nomeField ? nomeField.value.trim() : "",
       email: emailField ? emailField.value.trim() : "",
-      role: cargoField ? cargoField.value : "",
+      role: cargo, // ALTERAÇÃO: Usar variável cargo já tratada
+      cargo: cargo, // ALTERAÇÃO: Adicionar também no campo cargo para compatibilidade
       phone: telefoneField ? telefoneField.value.trim() : "",
       date_of_birth: nascimentoField ? nascimentoField.value : "",
       is_active: true,
@@ -1891,6 +2022,9 @@ class UsuarioManager {
     if (senha && senha.trim()) {
       formData.password = senha;
     }
+
+    // ALTERAÇÃO: Log de debug para verificar dados capturados (apenas em desenvolvimento)
+    // ALTERAÇÃO: Removido log de debug para evitar exposição desnecessária no console
 
     return formData;
   }
@@ -2211,6 +2345,7 @@ class UsuarioManager {
       manager: "Gerente",
       attendant: "Atendente",
       delivery: "Entregador",
+      deliverer: "Entregador", // ALTERAÇÃO: suporte ao novo role do backend
       customer: "Cliente",
     };
     return mapping[cargo] || "Atendente";
@@ -2225,6 +2360,7 @@ class UsuarioManager {
       manager: "gerente",
       attendant: "atendente",
       delivery: "entregador",
+      deliverer: "entregador", // ALTERAÇÃO: aplica classe correta para o novo role
       customer: "cliente",
     };
     return mapping[cargo] || "atendente";
