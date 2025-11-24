@@ -31,6 +31,8 @@
     <script src="../js/ui/admin/order-management.js" type="module" defer></script>
     <script src="../js/ui/admin/configuracoes-gerenciamento.js" type="module" defer></script>
     <script src="../js/ui/admin/promocoes-gerenciamento.js" type="module" defer></script>
+    <script src="../js/api/tables.js" type="module" defer></script>
+    <script src="../js/ui/admin/mesas-gerenciamento.js" type="module" defer></script>
     <!-- js complementares -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -50,11 +52,6 @@
             <div id="nav-pedidos" class="navegacao__item">
                 <i class="fa-solid fa-basket-shopping"></i>
                 <p>Pedidos</p>
-            </div>
-
-            <div id="nav-venda" class="navegacao__item">
-                <i class="fa-solid fa-credit-card"></i>
-                <p>Ponto de venda</p>
             </div>
 
             <div id="nav-cardapio" class="navegacao__item">
@@ -356,14 +353,6 @@
             </div>
         </section>
 
-        <section id="secao-venda" style="display: none;">
-            <div class="informa">
-                <div>
-                    <p class="titulo">Ponto de Venda</p>
-                    <p class="descricao">Sistema de vendas e caixa</p>
-                </div>
-            </div>
-        </section>
 
         <section id="secao-cardapio" style="display: none;">
             <div class="informa">
@@ -2482,6 +2471,138 @@
                 <button class="btn-adicionar" id="salvar-promocao">
                     <i class="fa-solid fa-plus"></i>
                     <span id="texto-botao-promocao">Adicionar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar/Editar Mesa -->
+    <!-- ALTERAÇÃO: Adicionado data-reset-on-close para resetar campos automaticamente ao fechar -->
+    <div id="modal-mesa" class="modal" style="display: none;" data-reset-on-close>
+        <div class="div-overlay"></div>
+        <div class="modal-content-mesa">
+            <div class="header-modal">
+                <h2 id="titulo-modal-mesa">Adicionar Mesa</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-mesa"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="div-input">
+                    <label for="nome-mesa">Nome da Mesa *</label>
+                    <input type="text" id="nome-mesa" name="nome-mesa" 
+                           autocomplete="off" required 
+                           placeholder="Ex: Mesa 01, Balcão 03"
+                           aria-label="Nome da mesa"
+                           aria-describedby="nome-mesa-help">
+                    <small id="nome-mesa-help" class="form-text">Nome único para identificar a mesa</small>
+                </div>
+
+                <div class="div-input" id="div-status-mesa" style="display: none;">
+                    <label for="status-mesa">Status</label>
+                    <select id="status-mesa" name="status-mesa" aria-label="Status da mesa">
+                        <option value="available">Disponível</option>
+                        <option value="occupied">Ocupada</option>
+                        <option value="cleaning">Em Limpeza</option>
+                        <option value="reserved">Reservada</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button type="button" class="btn-cancelar" data-close-modal="modal-mesa">Cancelar</button>
+                <button type="button" class="btn-adicionar" id="salvar-mesa">
+                    <i class="fa-solid fa-plus"></i>
+                    <span id="texto-botao-mesa">Adicionar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalhes da Mesa e Pedidos -->
+    <div id="modal-detalhes-mesa" class="modal" style="display: none;">
+        <div class="div-overlay"></div>
+        <div class="modal-content-detalhes-mesa">
+            <div class="header-modal">
+                <h2 id="titulo-detalhes-mesa">Detalhes da Mesa</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-detalhes-mesa"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="info-mesa">
+                    <div class="info-row">
+                        <span class="label-info">Nome:</span>
+                        <span id="detalhes-nome-mesa" class="valor-info"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label-info">Status:</span>
+                        <span id="detalhes-status-mesa" class="valor-info"></span>
+                    </div>
+                    <div class="info-row" id="info-pedido-ativo" style="display: none;">
+                        <span class="label-info">Pedido Ativo:</span>
+                        <span id="detalhes-pedido-ativo" class="valor-info"></span>
+                    </div>
+                </div>
+
+                <div class="pedidos-mesa" id="pedidos-mesa-container">
+                    <h3>Pedidos da Mesa</h3>
+                    <div id="lista-pedidos-mesa">
+                        <!-- Pedidos serão carregados dinamicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button type="button" class="btn-secondary" id="btn-transferir-pedido" style="display: none;">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                    Transferir Pedido
+                </button>
+                <button type="button" class="btn-cancelar" data-close-modal="modal-detalhes-mesa">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Transferir Pedido entre Mesas -->
+    <!-- ALTERAÇÃO: Adicionado data-reset-on-close para resetar campos automaticamente ao fechar -->
+    <div id="modal-transferir-pedido" class="modal" style="display: none;" data-reset-on-close>
+        <div class="div-overlay"></div>
+        <div class="modal-content-transferir-pedido">
+            <div class="header-modal">
+                <h2>Transferir Pedido</h2>
+                <i class="fa-solid fa-xmark fechar-modal" data-close-modal="modal-transferir-pedido"></i>
+            </div>
+
+            <div class="conteudo-modal">
+                <div class="info-transferencia">
+                    <div class="info-row">
+                        <span class="label-info">Pedido:</span>
+                        <span id="transfer-pedido-id" class="valor-info"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label-info">Mesa Atual:</span>
+                        <span id="transfer-mesa-atual" class="valor-info"></span>
+                    </div>
+                </div>
+
+                <div class="div-input">
+                    <label for="select-nova-mesa">Nova Mesa *</label>
+                    <select id="select-nova-mesa" name="select-nova-mesa" required aria-label="Selecionar nova mesa">
+                        <option value="">Selecione uma mesa</option>
+                        <!-- Mesas disponíveis serão carregadas dinamicamente -->
+                    </select>
+                    <small class="form-text">Apenas mesas disponíveis serão exibidas</small>
+                </div>
+
+                <div class="alert-info" id="transfer-alert" style="display: none;">
+                    <i class="fa-solid fa-info-circle"></i>
+                    <span id="transfer-alert-message"></span>
+                </div>
+            </div>
+
+            <div class="footer-modal">
+                <button type="button" class="btn-cancelar" data-close-modal="modal-transferir-pedido">Cancelar</button>
+                <button type="button" class="btn-adicionar" id="confirmar-transferencia">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                    <span>Transferir</span>
                 </button>
             </div>
         </div>

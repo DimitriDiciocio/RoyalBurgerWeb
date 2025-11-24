@@ -33,7 +33,6 @@ const ADMIN_CONFIG = {
     sections: {
         dashboard: 'secao-dashboard',
         pedidos: 'secao-pedidos',
-        venda: 'secao-venda',
         cardapio: 'secao-cardapio',
         promocoes: 'secao-promocoes',
         estoque: 'secao-estoque',
@@ -45,7 +44,6 @@ const ADMIN_CONFIG = {
     navigation: {
         dashboard: 'nav-dashboard',
         pedidos: 'nav-pedidos',
-        venda: 'nav-venda',
         cardapio: 'nav-cardapio',
         promocoes: 'nav-promocoes',
         estoque: 'nav-estoque',
@@ -284,7 +282,6 @@ class AdminPanelManager {
         const mapping = {
             'nav-dashboard': 'dashboard',
             'nav-pedidos': 'pedidos',
-            'nav-venda': 'venda',
             'nav-cardapio': 'cardapio',
             'nav-promocoes': 'promocoes',
             'nav-estoque': 'estoque',
