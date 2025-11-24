@@ -103,9 +103,15 @@ const isDevelopment = () => {
         }
     }
 
+    // ALTERAÇÃO: Função para limpar o cache de ingredientes
+    function clearIngredientsCache() {
+        state.ingredientsCache = null;
+    }
+
     // Carregar ingredientes e criar mapa de preços
-    async function loadIngredientsCache() {
-        if (state.ingredientsCache) {
+    // ALTERAÇÃO: Adicionado parâmetro forceReload para forçar recarregamento do cache
+    async function loadIngredientsCache(forceReload = false) {
+        if (state.ingredientsCache && !forceReload) {
             return state.ingredientsCache;
         }
 
@@ -126,6 +132,18 @@ const isDevelopment = () => {
                         };
                     }
                 });
+                
+                // ALTERAÇÃO: Log para debug - mostrar cache carregado
+                console.log('📦 [DEBUG] Cache de ingredientes carregado:', {
+                    total_ingredientes: Object.keys(state.ingredientsCache).length,
+                    primeiros_5: Object.entries(state.ingredientsCache).slice(0, 5).map(([id, data]) => ({
+                        id,
+                        nome: data.name,
+                        additional_price: data.additional_price,
+                        price: data.price
+                    }))
+                });
+                
                 return state.ingredientsCache;
             }
             // Resposta vazia ou inválida - inicializar cache vazio
@@ -142,15 +160,25 @@ const isDevelopment = () => {
 
     // Buscar preço adicional de um ingrediente pelo ID
     // Valida tipo e existência antes de buscar no cache
-    function getIngredientPrice(ingredientId) {
+    function agetIngredientPrice(ingredientId) {
         if (!state.ingredientsCache || !ingredientId) {
-            return 0;
+            return null; // ALTERAÇÃO: Retornar null em vez de 0 para diferenciar "não encontrado" de "preço zero"
         }
         // Normalizar ID para string (algumas APIs retornam number, outras string)
         const normalizedId = String(ingredientId);
         const ingredient = state.ingredientsCache[normalizedId];
-        // Retornar additional_price (preço quando adicionado como extra)
-        return ingredient ? (ingredient.additional_price || 0) : 0;
+        if (!ingredient) {
+            return null; // ALTERAÇÃO: Retornar null se ingrediente não está no cache
+        }
+        // ALTERAÇÃO: Retornar additional_price do cache (pode ser 0 para ingredientes gratuitos)
+        const additionalPrice = ingredient.additional_price;
+        console.log(`📦 [DEBUG] Cache consultado para ID ${ingredientId}:`, {
+            encontrado: !!ingredient,
+            additional_price: additionalPrice,
+            price: ingredient.price,
+            nome: ingredient.name
+        });
+        return additionalPrice !== undefined && additionalPrice !== null ? additionalPrice : null;
     }
 
     /**
@@ -161,33 +189,75 @@ const isDevelopment = () => {
      * @returns {number} Preço encontrado ou 0
      */
     function findIngredientPrice(ingredientData, ingredientId) {
-        // Primeiro tentar cache se tiver ID
-        if (ingredientId) {
-            const cachedPrice = getIngredientPrice(ingredientId);
-            if (cachedPrice > 0) {
-                return cachedPrice;
+        // ALTERAÇÃO: Log detalhado para debug - mostrar TODOS os campos disponíveis
+        console.log(`💰 [DEBUG] Buscando preço para ingrediente ID ${ingredientId}:`, {
+            additional_price: ingredientData.additional_price,
+            additionalPrice: ingredientData.additionalPrice,
+            ingredient_price: ingredientData.ingredient_price,
+            ingredientPrice: ingredientData.ingredientPrice,
+            price: ingredientData.price,
+            unit_price: ingredientData.unit_price,
+            todos_os_campos_disponiveis: Object.keys(ingredientData),
+            objeto_completo: ingredientData
+        });
+
+        // ALTERAÇÃO: SEMPRE priorizar additional_price do objeto, mesmo que seja 0 (pode ser ingrediente gratuito)
+        if (ingredientData.additional_price !== undefined && ingredientData.additional_price !== null) {
+            const additionalPrice = parseFloat(ingredientData.additional_price);
+            if (!isNaN(additionalPrice)) {
+                console.log(`✅ [DEBUG] Preço encontrado no objeto: ${additionalPrice} (campo: additional_price)`);
+                return additionalPrice >= 0 ? additionalPrice : 0; // Aceita 0 (ingrediente gratuito)
             }
         }
 
-        // Tentar nos dados do ingrediente
-        const priceCandidates = [
+        // ALTERAÇÃO: Se não tem additional_price no objeto, SEMPRE buscar no cache primeiro (cache tem additional_price correto)
+        if (ingredientId) {
+            const cachedPrice = getIngredientPrice(ingredientId);
+            if (cachedPrice !== null && cachedPrice !== undefined) {
+                const cachedPriceNum = parseFloat(cachedPrice);
+                if (!isNaN(cachedPriceNum)) {
+                    console.log(`✅ [DEBUG] Preço encontrado no cache: ${cachedPriceNum} (ID: ${ingredientId}, campo: additional_price do cache)`);
+                    return cachedPriceNum >= 0 ? cachedPriceNum : 0; // Aceita 0 (ingrediente gratuito)
+                }
+            } else {
+                console.log(`⚠️ [DEBUG] Ingrediente ID ${ingredientId} não encontrado no cache`);
+            }
+        }
+
+        // ALTERAÇÃO: Se não encontrou additional_price, tentar outros campos como fallback
+        // Mas NUNCA usar price se additional_price existir (mesmo que seja 0)
+        const fallbackCandidates = [
+            ingredientData.additionalPrice, // camelCase
             ingredientData.ingredient_price,
-            ingredientData.price,
-            ingredientData.additional_price,
+            ingredientData.ingredientPrice, // camelCase
+            ingredientData.ingredient_unit_price,
+            ingredientData.ingredientUnitPrice, // camelCase
             ingredientData.unit_price,
+            ingredientData.unitPrice, // camelCase
             ingredientData.preco,
             ingredientData.valor
         ];
 
-        for (const candidate of priceCandidates) {
+        for (const candidate of fallbackCandidates) {
             if (candidate !== undefined && candidate !== null) {
                 const priceNum = parseFloat(candidate);
                 if (!isNaN(priceNum) && priceNum > 0) {
+                    console.log(`✅ [DEBUG] Preço encontrado (fallback): ${priceNum} (campo: ${Object.keys(ingredientData).find(key => ingredientData[key] === candidate)})`);
                     return priceNum;
                 }
             }
         }
 
+        // Último recurso: usar price apenas se NENHUM outro campo foi encontrado
+        if (ingredientData.price !== undefined && ingredientData.price !== null) {
+            const priceNum = parseFloat(ingredientData.price);
+            if (!isNaN(priceNum) && priceNum > 0) {
+                console.log(`⚠️ [DEBUG] Usando price como último recurso: ${priceNum} (ATENÇÃO: deveria usar additional_price!)`);
+                return priceNum;
+            }
+        }
+
+        console.log(`⚠️ [DEBUG] Nenhum preço válido encontrado para ingrediente ID ${ingredientId}`);
         return 0;
     }
 
@@ -222,6 +292,42 @@ const isDevelopment = () => {
             
             if (result.success) {
                 state.order = result.data;
+                
+                // ALTERAÇÃO: Log detalhado dos dados recebidos da API
+                console.log('📥 [DEBUG] Dados recebidos da API (getOrderDetails):', {
+                    order_id: state.order?.id,
+                    total_items: state.order?.items?.length,
+                    primeiro_item: state.order?.items?.[0] ? {
+                        product_id: state.order.items[0].product_id,
+                        product_name: state.order.items[0].product_name,
+                        extras: state.order.items[0].extras,
+                        base_modifications: state.order.items[0].base_modifications,
+                        primeiro_extra: state.order.items[0].extras?.[0],
+                        primeira_modificacao: state.order.items[0].base_modifications?.[0]
+                    } : null
+                });
+                
+                // Log detalhado das modificações do primeiro item
+                if (state.order?.items?.[0]?.base_modifications) {
+                    console.log('📋 [DEBUG] Estrutura completa das modificações do primeiro item:', 
+                        state.order.items[0].base_modifications.map((bm, idx) => ({
+                            indice: idx,
+                            id: bm.id,
+                            ingredient_id: bm.ingredient_id,
+                            ingredient_name: bm.ingredient_name,
+                            delta: bm.delta,
+                            todos_os_campos: Object.keys(bm),
+                            valores: {
+                                additional_price: bm.additional_price,
+                                ingredient_price: bm.ingredient_price,
+                                price: bm.price,
+                                unit_price: bm.unit_price
+                            },
+                            objeto_completo: bm
+                        }))
+                    );
+                }
+                
                 // Enriquecer itens com dados do produto (imagem) quando necessário
                 try {
                     if (Array.isArray(state.order?.items) && state.order.items.length > 0) {
@@ -436,10 +542,12 @@ const isDevelopment = () => {
 
     // Atualizar status e progresso
     function updateOrderStatus(status) {
+        // ALTERAÇÃO: Adicionado 'in_progress' como fallback para 'ready' (quando constraint não permite 'ready')
         const statusMessages = {
             'pending': 'Seu pedido está sendo processado!',
             'preparing': 'Seu pedido está sendo preparado!',
             'ready': 'Seu pedido está pronto!',
+            'in_progress': 'Seu pedido está pronto!', // ALTERAÇÃO: Fallback do backend quando 'ready' não está na constraint
             'on_the_way': 'Seu pedido está em rota de entrega!',
             'delivered': 'Seu pedido foi entregue!',
             'paid': 'Seu pedido foi pago!',
@@ -457,10 +565,12 @@ const isDevelopment = () => {
 
     // Atualizar etapas do progresso
     function updateProgressSteps(status) {
+        // ALTERAÇÃO: Adicionado 'in_progress' como fallback para 'ready'
         const steps = {
             'pending': { pending: true, preparing: false, delivered: false },
             'preparing': { pending: true, preparing: true, delivered: false },
             'ready': { pending: true, preparing: true, delivered: false },
+            'in_progress': { pending: true, preparing: true, delivered: false }, // ALTERAÇÃO: Fallback do backend quando 'ready' não está na constraint
             'on_the_way': { pending: true, preparing: true, delivered: false },
             'delivered': { pending: true, preparing: true, delivered: true },
             'paid': { pending: true, preparing: true, delivered: true },
@@ -629,6 +739,21 @@ const isDevelopment = () => {
             return '';
         }
 
+        // ALTERAÇÃO: Log para debug - mostrar dados dos extras
+        console.log('🔍 [DEBUG] Extras do item:', extras);
+        extras.forEach((extra, index) => {
+            console.log(`  Extra ${index + 1}:`, {
+                id: extra.id || extra.ingredient_id,
+                nome: extra.ingredient_name || extra.name || extra.nome,
+                quantity: extra.quantity || extra.qty || extra.quantidade,
+                additional_price: extra.additional_price,
+                ingredient_price: extra.ingredient_price,
+                price: extra.price,
+                unit_price: extra.unit_price,
+                objeto_completo: extra
+            });
+        });
+
         const extrasItems = extras.map(extra => {
             const nome = extra.ingredient_name || extra.name || extra.title || extra.nome || 'Ingrediente';
             const quantidade = parseInt(extra.quantity ?? extra.qty ?? extra.quantidade ?? 0, 10) || 0;
@@ -665,21 +790,38 @@ const isDevelopment = () => {
             return '';
         }
 
+        // ALTERAÇÃO: Log para debug - mostrar dados das modificações
+        console.log('🔍 [DEBUG] Modificações base do item:', baseMods);
+        baseMods.forEach((bm, index) => {
+            console.log(`  Modificação ${index + 1}:`, {
+                id: bm.id || bm.ingredient_id,
+                nome: bm.ingredient_name || bm.name || bm.nome,
+                delta: bm.delta,
+                additional_price: bm.additional_price,
+                ingredient_price: bm.ingredient_price,
+                price: bm.price,
+                unit_price: bm.unit_price,
+                objeto_completo: bm
+            });
+        });
+
         const baseModsItems = baseMods.map(bm => {
             const nome = bm.ingredient_name || bm.name || bm.nome || 'Ingrediente';
             const delta = parseInt(bm.delta ?? 0, 10) || 0;
             const ingredientId = bm.ingredient_id || bm.id;
             
             // Buscar preço usando função centralizada
-            const preco = findIngredientPrice(bm, ingredientId);
+            const precoUnitario = findIngredientPrice(bm, ingredientId);
             
             const isPositive = delta > 0;
             const icon = isPositive ? 'plus' : 'minus';
             const colorClass = isPositive ? 'mod-add' : 'mod-remove';
             const deltaValue = Math.abs(delta);
             
+            // ALTERAÇÃO: Multiplicar preço unitário pela quantidade (delta) para exibir o preço total correto
             // Formatar preço se houver (apenas para adições, remoções não têm custo)
-            const precoFormatado = (preco > 0 && isPositive) ? ` <span class="base-mod-price">+R$ ${preco.toFixed(2).replace('.', ',')}</span>` : '';
+            const precoTotal = precoUnitario * deltaValue;
+            const precoFormatado = (precoTotal > 0 && isPositive) ? ` <span class="base-mod-price">+R$ ${precoTotal.toFixed(2).replace('.', ',')}</span>` : '';
             
             return `
                 <li>
@@ -1166,6 +1308,19 @@ const isDevelopment = () => {
         await loadIngredientsCache();
         
         await loadOrderDetails(orderId);
+    }
+
+    // ALTERAÇÃO: Expor função para limpar cache no escopo global (útil para debug/reset)
+    if (typeof window !== 'undefined') {
+        window.clearIngredientsCache = clearIngredientsCache;
+        window.reloadIngredientsCache = async () => {
+            clearIngredientsCache();
+            await loadIngredientsCache(true);
+            // Recarregar pedido para atualizar preços
+            if (state.orderId) {
+                await loadOrderDetails(state.orderId);
+            }
+        };
     }
 
     // Inicializar quando DOM estiver pronto (ou imediatamente se já estiver pronto)

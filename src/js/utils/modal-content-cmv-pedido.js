@@ -6,7 +6,7 @@
 
 import { getOrderDetails } from '../api/orders.js';
 import { getUserById } from '../api/user.js';
-import { getProductById } from '../api/products.js';
+import { getProductById, getProductIngredients } from '../api/products.js';
 import { getIngredientById } from '../api/ingredients.js';
 import { escapeHTML } from './html-sanitizer.js';
 import { abrirModal, fecharModal } from '../ui/modais.js';
@@ -279,6 +279,66 @@ export async function showCmvPedidoModal(orderId) {
         // ALTERAÇÃO: Usar items com CMV já calculado pelo backend
         const itemsWithCMV = order.items || [];
 
+        // ALTERAÇÃO: Buscar ingredientes base de cada produto para exibir todos os insumos
+        const itemsWithBaseIngredients = await Promise.all(
+            itemsWithCMV.map(async (item) => {
+                const productId = item.product_id || item.product?.id;
+                let baseIngredients = [];
+                
+                if (productId) {
+                    try {
+                        const productIngredientsResponse = await getProductIngredients(productId, item.quantity || 1);
+                        const ingredientsList = Array.isArray(productIngredientsResponse) 
+                            ? productIngredientsResponse 
+                            : (productIngredientsResponse?.items || []);
+                        
+                        // ALTERAÇÃO: Filtrar apenas ingredientes base (portions > 0)
+                        baseIngredients = ingredientsList
+                            .filter(ing => {
+                                const portions = parseFloat(ing.portions || 0);
+                                return portions > 0;
+                            })
+                            .map(ing => {
+                                // ALTERAÇÃO: Calcular custo unitário do insumo base usando estrutura correta da API
+                                const ingredientPrice = parseFloat(ing.price || 0);
+                                const stockUnit = ing.stock_unit || 'un';
+                                const basePortionQuantity = parseFloat(ing.base_portion_quantity || 1) || 1;
+                                const basePortionUnit = ing.base_portion_unit || 'un';
+                                const portions = parseFloat(ing.portions || 0);
+                                
+                                // ALTERAÇÃO: Calcular custo por porção base
+                                const costPerBasePortion = calculateCostPerBasePortion(
+                                    ingredientPrice,
+                                    stockUnit,
+                                    basePortionQuantity,
+                                    basePortionUnit
+                                );
+                                
+                                // ALTERAÇÃO: Quantidade total = portions × quantity do item
+                                const totalQuantity = portions * (item.quantity || 1);
+                                const totalCost = costPerBasePortion * totalQuantity;
+                                
+                                return {
+                                    ingredient_id: ing.ingredient_id || ing.id,
+                                    name: ing.name || 'Ingrediente',
+                                    portions: portions,
+                                    quantity: totalQuantity,
+                                    unit_cost: costPerBasePortion,
+                                    total_cost: totalCost
+                                };
+                            });
+                    } catch (error) {
+                        // ALTERAÇÃO: Ignorar erro silenciosamente - ingredientes base não são críticos para exibição
+                    }
+                }
+                
+                return {
+                    ...item,
+                    base_ingredients: baseIngredients
+                };
+            })
+        );
+
         // Criar ou obter modal seguindo padrão do sistema
         let modal = document.getElementById('modal-cmv-pedido');
         if (!modal) {
@@ -334,7 +394,7 @@ export async function showCmvPedidoModal(orderId) {
                             </div>
                         </div>
 
-                        ${itemsWithCMV.length > 0 ? `
+                        ${itemsWithBaseIngredients.length > 0 ? `
                         <div class="invoice-detail-section">
                             <h3>Itens do Pedido (Custo de Produção)</h3>
                             <div class="invoice-items-list">
@@ -348,14 +408,15 @@ export async function showCmvPedidoModal(orderId) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${itemsWithCMV.map((item, itemIdx) => {
+                                        ${itemsWithBaseIngredients.map((item, itemIdx) => {
                                             const productName = escapeHTML(item.product?.name || item.product_name || 'Produto');
                                             const quantity = item.quantity || 1;
                                             // ALTERAÇÃO: Usar unit_cost e total_cost calculados pelo backend
                                             const unitCost = parseFloat(item.unit_cost || item.cost_price || 0);
                                             const totalCost = parseFloat(item.total_cost || (unitCost * quantity) || 0);
                                             
-                                            // ALTERAÇÃO: Organizar extras e modificações para exibição
+                                            // ALTERAÇÃO: Organizar insumos base, extras e modificações para exibição
+                                            const baseIngredients = item.base_ingredients || [];
                                             const extras = item.extras || [];
                                             const baseMods = item.base_modifications || [];
                                             
@@ -377,6 +438,29 @@ export async function showCmvPedidoModal(orderId) {
                                                     R$ ${formatCurrency(totalCost)}
                                                 </td>
                                             </tr>
+                                            ${baseIngredients.map((baseIng, idx) => {
+                                                const baseIngUnitCost = parseFloat(baseIng.unit_cost || 0);
+                                                const baseIngQuantity = baseIng.quantity || 0;
+                                                const baseIngTotalCost = parseFloat(baseIng.total_cost || (baseIngUnitCost * baseIngQuantity) || 0);
+                                                return `
+                                            <tr>
+                                                <td class="insumo-details-cell">
+                                                    <div class="insumo-item insumo-base">
+                                                        <span class="insumo-name">${escapeHTML(baseIng.name || 'Insumo')}</span>
+                                                    </div>
+                                                </td>
+                                                <td class="insumo-unit-cost-cell" style="text-align: right;">
+                                                    R$ ${formatCurrency(baseIngUnitCost)}
+                                                </td>
+                                                <td class="insumo-quantity-cell" style="text-align: center;">
+                                                    ${baseIngQuantity}
+                                                </td>
+                                                <td class="insumo-total-cost-cell" style="text-align: right; font-weight: 600;">
+                                                    R$ ${formatCurrency(baseIngTotalCost)}
+                                                </td>
+                                            </tr>
+                                                `;
+                                            }).join('')}
                                             ${extras.map((extra, idx) => {
                                                 const extraUnitCost = parseFloat(extra.unit_cost || 0);
                                                 const extraQuantity = extra.quantity || 1;
@@ -432,7 +516,7 @@ export async function showCmvPedidoModal(orderId) {
                                     <tfoot>
                                         <tr>
                                             <td colspan="3" style="text-align: right; font-weight: bold; padding: 16px;">Total CMV:</td>
-                                            <td style="text-align: right; font-weight: bold; padding: 16px; font-size: 16px;">R$ ${formatCurrency(itemsWithCMV.reduce((sum, item) => {
+                                            <td style="text-align: right; font-weight: bold; padding: 16px; font-size: 16px;">R$ ${formatCurrency(itemsWithBaseIngredients.reduce((sum, item) => {
                                                 return sum + (parseFloat(item.total_cost || 0));
                                             }, 0))}</td>
                                         </tr>

@@ -176,8 +176,15 @@ const VALIDATION_LIMITS = {
     }).format(v || 0);
 
   // Carregar ingredientes e criar mapa de preços
-  async function loadIngredientsCache() {
-    if (state.ingredientsCache) {
+  // ALTERAÇÃO: Função para limpar o cache de ingredientes
+  function clearIngredientsCache() {
+    state.ingredientsCache = null;
+  }
+
+  // Carregar ingredientes e criar mapa de preços
+  // ALTERAÇÃO: Adicionado parâmetro forceReload para forçar recarregamento do cache
+  async function loadIngredientsCache(forceReload = false) {
+    if (state.ingredientsCache && !forceReload) {
       return state.ingredientsCache;
     }
 
@@ -386,11 +393,12 @@ const VALIDATION_LIMITS = {
                 // Buscar preço do cache de ingredientes primeiro
                 let preco = getIngredientPrice(id);
                 // Se não encontrou no cache, tentar nos dados do extra
+                // ALTERAÇÃO: Priorizar additional_price sobre price para modificações de produtos
                 if (preco === 0) {
                   const extraPrice = parseFloat(
-                    extra.ingredient_price ??
+                    extra.additional_price ??
+                      extra.ingredient_price ??
                       extra.price ??
-                      extra.additional_price ??
                       0
                   );
                   preco =
@@ -837,10 +845,13 @@ const VALIDATION_LIMITS = {
               const colorClass = isPositive ? "mod-add" : "mod-remove";
               const deltaValue = Math.abs(bm.delta);
 
+              // ALTERAÇÃO: Multiplicar preço unitário pela quantidade (delta) para exibir o preço total correto
               // Formatar preço se houver (apenas para adições, remoções não têm custo)
+              const precoUnitario = parseFloat(bm.preco || 0) || 0;
+              const precoTotal = precoUnitario * deltaValue;
               const precoFormatado =
-                bm.preco > 0 && isPositive
-                  ? ` <span class="base-mod-price">+R$ ${bm.preco
+                precoTotal > 0 && isPositive
+                  ? ` <span class="base-mod-price">+R$ ${precoTotal
                       .toFixed(2)
                       .replace(".", ",")}</span>`
                   : "";
@@ -3589,6 +3600,17 @@ const VALIDATION_LIMITS = {
   window.fecharModalRevisao = fecharModalRevisao;
   window.confirmarTroco = confirmarTroco;
   window.confirmarPedido = confirmarPedido;
+
+  // ALTERAÇÃO: Expor funções para limpar cache no escopo global (útil para debug/reset)
+  window.clearIngredientsCache = clearIngredientsCache;
+  window.reloadIngredientsCache = async () => {
+    clearIngredientsCache();
+    await loadIngredientsCache(true);
+    // Recarregar cesta para atualizar preços
+    await carregarCesta();
+    renderItens();
+    renderResumo();
+  };
 
   // Verificar se usuário está logado
   if (typeof window.isUserLoggedIn === "function" && !window.isUserLoggedIn()) {

@@ -631,10 +631,11 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
                 return sum + (parseFloat(extra.ingredient_price || extra.price || 0) * parseFloat(extra.quantity || 0));
               }, 0);
               
+              // ALTERAÇÃO: Priorizar additional_price sobre price para modificações de produtos
               // Calcular total de base_modifications
               const baseMods = item.base_modifications || [];
               const baseModsTotal = baseMods.reduce((sum, mod) => {
-                return sum + (parseFloat(mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
+                return sum + (parseFloat(mod.additional_price || mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
               }, 0);
               
               // Preço total original (sem desconto)
@@ -691,10 +692,11 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
                         return sum + (parseFloat(extra.ingredient_price || extra.price || 0) * parseFloat(extra.quantity || 0));
                       }, 0);
                       
+                      // ALTERAÇÃO: Priorizar additional_price sobre price para modificações de produtos
                       // Calcular total de base_modifications
                       const baseMods = item.base_modifications || [];
                       const baseModsTotal = baseMods.reduce((sum, mod) => {
-                        return sum + (parseFloat(mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
+                        return sum + (parseFloat(mod.additional_price || mod.ingredient_price || mod.price || 0) * Math.abs(parseInt(mod.delta || 0, 10) || 0));
                       }, 0);
                       
                       // Preço total original (sem desconto)

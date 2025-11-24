@@ -1147,13 +1147,15 @@ export default class DashboardManager {
                     const baseModsItems = baseMods.map((bm) => {
                         const nome = bm.ingredient_name || bm.name || bm.nome || 'Ingrediente';
                         const delta = parseInt(bm.delta ?? 0, 10) || 0;
-                        const preco = this.extractPriceFromObject(bm);
+                        const precoUnitario = this.extractPriceFromObject(bm);
                         const isPositive = delta > 0;
                         const icon = isPositive ? 'plus' : 'minus';
                         const colorClass = isPositive ? 'mod-add' : 'mod-remove';
                         const deltaValue = Math.abs(delta);
-                        const precoFormatado = preco > 0 && isPositive
-                            ? ` <span class="base-mod-price">+R$ ${escapeHTML(preco.toFixed(2).replace('.', ','))}</span>`
+                        // ALTERAÇÃO: Multiplicar preço unitário pela quantidade (delta) para exibir o preço total correto
+                        const precoTotal = precoUnitario * deltaValue;
+                        const precoFormatado = precoTotal > 0 && isPositive
+                            ? ` <span class="base-mod-price">+R$ ${escapeHTML(precoTotal.toFixed(2).replace('.', ','))}</span>`
                             : '';
 
                         return `
@@ -1667,14 +1669,23 @@ export default class DashboardManager {
     extractPriceFromObject(obj) {
         if (!obj || typeof obj !== 'object') return 0;
 
+        // ALTERAÇÃO: Priorizar additional_price sobre price para modificações de produtos
+        // additional_price é o preço quando o ingrediente é adicionado como modificação
+        // Verificar múltiplos campos possíveis que o backend pode retornar
         const priceCandidates = [
-            obj.ingredient_price,
-            obj.price,
             obj.additional_price,
-            obj.unit_price,
+            obj.additionalPrice, // camelCase
+            obj.ingredient_price,
+            obj.ingredientPrice, // camelCase
             obj.ingredient_unit_price,
+            obj.ingredientUnitPrice, // camelCase
+            obj.unit_price,
+            obj.unitPrice, // camelCase
+            obj.price,
             obj.preco,
-            obj.valor
+            obj.valor,
+            obj.cost, // Custo do ingrediente (fallback)
+            obj.custo // Custo em português (fallback)
         ];
 
         for (const candidate of priceCandidates) {
@@ -1682,6 +1693,25 @@ export default class DashboardManager {
                 const priceNum = parseFloat(candidate);
                 if (!isNaN(priceNum) && priceNum > 0 && isFinite(priceNum)) {
                     return priceNum;
+                }
+            }
+        }
+
+        // ALTERAÇÃO: Se não encontrou preço nos campos diretos e tem ingredient_id, 
+        // tentar buscar do objeto ingredient se estiver aninhado
+        if (obj.ingredient_id || obj.ingredientId || obj.id) {
+            const ingredient = obj.ingredient || obj.ingredient_data;
+            if (ingredient && typeof ingredient === 'object') {
+                const ingredientPrice = ingredient.additional_price || 
+                                       ingredient.additionalPrice ||
+                                       ingredient.ingredient_price ||
+                                       ingredient.ingredientPrice ||
+                                       ingredient.price;
+                if (ingredientPrice !== undefined && ingredientPrice !== null) {
+                    const priceNum = parseFloat(ingredientPrice);
+                    if (!isNaN(priceNum) && priceNum > 0 && isFinite(priceNum)) {
+                        return priceNum;
+                    }
                 }
             }
         }

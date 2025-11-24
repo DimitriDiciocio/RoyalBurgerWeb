@@ -204,7 +204,8 @@ async function carregarCesta() {
           
           const baseModsTotal = (item.base_modifications || []).reduce((sum, mod) => {
             if (!mod || typeof mod !== 'object') return sum;
-            const price = parseFloat(mod.ingredient_price || mod.price || 0) || 0;
+            // ALTERAÇÃO: Priorizar additional_price sobre price para modificações de produtos
+            const price = parseFloat(mod.additional_price || mod.ingredient_price || mod.price || 0) || 0;
             const delta = parseInt(mod.delta || 0, 10) || 0;
             if (isFinite(price) && isFinite(delta) && price >= 0) {
               const modTotal = price * Math.abs(delta);
@@ -238,8 +239,9 @@ async function carregarCesta() {
             const deltaRaw = parseInt(bm.delta || 0, 10);
             const delta = isNaN(deltaRaw) || !isFinite(deltaRaw) ? 0 : deltaRaw;
 
+            // ALTERAÇÃO: Priorizar additional_price sobre price para modificações de produtos
             // Validar preço como número positivo
-            const precoRaw = parseFloat(bm.ingredient_price || bm.price || 0);
+            const precoRaw = parseFloat(bm.additional_price || bm.ingredient_price || bm.price || 0);
             const preco = isNaN(precoRaw) || !isFinite(precoRaw) || precoRaw < 0 ? 0 : precoRaw;
 
             return { id, nome, delta, preco };
@@ -511,10 +513,13 @@ function renderItem(item, index) {
         const colorClass = isPositive ? "mod-add" : "mod-remove";
         const deltaValue = Math.abs(bm.delta);
 
+        // ALTERAÇÃO: Multiplicar preço unitário pela quantidade (delta) para exibir o preço total correto
         // Formatar preço se houver (apenas para adições, remoções não têm custo)
+        const precoUnitario = parseFloat(bm.preco || 0) || 0;
+        const precoTotal = precoUnitario * deltaValue;
         const precoFormatado =
-          bm.preco > 0 && isPositive
-            ? ` <span class="base-mod-price">+R$ ${bm.preco
+          precoTotal > 0 && isPositive
+            ? ` <span class="base-mod-price">+R$ ${precoTotal
                 .toFixed(2)
                 .replace(".", ",")}</span>`
             : "";
