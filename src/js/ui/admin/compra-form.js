@@ -49,26 +49,64 @@ export class CompraForm {
      * ALTERAÇÃO: Extrair fornecedores únicos
      */
     async loadIngredients() {
-        // ALTERAÇÃO: Usar cache para evitar chamadas API duplicadas
         const cacheKey = 'ingredients:active:1000';
         const cached = cacheManager.get(cacheKey);
         
         if (cached) {
-            this.ingredients = cached;
-            this.extractSuppliers();
-            this.filteredIngredients = [...this.ingredients];
+            // Verificar se cached é array válido
+            if (Array.isArray(cached)) {
+                this.ingredients = cached;
+                this.extractSuppliers();
+                this.filteredIngredients = [...this.ingredients];
+                console.log('✅ Ingredientes carregados do cache:', this.ingredients.length);
+            } else {
+                console.error('❌ Cache corrompido, limpando...');
+                cacheManager.delete(cacheKey);
+                this.ingredients = [];
+                this.suppliers = [];
+                this.filteredIngredients = [];
+            }
             return;
         }
-
+    
         try {
             const response = await getIngredients({ page_size: 1000, status: 'active' });
-            this.ingredients = response.items || response || [];
-            // ALTERAÇÃO: Cache por 5 minutos
-            cacheManager.set(cacheKey, this.ingredients, 5 * 60 * 1000);
+            console.log('📦 Resposta da API:', response); // DEBUG - ver estrutura real
+            
+            // CORREÇÃO CRÍTICA: Garantir que sempre seja um array
+            let items = response.data.items || [];
+            
+            // if (Array.isArray(response)) {
+            //     // Se response já é array
+            //     items = response.data;
+            // } else if (response && Array.isArray(response.items)) {
+            //     // Se response tem propriedade items que é array
+            //     items = response.items;
+            // } else if (response && Array.isArray(response.data)) {
+            //     // Se response tem propriedade data que é array
+            //     items = response.data;
+            // } else if (response && typeof response === 'object') {
+            //     // Se response é objeto, tentar encontrar array dentro dele
+            //     const possibleArrays = Object.values(response).filter(val => Array.isArray(val));
+            //     if (possibleArrays.length > 0) {
+            //         items = possibleArrays[0];
+            //     }
+            // }
+            
+            this.ingredients = items;
+
+            if (this.ingredients.length > 0) {
+                cacheManager.set(cacheKey, this.ingredients, 5 * 60 * 1000);
+            }
+            
             this.extractSuppliers();
             this.filteredIngredients = [...this.ingredients];
+            
+            console.log('✅ Ingredientes carregados da API:', this.ingredients.length);
+            console.log('✅ Fornecedores extraídos:', this.suppliers.length);
+            
         } catch (error) {
-            // ALTERAÇÃO: Removido console.error - erro será tratado pelo usuário se necessário
+            console.error('❌ Erro ao carregar ingredientes:', error);
             this.ingredients = [];
             this.suppliers = [];
             this.filteredIngredients = [];
@@ -79,7 +117,7 @@ export class CompraForm {
      * Extrai lista de fornecedores únicos dos ingredientes
      * ALTERAÇÃO: Novo método para extrair fornecedores
      */
-    extractSuppliers() {
+    async extractSuppliers() {
         const suppliersSet = new Set();
         
         this.ingredients.forEach(ingredient => {
@@ -87,6 +125,8 @@ export class CompraForm {
                 suppliersSet.add(ingredient.supplier.trim());
             }
         });
+
+        console.log('suppliersSet', suppliersSet); // DEBUG
 
         this.suppliers = Array.from(suppliersSet).sort((a, b) => 
             a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
@@ -97,7 +137,7 @@ export class CompraForm {
      * Filtra ingredientes por fornecedor
      * ALTERAÇÃO: Novo método para filtrar ingredientes
      */
-    filterIngredientsBySupplier(supplierName) {
+    async filterIngredientsBySupplier(supplierName) {
         if (!supplierName || supplierName === '') {
             this.filteredIngredients = [...this.ingredients];
             this.selectedSupplier = null;
@@ -115,11 +155,16 @@ export class CompraForm {
      * @param {Function} onSuccess - Callback chamado após sucesso
      */
     async openNew(onSuccess = null) {
+        // Garantir que ingredientes estejam carregados
+        if (this.ingredients.length === 0) {
+            console.log('⚠️ Ingredientes não carregados, carregando...'); // DEBUG
+            await this.loadIngredients();
+        }
+        
         this.items = [];
         this.onSuccess = onSuccess;
         await this.render();
         
-        // ALTERAÇÃO: Verificar se existe rascunho salvo
         if (this.hasDraft()) {
             this.showDraftConfirmation();
         } else {
@@ -163,7 +208,7 @@ export class CompraForm {
                                         <option value="${escapeHTML(supplier)}">${escapeHTML(supplier)}</option>
                                     `).join('')}
                                 </select>
-                                <label for="compra-supplier-select">Fornecedor *</label>
+                                <label for="compra-supplier-select" class="${this.suppliers.length > 0 ? 'active' : ''}">Fornecedor *</label>
                             </div>
                             <small class="form-text">Selecione o fornecedor para filtrar insumos, ou escolha um insumo para selecionar automaticamente</small>
                         </div>
@@ -407,7 +452,7 @@ export class CompraForm {
                                     <option value="${ing.id}" data-supplier="${escapeHTML(ing.supplier || '')}">${escapeHTML(ing.name || 'Insumo')}</option>
                                 `).join('')}
                             </select>
-                            <label class="">Insumo *</label>
+                            <label class="${this.filteredIngredients.length > 0 ? 'active' : ''}">Insumo *</label>
                         </div>
                         <small class="form-text">Selecione o insumo que foi comprado</small>
                     </div>
