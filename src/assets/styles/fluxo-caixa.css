@@ -1178,76 +1178,216 @@
     gap: 1.5rem;
 }
 
+/* ALTERAÇÃO: Design padronizado do card de recorrência baseado no compra-card */
 .recorrencia-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-    border-left: 4px solid var(--financial-primary);
+    background-color: var(--cor-div-primary);
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
 }
 
 .recorrencia-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* ALTERAÇÃO: Borda colorida baseada no tipo de recorrência */
+.recorrencia-card[data-rule-type="expense"],
+.recorrencia-card[data-rule-type="EXPENSE"] {
+    border: 2px solid var(--color-secondary);
+}
+
+.recorrencia-card[data-rule-type="revenue"],
+.recorrencia-card[data-rule-type="REVENUE"] {
+    border: 2px solid #4CAF50;
+}
+
+.recorrencia-card[data-rule-type="cmv"],
+.recorrencia-card[data-rule-type="CMV"] {
+    border: 2px solid var(--color-quaternary);
+}
+
+.recorrencia-card[data-rule-type="tax"],
+.recorrencia-card[data-rule-type="TAX"] {
+    border: 2px solid var(--color-tertiary);
 }
 
 .recorrencia-card-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
     border-bottom: 1px solid #e5e7eb;
 }
 
+.recorrencia-card-header .recorrencia-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
 .recorrencia-card-header h4 {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1f2937;
-    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-texto-black);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.recorrencia-card-header h4 i {
+    font-size: 0.9rem;
 }
 
 .recorrencia-description {
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.85rem;
+    color: var(--color-texto-erased);
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.recorrencia-description i {
+    font-size: 0.75rem;
+}
+
+/* ALTERAÇÃO: Container de ações do header */
+.recorrencia-card-header .recorrencia-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+/* ALTERAÇÃO: Badge de status melhorado */
+.recorrencia-card-header .financial-badge {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .recorrencia-card-body {
-    margin-bottom: 1rem;
+    margin-bottom: 12px;
+    flex: 1;
 }
 
 .recorrencia-info {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
 }
 
 .recorrencia-info .info-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 8px 0;
 }
 
 .recorrencia-info .info-item .label {
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.85rem;
+    color: var(--color-texto-erased);
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.recorrencia-info .info-item .label i {
+    font-size: 0.75rem;
+    color: var(--color-texto-erased);
 }
 
 .recorrencia-info .info-item .value {
-    font-size: 0.875rem;
-    color: #1f2937;
+    font-size: 0.9rem;
+    color: var(--color-texto-black);
     font-weight: 600;
+}
+
+/* ALTERAÇÃO: Valor total destacado */
+.recorrencia-info .info-item.total .value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-texto-black);
 }
 
 .recorrencia-card-footer {
     display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    padding-top: 1rem;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-top: auto;
+    padding-top: 12px;
     border-top: 1px solid #e5e7eb;
+}
+
+/* ALTERAÇÃO: Botões melhorados seguindo padrão do sistema */
+.recorrencia-card-footer .financial-btn {
+    flex: 0 1 auto;
+    min-width: auto;
+    font-size: 0.85rem;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.recorrencia-card-footer .financial-btn i {
+    font-size: 0.8rem;
+}
+
+/* ALTERAÇÃO: Botão de excluir com estilo de perigo */
+.recorrencia-card-footer .financial-btn-danger {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+}
+
+.recorrencia-card-footer .financial-btn-danger:hover {
+    background-color: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.recorrencia-card-footer .financial-btn-danger:active {
+    transform: translateY(0);
+}
+
+/* ALTERAÇÃO: Botão secundário */
+.recorrencia-card-footer .financial-btn-secondary {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-background);
+    color: var(--color-texto-black);
+    border: 2px solid #e0e1e4;
+}
+
+.recorrencia-card-footer .financial-btn-secondary:hover {
+    border-color: var(--color-primary);
+    color: var(--color-texto-black);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.recorrencia-card-footer .financial-btn-secondary:active {
+    transform: translateY(0);
 }
 
 /* === CONTAS A PAGAR === */
@@ -1540,6 +1680,40 @@
         justify-content: center;
     }
 
+    /* ALTERAÇÃO: Estilos responsivos para cards de recorrência */
+    .recorrencia-card {
+        padding: 16px;
+    }
+
+    .recorrencia-card-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .recorrencia-card-header .recorrencia-header-info {
+        width: 100%;
+    }
+
+    .recorrencia-card-header .recorrencia-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .recorrencia-card-header .financial-badge {
+        align-self: flex-start;
+    }
+
+    .recorrencia-card-footer {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .recorrencia-card-footer .financial-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
     .conciliacao-summary-cards {
         grid-template-columns: 1fr;
         gap: 1rem;
@@ -1712,11 +1886,24 @@
     }
 
     .recorrencia-card {
-        padding: 1rem;
+        padding: 12px;
     }
 
     .recorrencia-card-header h4 {
+        font-size: 0.9375rem;
+    }
+
+    .recorrencia-info .info-item .value {
+        font-size: 0.8125rem;
+    }
+
+    .recorrencia-info .info-item.total .value {
         font-size: 1rem;
+    }
+
+    .recorrencia-card-footer .financial-btn {
+        font-size: 0.8125rem;
+        padding: 0.625rem 1rem;
     }
 
     .dashboard-header h2 {

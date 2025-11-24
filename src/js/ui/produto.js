@@ -731,25 +731,65 @@ const VALIDATION_LIMITS = {
     // CORREÇÃO: Exibir apenas ingredientes que podem ser ajustados (min !== max)
     // Se min === max, significa que não há flexibilidade para alterar porções
     // Esses ingredientes não devem aparecer na interface de edição
+    // ALTERAÇÃO: Comparar valores originais da API ANTES de qualquer ajuste
     const ajustaveis = ingredientes.filter((ing) => {
       const basePortions = parseFloat(ing.portions || 1) || 1;
-      // Calcular min e max originais (antes de ajustes) para comparação
-      const minQuantityOriginal = Number.isFinite(parseFloat(ing.min_quantity))
-        ? parseFloat(ing.min_quantity)
+      
+      // ALTERAÇÃO: Obter valores originais diretamente da API sem ajustes
+      // IMPORTANTE: Comparar os valores brutos da API para determinar se há flexibilidade
+      const minQuantityRaw = ing.min_quantity;
+      const maxQuantityRaw = ing.max_quantity;
+      
+      // Converter para números para comparação
+      // Se min_quantity não está definido, usar basePortions como padrão
+      const minQuantityOriginal = (minQuantityRaw !== null && minQuantityRaw !== undefined && Number.isFinite(parseFloat(minQuantityRaw)))
+        ? parseFloat(minQuantityRaw)
         : basePortions;
       
-      // Calcular max original (antes de ajustes)
+      // ALTERAÇÃO: Tratar max_quantity = 0 como caso especial
+      // Se max_quantity é 0, significa que não há estoque disponível
+      // Se min_quantity > 0 e max_quantity = 0, não há flexibilidade (não exibir)
       let maxQuantityOriginal;
-      if (ing.max_quantity === null || ing.max_quantity === undefined || !Number.isFinite(parseFloat(ing.max_quantity))) {
-        // Se null ou undefined, considerar como flexível (pode adicionar)
+      if (maxQuantityRaw === null || maxQuantityRaw === undefined) {
+        // Se null/undefined, considerar como flexível (pode adicionar)
         maxQuantityOriginal = basePortions + 999;
       } else {
-        maxQuantityOriginal = parseFloat(ing.max_quantity);
+        const parsedMax = parseFloat(maxQuantityRaw);
+        if (!Number.isFinite(parsedMax)) {
+          // Se não é um número válido, considerar como flexível
+          maxQuantityOriginal = basePortions + 999;
+        } else if (parsedMax === 0) {
+          // ALTERAÇÃO: max_quantity = 0 significa sem estoque disponível
+          // Se min_quantity > 0, não há flexibilidade (não exibir)
+          maxQuantityOriginal = 0;
+        } else {
+          maxQuantityOriginal = parsedMax;
+        }
       }
       
-      // Exibir apenas se min !== max original (há flexibilidade para ajustar)
-      // IMPORTANTE: Comparar valores originais, não valores ajustados
-      return minQuantityOriginal !== maxQuantityOriginal;
+      // ALTERAÇÃO: Comparação estrita - se min === max, não exibir
+      // Usar comparação com tolerância para valores de ponto flutuante
+      const tolerance = 0.001;
+      const minValid = Number.isFinite(minQuantityOriginal);
+      const maxValid = Number.isFinite(maxQuantityOriginal);
+      
+      // Se algum valor não é válido, não exibir (mais seguro)
+      if (!minValid || !maxValid) {
+        return false;
+      }
+      
+      // ALTERAÇÃO: Casos especiais onde não deve exibir:
+      // 1. Se min === max (dentro da tolerância)
+      // 2. Se max = 0 e min > 0 (sem estoque e não pode reduzir)
+      const areEqual = Math.abs(minQuantityOriginal - maxQuantityOriginal) <= tolerance;
+      const isMaxZeroWithMinPositive = maxQuantityOriginal === 0 && minQuantityOriginal > 0;
+      
+      // ALTERAÇÃO: Retornar false se forem iguais OU se max=0 e min>0 (não exibir)
+      // CORREÇÃO: Garantir que a comparação funcione corretamente mesmo com valores iguais
+      if (areEqual || isMaxZeroWithMinPositive) {
+        return false; // Não exibir se min === max ou se max=0 e min>0
+      }
+      return true; // Exibir se min !== max e não for caso especial
     });
 
     if (ajustaveis.length === 0) {
@@ -1582,8 +1622,9 @@ const VALIDATION_LIMITS = {
           stock_info: productIng.stock_info ?? null,
           base_portion_quantity: productIng.base_portion_quantity ?? fullIngredient.base_portion_quantity ?? 1,
           stock_unit: productIng.stock_unit ?? fullIngredient.stock_unit ?? 'un',
-          // IMPORTANTE: Preservar max_quantity calculado pela API (já considera quantity do produto)
-          // Este valor é usado para habilitar/desabilitar botões de adicionar ingredientes
+          // IMPORTANTE: Preservar max_quantity e min_quantity calculados pela API (já consideram quantity do produto)
+          // Estes valores são usados para habilitar/desabilitar botões de adicionar ingredientes
+          // ALTERAÇÃO: Preservar valores originais da API para comparação correta no filtro
           max_quantity: productIng.max_quantity ?? fullIngredient.max_quantity ?? null,
           min_quantity: productIng.min_quantity ?? fullIngredient.min_quantity ?? null,
         };
@@ -1647,6 +1688,7 @@ const VALIDATION_LIMITS = {
       const produto = produtoData?.product || produtoData;
       
       // ALTERAÇÃO: Buscar promoção ativa para o produto
+      // IMPORTANTE: 404 é esperado quando produto não tem promoção - não é um erro
       try {
         const promotion = await getPromotionByProductId(state.productId, false);
         // Verificar se a promoção está ativa (não expirada)
@@ -1656,10 +1698,12 @@ const VALIDATION_LIMITS = {
           state.promotion = null;
         }
       } catch (error) {
-        // Se não houver promoção (404) ou outro erro, continuar sem promoção
+        // ALTERAÇÃO: Se não houver promoção (404) ou outro erro, continuar sem promoção
+        // 404 é esperado e já é tratado silenciosamente pela API (retorna null)
+        // Apenas logar outros erros (não-404) em modo debug
         state.promotion = null;
-        // ALTERAÇÃO: Log condicional apenas em modo debug
-        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        // ALTERAÇÃO: Log condicional apenas para erros não-404 e apenas em modo debug
+        if (typeof window !== 'undefined' && window.DEBUG_MODE && error?.status !== 404) {
           console.warn("Erro ao buscar promoção do produto:", error);
         }
       }

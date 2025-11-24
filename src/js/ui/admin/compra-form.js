@@ -46,10 +46,10 @@ export class CompraForm {
 
     /**
      * Carrega lista de ingredientes
-     * ALTERAÇÃO: Extrair fornecedores únicos
+     * ALTERAÇÃO: Buscar todos os ingredientes disponíveis e extrair fornecedores únicos
      */
     async loadIngredients() {
-        const cacheKey = 'ingredients:active:1000';
+        const cacheKey = 'ingredients:all:1000';
         const cached = cacheManager.get(cacheKey);
         
         if (cached) {
@@ -58,9 +58,7 @@ export class CompraForm {
                 this.ingredients = cached;
                 this.extractSuppliers();
                 this.filteredIngredients = [...this.ingredients];
-                console.log('✅ Ingredientes carregados do cache:', this.ingredients.length);
-            } else {
-                console.error('❌ Cache corrompido, limpando...');
+             } else {
                 cacheManager.delete(cacheKey);
                 this.ingredients = [];
                 this.suppliers = [];
@@ -70,28 +68,25 @@ export class CompraForm {
         }
     
         try {
-            const response = await getIngredients({ page_size: 1000, status: 'active' });
-            console.log('📦 Resposta da API:', response); // DEBUG - ver estrutura real
+            // ALTERAÇÃO: Remover filtro de status para buscar todos os ingredientes disponíveis
+            // Buscar todos os ingredientes sem filtro de status para exibir todos os fornecedores e insumos
+            const response = await getIngredients({ page_size: 1000 });
+            
+            // ALTERAÇÃO: Verificar se a resposta foi bem-sucedida
+            if (!response || !response.success) {
+                throw new Error(response?.error || 'Erro ao buscar ingredientes');
+            }
             
             // CORREÇÃO CRÍTICA: Garantir que sempre seja um array
-            let items = response.data.items || [];
+            let items = response.data?.items || [];
             
-            // if (Array.isArray(response)) {
-            //     // Se response já é array
-            //     items = response.data;
-            // } else if (response && Array.isArray(response.items)) {
-            //     // Se response tem propriedade items que é array
-            //     items = response.items;
-            // } else if (response && Array.isArray(response.data)) {
-            //     // Se response tem propriedade data que é array
-            //     items = response.data;
-            // } else if (response && typeof response === 'object') {
-            //     // Se response é objeto, tentar encontrar array dentro dele
-            //     const possibleArrays = Object.values(response).filter(val => Array.isArray(val));
-            //     if (possibleArrays.length > 0) {
-            //         items = possibleArrays[0];
-            //     }
-            // }
+            // ALTERAÇÃO: Filtrar apenas ingredientes disponíveis (is_available = true) para manter validação
+            // mas incluir todos os fornecedores, mesmo os com "Não informado"
+            items = items.filter(ingredient => {
+                // Incluir apenas ingredientes disponíveis (se o campo existir)
+                const isAvailable = ingredient.is_available !== undefined ? ingredient.is_available : true;
+                return isAvailable;
+            });
             
             this.ingredients = items;
 
@@ -101,50 +96,59 @@ export class CompraForm {
             
             this.extractSuppliers();
             this.filteredIngredients = [...this.ingredients];
-            
-            console.log('✅ Ingredientes carregados da API:', this.ingredients.length);
-            console.log('✅ Fornecedores extraídos:', this.suppliers.length);
-            
         } catch (error) {
-            console.error('❌ Erro ao carregar ingredientes:', error);
-            this.ingredients = [];
-            this.suppliers = [];
-            this.filteredIngredients = [];
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
+            showToast('Erro ao carregar ingredientes', { type: 'error' });
         }
     }
 
     /**
      * Extrai lista de fornecedores únicos dos ingredientes
-     * ALTERAÇÃO: Novo método para extrair fornecedores
+     * ALTERAÇÃO: Incluir TODOS os fornecedores, incluindo "Não informado" e vazios
      */
     async extractSuppliers() {
         const suppliersSet = new Set();
         
         this.ingredients.forEach(ingredient => {
-            if (ingredient.supplier && ingredient.supplier.trim() !== '' && ingredient.supplier !== 'Não informado') {
+            // ALTERAÇÃO: Incluir todos os fornecedores, mesmo vazios ou "Não informado"
+            if (ingredient.supplier && ingredient.supplier.trim() !== '') {
                 suppliersSet.add(ingredient.supplier.trim());
+            } else {
+                // ALTERAÇÃO: Adicionar "Não informado" como opção válida para ingredientes sem fornecedor
+                suppliersSet.add('Não informado');
             }
         });
 
-        console.log('suppliersSet', suppliersSet); // DEBUG
-
-        this.suppliers = Array.from(suppliersSet).sort((a, b) => 
-            a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
-        );
+        // ALTERAÇÃO: Ordenar fornecedores, colocando "Não informado" no final
+        this.suppliers = Array.from(suppliersSet).sort((a, b) => {
+            // Colocar "Não informado" sempre no final
+            if (a === 'Não informado') return 1;
+            if (b === 'Não informado') return -1;
+            return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
+        });
     }
 
     /**
      * Filtra ingredientes por fornecedor
-     * ALTERAÇÃO: Novo método para filtrar ingredientes
+     * ALTERAÇÃO: Incluir ingredientes sem fornecedor quando "Não informado" for selecionado
      */
     async filterIngredientsBySupplier(supplierName) {
         if (!supplierName || supplierName === '') {
             this.filteredIngredients = [...this.ingredients];
             this.selectedSupplier = null;
+        } else if (supplierName === 'Não informado') {
+            // ALTERAÇÃO: Filtrar ingredientes sem fornecedor ou com fornecedor vazio
+            this.filteredIngredients = this.ingredients.filter(ing => {
+                const supplier = ing.supplier ? ing.supplier.trim() : '';
+                return !supplier || supplier === '' || supplier === 'Não informado';
+            });
+            this.selectedSupplier = supplierName;
         } else {
-            this.filteredIngredients = this.ingredients.filter(ing => 
-                ing.supplier && ing.supplier.trim() === supplierName.trim()
-            );
+            // ALTERAÇÃO: Filtrar ingredientes com fornecedor específico
+            this.filteredIngredients = this.ingredients.filter(ing => {
+                const supplier = ing.supplier ? ing.supplier.trim() : '';
+                return supplier === supplierName.trim();
+            });
             this.selectedSupplier = supplierName;
         }
     }
@@ -157,7 +161,6 @@ export class CompraForm {
     async openNew(onSuccess = null) {
         // Garantir que ingredientes estejam carregados
         if (this.ingredients.length === 0) {
-            console.log('⚠️ Ingredientes não carregados, carregando...'); // DEBUG
             await this.loadIngredients();
         }
         
@@ -217,7 +220,7 @@ export class CompraForm {
                         <div class="compra-items-section">
                             <div class="compra-items-header">
                                 <h3>Itens da Nota Fiscal *</h3>
-                                <button type="button" class="btn-adicionar-item" id="btn-adicionar-item">
+                                <button type="button" class="btn-adicionar-item" id="btn-adicionar-item" aria-label="Adicionar novo item à nota fiscal">
                                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
                                     <span>Adicionar Item</span>
                                 </button>
@@ -290,8 +293,8 @@ export class CompraForm {
                     </form>
                 </div>
                 <div class="footer-modal">
-                    <button type="button" class="btn-cancelar" data-close-modal="modal-nova-compra">Cancelar</button>
-                    <button type="button" class="btn-salvar" id="btn-save-compra">
+                    <button type="button" class="btn-cancelar" data-close-modal="modal-nova-compra" aria-label="Cancelar e fechar formulário">Cancelar</button>
+                    <button type="button" class="btn-salvar" id="btn-save-compra" aria-label="Salvar compra">
                         Salvar
                     </button>
                 </div>
@@ -610,20 +613,24 @@ export class CompraForm {
             if (supplierSpan) supplierSpan.textContent = ingredient.supplier || 'Não informado';
             if (unitSpan) unitSpan.textContent = this.normalizeUnit(ingredient.stock_unit || 'un').toUpperCase();
 
-            // ALTERAÇÃO: Sincronizar fornecedor bidirecional
+            // ALTERAÇÃO: Sincronizar fornecedor bidirecional (incluindo "Não informado")
             const supplierSelect = document.getElementById('compra-supplier-select');
-            if (supplierSelect && ingredient.supplier && ingredient.supplier !== 'Não informado') {
+            if (supplierSelect) {
                 const currentSupplier = supplierSelect.value;
+                // ALTERAÇÃO: Determinar fornecedor a usar (incluindo "Não informado" para ingredientes sem fornecedor)
+                const ingredientSupplier = (ingredient.supplier && ingredient.supplier.trim() !== '') 
+                    ? ingredient.supplier.trim() 
+                    : 'Não informado';
                 
                 // Se nenhum fornecedor selecionado, ou fornecedor diferente, atualizar
-                if (!currentSupplier || currentSupplier !== ingredient.supplier) {
+                if (!currentSupplier || currentSupplier !== ingredientSupplier) {
                     // Definir fornecedor no select
-                    supplierSelect.value = ingredient.supplier;
+                    supplierSelect.value = ingredientSupplier;
                     const label = supplierSelect.closest('.div-input')?.querySelector('label');
                     if (label) label.classList.add('active');
                     
                     // Filtrar ingredientes pelo fornecedor
-                    this.filterIngredientsBySupplier(ingredient.supplier);
+                    this.filterIngredientsBySupplier(ingredientSupplier);
                     
                     // Atualizar select de insumos
                     this.updateIngredientSelectInForm();
@@ -700,7 +707,15 @@ export class CompraForm {
         if (!ingredientData) return;
 
         try {
+            // ALTERAÇÃO: Validar que ingredientData é string antes de parsear
+            if (typeof ingredientData !== 'string' || ingredientData.trim() === '') {
+                return;
+            }
             const data = JSON.parse(ingredientData);
+            // ALTERAÇÃO: Validar estrutura do objeto parseado
+            if (!data || typeof data !== 'object' || typeof data.price !== 'number') {
+                return;
+            }
             if (data.price > 0) {
                 const calculatedPrice = quantity * data.price;
                 // ALTERAÇÃO: Preservar todas as casas decimais sem arredondamento
@@ -709,7 +724,7 @@ export class CompraForm {
                 if (label) label.classList.add('active');
             }
         } catch (e) {
-            // Ignorar erro de parse
+            // ALTERAÇÃO: Ignorar erro de parse silenciosamente (dados inválidos)
         }
     }
 
@@ -733,7 +748,15 @@ export class CompraForm {
         if (!ingredientData) return;
 
         try {
+            // ALTERAÇÃO: Validar que ingredientData é string antes de parsear
+            if (typeof ingredientData !== 'string' || ingredientData.trim() === '') {
+                return;
+            }
             const data = JSON.parse(ingredientData);
+            // ALTERAÇÃO: Validar estrutura do objeto parseado
+            if (!data || typeof data !== 'object' || typeof data.price !== 'number') {
+                return;
+            }
             if (data.price > 0) {
                 const calculatedQuantity = totalPrice / data.price;
                 // ALTERAÇÃO: Preservar todas as casas decimais sem arredondamento
@@ -742,7 +765,7 @@ export class CompraForm {
                 if (label) label.classList.add('active');
             }
         } catch (e) {
-            // Ignorar erro de parse
+            // ALTERAÇÃO: Ignorar erro de parse silenciosamente (dados inválidos)
         }
     }
 
@@ -784,7 +807,18 @@ export class CompraForm {
         // Obter dados do ingrediente
         let ingredientData = null;
         try {
-            ingredientData = JSON.parse(formWrapper.dataset.ingredientData || '{}');
+            // ALTERAÇÃO: Validar dados antes de parsear
+            const dataStr = formWrapper.dataset.ingredientData || '{}';
+            if (typeof dataStr !== 'string' || dataStr.trim() === '') {
+                showToast('Erro ao processar dados do insumo', { type: 'error', title: 'Erro' });
+                return;
+            }
+            ingredientData = JSON.parse(dataStr);
+            // ALTERAÇÃO: Validar estrutura do objeto parseado
+            if (!ingredientData || typeof ingredientData !== 'object') {
+                showToast('Erro ao processar dados do insumo', { type: 'error', title: 'Erro' });
+                return;
+            }
         } catch (e) {
             showToast('Erro ao processar dados do insumo', { type: 'error', title: 'Erro' });
             return;
@@ -929,9 +963,17 @@ export class CompraForm {
     loadDraft() {
         try {
             const draftStr = localStorage.getItem(this.draftKey);
-            if (!draftStr) return false;
+            if (!draftStr || typeof draftStr !== 'string' || draftStr.trim() === '') {
+                return false;
+            }
 
+            // ALTERAÇÃO: Validar JSON antes de parsear
             const draft = JSON.parse(draftStr);
+            // ALTERAÇÃO: Validar estrutura básica do rascunho
+            if (!draft || typeof draft !== 'object') {
+                this.clearDraft();
+                return false;
+            }
 
             // Preencher campos do formulário
             const invoiceInput = document.getElementById('compra-invoice-number');
@@ -1041,7 +1083,20 @@ export class CompraForm {
         }
 
         try {
+            // ALTERAÇÃO: Validar JSON antes de parsear
+            if (typeof draftStr !== 'string' || draftStr.trim() === '') {
+                this.showModal();
+                this.startAutoSave();
+                return;
+            }
             const draft = JSON.parse(draftStr);
+            // ALTERAÇÃO: Validar estrutura básica do rascunho
+            if (!draft || typeof draft !== 'object') {
+                this.clearDraft();
+                this.showModal();
+                this.startAutoSave();
+                return;
+            }
             const timestamp = new Date(draft.timestamp);
             const timeAgo = this.getTimeAgo(timestamp);
 

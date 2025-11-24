@@ -11,8 +11,9 @@ import {
     generateRecurringMovements 
 } from '../../api/recurrence.js';
 import { showToast, showConfirm } from '../alerts.js';
-import { escapeHTML } from '../../utils/html-sanitizer.js';
+import { escapeHTML, escapeAttribute } from '../../utils/html-sanitizer.js';
 import { cacheManager } from '../../utils/cache-manager.js';
+import { validateRequired, validateLength, applyFieldValidation, clearFieldValidation } from '../../utils/validators.js';
 
 import { abrirModal, fecharModal } from '../modais.js';
 import { getNewRuleModalTemplate, getEditRuleModalTemplate } from '../../utils/recurrence-modal-templates.js';
@@ -129,6 +130,24 @@ export class RecorrenciasManager {
     }
 
     /**
+     * ALTERAÇÃO: Valida ID de regra para prevenir XSS e injeção
+     * @param {any} id - ID a ser validado
+     * @returns {number|null} ID validado ou null se inválido
+     */
+    validateRuleId(id) {
+        if (!id) return null;
+        
+        // Validar se é string ou número
+        const idStr = String(id).trim();
+        if (!/^\d+$/.test(idStr)) return null; // Apenas números
+        
+        const parsed = parseInt(idStr, 10);
+        return Number.isInteger(parsed) && parsed > 0 && parsed <= 2147483647
+            ? parsed
+            : null;
+    }
+
+    /**
      * Renderiza a lista de regras
      */
     renderRulesList() {
@@ -146,7 +165,13 @@ export class RecorrenciasManager {
         }
 
         listContainer.innerHTML = this.rules.map(rule => {
-            const ruleId = rule.id || rule.rule_id;
+            // ALTERAÇÃO: Validar ruleId antes de usar em innerHTML
+            const rawRuleId = rule.id || rule.rule_id;
+            const ruleId = this.validateRuleId(rawRuleId);
+            if (!ruleId) {
+                // ALTERAÇÃO: Pular regras com ID inválido para prevenir XSS
+                return '';
+            }
             const ruleName = escapeHTML(rule.name || 'Regra sem nome');
             const description = escapeHTML(rule.description || '');
             const ruleType = (rule.type || 'EXPENSE').toLowerCase();
@@ -156,29 +181,49 @@ export class RecorrenciasManager {
             const category = escapeHTML(rule.category || 'Sem categoria');
             const typeLabel = this.translateType(rule.type || 'EXPENSE');
 
+            // ALTERAÇÃO: Estrutura padronizada seguindo o padrão do compra-card
+            const ruleTypeUpper = (rule.type || 'EXPENSE').toUpperCase();
+            
             return `
-                <div class="recorrencia-card" data-rule-id="${ruleId}">
+                <div class="recorrencia-card" data-rule-id="${escapeAttribute(String(ruleId))}" data-rule-type="${escapeAttribute(ruleTypeUpper)}">
                     <div class="recorrencia-card-header">
-                        <div>
-                            <h4>${ruleName}</h4>
-                            ${description ? `<p class="recorrencia-description">${description}</p>` : ''}
+                        <div class="recorrencia-header-info">
+                            <h4>
+                                <i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                                ${ruleName}
+                            </h4>
+                            ${description ? `<p class="recorrencia-description">
+                                <i class="fa-solid fa-align-left" aria-hidden="true"></i>
+                                ${description}
+                            </p>` : ''}
                         </div>
-                        <span class="financial-badge type-${ruleType}">
-                            ${escapeHTML(typeLabel)}
-                        </span>
+                        <div class="recorrencia-header-actions">
+                            <span class="financial-badge type-${ruleType}">
+                                ${escapeHTML(typeLabel)}
+                            </span>
+                        </div>
                     </div>
                     <div class="recorrencia-card-body">
                         <div class="recorrencia-info">
-                            <div class="info-item">
-                                <span class="label">Valor:</span>
+                            <div class="info-item total">
+                                <span class="label">
+                                    <i class="fa-solid fa-dollar-sign" aria-hidden="true"></i>
+                                    Valor:
+                                </span>
                                 <span class="value">R$ ${this.formatCurrency(value)}</span>
                             </div>
                             <div class="info-item">
-                                <span class="label">Recorrência:</span>
+                                <span class="label">
+                                    <i class="fa-solid fa-calendar-repeat" aria-hidden="true"></i>
+                                    Recorrência:
+                                </span>
                                 <span class="value">${this.formatRecurrenceType(recurrenceType, recurrenceDay)}</span>
                             </div>
                             <div class="info-item">
-                                <span class="label">Categoria:</span>
+                                <span class="label">
+                                    <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                                    Categoria:
+                                </span>
                                 <span class="value">${category}</span>
                             </div>
                         </div>
@@ -186,22 +231,22 @@ export class RecorrenciasManager {
                     <div class="recorrencia-card-footer">
                         <button class="financial-btn financial-btn-secondary" 
                                 data-action="edit" 
-                                data-rule-id="${ruleId}"
-                                aria-label="Editar regra ${ruleName}">
+                                data-rule-id="${escapeAttribute(String(ruleId))}"
+                                aria-label="${escapeAttribute(`Editar regra ${ruleName}`)}">
                             <i class="fa-solid fa-edit" aria-hidden="true"></i>
                             <span>Editar</span>
                         </button>
                         <button class="financial-btn financial-btn-danger" 
                                 data-action="delete" 
-                                data-rule-id="${ruleId}"
-                                aria-label="Desativar regra ${ruleName}">
+                                data-rule-id="${escapeAttribute(String(ruleId))}"
+                                aria-label="${escapeAttribute(`Desativar regra ${ruleName}`)}">
                             <i class="fa-solid fa-trash" aria-hidden="true"></i>
                             <span>Desativar</span>
                         </button>
                     </div>
                 </div>
             `;
-        }).join('');
+        }).filter(html => html !== '').join(''); // ALTERAÇÃO: Filtrar HTML vazio de regras inválidas
     }
 
     /**
@@ -375,7 +420,9 @@ export class RecorrenciasManager {
                 if (!button) return;
 
                 const action = button.dataset.action;
-                const ruleId = parseInt(button.dataset.ruleId);
+                // ALTERAÇÃO: Validar ruleId antes de usar
+                const rawRuleId = button.dataset.ruleId;
+                const ruleId = this.validateRuleId(rawRuleId);
 
                 if (action === 'edit' && ruleId) {
                     e.preventDefault();
@@ -426,6 +473,9 @@ export class RecorrenciasManager {
             const { gerenciarInputsEspecificos } = await import('../../utils.js');
             gerenciarInputsEspecificos(inputs);
         }
+
+        // ALTERAÇÃO: Configurar máscaras e validações
+        this.setupMasksAndValidationsNewRule(modal);
 
         // ALTERAÇÃO: Armazenar referência ao event listener para cleanup
         const btnSave = document.getElementById('btn-save-new-recorrencia');
@@ -489,8 +539,21 @@ export class RecorrenciasManager {
      * @param {number} ruleId - ID da regra
      */
     async editRule(ruleId) {
+        // ALTERAÇÃO: Validar ruleId antes de processar
+        const validatedRuleId = this.validateRuleId(ruleId);
+        if (!validatedRuleId) {
+            showToast('ID de regra inválido', { 
+                type: 'error',
+                title: 'Erro'
+            });
+            return;
+        }
+        
         try {
-            const rule = this.rules.find(r => (r.id || r.rule_id) === ruleId);
+            const rule = this.rules.find(r => {
+                const rId = this.validateRuleId(r.id || r.rule_id);
+                return rId === validatedRuleId;
+            });
             if (!rule) {
                 showToast('Regra não encontrada', { 
                     type: 'error',
@@ -621,41 +684,68 @@ export class RecorrenciasManager {
      * @param {HTMLElement} modal - Elemento do modal
      */
     async handleCreateRule(modal) {
-        const form = document.getElementById('form-new-recorrencia');
-        if (!form || !form.checkValidity()) {
-            form?.reportValidity();
-            return;
-        }
+        // ALTERAÇÃO: Validar todos os campos antes de processar
+        const nameInput = document.getElementById('rec-new-name');
+        const typeSelect = document.getElementById('rec-new-type');
+        const valueInput = document.getElementById('rec-new-value');
+        const categoryInput = document.getElementById('rec-new-category');
+        const recurrenceTypeSelect = document.getElementById('rec-new-recurrence-type');
+        const recurrenceDayInput = document.getElementById('rec-new-recurrence-day');
+        const descriptionInput = document.getElementById('rec-new-description');
 
-        const formData = {
-            name: document.getElementById('rec-new-name').value.trim(),
-            description: document.getElementById('rec-new-description').value.trim() || null,
-            type: document.getElementById('rec-new-type').value,
-            value: parseFloat(document.getElementById('rec-new-value').value),
-            category: document.getElementById('rec-new-category').value.trim(),
-            subcategory: document.getElementById('rec-new-subcategory').value.trim() || null,
-            recurrence_type: document.getElementById('rec-new-recurrence-type').value,
-            recurrence_day: parseInt(document.getElementById('rec-new-recurrence-day').value, 10),
-            sender_receiver: document.getElementById('rec-new-sender-receiver').value.trim() || null,
-            notes: document.getElementById('rec-new-notes').value.trim() || null
-        };
+        let isValid = true;
 
-        // Validar campos obrigatórios
-        if (!formData.name || !formData.type || !formData.category || !formData.value || 
-            !formData.recurrence_type || !formData.recurrence_day) {
-            showToast('Preencha todos os campos obrigatórios', { 
+        // Validar cada campo obrigatório
+        if (!this.validateName(nameInput)) isValid = false;
+        if (!this.validateType(typeSelect)) isValid = false;
+        if (!this.validateValue(valueInput)) isValid = false;
+        if (!this.validateCategory(categoryInput)) isValid = false;
+        if (!this.validateRecurrenceType(recurrenceTypeSelect)) isValid = false;
+        if (!this.validateRecurrenceDay(recurrenceDayInput)) isValid = false;
+        if (descriptionInput && !this.validateDescription(descriptionInput)) isValid = false;
+
+        if (!isValid) {
+            showToast('Corrija os erros no formulário antes de salvar', { 
                 type: 'error',
                 title: 'Validação'
             });
+            // Focar no primeiro campo com erro
+            const firstError = modal.querySelector('.error');
+            if (firstError) {
+                firstError.focus();
+            }
             return;
         }
 
-        // Validar valor
+        // ALTERAÇÃO: Converter valor monetário formatado (com vírgula) para número
+        let value = 0;
+        if (valueInput && valueInput.value) {
+            // Remover pontos de milhar e substituir vírgula por ponto
+            const valueStr = valueInput.value.replace(/\./g, '').replace(',', '.');
+            value = parseFloat(valueStr) || 0;
+        }
+
+        const formData = {
+            name: nameInput.value.trim(),
+            description: descriptionInput?.value.trim() || null,
+            type: typeSelect.value,
+            value: value,
+            category: categoryInput.value.trim(),
+            subcategory: document.getElementById('rec-new-subcategory')?.value.trim() || null,
+            recurrence_type: recurrenceTypeSelect.value,
+            recurrence_day: parseInt(recurrenceDayInput.value, 10),
+            sender_receiver: document.getElementById('rec-new-sender-receiver')?.value.trim() || null,
+            notes: document.getElementById('rec-new-notes')?.value.trim() || null
+        };
+
+        // Validar valor novamente (garantir que é maior que zero)
         if (formData.value <= 0) {
+            this.validateValue(valueInput);
             showToast('O valor deve ser maior que zero', { 
                 type: 'error',
                 title: 'Validação'
             });
+            valueInput.focus();
             return;
         }
 
@@ -701,6 +791,16 @@ export class RecorrenciasManager {
      * @param {number} ruleId - ID da regra
      */
     async deleteRule(ruleId) {
+        // ALTERAÇÃO: Validar ruleId antes de processar
+        const validatedRuleId = this.validateRuleId(ruleId);
+        if (!validatedRuleId) {
+            showToast('ID de regra inválido', { 
+                type: 'error',
+                title: 'Erro'
+            });
+            return;
+        }
+        
         const confirmed = await showConfirm({
             title: 'Desativar Regra',
             message: 'Deseja realmente desativar esta regra de recorrência?',
@@ -712,7 +812,7 @@ export class RecorrenciasManager {
         if (!confirmed) return;
 
         try {
-            await deleteRecurrenceRule(ruleId);
+            await deleteRecurrenceRule(validatedRuleId);
             showToast('Regra desativada com sucesso', { 
                 type: 'success',
                 title: 'Sucesso'
@@ -752,6 +852,357 @@ export class RecorrenciasManager {
             'TAX': 'Imposto'
         };
         return translations[type] || type;
+    }
+
+    /**
+     * ALTERAÇÃO: Configura máscaras e validações para modal de nova regra
+     * @param {HTMLElement} modal - Elemento do modal
+     */
+    setupMasksAndValidationsNewRule(modal) {
+        // Máscara monetária para campo de valor
+        const valueInput = document.getElementById('rec-new-value');
+        if (valueInput) {
+            // Converter input number para text para aplicar máscara
+            valueInput.type = 'text';
+            valueInput.setAttribute('inputmode', 'decimal');
+            
+            const valueHandler = (e) => {
+                this.applyCurrencyMask(e.target);
+                this.validateValue(e.target);
+            };
+            
+            valueInput.addEventListener('input', valueHandler);
+            valueInput.addEventListener('blur', (e) => {
+                this.validateValue(e.target);
+            });
+            valueInput.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+            
+            this.modalEventListeners.newRule.push({ element: valueInput, event: 'input', handler: valueHandler });
+        }
+
+        // Validação de nome (obrigatório)
+        const nameInput = document.getElementById('rec-new-name');
+        if (nameInput) {
+            const nameHandler = (e) => {
+                this.applyNameMask(e.target);
+                this.validateName(e.target);
+            };
+            
+            nameInput.addEventListener('input', nameHandler);
+            nameInput.addEventListener('blur', (e) => {
+                this.validateName(e.target);
+            });
+            nameInput.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+            
+            this.modalEventListeners.newRule.push({ element: nameInput, event: 'input', handler: nameHandler });
+        }
+
+        // Validação de categoria (obrigatório)
+        const categoryInput = document.getElementById('rec-new-category');
+        if (categoryInput) {
+            const categoryHandler = (e) => {
+                this.applyNameMask(e.target);
+                this.validateCategory(e.target);
+            };
+            
+            categoryInput.addEventListener('input', categoryHandler);
+            categoryInput.addEventListener('blur', (e) => {
+                this.validateCategory(e.target);
+            });
+            categoryInput.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+            
+            this.modalEventListeners.newRule.push({ element: categoryInput, event: 'input', handler: categoryHandler });
+        }
+
+        // Máscara de nome para subcategoria (opcional)
+        const subcategoryInput = document.getElementById('rec-new-subcategory');
+        if (subcategoryInput) {
+            const subcategoryHandler = (e) => {
+                this.applyNameMask(e.target);
+            };
+            
+            subcategoryInput.addEventListener('input', subcategoryHandler);
+            this.modalEventListeners.newRule.push({ element: subcategoryInput, event: 'input', handler: subcategoryHandler });
+        }
+
+        // Máscara de nome para remetente/destinatário (opcional)
+        const senderReceiverInput = document.getElementById('rec-new-sender-receiver');
+        if (senderReceiverInput) {
+            const senderReceiverHandler = (e) => {
+                this.applyNameMask(e.target);
+            };
+            
+            senderReceiverInput.addEventListener('input', senderReceiverHandler);
+            this.modalEventListeners.newRule.push({ element: senderReceiverInput, event: 'input', handler: senderReceiverHandler });
+        }
+
+        // Validação de tipo (obrigatório)
+        const typeSelect = document.getElementById('rec-new-type');
+        if (typeSelect) {
+            const typeHandler = (e) => {
+                this.validateType(e.target);
+            };
+            
+            typeSelect.addEventListener('change', typeHandler);
+            typeSelect.addEventListener('blur', typeHandler);
+            typeSelect.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+            
+            this.modalEventListeners.newRule.push({ element: typeSelect, event: 'change', handler: typeHandler });
+        }
+
+        // Validação de tipo de recorrência (obrigatório)
+        const recurrenceTypeSelect = document.getElementById('rec-new-recurrence-type');
+        if (recurrenceTypeSelect) {
+            const recurrenceTypeHandler = (e) => {
+                this.validateRecurrenceType(e.target);
+            };
+            
+            recurrenceTypeSelect.addEventListener('change', recurrenceTypeHandler);
+            recurrenceTypeSelect.addEventListener('blur', recurrenceTypeHandler);
+            recurrenceTypeSelect.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+            
+            this.modalEventListeners.newRule.push({ element: recurrenceTypeSelect, event: 'change', handler: recurrenceTypeHandler });
+        }
+
+        // Validação de dia de recorrência (obrigatório)
+        const recurrenceDayInput = document.getElementById('rec-new-recurrence-day');
+        if (recurrenceDayInput) {
+            const recurrenceDayHandler = (e) => {
+                this.validateRecurrenceDay(e.target);
+            };
+            
+            recurrenceDayInput.addEventListener('input', recurrenceDayHandler);
+            recurrenceDayInput.addEventListener('blur', recurrenceDayHandler);
+            recurrenceDayInput.addEventListener('focus', (e) => {
+                clearFieldValidation(e.target);
+            });
+            
+            this.modalEventListeners.newRule.push({ element: recurrenceDayInput, event: 'input', handler: recurrenceDayHandler });
+        }
+
+        // Validação de descrição (opcional, mas com limite de caracteres)
+        const descriptionInput = document.getElementById('rec-new-description');
+        if (descriptionInput) {
+            const descriptionHandler = (e) => {
+                this.validateDescription(e.target);
+            };
+            
+            descriptionInput.addEventListener('input', descriptionHandler);
+            descriptionInput.addEventListener('blur', descriptionHandler);
+            
+            this.modalEventListeners.newRule.push({ element: descriptionInput, event: 'input', handler: descriptionHandler });
+        }
+    }
+
+    /**
+     * ALTERAÇÃO: Aplica máscara monetária brasileira (R$ 0,00)
+     * @param {HTMLInputElement} input - Campo de input
+     */
+    applyCurrencyMask(input) {
+        let value = input.value;
+        
+        // Remover tudo exceto números e vírgula
+        value = value.replace(/[^\d,]/g, '');
+        
+        // Garantir apenas uma vírgula
+        const parts = value.split(',');
+        if (parts.length > 2) {
+            value = parts[0] + ',' + parts.slice(1).join('');
+        }
+        
+        // Limitar a 2 casas decimais após a vírgula
+        if (parts.length === 2 && parts[1].length > 2) {
+            value = parts[0] + ',' + parts[1].substring(0, 2);
+        }
+        
+        if (value === '' || value === ',') {
+            input.value = '';
+            return;
+        }
+        
+        // Separar parte inteira e decimal
+        let [integerPart, decimalPart = ''] = value.split(',');
+        
+        // Remover zeros à esquerda da parte inteira
+        integerPart = integerPart.replace(/^0+/, '') || '0';
+        
+        // Formatar parte inteira com pontos de milhar
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        
+        // Combinar partes
+        input.value = decimalPart ? `${integerPart},${decimalPart}` : integerPart;
+    }
+
+    /**
+     * ALTERAÇÃO: Aplica máscara de nome (letras, números e caracteres especiais permitidos)
+     * @param {HTMLInputElement} input - Campo de input
+     */
+    applyNameMask(input) {
+        let value = input.value;
+        // Permitir letras (incluindo acentos), números, espaços, pontos, hífens, apóstrofos, vírgulas, & e parênteses
+        value = value.replace(/[^A-Za-zÀ-ÿ0-9\s\.\-\',&()]/g, '');
+        input.value = value;
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de valor monetário
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateValue(input) {
+        const value = input.value.replace(/\./g, '').replace(',', '.');
+        const numValue = parseFloat(value);
+        
+        if (!value || value.trim() === '') {
+            return applyFieldValidation(input, () => ({ valid: false, message: 'Valor é obrigatório' }));
+        }
+        
+        if (isNaN(numValue) || numValue <= 0) {
+            return applyFieldValidation(input, () => ({ valid: false, message: 'Valor deve ser maior que zero' }));
+        }
+        
+        return applyFieldValidation(input, () => ({ valid: true, message: '' }));
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de nome
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateName(input) {
+        return applyFieldValidation(
+            input,
+            (value) => validateRequired(value, 'Nome'),
+            true
+        );
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de categoria
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateCategory(input) {
+        return applyFieldValidation(
+            input,
+            (value) => validateRequired(value, 'Categoria'),
+            true
+        );
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de tipo
+     * @param {HTMLSelectElement} input - Campo de select
+     * @returns {boolean} True se válido
+     */
+    validateType(input) {
+        return applyFieldValidation(
+            input,
+            (value) => validateRequired(value, 'Tipo'),
+            true
+        );
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de tipo de recorrência
+     * @param {HTMLSelectElement} input - Campo de select
+     * @returns {boolean} True se válido
+     */
+    validateRecurrenceType(input) {
+        return applyFieldValidation(
+            input,
+            (value) => validateRequired(value, 'Tipo de Recorrência'),
+            true
+        );
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de dia de recorrência
+     * @param {HTMLInputElement} input - Campo de input
+     * @returns {boolean} True se válido
+     */
+    validateRecurrenceDay(input) {
+        const recurrenceTypeSelect = document.getElementById('rec-new-recurrence-type');
+        const recurrenceType = recurrenceTypeSelect?.value;
+        
+        if (!recurrenceType) {
+            return applyFieldValidation(
+                input,
+                () => ({ valid: false, message: 'Selecione o tipo de recorrência primeiro' }),
+                true
+            );
+        }
+        
+        const dayValue = parseInt(input.value, 10);
+        let min = 1;
+        let max = 31;
+        
+        switch (recurrenceType) {
+            case 'MONTHLY':
+                min = 1;
+                max = 31;
+                break;
+            case 'WEEKLY':
+                min = 1;
+                max = 7;
+                break;
+            case 'YEARLY':
+                min = 1;
+                max = 365;
+                break;
+        }
+        
+        if (!input.value || input.value.trim() === '') {
+            return applyFieldValidation(
+                input,
+                () => ({ valid: false, message: 'Dia da recorrência é obrigatório' }),
+                true
+            );
+        }
+        
+        if (isNaN(dayValue) || dayValue < min || dayValue > max) {
+            return applyFieldValidation(
+                input,
+                () => ({ valid: false, message: `Dia deve estar entre ${min} e ${max}` }),
+                true
+            );
+        }
+        
+        return applyFieldValidation(input, () => ({ valid: true, message: '' }), true);
+    }
+
+    /**
+     * ALTERAÇÃO: Valida campo de descrição
+     * @param {HTMLTextAreaElement} input - Campo de textarea
+     * @returns {boolean} True se válido
+     */
+    validateDescription(input) {
+        return applyFieldValidation(
+            input,
+            (value) => validateLength(value || '', { maxLength: 500, fieldName: 'Descrição' }),
+            true
+        );
+    }
+
+    /**
+     * ALTERAÇÃO: Formata valor monetário para exibição no input
+     * @param {number|string} value - Valor a formatar
+     * @returns {string} Valor formatado
+     */
+    formatCurrencyInput(value) {
+        if (!value || value === '') return '';
+        const numValue = parseFloat(value) || 0;
+        return numValue.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 }
 

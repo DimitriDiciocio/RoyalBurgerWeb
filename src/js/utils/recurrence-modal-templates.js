@@ -3,7 +3,25 @@
  * Centraliza o HTML dos modais para melhor manutenção
  */
 
-import { escapeHTML } from './html-sanitizer.js';
+import { escapeHTML, escapeAttribute } from './html-sanitizer.js';
+
+/**
+ * ALTERAÇÃO: Valida ID de regra para prevenir XSS e injeção
+ * @param {any} id - ID a ser validado
+ * @returns {number|null} ID validado ou null se inválido
+ */
+function validateRuleId(id) {
+    if (!id) return null;
+    
+    // Validar se é string ou número
+    const idStr = String(id).trim();
+    if (!/^\d+$/.test(idStr)) return null; // Apenas números
+    
+    const parsed = parseInt(idStr, 10);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= 2147483647
+        ? parsed
+        : null;
+}
 
 /**
  * Template para modal de criação de nova regra de recorrência
@@ -48,8 +66,8 @@ export function getNewRuleModalTemplate() {
 
                     <div class="form-field-wrapper">
                         <div class="div-input">
-                            <input type="number" id="rec-new-value" 
-                                   step="0.01" min="0.01" required placeholder="0.00">
+                            <input type="text" id="rec-new-value" 
+                                   inputmode="decimal" required placeholder="0,00">
                             <label for="rec-new-value">Valor *</label>
                         </div>
                     </div>
@@ -123,15 +141,30 @@ export function getNewRuleModalTemplate() {
  * @returns {string} HTML do modal
  */
 export function getEditRuleModalTemplate(rule) {
-    const ruleId = rule.id || rule.rule_id;
+    // ALTERAÇÃO: Validar ruleId para prevenir XSS
+    const rawRuleId = rule.id || rule.rule_id;
+    const ruleId = validateRuleId(rawRuleId);
+    if (!ruleId) {
+        // ALTERAÇÃO: Se ID inválido, retornar template vazio ou erro
+        // TODO: REVISAR - Considerar lançar erro ou retornar template de erro
+        return '';
+    }
+    
     const ruleName = escapeHTML(rule.name || '');
     const description = escapeHTML(rule.description || '');
-    const value = parseFloat(rule.value || rule.amount || 0);
+    // ALTERAÇÃO: Validar valor numérico para prevenir NaN
+    const value = Number.isFinite(parseFloat(rule.value || rule.amount || 0))
+        ? parseFloat(rule.value || rule.amount || 0)
+        : 0;
     const type = rule.type || 'EXPENSE';
     const category = escapeHTML(rule.category || '');
     const subcategory = escapeHTML(rule.subcategory || '');
     const recurrenceType = rule.recurrence_type || rule.recurrenceType || 'MONTHLY';
-    const recurrenceDay = rule.recurrence_day || rule.recurrenceDay || 1;
+    // ALTERAÇÃO: Validar recurrenceDay para prevenir valores inválidos
+    const rawRecurrenceDay = rule.recurrence_day || rule.recurrenceDay || 1;
+    const recurrenceDay = Number.isInteger(parseInt(rawRecurrenceDay, 10)) && parseInt(rawRecurrenceDay, 10) > 0
+        ? parseInt(rawRecurrenceDay, 10)
+        : 1;
     const senderReceiver = escapeHTML(rule.sender_receiver || '');
     const notes = escapeHTML(rule.notes || '');
 
@@ -147,7 +180,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <input type="text" id="rec-name" 
-                                   value="${ruleName}" required placeholder="Ex: Aluguel, Salário, etc.">
+                                   value="${escapeAttribute(ruleName)}" required placeholder="Ex: Aluguel, Salário, etc.">
                             <label for="rec-name" class="${ruleName ? 'active' : ''}">Nome *</label>
                         </div>
                     </div>
@@ -155,7 +188,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <textarea id="rec-description" rows="3" 
-                                      placeholder="Descrição da regra">${description}</textarea>
+                                      placeholder="Descrição da regra">${escapeAttribute(description)}</textarea>
                             <label for="rec-description" class="${description ? 'active' : ''}">Descrição</label>
                         </div>
                     </div>
@@ -173,7 +206,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <input type="number" id="rec-value" step="0.01" min="0" 
-                                   value="${value}" required placeholder="0.00">
+                                   value="${escapeAttribute(String(value))}" required placeholder="0.00">
                             <label for="rec-value" class="${value ? 'active' : ''}">Valor *</label>
                         </div>
                     </div>
@@ -181,7 +214,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <input type="text" id="rec-category" 
-                                   value="${category}" placeholder="Ex: Alimentação, Salário, etc.">
+                                   value="${escapeAttribute(category)}" placeholder="Ex: Alimentação, Salário, etc.">
                             <label for="rec-category" class="${category ? 'active' : ''}">Categoria</label>
                         </div>
                     </div>
@@ -189,7 +222,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <input type="text" id="rec-subcategory" 
-                                   value="${subcategory}" 
+                                   value="${escapeAttribute(subcategory)}" 
                                    placeholder="Ex: Aluguel, Salário, etc.">
                             <label for="rec-subcategory" class="${subcategory ? 'active' : ''}">Subcategoria</label>
                         </div>
@@ -209,7 +242,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <input type="number" id="rec-recurrence-day" 
-                                   min="1" max="31" value="${recurrenceDay}" required 
+                                   min="1" max="31" value="${escapeAttribute(String(recurrenceDay))}" required 
                                    placeholder="Dia do mês (1-31) ou dia da semana (1-7)">
                             <label for="rec-recurrence-day" class="${recurrenceDay ? 'active' : ''}">Dia da Recorrência *</label>
                         </div>
@@ -218,7 +251,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <input type="text" id="rec-sender-receiver" 
-                                   value="${senderReceiver}" 
+                                   value="${escapeAttribute(senderReceiver)}" 
                                    placeholder="Ex: Empresa XYZ, João Silva, etc.">
                             <label for="rec-sender-receiver" class="${senderReceiver ? 'active' : ''}">Remetente/Destinatário</label>
                         </div>
@@ -227,7 +260,7 @@ export function getEditRuleModalTemplate(rule) {
                     <div class="form-field-wrapper">
                         <div class="div-input">
                             <textarea id="rec-notes" rows="3" 
-                                      placeholder="Observações adicionais">${notes}</textarea>
+                                      placeholder="Observações adicionais">${escapeAttribute(notes)}</textarea>
                             <label for="rec-notes" class="${notes ? 'active' : ''}">Observações</label>
                         </div>
                     </div>

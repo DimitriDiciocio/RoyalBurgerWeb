@@ -34,7 +34,7 @@ export class GruposInsumosManager {
     async init() {
         // Evitar inicialização múltipla
         if (this.isInitialized) {
-            console.log('GruposInsumosManager já inicializado');
+            // ALTERAÇÃO: Removido console.log - não necessário em produção
             return;
         }
 
@@ -43,7 +43,7 @@ export class GruposInsumosManager {
             await this.carregarDados();
             this.isInitialized = true;
         } catch (error) {
-            console.error('Erro ao inicializar gerenciador de grupos de insumos:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar dados', { type: 'error' });
         }
     }
@@ -110,7 +110,7 @@ export class GruposInsumosManager {
             await this.carregarInsumosDisponiveis();
 
         } catch (error) {
-            console.error('Erro ao carregar dados:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado pelo chamador
             throw error;
         }
     }
@@ -123,7 +123,7 @@ export class GruposInsumosManager {
             const grupos = await getGroups({ active_only: false });
             this.grupos = grupos || [];
         } catch (error) {
-            console.error('Erro ao carregar grupos:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar grupos', { type: 'error' });
             this.grupos = [];
         }
@@ -131,24 +131,50 @@ export class GruposInsumosManager {
 
     /**
      * Carrega insumos disponíveis da API
+     * ALTERAÇÃO: Garantir que todos os insumos sejam carregados e tratados corretamente
      */
     async carregarInsumosDisponiveis() {
         try {
+            // ALTERAÇÃO: Buscar todos os insumos sem filtro de status para exibir todos disponíveis
             const response = await getIngredients({ page_size: 1000 });
-            if (response && response.items) {
-                this.insumosDisponiveis = response.items;
+            
+            // ALTERAÇÃO: Verificar se a resposta foi bem-sucedida
+            if (!response || !response.success) {
+                throw new Error(response?.error || 'Erro ao buscar insumos');
+            }
+            
+            // ALTERAÇÃO: Garantir que sempre seja um array válido
+            let items = response.data?.items || [];
+            
+            // ALTERAÇÃO: Incluir todos os insumos (ativos e inativos) para permitir adicionar qualquer insumo ao grupo
+            // O status será exibido visualmente, mas não impedirá a adição
+            this.insumosDisponiveis = items;
+            
+            // ALTERAÇÃO: Se não houver insumos, garantir array vazio
+            if (!Array.isArray(this.insumosDisponiveis)) {
+                this.insumosDisponiveis = [];
             }
         } catch (error) {
-            console.error('Erro ao carregar insumos:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar insumos disponíveis', { type: 'error' });
+            // ALTERAÇÃO: Garantir array vazio em caso de erro
+            this.insumosDisponiveis = [];
         }
     }
 
     /**
      * Abre modal principal de grupos
-     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
+     * ALTERAÇÃO: Garantir que dados estejam atualizados ao abrir modal
      */
-    abrirModalGrupos() {
+    async abrirModalGrupos() {
+        // ALTERAÇÃO: Recarregar grupos e insumos para garantir dados atualizados
+        try {
+            await this.carregarGrupos();
+            await this.carregarInsumosDisponiveis();
+        } catch (error) {
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
+        }
+        
         this.renderizarGrupos();
         
         // ALTERAÇÃO: Usar sistema centralizado de modais
@@ -312,7 +338,7 @@ export class GruposInsumosManager {
             await this.carregarGrupos();
             this.renderizarGrupos();
         } catch (error) {
-            console.error('Erro ao salvar grupo:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             const mensagem = error.message || 'Erro ao salvar grupo';
             showToast(mensagem, { type: 'error' });
         }
@@ -349,7 +375,7 @@ export class GruposInsumosManager {
             await this.carregarGrupos();
             this.renderizarGrupos();
         } catch (error) {
-            console.error('Erro ao excluir grupo:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             const mensagem = error.message || 'Erro ao excluir grupo';
             showToast(mensagem, { type: 'error' });
         }
@@ -386,7 +412,7 @@ export class GruposInsumosManager {
                 }
             }
         } catch (error) {
-            console.error('Erro ao abrir modal de insumos:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar insumos do grupo', { type: 'error' });
         }
     }
@@ -481,7 +507,7 @@ export class GruposInsumosManager {
             this.grupoAtual = grupoAtualizado;
             this.renderizarInsumosGrupo();
         } catch (error) {
-            console.error('Erro ao remover insumo:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             const mensagem = error.message || 'Erro ao remover insumo do grupo';
             showToast(mensagem, { type: 'error' });
         }
@@ -498,10 +524,18 @@ export class GruposInsumosManager {
 
     /**
      * Abre modal de seleção de insumos
-     * ALTERAÇÃO: Usar sistema centralizado de modais.js e utils.js
+     * ALTERAÇÃO: Garantir que insumos estejam carregados antes de abrir a modal
      */
-    abrirModalSelecaoInsumos() {
+    async abrirModalSelecaoInsumos() {
+        // ALTERAÇÃO: Limpar seleções anteriores
         this.insumosSelecionados.clear();
+        
+        // ALTERAÇÃO: Recarregar insumos disponíveis se necessário
+        if (!Array.isArray(this.insumosDisponiveis) || this.insumosDisponiveis.length === 0) {
+            await this.carregarInsumosDisponiveis();
+        }
+        
+        // ALTERAÇÃO: Renderizar insumos disponíveis
         this.renderizarInsumosDisponiveis();
         
         // ALTERAÇÃO: Usar sistema centralizado de modais
@@ -513,6 +547,12 @@ export class GruposInsumosManager {
             const inputs = modal.querySelectorAll('input, select, textarea');
             if (inputs.length > 0) {
                 gerenciarInputsEspecificos(inputs);
+            }
+            
+            // ALTERAÇÃO: Limpar campo de busca ao abrir modal
+            const buscaInput = document.getElementById('busca-insumo-modal');
+            if (buscaInput) {
+                buscaInput.value = '';
             }
         }
     }
@@ -532,23 +572,53 @@ export class GruposInsumosManager {
 
     /**
      * Renderiza insumos disponíveis para seleção
+     * ALTERAÇÃO: Garantir que todos os insumos disponíveis sejam exibidos
      */
     renderizarInsumosDisponiveis(filtro = '') {
         const lista = document.getElementById('lista-insumos-selecao');
         if (!lista) return;
 
+        // ALTERAÇÃO: Garantir que insumosDisponiveis seja um array válido
+        if (!Array.isArray(this.insumosDisponiveis)) {
+            this.insumosDisponiveis = [];
+        }
+
         // Filtrar insumos que já não estão no grupo
         const insumosJaVinculados = this.grupoAtual?.ingredients || [];
-        const idsJaVinculados = insumosJaVinculados.map(i => i.id);
+        // ALTERAÇÃO: Converter IDs para números para comparação correta
+        const idsJaVinculados = insumosJaVinculados.map(i => parseInt(i.id)).filter(id => !isNaN(id));
         
+        // ALTERAÇÃO: Filtrar insumos não vinculados e que correspondem ao filtro de busca
         const insumosParaMostrar = this.insumosDisponiveis.filter(insumo => {
-            const naoVinculado = !idsJaVinculados.includes(insumo.id);
-            const matchFiltro = !filtro || insumo.name.toLowerCase().includes(filtro.toLowerCase());
+            // Verificar se insumo tem ID válido
+            if (!insumo || !insumo.id) return false;
+            
+            // ALTERAÇÃO: Converter ID para número para comparação correta
+            const insumoId = parseInt(insumo.id);
+            if (isNaN(insumoId)) return false;
+            
+            // Verificar se não está vinculado ao grupo
+            const naoVinculado = !idsJaVinculados.includes(insumoId);
+            
+            // Verificar se corresponde ao filtro de busca (nome)
+            const matchFiltro = !filtro || 
+                (insumo.name && insumo.name.toLowerCase().includes(filtro.toLowerCase()));
+            
             return naoVinculado && matchFiltro;
         });
 
+        // ALTERAÇÃO: Ordenar insumos por nome para facilitar busca
+        insumosParaMostrar.sort((a, b) => {
+            const nomeA = (a.name || '').toLowerCase();
+            const nomeB = (b.name || '').toLowerCase();
+            return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
+        });
+
         if (insumosParaMostrar.length === 0) {
-            lista.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">Nenhum insumo disponível</p>';
+            const mensagem = filtro 
+                ? `Nenhum insumo disponível encontrado para "${filtro}"`
+                : 'Nenhum insumo disponível para adicionar ao grupo';
+            lista.innerHTML = `<p style="text-align: center; color: #888; padding: 20px;">${mensagem}</p>`;
             return;
         }
 
@@ -646,7 +716,7 @@ export class GruposInsumosManager {
             this.grupoAtual = grupoAtualizado;
             this.renderizarInsumosGrupo();
         } catch (error) {
-            console.error('Erro ao adicionar insumos:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             const mensagem = error.message || 'Erro ao adicionar insumos ao grupo';
             showToast(mensagem, { type: 'error' });
         }
