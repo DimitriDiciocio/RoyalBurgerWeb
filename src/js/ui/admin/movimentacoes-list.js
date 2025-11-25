@@ -122,7 +122,7 @@ export class MovementsList {
                 </div>
 
                 <!-- Paginação -->
-                <div class="pagination-container" id="pagination-container">
+                <div class="pagination" id="pagination-container">
                     <!-- Será preenchido dinamicamente -->
                 </div>
             </div>
@@ -222,7 +222,13 @@ export class MovementsList {
 
         this.isLoading = true;
         try {
-            const response = await getFinancialMovements(this.filters);
+            // ALTERAÇÃO: Incluir parâmetros de paginação nos filtros
+            const filtersWithPagination = {
+                ...this.filters,
+                page: this.currentPage,
+                page_size: this.pageSize
+            };
+            const response = await getFinancialMovements(filtersWithPagination);
             
             // Tratar resposta como array ou objeto com paginação
             if (Array.isArray(response)) {
@@ -249,7 +255,10 @@ export class MovementsList {
                 title: 'Erro'
             });
             this.movements = [];
+            this.totalItems = 0;
+            this.totalPages = 1;
             this.renderTable();
+            this.renderPagination(); // ALTERAÇÃO: Garantir que paginação seja renderizada mesmo em caso de erro
         } finally {
             this.isLoading = false;
         }
@@ -342,12 +351,13 @@ export class MovementsList {
         const container = document.getElementById('pagination-container');
         if (!container) return;
 
-        if (this.totalPages <= 1) {
+        // ALTERAÇÃO: Sempre renderizar paginação se houver itens, mesmo que seja apenas 1 página
+        if (this.totalItems === 0) {
             container.innerHTML = '';
             return;
         }
 
-        const startItem = this.totalItems === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+        const startItem = (this.currentPage - 1) * this.pageSize + 1;
         const endItem = Math.min(this.currentPage * this.pageSize, this.totalItems);
 
         container.innerHTML = `
@@ -360,16 +370,16 @@ export class MovementsList {
                 </div>
                 ${this.totalPages > 1 ? `
                 <div class="pagination-controls">
-                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" aria-label="Página anterior">
-                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+                        <i class="fa-solid fa-chevron-left"></i>
                         <span>Anterior</span>
                     </button>
-                    <div class="pagination-numbers">
-                        ${this.generatePaginationNumbers()}
+                    <div class="pagination-pages">
+                        ${this.generatePageNumbers()}
                     </div>
-                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" aria-label="Próxima página">
+                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
                         <span>Próxima</span>
-                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        <i class="fa-solid fa-chevron-right"></i>
                     </button>
                 </div>
                 ` : ''}
@@ -378,45 +388,62 @@ export class MovementsList {
     }
 
     /**
-     * Gera números de paginação
+     * ALTERAÇÃO: Gera números de paginação usando padrão das outras seções
      * @returns {string} HTML dos números de paginação
      */
-    generatePaginationNumbers() {
-        const maxVisible = 5;
+    generatePageNumbers() {
         const pages = [];
-        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
-        let endPage = Math.min(this.totalPages, startPage + maxVisible - 1);
-
-        if (endPage - startPage < maxVisible - 1) {
-            startPage = Math.max(1, endPage - maxVisible + 1);
+        const maxVisible = 7; // Máximo de números de página visíveis
+        
+        if (this.totalPages <= maxVisible) {
+            // Se houver poucas páginas, mostrar todas
+            for (let i = 1; i <= this.totalPages; i++) {
+                pages.push(
+                    `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+                );
+            }
+            return pages.join("");
         }
 
-        if (startPage > 1) {
-            pages.push(`<button class="pagination-btn" data-page="1" aria-label="Ir para página 1">1</button>`);
-            if (startPage > 2) {
-                pages.push(`<span class="pagination-ellipsis">...</span>`);
+        // Lógica para muitas páginas
+        let startPage = Math.max(1, this.currentPage - 2);
+        let endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+        // Ajustar início se estiver no final
+        if (endPage - startPage < 4) {
+            if (this.currentPage <= 3) {
+                startPage = 1;
+                endPage = Math.min(5, this.totalPages);
+            } else if (this.currentPage >= this.totalPages - 2) {
+                startPage = Math.max(1, this.totalPages - 4);
+                endPage = this.totalPages;
             }
         }
 
-        for (let i = startPage; i <= endPage; i++) {
-            pages.push(`
-                <button class="pagination-btn ${i === this.currentPage ? 'active' : ''}" 
-                        data-page="${i}" 
-                        aria-label="Ir para página ${i}"
-                        ${i === this.currentPage ? 'aria-current="page"' : ''}>
-                    ${i}
-                </button>
-            `);
+        // Primeira página
+        if (startPage > 1) {
+            pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+            if (startPage > 2) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
         }
 
+        // Páginas do meio
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(
+                `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+            );
+        }
+
+        // Última página
         if (endPage < this.totalPages) {
             if (endPage < this.totalPages - 1) {
-                pages.push(`<span class="pagination-ellipsis">...</span>`);
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
             }
-            pages.push(`<button class="pagination-btn" data-page="${this.totalPages}" aria-label="Ir para página ${this.totalPages}">${this.totalPages}</button>`);
+            pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página">${this.totalPages}</button>`);
         }
 
-        return pages.join('');
+        return pages.join("");
     }
 
     /**
@@ -540,31 +567,50 @@ export class MovementsList {
             });
         }
 
-        // Event delegation para paginação
+        // ALTERAÇÃO: Event delegation para paginação usando padrão das outras seções
         const paginationContainer = document.getElementById('pagination-container');
         if (paginationContainer) {
             paginationContainer.addEventListener('click', (e) => {
-                const button = e.target.closest('[data-page]');
-                if (!button || button.disabled) return;
-
-                const page = button.dataset.page;
-                if (page === 'prev') {
-                    if (this.currentPage > 1) {
-                        this.currentPage--;
-                        this.loadMovements();
-                    }
-                } else if (page === 'next') {
-                    if (this.currentPage < this.totalPages) {
-                        this.currentPage++;
-                        this.loadMovements();
-                    }
-                } else {
-                    const pageNum = parseInt(page);
-                    if (pageNum && pageNum !== this.currentPage) {
-                        this.currentPage = pageNum;
-                        this.loadMovements();
-                    }
+                const target = e.target.closest('.pagination-btn, .page-number');
+                if (!target) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (this.isLoading) {
+                    return;
                 }
+                
+                // Verificar se é botão de navegação
+                if (target.classList.contains('pagination-btn')) {
+                    if (target.disabled) {
+                        return;
+                    }
+                    
+                    const action = target.dataset.page;
+                    
+                    if (action === "prev" && this.currentPage > 1) {
+                        this.currentPage = Math.max(1, this.currentPage - 1);
+                    } else if (action === "next" && this.currentPage < this.totalPages) {
+                        this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+                    } else {
+                        return;
+                    }
+                } 
+                // Verificar se é número de página
+                else if (target.classList.contains('page-number')) {
+                    const page = parseInt(target.dataset.page);
+                    
+                    if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+                        return;
+                    }
+                    
+                    this.currentPage = page;
+                } else {
+                    return;
+                }
+                
+                this.loadMovements();
             });
         }
     }

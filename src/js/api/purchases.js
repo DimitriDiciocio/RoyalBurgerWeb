@@ -19,9 +19,12 @@ export async function createPurchaseInvoice(invoiceData) {
 }
 
 /**
- * Lista notas fiscais de compra com filtros
- * @param {Object} filters - Filtros de busca
- * @returns {Promise<Array>}
+ * Lista notas fiscais de compra com filtros e paginação
+ * ALTERAÇÃO: Adicionado suporte a paginação
+ * @param {Object} filters - Filtros de busca e paginação
+ * @param {number} filters.page - Número da página (opcional, default: 1)
+ * @param {number} filters.page_size - Itens por página (opcional, default: 100)
+ * @returns {Promise<Object>} Objeto com items, total, page, page_size, total_pages
  */
 export async function getPurchaseInvoices(filters = {}) {
     const params = new URLSearchParams();
@@ -29,9 +32,25 @@ export async function getPurchaseInvoices(filters = {}) {
     if (filters.end_date) params.append('end_date', filters.end_date);
     if (filters.supplier_name) params.append('supplier_name', filters.supplier_name);
     if (filters.payment_status) params.append('payment_status', filters.payment_status);
+    // ALTERAÇÃO: Adicionar parâmetros de paginação
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.page_size) params.append('page_size', filters.page_size.toString());
     
     const url = `${PURCHASES_API_BASE}/invoices${params.toString() ? '?' + params.toString() : ''}`;
-    return apiRequest(url, { method: 'GET' });
+    const response = await apiRequest(url, { method: 'GET' });
+    
+    // ALTERAÇÃO: Compatibilidade com formato antigo (array) e novo (objeto com paginação)
+    if (Array.isArray(response)) {
+        return {
+            items: response,
+            total: response.length,
+            page: 1,
+            page_size: response.length,
+            total_pages: 1
+        };
+    }
+    
+    return response;
 }
 
 /**

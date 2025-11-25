@@ -28,6 +28,11 @@ export class ComprasManager {
             supplier_name: null,
             payment_status: null
         };
+        // ALTERAÇÃO: Adicionar propriedades de paginação
+        this.currentPage = 1;
+        this.pageSize = 50;
+        this.totalItems = 0;
+        this.totalPages = 1;
         this.isInitialized = false;
         this.isLoading = false;
         this.compraForm = null;
@@ -111,6 +116,11 @@ export class ComprasManager {
                 <div class="compras-list" id="compras-list">
                     <!-- Será preenchido dinamicamente -->
                 </div>
+
+                <!-- ALTERAÇÃO: Paginação -->
+                <div class="pagination" id="compras-pagination-container">
+                    <!-- Será preenchido dinamicamente -->
+                </div>
             </div>
         `;
     }
@@ -126,18 +136,32 @@ export class ComprasManager {
 
         this.isLoading = true;
         try {
-            const response = await getPurchaseInvoices(this.filters);
+            // ALTERAÇÃO: Incluir parâmetros de paginação nos filtros
+            const filtersWithPagination = {
+                ...this.filters,
+                page: this.currentPage,
+                page_size: this.pageSize
+            };
+            const response = await getPurchaseInvoices(filtersWithPagination);
 
             // Tratar resposta como array ou objeto com items
             if (Array.isArray(response)) {
                 this.invoices = response;
+                this.totalItems = response.length;
+                this.totalPages = Math.ceil(this.totalItems / this.pageSize);
             } else if (response && response.items) {
+                // Resposta paginada
                 this.invoices = response.items || [];
+                this.totalItems = response.total || response.items.length;
+                this.totalPages = response.total_pages || Math.ceil(this.totalItems / this.pageSize);
             } else {
                 this.invoices = [];
+                this.totalItems = 0;
+                this.totalPages = 1;
             }
 
             this.renderInvoicesList();
+            this.renderPagination();
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao carregar compras', {
@@ -145,7 +169,10 @@ export class ComprasManager {
                 title: 'Erro'
             });
             this.invoices = [];
+            this.totalItems = 0;
+            this.totalPages = 1;
             this.renderInvoicesList();
+            this.renderPagination(); // ALTERAÇÃO: Garantir que paginação seja renderizada mesmo em caso de erro
         } finally {
             this.isLoading = false;
         }
@@ -339,6 +366,53 @@ export class ComprasManager {
                 }
             });
         }
+
+        // ALTERAÇÃO: Event delegation para paginação usando padrão das outras seções
+        const paginationContainer = document.getElementById('compras-pagination-container');
+        if (paginationContainer) {
+            paginationContainer.addEventListener('click', (e) => {
+                const target = e.target.closest('.pagination-btn, .page-number');
+                if (!target) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (this.isLoading) {
+                    return;
+                }
+                
+                // Verificar se é botão de navegação
+                if (target.classList.contains('pagination-btn')) {
+                    if (target.disabled) {
+                        return;
+                    }
+                    
+                    const action = target.dataset.page;
+                    
+                    if (action === "prev" && this.currentPage > 1) {
+                        this.currentPage = Math.max(1, this.currentPage - 1);
+                    } else if (action === "next" && this.currentPage < this.totalPages) {
+                        this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+                    } else {
+                        return;
+                    }
+                } 
+                // Verificar se é número de página
+                else if (target.classList.contains('page-number')) {
+                    const page = parseInt(target.dataset.page);
+                    
+                    if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+                        return;
+                    }
+                    
+                    this.currentPage = page;
+                } else {
+                    return;
+                }
+                
+                this.loadInvoices();
+            });
+        }
     }
 
     /**
@@ -361,6 +435,7 @@ export class ComprasManager {
             payment_status: status || null
         };
 
+        this.currentPage = 1; // ALTERAÇÃO: Resetar para primeira página ao aplicar filtros
         this.loadInvoices();
     }
 
@@ -891,15 +966,21 @@ export class ComprasManager {
 
         let allIngredients = [];
         if (cached) {
-            allIngredients = cached;
+            // ALTERAÇÃO: Garantir que cached seja um array antes de usar
+            allIngredients = Array.isArray(cached) ? cached : [];
         } else {
             try {
                 const response = await getIngredients({ page_size: 1000, status: 'active' });
-                allIngredients = response.items || response || [];
+                allIngredients = Array.isArray(response.items) ? response.items : (Array.isArray(response) ? response : []);
                 cacheManager.set(cacheKey, allIngredients, 5 * 60 * 1000);
             } catch (error) {
                 allIngredients = [];
             }
+        }
+
+        // ALTERAÇÃO: Garantir que allIngredients seja um array antes de usar filter
+        if (!Array.isArray(allIngredients)) {
+            allIngredients = [];
         }
 
         // ALTERAÇÃO: Filtrar ingredientes por fornecedor se fornecido (comparação case-insensitive)
@@ -1672,6 +1753,108 @@ export class ComprasManager {
                 title: 'Erro'
             });
         }
+    }
+
+    /**
+     * ALTERAÇÃO: Renderiza controles de paginação
+     */
+    renderPagination() {
+        const container = document.getElementById('compras-pagination-container');
+        if (!container) return;
+
+        // ALTERAÇÃO: Sempre renderizar paginação se houver itens, mesmo que seja apenas 1 página
+        if (this.totalItems === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const startItem = (this.currentPage - 1) * this.pageSize + 1;
+        const endItem = Math.min(this.currentPage * this.pageSize, this.totalItems);
+
+        container.innerHTML = `
+            <div class="pagination-wrapper">
+                <div class="pagination-info">
+                    <span class="pagination-text">
+                        Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${this.totalItems}</strong> compras
+                    </span>
+                    ${this.totalPages > 1 ? `<span class="pagination-page-info">Página ${this.currentPage} de ${this.totalPages}</span>` : ''}
+                </div>
+                ${this.totalPages > 1 ? `
+                <div class="pagination-controls">
+                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+                        <i class="fa-solid fa-chevron-left"></i>
+                        <span>Anterior</span>
+                    </button>
+                    <div class="pagination-pages">
+                        ${this.generatePageNumbers()}
+                    </div>
+                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
+                        <span>Próxima</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * ALTERAÇÃO: Gera números de paginação usando padrão das outras seções
+     * @returns {string} HTML dos números de paginação
+     */
+    generatePageNumbers() {
+        const pages = [];
+        const maxVisible = 7; // Máximo de números de página visíveis
+        
+        if (this.totalPages <= maxVisible) {
+            // Se houver poucas páginas, mostrar todas
+            for (let i = 1; i <= this.totalPages; i++) {
+                pages.push(
+                    `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+                );
+            }
+            return pages.join("");
+        }
+
+        // Lógica para muitas páginas
+        let startPage = Math.max(1, this.currentPage - 2);
+        let endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+        // Ajustar início se estiver no final
+        if (endPage - startPage < 4) {
+            if (this.currentPage <= 3) {
+                startPage = 1;
+                endPage = Math.min(5, this.totalPages);
+            } else if (this.currentPage >= this.totalPages - 2) {
+                startPage = Math.max(1, this.totalPages - 4);
+                endPage = this.totalPages;
+            }
+        }
+
+        // Primeira página
+        if (startPage > 1) {
+            pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+            if (startPage > 2) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
+        }
+
+        // Páginas do meio
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(
+                `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+            );
+        }
+
+        // Última página
+        if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
+            pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página">${this.totalPages}</button>`);
+        }
+
+        return pages.join("");
     }
 
     /**

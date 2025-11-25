@@ -19,6 +19,10 @@ export class ConciliacaoBancariaManager {
             reconciled: null,
             payment_gateway_id: null
         };
+        // ALTERAÇÃO: Adicionar propriedades de paginação
+        this.currentPage = 1;
+        this.pageSize = 50;
+        this.totalPages = 1;
         this.isInitialized = false;
         this.isLoading = false;
     }
@@ -90,6 +94,11 @@ export class ConciliacaoBancariaManager {
                 <div class="conciliacao-list" id="conciliacao-list">
                     <div class="financial-loading">Carregando...</div>
                 </div>
+
+                <!-- ALTERAÇÃO: Paginação -->
+                <div class="pagination" id="conciliacao-pagination-container">
+                    <!-- Será preenchido dinamicamente -->
+                </div>
             </div>
         `;
     }
@@ -111,9 +120,24 @@ export class ConciliacaoBancariaManager {
                 listContainer.innerHTML = '<div class="financial-loading">Carregando relatório...</div>';
             }
             
-            this.report = await getReconciliationReport(this.filters);
+            // ALTERAÇÃO: Incluir parâmetros de paginação nos filtros
+            const filtersWithPagination = {
+                ...this.filters,
+                page: this.currentPage,
+                page_size: this.pageSize
+            };
+            this.report = await getReconciliationReport(filtersWithPagination);
+            
+            // ALTERAÇÃO: Atualizar totalPages do relatório
+            if (this.report && this.report.total_pages) {
+                this.totalPages = this.report.total_pages;
+            } else if (this.report && this.report.total_movements) {
+                this.totalPages = Math.ceil(this.report.total_movements / this.pageSize);
+            }
+            
             this.renderSummary();
             this.renderMovements();
+            this.renderPagination();
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é tratado e exibido ao usuário via toast
             // console.error('Erro ao carregar relatório de conciliação:', error);
@@ -131,8 +155,10 @@ export class ConciliacaoBancariaManager {
                 title: 'Erro no Relatório'
             });
             this.report = null;
+            this.totalPages = 1;
             this.renderSummary();
             this.renderMovements();
+            this.renderPagination(); // ALTERAÇÃO: Garantir que paginação seja renderizada mesmo em caso de erro
         } finally {
             this.isLoading = false;
         }
@@ -407,6 +433,53 @@ export class ConciliacaoBancariaManager {
                 this.applyFilters();
             });
         }
+
+        // ALTERAÇÃO: Event delegation para paginação usando padrão das outras seções
+        const paginationContainer = document.getElementById('conciliacao-pagination-container');
+        if (paginationContainer) {
+            paginationContainer.addEventListener('click', (e) => {
+                const target = e.target.closest('.pagination-btn, .page-number');
+                if (!target) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (this.isLoading) {
+                    return;
+                }
+                
+                // Verificar se é botão de navegação
+                if (target.classList.contains('pagination-btn')) {
+                    if (target.disabled) {
+                        return;
+                    }
+                    
+                    const action = target.dataset.page;
+                    
+                    if (action === "prev" && this.currentPage > 1) {
+                        this.currentPage = Math.max(1, this.currentPage - 1);
+                    } else if (action === "next" && this.currentPage < this.totalPages) {
+                        this.currentPage = Math.min(this.totalPages, this.currentPage + 1);
+                    } else {
+                        return;
+                    }
+                } 
+                // Verificar se é número de página
+                else if (target.classList.contains('page-number')) {
+                    const page = parseInt(target.dataset.page);
+                    
+                    if (isNaN(page) || page === this.currentPage || page < 1 || page > this.totalPages) {
+                        return;
+                    }
+                    
+                    this.currentPage = page;
+                } else {
+                    return;
+                }
+                
+                this.loadReport();
+            });
+        }
     }
 
     /**
@@ -428,6 +501,7 @@ export class ConciliacaoBancariaManager {
             payment_gateway_id: null
         };
 
+        this.currentPage = 1; // ALTERAÇÃO: Resetar para primeira página ao aplicar filtros
         this.loadReport();
     }
 
@@ -493,6 +567,114 @@ export class ConciliacaoBancariaManager {
             'TAX': 'Imposto'
         };
         return translations[type] || type;
+    }
+
+    /**
+     * ALTERAÇÃO: Renderiza controles de paginação
+     */
+    renderPagination() {
+        const container = document.getElementById('conciliacao-pagination-container');
+        if (!container) return;
+
+        // ALTERAÇÃO: Sempre renderizar paginação se houver itens, mesmo que seja apenas 1 página
+        if (!this.report || !this.report.total_movements) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const totalItems = this.report.total_movements || 0;
+        if (totalItems === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const startItem = (this.currentPage - 1) * this.pageSize + 1;
+        const endItem = Math.min(this.currentPage * this.pageSize, totalItems);
+
+        container.innerHTML = `
+            <div class="pagination-wrapper">
+                <div class="pagination-info">
+                    <span class="pagination-text">
+                        Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${totalItems}</strong> movimentações
+                    </span>
+                    ${this.totalPages > 1 ? `<span class="pagination-page-info">Página ${this.currentPage} de ${this.totalPages}</span>` : ''}
+                </div>
+                ${this.totalPages > 1 ? `
+                <div class="pagination-controls">
+                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev" title="Página anterior">
+                        <i class="fa-solid fa-chevron-left"></i>
+                        <span>Anterior</span>
+                    </button>
+                    <div class="pagination-pages">
+                        ${this.generatePageNumbers()}
+                    </div>
+                    <button class="pagination-btn pagination-btn-nav" ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="next" title="Próxima página">
+                        <span>Próxima</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * ALTERAÇÃO: Gera números de paginação usando padrão das outras seções
+     * @returns {string} HTML dos números de paginação
+     */
+    generatePageNumbers() {
+        const pages = [];
+        const maxVisible = 7; // Máximo de números de página visíveis
+        
+        if (this.totalPages <= maxVisible) {
+            // Se houver poucas páginas, mostrar todas
+            for (let i = 1; i <= this.totalPages; i++) {
+                pages.push(
+                    `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+                );
+            }
+            return pages.join("");
+        }
+
+        // Lógica para muitas páginas
+        let startPage = Math.max(1, this.currentPage - 2);
+        let endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+        // Ajustar início se estiver no final
+        if (endPage - startPage < 4) {
+            if (this.currentPage <= 3) {
+                startPage = 1;
+                endPage = Math.min(5, this.totalPages);
+            } else if (this.currentPage >= this.totalPages - 2) {
+                startPage = Math.max(1, this.totalPages - 4);
+                endPage = this.totalPages;
+            }
+        }
+
+        // Primeira página
+        if (startPage > 1) {
+            pages.push(`<button class="page-number" data-page="1" title="Primeira página">1</button>`);
+            if (startPage > 2) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
+        }
+
+        // Páginas do meio
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(
+                `<button class="page-number ${i === this.currentPage ? 'active' : ''}" data-page="${i}" title="Página ${i}">${i}</button>`
+            );
+        }
+
+        // Última página
+        if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) {
+                pages.push(`<span class="page-ellipsis" title="Mais páginas">...</span>`);
+            }
+            pages.push(`<button class="page-number" data-page="${this.totalPages}" title="Última página">${this.totalPages}</button>`);
+        }
+
+        return pages.join("");
     }
 
     /**

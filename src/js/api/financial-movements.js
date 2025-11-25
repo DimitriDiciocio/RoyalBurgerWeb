@@ -119,15 +119,34 @@ export async function getCashFlowSummary(period = 'this_month', includePending =
 
 /**
  * Lista contas a pagar (movimentações pendentes)
- * @param {Object} filters - Filtros opcionais
- * @returns {Promise<Array>}
+ * ALTERAÇÃO: Adicionado suporte a paginação
+ * @param {Object} filters - Filtros opcionais e paginação
+ * @param {number} filters.page - Número da página (opcional, default: 1)
+ * @param {number} filters.page_size - Itens por página (opcional, default: 100)
+ * @returns {Promise<Object>} Objeto com items, total, page, page_size, total_pages
  */
 export async function getPendingPayments(filters = {}) {
     const params = new URLSearchParams();
     if (filters.type) params.append('type', filters.type);
+    // ALTERAÇÃO: Adicionar parâmetros de paginação
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.page_size) params.append('page_size', filters.page_size.toString());
     
     const url = `${FINANCIAL_API_BASE}/pending${params.toString() ? '?' + params.toString() : ''}`;
-    return apiRequest(url, { method: 'GET' });
+    const response = await apiRequest(url, { method: 'GET' });
+    
+    // ALTERAÇÃO: Compatibilidade com formato antigo (array) e novo (objeto com paginação)
+    if (Array.isArray(response)) {
+        return {
+            items: response,
+            total: response.length,
+            page: 1,
+            page_size: response.length,
+            total_pages: 1
+        };
+    }
+    
+    return response;
 }
 
 /**
@@ -175,7 +194,10 @@ export async function deleteFinancialMovement(movementId) {
 
 /**
  * Obtém relatório de conciliação bancária
- * @param {Object} filters - Filtros de data e gateway
+ * ALTERAÇÃO: Adicionado suporte a paginação
+ * @param {Object} filters - Filtros de data, gateway e paginação
+ * @param {number} filters.page - Número da página (opcional, default: 1)
+ * @param {number} filters.page_size - Itens por página (opcional, default: 100)
  * @returns {Promise<Object>}
  */
 export async function getReconciliationReport(filters = {}) {
@@ -210,6 +232,9 @@ export async function getReconciliationReport(filters = {}) {
         !isNaN(filters.payment_gateway_id)) {
         params.append('payment_gateway_id', filters.payment_gateway_id);
     }
+    // ALTERAÇÃO: Adicionar parâmetros de paginação
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.page_size) params.append('page_size', filters.page_size.toString());
     
     const url = `${FINANCIAL_API_BASE}/reconciliation-report${params.toString() ? '?' + params.toString() : ''}`;
     return apiRequest(url, { method: 'GET' });
