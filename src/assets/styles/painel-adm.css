@@ -705,6 +705,8 @@ main {
     /* ============================================================================
        SEÇÃO DASHBOARD
        ============================================================================ */
+       banana:
+
     & #secao-dashboard {
         padding-bottom: 50px;
         overflow-x: hidden;
@@ -2516,7 +2518,6 @@ main {
     }
 
     & .card-ingrediente {
-        width: 370px;
         background-color: var(--cor-div-primary);
         border-radius: 12px;
         padding: 20px;
@@ -4867,6 +4868,16 @@ main {
 
             }
         }
+
+        & #secao-dashboard {
+            padding-bottom: 50px;
+            overflow-x: hidden;
+
+            & .dashboard-charts {
+                display: none;
+                
+            }
+        }
     }
 }
 
@@ -5418,6 +5429,16 @@ main {
                     }
                 }
 
+            }
+        }
+
+        & #secao-dashboard {
+            padding-bottom: 50px;
+            overflow-x: hidden;
+
+            & .dashboard-charts {
+                display: none;
+                
             }
         }
     }
@@ -6201,6 +6222,9 @@ main {
     padding: 1.5rem;
     box-shadow: var(--box-shadow);
     transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 .relatorio-card:hover {
