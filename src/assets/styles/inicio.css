@@ -123,7 +123,6 @@
       text-decoration: none;
       color: inherit;
       display: block;
-      width: 250px;
       flex-shrink: 0;
     }
 
@@ -155,6 +154,8 @@
         border-radius: 5px 5px 0px 0px;
         flex-shrink: 0;
         display: block;
+        user-select: none;
+        -webkit-user-drag: none;
       }
 
       /* NOVO: Badge de estoque limitado/baixo - posicionado sobre a imagem */
