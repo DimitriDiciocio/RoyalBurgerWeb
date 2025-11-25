@@ -291,7 +291,8 @@
     overflow-x: auto;
     scrollbar-width: none;
     margin-bottom: 20px;
-
+    z-index: 100;
+    background-color: var(--color-background);
     display: flex;
     flex-direction: row;
     align-items: center;
