@@ -836,12 +836,27 @@ const VALIDATION_LIMITS = {
         // basePortions é por unidade, então precisa multiplicar por state.quantity
         const effectiveQty = (basePortions * (state.quantity || 1)) + extraQty;
 
-        // CORREÇÃO: Usar diretamente max_quantity da API (já considera estoque e regras)
+        // ALTERAÇÃO CRÍTICA: Buscar effective_max_quantity atualizado de state.ingredientes
+        // O atributo data-max-qty pode estar desatualizado se o estoque mudou ou se a quantidade do produto mudou
+        // Sempre usar o valor mais atualizado de state.ingredientes que é atualizado quando loadIngredientes é chamado
+        const ingredientFromState = state.ingredientes.find(
+          (ing) => (ing.ingredient_id || ing.id) === ingId
+        );
+        
+        // ALTERAÇÃO: Usar effective_max_quantity que já considera estoque E regra (menor entre os dois)
+        // Se não tiver effective_max_quantity, usar max_quantity (regra do banco)
+        const currentMaxQuantity = ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.effective_max_quantity))
+          ? parseFloat(ingredientFromState.effective_max_quantity)
+          : (ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.max_quantity))
+            ? parseFloat(ingredientFromState.max_quantity)
+            : maxQuantity);
+
+        // CORREÇÃO: Usar effective_max_quantity da API (já considera estoque E regra - menor entre os dois)
         // A API já calcula o menor entre a regra e o estoque disponível para cada ingrediente
-        // Cada ingrediente é avaliado individualmente: se ainda tem estoque (effectiveQty < maxQuantity),
+        // Cada ingrediente é avaliado individualmente: se ainda tem estoque (effectiveQty < currentMaxQuantity),
         // permite adicionar, mesmo que o produto já esteja no limite de estoque
-        // Apenas ingredientes que não têm mais estoque são desabilitados
-        let canIncrement = effectiveQty < maxQuantity;
+        // Apenas ingredientes que não têm mais estoque ou atingiram a regra são desabilitados
+        let canIncrement = effectiveQty < currentMaxQuantity;
 
         const showMinus = effectiveQty > minQuantity;
         const showPlus = canIncrement;
@@ -925,13 +940,28 @@ const VALIDATION_LIMITS = {
         // basePortions é por unidade, então precisa multiplicar por state.quantity
         const effectiveQty = (basePortions * (state.quantity || 1)) + extraQty;
 
+        // ALTERAÇÃO CRÍTICA: Buscar effective_max_quantity atualizado de state.ingredientes
+        // O atributo data-max-qty pode estar desatualizado se o estoque mudou ou se a quantidade do produto mudou
+        // Sempre usar o valor mais atualizado de state.ingredientes que é atualizado quando loadIngredientes é chamado
+        const ingredientFromState = state.ingredientes.find(
+          (ing) => (ing.ingredient_id || ing.id) === ingId
+        );
+        
+        // ALTERAÇÃO: Usar effective_max_quantity que já considera estoque E regra (menor entre os dois)
+        // Se não tiver effective_max_quantity, usar max_quantity (regra do banco)
+        const currentMaxQuantity = ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.effective_max_quantity))
+          ? parseFloat(ingredientFromState.effective_max_quantity)
+          : (ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.max_quantity))
+            ? parseFloat(ingredientFromState.max_quantity)
+            : maxQuantity);
+
         // AJUSTE: Validar estoque disponível considerando current_stock e porções base
-        // CORREÇÃO: Usar diretamente max_quantity da API (já considera estoque e regras)
+        // CORREÇÃO: Usar effective_max_quantity da API (já considera estoque E regra - menor entre os dois)
         // A API já calcula o menor entre a regra e o estoque disponível para cada ingrediente
-        // Cada ingrediente é avaliado individualmente: se ainda tem estoque (effectiveQty < maxQuantity),
+        // Cada ingrediente é avaliado individualmente: se ainda tem estoque (effectiveQty < currentMaxQuantity),
         // permite adicionar, mesmo que o produto já esteja no limite de estoque
-        // Apenas ingredientes que não têm mais estoque são desabilitados
-        let canIncrement = effectiveQty < maxQuantity;
+        // Apenas ingredientes que não têm mais estoque ou atingiram a regra são desabilitados
+        let canIncrement = effectiveQty < currentMaxQuantity;
 
         const showMinus = effectiveQty > minQuantity;
         const showPlus = canIncrement;
@@ -1009,15 +1039,25 @@ const VALIDATION_LIMITS = {
         0,
         parseFloat(itemEl.getAttribute("data-porcoes")) || 0
       );
-      const minQuantity = parseFloat(itemEl.getAttribute("data-min-qty"));
-      // CORREÇÃO: Buscar max_quantity atualizado de state.ingredientes (já considera quantity do produto)
-      // O atributo data-max-qty pode estar desatualizado se a quantidade do produto mudou
+      // CORREÇÃO: Buscar min_quantity e max_quantity atualizados de state.ingredientes
+      // O atributo data-min-qty e data-max-qty podem estar desatualizados se a quantidade do produto mudou
       const ingredientFromState = state.ingredientes.find(
         (ing) => (ing.ingredient_id || ing.id) === id
       );
-      const maxQuantity = ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.max_quantity))
-        ? parseFloat(ingredientFromState.max_quantity)
-        : parseFloat(itemEl.getAttribute("data-max-qty")) || basePortions + 999;
+      
+      // ALTERAÇÃO: Usar effective_max_quantity que já considera estoque E regra (menor entre os dois)
+      // Se não tiver effective_max_quantity, usar max_quantity (regra do banco)
+      const effectiveMaxQuantity = ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.effective_max_quantity))
+        ? parseFloat(ingredientFromState.effective_max_quantity)
+        : (ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.max_quantity))
+          ? parseFloat(ingredientFromState.max_quantity)
+          : parseFloat(itemEl.getAttribute("data-max-qty")) || basePortions + 999);
+      
+      const minQuantity = ingredientFromState && Number.isFinite(parseFloat(ingredientFromState.min_quantity))
+        ? parseFloat(ingredientFromState.min_quantity)
+        : parseFloat(itemEl.getAttribute("data-min-qty")) || basePortions;
+      
+      const maxQuantity = effectiveMaxQuantity;
 
       const qtdEl = itemEl.querySelector(".qtd-extra");
       const nomeEl = itemEl.querySelector(".nome-adicional");
@@ -1076,25 +1116,35 @@ const VALIDATION_LIMITS = {
         // Cada ingrediente é validado individualmente baseado no seu próprio estoque disponível
         const wouldBeEffectiveQty = effectiveQty + 1;
         
-        // IMPORTANTE: Buscar maxQuantity atualizado de state.ingredientes (já considera quantity do produto)
+        // IMPORTANTE: Buscar effective_max_quantity atualizado de state.ingredientes (já considera quantity do produto, estoque E regra)
         // Sempre buscar o valor mais atualizado, pois pode ter mudado após alterar quantity
         const ingredientCurrent = state.ingredientes.find(
           (ing) => (ing.ingredient_id || ing.id) === id
         );
-        const currentMaxQuantity = ingredientCurrent && Number.isFinite(parseFloat(ingredientCurrent.max_quantity))
-          ? parseFloat(ingredientCurrent.max_quantity)
-          : (extra.maxQuantity || maxQuantity);
+        
+        // ALTERAÇÃO: Usar effective_max_quantity que já considera estoque E regra (menor entre os dois)
+        // Se não tiver effective_max_quantity, usar max_quantity (regra do banco)
+        const currentEffectiveMaxQuantity = ingredientCurrent && Number.isFinite(parseFloat(ingredientCurrent.effective_max_quantity))
+          ? parseFloat(ingredientCurrent.effective_max_quantity)
+          : (ingredientCurrent && Number.isFinite(parseFloat(ingredientCurrent.max_quantity))
+            ? parseFloat(ingredientCurrent.max_quantity)
+            : (extra.maxQuantity || maxQuantity));
+        
+        // ALTERAÇÃO: Buscar min_quantity atualizado também
+        const currentMinQuantity = ingredientCurrent && Number.isFinite(parseFloat(ingredientCurrent.min_quantity))
+          ? parseFloat(ingredientCurrent.min_quantity)
+          : minQuantity;
         
         // ALTERAÇÃO: Removido console.log em produção
         // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
         
-        // CORREÇÃO: Usar <= (menor ou igual) para permitir adicionar quando wouldBeEffectiveQty <= maxQuantity
-        // Se wouldBeEffectiveQty <= maxQuantity, pode adicionar (ainda tem estoque disponível)
-        // Se wouldBeEffectiveQty > maxQuantity, não pode adicionar (ultrapassou o limite)
-        const canAdd = wouldBeEffectiveQty <= currentMaxQuantity;
+        // CORREÇÃO: Validar contra effective_max_quantity (já considera estoque E regra)
+        // Se wouldBeEffectiveQty < currentEffectiveMaxQuantity, pode adicionar (ainda tem estoque disponível e não ultrapassou regra)
+        // Se wouldBeEffectiveQty >= currentEffectiveMaxQuantity, não pode adicionar (ultrapassou limite de estoque ou regra)
+        const canAdd = wouldBeEffectiveQty < currentEffectiveMaxQuantity;
         
-        // Se ultrapassou o limite do ingrediente, exibir mensagem de estoque insuficiente
-        if (!canAdd || wouldBeEffectiveQty > currentMaxQuantity) {
+        // Se ultrapassou o limite do ingrediente, exibir mensagem de estoque insuficiente ou limite atingido
+        if (!canAdd || wouldBeEffectiveQty >= currentEffectiveMaxQuantity) {
           // ALTERAÇÃO: Removido console.log em produção
           const ingredientName = extra.name || nomeEl?.textContent || "Ingrediente";
           showToast(
@@ -1152,18 +1202,22 @@ const VALIDATION_LIMITS = {
         parseFloat(itemEl.getAttribute("data-porcoes")) || 0
       );
       
-      // CORREÇÃO: Buscar max_quantity e min_quantity atualizados de state.ingredientes
-      // (já considera quantity do produto e consumo acumulado)
+      // CORREÇÃO: Buscar effective_max_quantity e min_quantity atualizados de state.ingredientes
+      // (já considera quantity do produto, estoque E regra)
       // O atributo data-max-qty pode estar desatualizado se a quantidade do produto mudou
       const ingredient = state.ingredientes.find(
         (ing) => (ing.ingredient_id || ing.id) === id
       );
       
-      const maxQuantityFromState = ingredient && Number.isFinite(parseFloat(ingredient.max_quantity))
-        ? parseFloat(ingredient.max_quantity)
-        : null;
+      // ALTERAÇÃO: Usar effective_max_quantity que já considera estoque E regra (menor entre os dois)
+      // Se não tiver effective_max_quantity, usar max_quantity (regra do banco)
+      const effectiveMaxQuantityFromState = ingredient && Number.isFinite(parseFloat(ingredient.effective_max_quantity))
+        ? parseFloat(ingredient.effective_max_quantity)
+        : (ingredient && Number.isFinite(parseFloat(ingredient.max_quantity))
+          ? parseFloat(ingredient.max_quantity)
+          : null);
       const maxQuantityFromAttr = parseFloat(itemEl.getAttribute("data-max-qty")) || basePortions + 999;
-      const maxQuantity = maxQuantityFromState !== null ? maxQuantityFromState : maxQuantityFromAttr;
+      const maxQuantity = effectiveMaxQuantityFromState !== null ? effectiveMaxQuantityFromState : maxQuantityFromAttr;
       
       const minQuantityFromState = ingredient && Number.isFinite(parseFloat(ingredient.min_quantity))
         ? parseFloat(ingredient.min_quantity)
@@ -1225,12 +1279,27 @@ const VALIDATION_LIMITS = {
       // ALTERAÇÃO: Removido console.log em produção
       // TODO: REVISAR - Implementar logging estruturado condicional (apenas em modo debug)
 
+      // ALTERAÇÃO CRÍTICA: Buscar effective_max_quantity atualizado de state.ingredientes
+      // O atributo data-max-qty pode estar desatualizado se o estoque mudou ou se a quantidade do produto mudou
+      // Sempre usar o valor mais atualizado de state.ingredientes que é atualizado quando loadIngredientes é chamado
+      const ingredientCurrent = state.ingredientes.find(
+        (ing) => (ing.ingredient_id || ing.id) === id
+      );
+      
+      // ALTERAÇÃO: Usar effective_max_quantity que já considera estoque E regra (menor entre os dois)
+      // Se não tiver effective_max_quantity, usar max_quantity (regra do banco)
+      const currentMaxQuantity = ingredientCurrent && Number.isFinite(parseFloat(ingredientCurrent.effective_max_quantity))
+        ? parseFloat(ingredientCurrent.effective_max_quantity)
+        : (ingredientCurrent && Number.isFinite(parseFloat(ingredientCurrent.max_quantity))
+          ? parseFloat(ingredientCurrent.max_quantity)
+          : maxQuantity);
+
       // CORREÇÃO: Usar diretamente max_quantity da API (já considera estoque, regras E quantity do produto)
       // A API já calcula o menor entre a regra e o estoque disponível para cada ingrediente
-      // Cada ingrediente é avaliado individualmente: se ainda tem estoque (effectiveQty < maxQuantity),
+      // Cada ingrediente é avaliado individualmente: se ainda tem estoque (effectiveQty < currentMaxQuantity),
       // permite adicionar, mesmo que o produto já esteja no limite de estoque
       // Apenas ingredientes que não têm mais estoque são desabilitados
-      let canIncrement = effectiveQty < maxQuantity;
+      let canIncrement = effectiveQty < currentMaxQuantity;
 
       // CORREÇÃO: Habilitar/desabilitar botões em vez de removê-los
       if (minus) {

@@ -478,10 +478,39 @@ document.addEventListener("DOMContentLoaded", function () {
                     title: "Carrinho Restaurado",
                     autoClose: 2000,
                   });
+                } else {
+                  // ALTERAÇÃO: Tratar erros de estoque insuficiente durante recuperação
+                  // Informar usuário sobre itens que não puderam ser restaurados
+                  const errorMsg = claimResult.error || "Erro ao restaurar carrinho";
+                  if (errorMsg.includes("Estoque insuficiente") || errorMsg.includes("INSUFFICIENT_STOCK")) {
+                    showToast(
+                      "Alguns itens do seu carrinho não puderam ser restaurados devido a estoque insuficiente. Verifique sua cesta.",
+                      {
+                        type: "warning",
+                        title: "Carrinho Parcialmente Restaurado",
+                        autoClose: 5000,
+                      }
+                    );
+                  } else {
+                    // Outros erros são tratados silenciosamente para não impactar UX
+                    // TODO: REVISAR - Considerar logging estruturado para diagnóstico
+                  }
                 }
               } catch (claimErr) {
-                // Não bloqueia o fluxo de login se falhar
-                // NOTA: Erro silencioso intencional para não impactar UX
+                // ALTERAÇÃO: Tratar erros de estoque durante recuperação
+                const errorMsg = claimErr?.message || claimErr?.error || "";
+                if (errorMsg.includes("Estoque insuficiente") || errorMsg.includes("INSUFFICIENT_STOCK")) {
+                  showToast(
+                    "Alguns itens do seu carrinho não puderam ser restaurados devido a estoque insuficiente. Verifique sua cesta.",
+                    {
+                      type: "warning",
+                      title: "Carrinho Parcialmente Restaurado",
+                      autoClose: 5000,
+                    }
+                  );
+                }
+                // Outros erros são tratados silenciosamente para não impactar UX
+                // TODO: REVISAR - Considerar logging estruturado para diagnóstico
               }
             }
 
