@@ -822,14 +822,27 @@ async function loadHeader() {
         const openModal = () => {
           if (!modal) return;
           modal.classList.add("open");
+          // ALTERAÇÃO: Atualizar aria-hidden para false quando o modal abrir
+          modal.setAttribute("aria-hidden", "false");
           if (btn) btn.setAttribute("aria-expanded", "true");
           document.body.style.overflow = "hidden";
+          // ALTERAÇÃO: Focar no botão de fechar quando o modal abrir para melhor acessibilidade
+          const closeBtn = modal.querySelector(".nav-modal-close");
+          if (closeBtn) {
+            setTimeout(() => closeBtn.focus(), 100);
+          }
         };
         const closeModal = () => {
           if (!modal) return;
           modal.classList.remove("open");
+          // ALTERAÇÃO: Atualizar aria-hidden para true quando o modal fechar
+          modal.setAttribute("aria-hidden", "true");
           if (btn) btn.setAttribute("aria-expanded", "false");
           document.body.style.overflow = "";
+          // ALTERAÇÃO: Retornar foco para o botão hamburger quando o modal fechar
+          if (btn) {
+            setTimeout(() => btn.focus(), 100);
+          }
         };
 
         btn && (btn.onclick = openModal);

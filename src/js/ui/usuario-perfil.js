@@ -4,6 +4,14 @@ import { getStoredUser, logoutLocal } from "../api/api.js";
 import { showConfirm, toastFromApiError, toastFromApiSuccess, setFlashMessage, showToast } from "./alerts.js";
 import { getLoyaltyBalance } from "../api/loyalty.js";
 
+// ALTERAÇÃO: Função para sanitizar strings para uso seguro em innerHTML
+function escapeHTML(str) {
+    if (typeof str !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 $(document).ready(function () {
     // ====== Guarda de rota: qualquer usuário logado pode acessar esta página ======
     try {
@@ -429,10 +437,20 @@ $(document).ready(function () {
                 // ALTERAÇÃO: Carregar pontos do Clube Royal apenas se for cliente
                 await carregarPontosRoyal();
             }
+            
+            // ALTERAÇÃO: Processar hash da URL após carregar perfil e endereços
+            setTimeout(() => {
+                processarHashURL();
+            }, 300);
+            
             // sucesso
             // noop
         } catch (err) {
             toastFromApiError && toastFromApiError(err, 'Falha ao carregar seu perfil.');
+            // ALTERAÇÃO: Tentar processar hash mesmo em caso de erro
+            setTimeout(() => {
+                processarHashURL();
+            }, 300);
         }
     }
 
@@ -706,12 +724,27 @@ $(document).ready(function () {
         const div = document.createElement('div');
         div.className = 'quadro-endereco';
         div.dataset.addressId = end.id || end.address_id;
+        
+        // ALTERAÇÃO: Sanitizar dados do endereço antes de inserir no innerHTML
+        const street = escapeHTML(end.street || '');
+        const number = escapeHTML(end.number || '');
+        const neighborhood = escapeHTML(end.neighborhood || '');
+        const city = escapeHTML(end.city || '');
+        const state = escapeHTML(end.state || '');
+        
+        const tituloTexto = street + (number ? ', ' + number : '');
+        const descricaoTexto = neighborhood + 
+            (neighborhood && (city || state) ? ' - ' : '') + 
+            city + 
+            (city && state ? ' - ' : '') + 
+            state;
+        
         div.innerHTML = `
             <div style="display: flex; align-items: center; gap: 20px">
                 <i class="fa-solid fa-location-dot"></i>
                 <div>
-                    <p class="titulo">${(end.street || '') + (end.number ? ', ' + end.number : '')}</p>
-                    <p class="descricao">${(end.neighborhood || '')}${end.neighborhood && (end.city || end.state) ? ' - ' : ''}${(end.city || '')}${end.city && end.state ? ' - ' : ''}${(end.state || '')}</p>
+                    <p class="titulo">${tituloTexto}</p>
+                    <p class="descricao">${descricaoTexto}</p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 15px">
@@ -2051,12 +2084,99 @@ $(document).ready(function () {
     });
 
 
+    // ALTERAÇÃO: Função para processar hash da URL e abrir modais/seções apropriadas
+    function processarHashURL() {
+        const hash = window.location.hash;
+        
+        if (hash === '#editar-endereco' || hash === '#enderecos') {
+            // Verificar se é cliente antes de mostrar endereços
+            const u = currentUser || getStoredUser();
+            const isUserCliente = isCliente(u);
+            
+            if (!isUserCliente) {
+                // Se não for cliente, não fazer nada
+                return;
+            }
+            
+            // Mostrar seção de endereços
+            $("#dados-user, #config").hide();
+            $("#enderecos").show();
+            
+            // Atualizar navegação
+            $(".navega div").removeClass("select");
+            $(".navega div:contains('Endereços')").addClass("select");
+            
+            // Se o hash for #editar-endereco, abrir modal apropriada
+            if (hash === '#editar-endereco') {
+                // Aguardar um pouco para garantir que a página carregou completamente
+                setTimeout(async () => {
+                    try {
+                        const userId = await resolveUserId();
+                        if (!userId) {
+                            // Se não conseguir identificar usuário, abrir modal de adicionar
+                            abrirModal && abrirModal('adicionar-endereco');
+                            return;
+                        }
+                        
+                        const lista = await listAddresses(userId);
+                        
+                        // Se não houver endereços, abrir modal de adicionar
+                        if (!lista || lista.length === 0) {
+                            abrirModal && abrirModal('adicionar-endereco');
+                        } else {
+                            // ALTERAÇÃO: Se houver endereços, abrir modal de editar com o primeiro endereço pré-preenchido
+                            const primeiroEndereco = lista[0];
+                            if (primeiroEndereco) {
+                                editingAddressId = Number(primeiroEndereco.id || primeiroEndereco.address_id);
+                                
+                                // Preencher campos da modal de editar
+                                const cepEl = document.getElementById('cep-edit');
+                                const ufEl = document.getElementById('estado-edit');
+                                const cidadeEl = document.getElementById('cidade-edit');
+                                const ruaEl = document.getElementById('rua-edit');
+                                const bairroEl = document.getElementById('bairro-edit');
+                                const numeroEl = document.getElementById('numero-edit');
+                                const complEl = document.getElementById('complemento-edit');
+                                
+                                if (cepEl) cepEl.value = primeiroEndereco.zip_code ? String(primeiroEndereco.zip_code).replace(/\D/g, '').replace(/(\d{5})(\d{1,3})/, '$1-$2') : '';
+                                if (ruaEl) ruaEl.value = primeiroEndereco.street || '';
+                                if (bairroEl) bairroEl.value = primeiroEndereco.neighborhood || '';
+                                if (numeroEl) numeroEl.value = primeiroEndereco.number || '';
+                                if (complEl) complEl.value = primeiroEndereco.complement || '';
+                                
+                                if (ufEl && primeiroEndereco.state) {
+                                    ufEl.value = primeiroEndereco.state;
+                                    await fetchCitiesByUF(primeiroEndereco.state, cidadeEl);
+                                    if (cidadeEl && primeiroEndereco.city) {
+                                        cidadeEl.value = primeiroEndereco.city;
+                                    }
+                                }
+                                
+                                abrirModal && abrirModal('editar-endereco');
+                            } else {
+                                abrirModal && abrirModal('adicionar-endereco');
+                            }
+                        }
+                    } catch (err) {
+                        // Em caso de erro, abrir modal de adicionar
+                        abrirModal && abrirModal('adicionar-endereco');
+                    }
+                }, 500);
+            }
+        }
+    }
+
     // mostra "dados da conta" ao entrar
     $("#dados-user").show();
     $("#enderecos, #config").hide();
 
     // já marca "Dados da conta" como selecionado
     $(".navega div:contains('Dados da conta')").addClass("select");
+    
+    // ALTERAÇÃO: Ouvir mudanças no hash da URL
+    window.addEventListener('hashchange', () => {
+        processarHashURL();
+    });
 
     // clique nos botões
     $(".navega div").click(function () {

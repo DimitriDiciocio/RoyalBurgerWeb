@@ -50,9 +50,8 @@ function isUserLoggedIn() {
     // Verificar se cada parte não está vazia
     return tokenParts.every(part => part.length > 0);
   } catch (error) {
-    // Log apenas em desenvolvimento
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // ALTERAÇÃO: Log apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.warn('Erro ao verificar login:', error);
     }
     return false;
@@ -75,9 +74,8 @@ function getStoredUser() {
     // Sanitizar dados sensíveis antes de retornar
     return sanitizeUserData(user);
   } catch (error) {
-    // Log apenas em desenvolvimento
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // ALTERAÇÃO: Log apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.warn('Erro ao obter usuário:', error);
     }
     return null;
@@ -383,9 +381,8 @@ async function carregarPontos() {
       atualizarExibicaoPontos();
     }
   } catch (error) {
-    // Log apenas em desenvolvimento
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // ALTERAÇÃO: Log apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.error('Erro ao carregar pontos:', error.message);
     }
     // Mesmo com erro, mostrar 0 pontos em vez de ocultar
@@ -520,12 +517,29 @@ async function carregarEndereco() {
       exibirSemEndereco();
     }
   } catch (error) {
-    // Log apenas em desenvolvimento
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // ALTERAÇÃO: Log apenas em modo debug
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.error('Erro ao carregar endereço:', error.message);
     }
     exibirSemEndereco();
+  }
+}
+
+/**
+ * ALTERAÇÃO: Função auxiliar para obter caminho correto da página de perfil
+ */
+function getUsuarioPerfilPath() {
+  const currentPath = window.location.pathname;
+  const isInPagesFolder = currentPath.includes('/pages/') || currentPath.includes('pages/');
+  const isInSrcFolder = currentPath.includes('/src/') || currentPath.includes('src/');
+  
+  // ALTERAÇÃO: Sempre usar #editar-endereco para abrir a modal de editar/adicionar endereço
+  if (isInPagesFolder) {
+    return 'usuario-perfil.html#editar-endereco';
+  } else if (isInSrcFolder) {
+    return 'pages/usuario-perfil.html#editar-endereco';
+  } else {
+    return 'src/pages/usuario-perfil.html#editar-endereco';
   }
 }
 
@@ -587,12 +601,12 @@ function exibirSemEndereco() {
   enderecoElement.style.color = '#999';
   enderecoElement.style.fontStyle = 'italic';
   
-  // Adicionar evento de clique para cadastrar endereço
+  // ALTERAÇÃO: Adicionar evento de clique para cadastrar endereço com caminho correto
   const enderecoContainer = enderecoElement.parentElement;
   if (enderecoContainer) {
     enderecoContainer.style.cursor = 'pointer';
     enderecoContainer.onclick = () => {
-      window.location.href = '../pages/usuario-perfil.html#enderecos';
+      window.location.href = getUsuarioPerfilPath();
     };
   }
 }
@@ -605,10 +619,8 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     // Buscar todos os endereços do usuário
     const enderecos = await getAddresses();
     
-    if (enderecos.length <= 1) {
-      showError('Você não tem endereços adicionais para alternar.');
-      return;
-    }
+    // ALTERAÇÃO: Remover validação que impedia mostrar modal com apenas 1 endereço
+    // Agora sempre mostra a modal, mesmo com apenas 1 endereço, permitindo adicionar novos
     
     // Função auxiliar para sanitizar dados do endereço
     function sanitizeAddressData(address) {
@@ -623,36 +635,54 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
       };
     }
     
-    // ALTERAÇÃO: Criar modal seguindo o mesmo padrão da modal de pagamento
-    const enderecosSanitizados = enderecos.map(endereco => {
-      const sanitized = sanitizeAddressData(endereco);
-      const addressId = Number(endereco.id) || 0;
-      const isCurrent = addressId === Number(currentAddressId);
-      
-      // ALTERAÇÃO: Usar escapeHTML para sanitização segura dos dados
-      const street = escapeHTML(sanitized.street);
-      const number = escapeHTML(sanitized.number);
-      const neighborhood = escapeHTML(sanitized.neighborhood);
-      const city = escapeHTML(sanitized.city);
-      const state = escapeHTML(sanitized.state);
-      
-      return `
-        <div class="endereco-item ${isCurrent ? 'selecionado' : ''}" 
-             data-address-id="${addressId}"
-             data-action="select-address">
-          <div class="endereco-info">
-            <i class="fa-solid fa-location-dot"></i>
-            <div class="endereco-info-content">
-              <p class="titulo">${street}, ${number}</p>
-              <p class="descricao">${neighborhood} - ${city}/${state}</p>
+    // ALTERAÇÃO: Criar lista de endereços seguindo o mesmo padrão da modal de pagamento
+    let enderecosSanitizados = '';
+    
+    // Se há endereços cadastrados, renderizar lista
+    if (enderecos && enderecos.length > 0) {
+      enderecosSanitizados = enderecos.map(endereco => {
+        const sanitized = sanitizeAddressData(endereco);
+        const addressId = Number(endereco.id) || 0;
+        const isCurrent = addressId === Number(currentAddressId);
+        
+        // ALTERAÇÃO: Usar escapeHTML para sanitização segura dos dados
+        const street = escapeHTML(sanitized.street);
+        const number = escapeHTML(sanitized.number);
+        const neighborhood = escapeHTML(sanitized.neighborhood);
+        const city = escapeHTML(sanitized.city);
+        const state = escapeHTML(sanitized.state);
+        
+        return `
+          <div class="endereco-item ${isCurrent ? 'selecionado' : ''}" 
+               data-address-id="${addressId}"
+               data-action="select-address">
+            <div class="endereco-info">
+              <i class="fa-solid fa-location-dot"></i>
+              <div class="endereco-info-content">
+                <p class="titulo">${street}, ${number}</p>
+                <p class="descricao">${neighborhood} - ${city}/${state}</p>
+              </div>
+            </div>
+            <div class="endereco-actions">
+              ${isCurrent ? '<div class="endereco-check"><i class="fa-solid fa-check"></i></div>' : ''}
             </div>
           </div>
-          <div class="endereco-actions">
-            ${isCurrent ? '<div class="endereco-check"><i class="fa-solid fa-check"></i></div>' : ''}
+        `;
+      }).join('');
+    }
+    
+    // ALTERAÇÃO: Adicionar botão para adicionar novo endereço (sempre visível)
+    const botaoAdicionarEndereco = `
+      <div class="endereco-item" data-endereco-id="novo" data-action="add-address">
+        <div class="endereco-info">
+          <i class="fa-solid fa-plus"></i>
+          <div class="endereco-info-content">
+            <p class="titulo">${enderecos && enderecos.length > 0 ? 'Adicionar novo endereço' : 'Adicionar primeiro endereço'}</p>
+            <p class="descricao">Cadastrar um novo endereço de entrega</p>
           </div>
         </div>
-      `;
-    }).join('');
+      </div>
+    `;
     
     // ALTERAÇÃO: Estrutura da modal seguindo o padrão da modal de pagamento
     const modalHtml = `
@@ -662,12 +692,13 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
           <div class="header">
             <i class="fa-solid fa-xmark" data-close-modal="modal-alterar-endereco"></i>
             <p class="titulo">Selecionar endereço</p>
-            <p class="descricao">Escolha um endereço para definir como principal</p>
+            <p class="descricao">Escolha um endereço para definir como principal ou adicione um novo</p>
           </div>
           
           <div class="main">
             <div id="lista-enderecos-alteracao" class="lista-enderecos-modal">
               ${enderecosSanitizados}
+              ${botaoAdicionarEndereco}
             </div>
           </div>
           
@@ -692,6 +723,15 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     
     // ALTERAÇÃO: Adicionar evento de clique para seleção de endereço
     document.getElementById('modal-alterar-endereco')?.addEventListener('click', async (e) => {
+      // Verificar se clicou no botão de adicionar endereço
+      const addAddressItem = e.target.closest('.endereco-item[data-action="add-address"]');
+      if (addAddressItem) {
+        fecharModal('modal-alterar-endereco');
+        window.location.href = getUsuarioPerfilPath();
+        return;
+      }
+      
+      // Verificar se clicou em um endereço existente
       const addressItem = e.target.closest('.endereco-item[data-action="select-address"]');
       if (addressItem) {
         const addressId = parseInt(String(addressItem.dataset.addressId || ''), 10);
@@ -702,9 +742,8 @@ async function mostrarModalAlterarEndereco(currentAddressId) {
     });
     
   } catch (error) {
-    // Log apenas em desenvolvimento - erro já é exibido ao usuário
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // ALTERAÇÃO: Log apenas em modo debug - erro já é exibido ao usuário
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.error('Erro ao mostrar modal de alteração de endereço:', error.message);
     }
     showError('Erro ao carregar endereços. Tente novamente.');
@@ -728,9 +767,8 @@ async function alterarEnderecoPrincipal(addressId) {
     showSuccess('Endereço principal alterado com sucesso!');
     
   } catch (error) {
-    // Log apenas em desenvolvimento - erro já é exibido ao usuário
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // ALTERAÇÃO: Log apenas em modo debug - erro já é exibido ao usuário
+    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
       console.error('Erro ao alterar endereço principal:', error.message);
     }
     showError('Erro ao alterar endereço principal. Tente novamente.');

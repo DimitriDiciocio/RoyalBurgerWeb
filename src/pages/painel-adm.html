@@ -35,7 +35,8 @@
     <!-- ALTERAÇÃO: Removido import obsoleto mesas-gerenciamento.js (arquivo não existe mais) -->
     <!-- js complementares -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- ALTERAÇÃO: Chart.js com verificação de carregamento (logs apenas em modo debug) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" ></script>
 </head>
 
 <body>
@@ -208,19 +209,25 @@
                 <!-- Gráfico de Vendas (Últimos 7 dias) -->
                 <div class="dashboard-chart-card">
                     <h3>Vendas dos Últimos 7 Dias</h3>
-                    <canvas id="chart-vendas-semana"></canvas>
+                    <div class="chart-container">
+                        <canvas id="chart-vendas-semana"></canvas>
+                    </div>
                 </div>
 
                 <!-- Gráfico de Pedidos por Status -->
                 <div class="dashboard-chart-card">
                     <h3>Pedidos por Status</h3>
-                    <canvas id="chart-pedidos-status"></canvas>
+                    <div class="chart-container">
+                        <canvas id="chart-pedidos-status"></canvas>
+                    </div>
                 </div>
 
                 <!-- Gráfico de Canais de Venda -->
                 <div class="dashboard-chart-card">
                     <h3>Vendas por Canal</h3>
-                    <canvas id="chart-canais-venda"></canvas>
+                    <div class="chart-container">
+                        <canvas id="chart-canais-venda"></canvas>
+                    </div>
                 </div>
 
                 <!-- Pedidos Ativos -->

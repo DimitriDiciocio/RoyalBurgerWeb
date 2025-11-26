@@ -79,7 +79,10 @@ export default class DashboardManager {
         try {
             // ALTERAÇÃO: Verificar se a seção existe
             if (!this.container) {
-                console.warn('[Dashboard] Seção de dashboard não encontrada');
+                // ALTERAÇÃO: Log apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.warn('[Dashboard] Seção de dashboard não encontrada');
+                }
                 return;
             }
 
@@ -96,8 +99,9 @@ export default class DashboardManager {
             
             this.isInitialized = true;
         } catch (error) {
-            console.error('[Dashboard] Erro ao inicializar dashboard:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao inicializar dashboard:', error);
                 console.error('[Dashboard] Stack trace:', error.stack);
             }
             this.showError('Erro ao carregar dashboard');
@@ -142,10 +146,7 @@ export default class DashboardManager {
             });
         } else {
             // ALTERAÇÃO: Fallback se Page Visibility API não estiver disponível
-            // Continuar com atualizações normais
-            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.warn('Page Visibility API não está disponível. Atualizações continuarão mesmo quando a página não estiver visível.');
-            }
+            // Continuar com atualizações normais (sem log, pois é comportamento esperado)
         }
         
         // ALTERAÇÃO: Limpar intervalos ao sair da seção
@@ -182,8 +183,9 @@ export default class DashboardManager {
             
             this.data.lastUpdate = new Date();
         } catch (error) {
-            console.error('[Dashboard] Erro ao carregar dados do dashboard:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao carregar dados do dashboard:', error);
                 console.error('[Dashboard] Stack trace:', error.stack);
             }
             this.showError('Erro ao carregar dados do dashboard');
@@ -203,10 +205,46 @@ export default class DashboardManager {
     async loadFinancialMetrics() {
         try {
             // ALTERAÇÃO: PADRONIZAÇÃO - Usar movimentações financeiras (mesma lógica do módulo financeiro)
-            const todayRevenue = await this.getTodayRevenueFromFinancialMovements();
+            // ALTERAÇÃO: Otimização - Buscar movimentações de hoje e ontem uma vez e reutilizar
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
             
-            // ALTERAÇÃO: Buscar receita de ontem via movimentações financeiras
-            const yesterdayRevenue = await this.getYesterdayRevenueFromFinancialMovements();
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+            const yesterdayEnd = new Date(yesterday);
+            yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
+            
+            const todayStartDate = formatDateForISO(today);
+            const todayEndDate = formatDateForISO(tomorrow);
+            const yesterdayStartDate = formatDateForISO(yesterday);
+            const yesterdayEndDate = formatDateForISO(yesterdayEnd);
+            
+            // ALTERAÇÃO: Buscar movimentações de hoje e ontem em paralelo para melhor performance
+            const [todayMovementsResponse, yesterdayMovementsResponse] = await Promise.all([
+                getFinancialMovements({
+                    start_date: todayStartDate,
+                    end_date: todayEndDate,
+                    type: 'REVENUE',
+                    payment_status: 'Paid'
+                }),
+                getFinancialMovements({
+                    start_date: yesterdayStartDate,
+                    end_date: yesterdayEndDate,
+                    type: 'REVENUE',
+                    payment_status: 'Paid'
+                })
+            ]);
+            
+            const todayMovements = todayMovementsResponse.items || todayMovementsResponse || [];
+            const yesterdayMovements = yesterdayMovementsResponse.items || yesterdayMovementsResponse || [];
+            
+            // ALTERAÇÃO: Calcular receita a partir das movimentações já buscadas (evita chamada duplicada)
+            const todayRevenue = this.calculateRevenueFromMovements(todayMovements);
+            const yesterdayRevenue = this.calculateRevenueFromMovements(yesterdayMovements);
+            
             const revenueVariation = this.calculateVariation(todayRevenue, yesterdayRevenue);
             
             // ALTERAÇÃO: Atualizar DOM - Receita do dia
@@ -224,7 +262,10 @@ export default class DashboardManager {
                 this.updateElement('dashboard-receita-mensal', formatCurrency(monthlyRevenue || 0));
                 this.updateElement('dashboard-meta-mensal', `Meta: ${formatCurrency(monthlyGoal || 0)}`);
             } catch (error) {
-                console.error('[Dashboard] Erro ao buscar receita mensal via getCashFlowSummary, usando fallback:', error);
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.error('[Dashboard] Erro ao buscar receita mensal via getCashFlowSummary, usando fallback:', error);
+                }
                 // ALTERAÇÃO: Fallback para método antigo se getCashFlowSummary falhar
                 const monthlyRevenue = await this.getMonthlyRevenue();
                 const monthlyGoal = await this.getMonthlyGoal();
@@ -232,23 +273,13 @@ export default class DashboardManager {
                 this.updateElement('dashboard-meta-mensal', `Meta: ${formatCurrency(monthlyGoal || 0)}`);
             }
             
-            // ALTERAÇÃO: Ticket médio - Calcular baseado em pedidos (para contagem de pedidos)
-            // ALTERAÇÃO: Receita vem de movimentações financeiras, mas pedidos são contados separadamente
-            const todayOrdersResponse = await this.getCachedData('orders', async () => {
-                return await getTodayOrders();
-            });
-            const todayOrders = this.extractOrdersFromResponse(todayOrdersResponse);
+            // ALTERAÇÃO: Ticket médio - Reutilizar movimentações já buscadas (evita chamada duplicada)
+            const todayOrdersCount = this.countUniqueOrdersFromMovements(todayMovements);
+            const yesterdayOrdersCount = this.countUniqueOrdersFromMovements(yesterdayMovements);
             
-            const completedTodayOrders = todayOrders.filter(order => ['completed', 'delivered', 'paid'].includes(order.status));
-            const completedTodayCount = completedTodayOrders.length;
-            
-            // ALTERAÇÃO: Ticket médio = Receita de movimentações financeiras / Pedidos concluídos
-            const ticketMedio = completedTodayCount > 0 ? todayRevenue / completedTodayCount : 0;
-            
-            // ALTERAÇÃO: Para ticket médio de ontem, usar mesma lógica
-            const yesterdayCompletedCount = await this.getYesterdayCompletedOrdersCount();
-            
-            const yesterdayTicket = yesterdayCompletedCount > 0 ? yesterdayRevenue / yesterdayCompletedCount : 0;
+            // ALTERAÇÃO: Ticket médio = Receita de movimentações financeiras / Pedidos únicos com movimentações pagas
+            const ticketMedio = todayOrdersCount > 0 ? todayRevenue / todayOrdersCount : 0;
+            const yesterdayTicket = yesterdayOrdersCount > 0 ? yesterdayRevenue / yesterdayOrdersCount : 0;
             
             const ticketVariation = this.calculateVariation(ticketMedio, yesterdayTicket);
             this.updateElement('dashboard-ticket-medio', formatCurrency(ticketMedio || 0));
@@ -256,8 +287,9 @@ export default class DashboardManager {
                 `${ticketVariation >= 0 ? '+' : ''}${ticketVariation.toFixed(1)}% vs ontem`);
                 
         } catch (error) {
-            console.error('[Dashboard] Erro ao carregar métricas financeiras:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao carregar métricas financeiras:', error);
                 console.error('[Dashboard] Stack trace:', error.stack);
             }
             this.showError('Erro ao carregar métricas financeiras');
@@ -296,8 +328,9 @@ export default class DashboardManager {
             this.updateElement('dashboard-pedidos-concluidos', `${completedOrders.length} Concluídos`);
             
         } catch (error) {
-            console.error('[Dashboard] Erro ao carregar métricas de pedidos:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao carregar métricas de pedidos:', error);
                 console.error('[Dashboard] Stack trace:', error.stack);
             }
             this.showError('Erro ao carregar métricas de pedidos');
@@ -327,7 +360,10 @@ export default class DashboardManager {
                 this.updateElement('dashboard-produtos-indisponiveis', 
                     `${unavailable_items || 0} indisponíveis`);
             } else {
-                console.warn('[Dashboard] MenuMetrics não retornou dados válidos:', menuMetrics);
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.warn('[Dashboard] MenuMetrics não retornou dados válidos:', menuMetrics);
+                }
             }
             
             // ALTERAÇÃO: Estoque
@@ -341,7 +377,10 @@ export default class DashboardManager {
                     : (critical_items || 0);
                 this.updateElement('dashboard-estoque-critico', criticalStock || 0);
             } else {
-                console.warn('[Dashboard] StockMetrics não retornou dados válidos:', stockMetrics);
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.warn('[Dashboard] StockMetrics não retornou dados válidos:', stockMetrics);
+                }
             }
             
             // ALTERAÇÃO: Promoções
@@ -361,14 +400,23 @@ export default class DashboardManager {
                     const activeUsers = userMetrics.ativos || userMetrics.active_users || userMetrics.total_users || userMetrics.count || 0;
                     this.updateElement('dashboard-usuarios-ativos', activeUsers || 0);
                 } else {
-                    console.warn('[Dashboard] UserMetrics não retornou dados válidos:', userMetrics);
+                    // ALTERAÇÃO: Log condicional apenas em modo debug
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.warn('[Dashboard] UserMetrics não retornou dados válidos:', userMetrics);
+                    }
                 }
             } catch (error) {
-                console.error('[Dashboard] Erro ao buscar métricas de usuários:', error);
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.error('[Dashboard] Erro ao buscar métricas de usuários:', error);
+                }
             }
             
         } catch (error) {
-            console.error('[Dashboard] Erro ao carregar outras métricas:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao carregar outras métricas:', error);
+            }
             // ALTERAÇÃO: Não mostrar erro para métricas secundárias para não poluir a UI
         }
     }
@@ -451,6 +499,45 @@ export default class DashboardManager {
     }
 
     /**
+     * ALTERAÇÃO: Conta pedidos únicos a partir de movimentações financeiras pagas
+     * Usa related_entity_id quando related_entity_type for 'order' ou similar
+     * 
+     * @param {Array} movements - Array de movimentações financeiras
+     * @returns {number} Número de pedidos únicos com movimentações pagas
+     * @private
+     */
+    countUniqueOrdersFromMovements(movements) {
+        if (!Array.isArray(movements) || movements.length === 0) {
+            return 0;
+        }
+        
+        // ALTERAÇÃO: Filtrar apenas movimentações de receita pagas
+        const paidRevenues = movements.filter(movement => {
+            return movement.type === 'REVENUE' && 
+                   (movement.payment_status === 'Paid' || movement.payment_status === 'PAID');
+        });
+        
+        // ALTERAÇÃO: Extrair IDs únicos de pedidos das movimentações
+        const orderIds = new Set();
+        
+        paidRevenues.forEach(movement => {
+            // ALTERAÇÃO: Verificar diferentes campos possíveis para order_id
+            const orderId = movement.order_id || 
+                          movement.orderId || 
+                          movement.related_entity_id || 
+                          movement.relatedEntityId ||
+                          (movement.related_entity_type === 'order' || movement.related_entity_type === 'Order' 
+                           ? movement.related_entity_id : null);
+            
+            if (orderId) {
+                orderIds.add(String(orderId));
+            }
+        });
+        
+        return orderIds.size;
+    }
+
+    /**
      * ALTERAÇÃO: Obtém receita do dia usando movimentações financeiras (padronizado com módulo financeiro)
      * 
      * @async
@@ -484,7 +571,10 @@ export default class DashboardManager {
             
             return revenue;
         } catch (error) {
-            console.error('[Dashboard] Erro ao buscar receita do dia via movimentações financeiras:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao buscar receita do dia via movimentações financeiras:', error);
+            }
             return 0;
         }
     }
@@ -524,7 +614,10 @@ export default class DashboardManager {
             
             return revenue;
         } catch (error) {
-            console.error('[Dashboard] Erro ao buscar receita de ontem via movimentações financeiras:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao buscar receita de ontem via movimentações financeiras:', error);
+            }
             return 0;
         }
     }
@@ -698,7 +791,10 @@ export default class DashboardManager {
             const monthlyRevenue = monthlySummary.total_revenue || 0;
             return monthlyRevenue;
         } catch (error) {
-            console.error('[Dashboard] Erro ao buscar receita mensal via getCashFlowSummary, usando fallback:', error);
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.error('[Dashboard] Erro ao buscar receita mensal via getCashFlowSummary, usando fallback:', error);
+            }
             // ALTERAÇÃO: Fallback para cálculo baseado em pedidos se getCashFlowSummary falhar
             try {
                 const monthlyResponse = await getAllOrders({ period: 'month' });
@@ -722,7 +818,10 @@ export default class DashboardManager {
                 
                 return this.calculateTodayRevenue(currentMonthOrders);
             } catch (fallbackError) {
-                console.error('[Dashboard] Erro no fallback de receita mensal:', fallbackError);
+                // ALTERAÇÃO: Log condicional apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    console.error('[Dashboard] Erro no fallback de receita mensal:', fallbackError);
+                }
                 return 0;
             }
         }
@@ -749,7 +848,7 @@ export default class DashboardManager {
             // ALTERAÇÃO: Se não houver meta, retornar 0 (será exibido como R$ 0,00)
             return 0;
         } catch (error) {
-            // ALTERAÇÃO: Log condicional apenas em modo debug
+            // ALTERAÇÃO: Log condicional apenas em modo debug (já estava correto)
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
                 console.error('Erro ao buscar meta mensal:', error);
             }
@@ -856,10 +955,11 @@ export default class DashboardManager {
     showErrorInContainer(containerId, message) {
         const container = document.getElementById(containerId);
         if (container) {
+            // ALTERAÇÃO: Sanitizar mensagem antes de inserir no innerHTML para prevenir XSS
             container.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #ef4444;">
                     <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
-                    <p>${message}</p>
+                    <p>${escapeHTML(message)}</p>
                 </div>
             `;
         }
@@ -927,12 +1027,7 @@ export default class DashboardManager {
             if (!container) return;
             
             // ALTERAÇÃO: Mostrar loading
-            container.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #666;">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
-                    <p>Carregando pedidos ativos...</p>
-                </div>
-            `;
+            this.showLoadingInContainer('dashboard-pedidos-ativos-list', 'Carregando pedidos ativos...');
             
             // ALTERAÇÃO: Buscar pedidos de hoje usando cache
             const response = await this.getCachedData('orders', async () => {
@@ -1027,12 +1122,8 @@ export default class DashboardManager {
      */
     renderActiveOrdersCards(orders, container) {
         if (!orders || orders.length === 0) {
-            container.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
-                    <i class="fa-solid fa-inbox" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i>
-                    <p>Nenhum pedido ativo no momento</p>
-                </div>
-            `;
+            // ALTERAÇÃO: Usar método padronizado para estado vazio
+            this.showEmptyStateInContainer('dashboard-pedidos-ativos-list', 'Nenhum pedido ativo no momento');
             return;
         }
         
@@ -1933,11 +2024,27 @@ export default class DashboardManager {
     async updateCharts() {
         // ALTERAÇÃO: Verificar se Chart.js está disponível
         if (typeof Chart === 'undefined') {
-            // ALTERAÇÃO: Log condicional apenas em modo debug
+            // ALTERAÇÃO: Log apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.warn('Chart.js não está disponível. Gráficos não serão renderizados.');
+                console.warn('[Dashboard] Chart.js não está disponível. Aguardando carregamento...');
             }
-            return;
+            // ALTERAÇÃO: Aguardar até Chart.js estar disponível (máximo 5 segundos)
+            let attempts = 0;
+            const maxAttempts = 50; // 5 segundos (50 * 100ms)
+            while (typeof Chart === 'undefined' && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (typeof Chart === 'undefined') {
+                // ALTERAÇÃO: Erro crítico sempre deve ser logado (não condicionado a DEBUG_MODE)
+                console.error('[Dashboard] Chart.js não foi carregado após 5 segundos. Verifique a conexão ou bloqueadores de conteúdo.');
+                return;
+            }
+            // ALTERAÇÃO: Log apenas em modo debug
+            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                console.log('[Dashboard] Chart.js carregado com sucesso após', attempts * 100, 'ms');
+            }
         }
 
         try {
@@ -1949,7 +2056,8 @@ export default class DashboardManager {
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.error('Erro ao atualizar gráficos:', error);
+                console.error('[Dashboard] Erro ao atualizar gráficos:', error);
+                console.error('[Dashboard] Stack trace:', error.stack);
             }
         }
     }
@@ -1966,33 +2074,74 @@ export default class DashboardManager {
         try {
             // ALTERAÇÃO: Verificar se Chart.js está disponível antes de criar gráfico
             if (typeof Chart === 'undefined') {
+                // ALTERAÇÃO: Log apenas em modo debug
                 if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                    console.warn('Chart.js não está disponível. Gráfico de vendas não será renderizado.');
+                    console.error('[Dashboard] Chart.js não está disponível. Verifique se o script foi carregado corretamente.');
+                }
+                // ALTERAÇÃO: Tentar recarregar Chart.js se não estiver disponível
+                if (typeof window !== 'undefined' && !window.chartJsLoadAttempted) {
+                    window.chartJsLoadAttempted = true;
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.warn('[Dashboard] Tentando carregar Chart.js novamente...');
+                    }
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+                    script.onload = () => {
+                        if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                            console.log('[Dashboard] Chart.js carregado com sucesso. Tentando criar gráfico novamente...');
+                        }
+                        this.createSalesChart();
+                    };
+                    script.onerror = () => {
+                        // ALTERAÇÃO: Erro crítico sempre deve ser logado (não condicionado a DEBUG_MODE)
+                        console.error('[Dashboard] Erro ao carregar Chart.js do CDN.');
+                    };
+                    document.head.appendChild(script);
                 }
                 return;
             }
             
             const canvas = document.getElementById('chart-vendas-semana');
-            if (!canvas) return;
+            if (!canvas) {
+                // ALTERAÇÃO: Erro crítico sempre deve ser logado (não condicionado a DEBUG_MODE)
+                console.error('[Dashboard] Canvas chart-vendas-semana não encontrado no DOM.');
+                return;
+            }
             
             // ALTERAÇÃO: Destruir gráfico existente se houver
             if (this.charts.salesChart) {
                 this.charts.salesChart.destroy();
             }
             
-            // ALTERAÇÃO: Buscar dados dos últimos 7 dias
+            // ALTERAÇÃO: Buscar dados dos últimos 7 dias ANTES de definir dimensões
             const salesData = await this.getLast7DaysSales();
             
-            // ALTERAÇÃO: Verificar se há dados para exibir
-            if (!salesData || !salesData.labels || !salesData.values) {
+            // ALTERAÇÃO: Verificar se há dados para exibir (permitir valores zerados)
+            if (!salesData || !salesData.labels || !Array.isArray(salesData.values)) {
                 if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                    console.warn('Dados de vendas não disponíveis para gráfico');
+                    console.warn('Dados de vendas não disponíveis para gráfico:', salesData);
                 }
                 return;
             }
             
+            // ALTERAÇÃO: Garantir que o container tenha dimensões corretas (Chart.js gerencia o canvas)
+            const chartContainer = canvas.closest('.chart-container') || canvas.parentElement;
+            if (chartContainer) {
+                // ALTERAÇÃO: Aguardar um frame para garantir que o container tenha dimensões calculadas
+                await new Promise(resolve => requestAnimationFrame(resolve));
+                
+                // ALTERAÇÃO: Garantir que o container tenha altura definida (CSS já define, mas garantir)
+                if (!chartContainer.style.height) {
+                    chartContainer.style.height = '300px';
+                }
+                
+                // ALTERAÇÃO: Não definir dimensões no canvas - Chart.js gerencia isso automaticamente
+                // Apenas garantir que o container está configurado corretamente
+            }
+            
             // ALTERAÇÃO: Criar gráfico
             const ctx = canvas.getContext('2d');
+            
             this.charts.salesChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -2002,6 +2151,12 @@ export default class DashboardManager {
                         data: salesData.values,
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
                         tension: 0.4,
                         fill: true
                     }]
@@ -2009,30 +2164,56 @@ export default class DashboardManager {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 750
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
                     plugins: {
                         legend: {
                             display: false
                         },
                         tooltip: {
+                            enabled: true,
                             callbacks: {
-                                label: (context) => formatCurrency(context.parsed.y)
+                                label: (context) => {
+                                    const value = context.parsed.y || 0;
+                                    return formatCurrency(value);
+                                }
                             }
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
+                            min: 0,
                             ticks: {
+                                stepSize: salesData.values.every(v => v === 0) ? 10 : undefined,
                                 callback: (value) => {
                                     // ALTERAÇÃO: Formatar valores do eixo Y
                                     const formatted = formatCurrency(value);
                                     return formatted.replace('R$', '').trim();
                                 }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            display: true,
+                            grid: {
+                                display: false
                             }
                         }
                     }
                 }
             });
+            
+            // ALTERAÇÃO: Forçar atualização do gráfico após criação
+            this.charts.salesChart.update('none'); // 'none' para atualizar sem animação
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
@@ -2065,6 +2246,20 @@ export default class DashboardManager {
             // ALTERAÇÃO: Destruir gráfico existente se houver
             if (this.charts.ordersStatusChart) {
                 this.charts.ordersStatusChart.destroy();
+            }
+            
+            // ALTERAÇÃO: Garantir que o container tenha dimensões corretas (Chart.js gerencia o canvas)
+            const chartContainer = canvas.closest('.chart-container') || canvas.parentElement;
+            if (chartContainer) {
+                // ALTERAÇÃO: Aguardar um frame para garantir que o container tenha dimensões calculadas
+                await new Promise(resolve => requestAnimationFrame(resolve));
+                
+                // ALTERAÇÃO: Garantir que o container tenha altura definida (CSS já define, mas garantir)
+                if (!chartContainer.style.height) {
+                    chartContainer.style.height = '300px';
+                }
+                
+                // ALTERAÇÃO: Não definir dimensões no canvas - Chart.js gerencia isso automaticamente
             }
             
             // ALTERAÇÃO: Buscar pedidos de hoje usando cache
@@ -2149,6 +2344,20 @@ export default class DashboardManager {
                 this.charts.salesChannelChart.destroy();
             }
             
+            // ALTERAÇÃO: Garantir que o container tenha dimensões corretas (Chart.js gerencia o canvas)
+            const chartContainer = canvas.closest('.chart-container') || canvas.parentElement;
+            if (chartContainer) {
+                // ALTERAÇÃO: Aguardar um frame para garantir que o container tenha dimensões calculadas
+                await new Promise(resolve => requestAnimationFrame(resolve));
+                
+                // ALTERAÇÃO: Garantir que o container tenha altura definida (CSS já define, mas garantir)
+                if (!chartContainer.style.height) {
+                    chartContainer.style.height = '300px';
+                }
+                
+                // ALTERAÇÃO: Não definir dimensões no canvas - Chart.js gerencia isso automaticamente
+            }
+            
             // ALTERAÇÃO: Buscar dados de vendas por canal
             const channelData = await this.getSalesByChannel();
             
@@ -2165,11 +2374,11 @@ export default class DashboardManager {
             this.charts.salesChannelChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: channelData.labels, // ['Delivery', 'Balcão', 'Mesa']
+                    labels: channelData.labels, // ['Delivery', 'Retirada']
                     datasets: [{
                         label: 'Receita (R$)',
                         data: channelData.values,
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b']
+                        backgroundColor: ['#3b82f6', '#10b981'] // ALTERAÇÃO: Removida cor do Balcão
                     }]
                 },
                 options: {
@@ -2208,7 +2417,7 @@ export default class DashboardManager {
     }
 
     /**
-     * Busca dados de vendas dos últimos 7 dias
+     * ALTERAÇÃO: Busca dados de vendas dos últimos 7 dias usando movimentações financeiras (padronizado com Receita do Dia)
      * 
      * @async
      * @returns {Promise<Object>} Objeto com labels e values
@@ -2217,16 +2426,11 @@ export default class DashboardManager {
      */
     async getLast7DaysSales() {
         try {
-            // ALTERAÇÃO: Buscar pedidos da última semana usando cache
-            const response = await this.getCachedData('charts', async () => {
-                return await getAllOrders({ period: 'week' });
-            });
-            const orders = this.extractOrdersFromResponse(response);
-            
             // ALTERAÇÃO: Criar array com os últimos 7 dias
             const days = [];
             const sales = [];
             
+            // ALTERAÇÃO: Buscar receita de cada dia usando movimentações financeiras
             for (let i = 6; i >= 0; i--) {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
@@ -2236,25 +2440,35 @@ export default class DashboardManager {
                 const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' });
                 days.push(dayName.charAt(0).toUpperCase() + dayName.slice(1));
                 
-                // ALTERAÇÃO: Filtrar pedidos do dia e calcular receita
-                const dayOrders = orders.filter(order => {
-                    if (!order.created_at && !order.order_date) {
-                        return false;
+                // ALTERAÇÃO: Calcular início e fim do dia
+                const dayStart = new Date(date);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(date);
+                dayEnd.setHours(23, 59, 59, 999);
+                
+                // ALTERAÇÃO: Buscar movimentações financeiras do dia
+                try {
+                    const startDate = formatDateForISO(dayStart);
+                    const endDate = formatDateForISO(dayEnd);
+                    
+                    const response = await getFinancialMovements({
+                        start_date: startDate,
+                        end_date: endDate,
+                        type: 'REVENUE',
+                        payment_status: 'Paid'
+                    });
+                    
+                    const movements = response.items || response || [];
+                    const dayRevenue = this.calculateRevenueFromMovements(movements);
+                    
+                    sales.push(dayRevenue);
+                } catch (dayError) {
+                    // ALTERAÇÃO: Se houver erro em um dia específico, usar 0 e continuar
+                    if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                        console.warn(`[Dashboard] Erro ao buscar receita do dia ${dayName}:`, dayError);
                     }
-                    const orderDate = new Date(order.created_at || order.order_date);
-                    orderDate.setHours(0, 0, 0, 0);
-                    return orderDate.getTime() === date.getTime();
-                });
-                
-                // ALTERAÇÃO: Calcular receita do dia (apenas pedidos concluídos/pagos)
-                const dayRevenue = dayOrders
-                    .filter(order => ['completed', 'delivered', 'paid'].includes(order.status))
-                    .reduce((total, order) => {
-                        const orderTotal = parseFloat(order.total_amount || order.total || 0);
-                        return total + (isNaN(orderTotal) ? 0 : orderTotal);
-                    }, 0);
-                
-                sales.push(dayRevenue);
+                    sales.push(0);
+                }
             }
             
             return {
@@ -2264,11 +2478,18 @@ export default class DashboardManager {
         } catch (error) {
             // ALTERAÇÃO: Log condicional apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.error('Erro ao buscar vendas dos últimos 7 dias:', error);
+                console.error('[Dashboard] Erro ao buscar vendas dos últimos 7 dias:', error);
             }
-            // ALTERAÇÃO: Retornar dados vazios em caso de erro
+            // ALTERAÇÃO: Retornar dados vazios em caso de erro (ainda assim exibir o gráfico)
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' });
+                days.push(dayName.charAt(0).toUpperCase() + dayName.slice(1));
+            }
             return {
-                labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+                labels: days,
                 values: [0, 0, 0, 0, 0, 0, 0]
             };
         }
@@ -2352,7 +2573,7 @@ export default class DashboardManager {
                 }
             });
             
-            // ALTERAÇÃO: Preparar labels e valores
+            // ALTERAÇÃO: Preparar labels e valores (removido Balcão)
             const labels = [];
             const values = [];
             
@@ -2366,16 +2587,13 @@ export default class DashboardManager {
                 values.push(channelSales.pickup);
             }
             
-            if (channelSales.dine_in > 0) {
-                labels.push('Balcão');
-                values.push(channelSales.dine_in);
-            }
+            // ALTERAÇÃO: Removido dine_in (Balcão) conforme solicitado
             
-            // ALTERAÇÃO: Se não houver dados, retornar valores vazios
+            // ALTERAÇÃO: Se não houver dados, retornar valores vazios (sem Balcão)
             if (labels.length === 0) {
                 return {
-                    labels: ['Delivery', 'Retirada', 'Balcão'],
-                    values: [0, 0, 0]
+                    labels: ['Delivery', 'Retirada'],
+                    values: [0, 0]
                 };
             }
             

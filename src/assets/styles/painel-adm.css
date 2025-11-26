@@ -705,8 +705,6 @@ main {
     /* ============================================================================
        SEÇÃO DASHBOARD
        ============================================================================ */
-       banana:
-
     & #secao-dashboard {
         padding-bottom: 50px;
         overflow-x: hidden;
@@ -719,22 +717,14 @@ main {
 
             & .dashboard-chart-card {
                 /* ALTERAÇÃO: Aplicar mesmo estilo do order-card */
-                background-color: var(--cor-div-primary);
-                box-shadow: var(--box-shadow);
                 border-radius: var(--border-radius);
                 padding: 20px;
                 display: flex;
                 flex-direction: column;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
 
                 /* ALTERAÇÃO: Card de pedidos ativos ocupa toda a largura */
                 &.full-width {
                     grid-column: 1 / -1;
-                }
-
-                &:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
                 }
 
                 & h3 {
@@ -744,11 +734,32 @@ main {
                     font-weight: 600;
                 }
 
-                & canvas {
+                /* ALTERAÇÃO: Container para gráficos com altura fixa para evitar expansão infinita */
+                & .chart-container {
+                    position: relative;
+                    height: 300px;
+                    width: 100%;
+                    min-height: 300px;
                     max-height: 300px;
+                    box-sizing: border-box;
+                    transition: all 0.2s ease-in-out;
                 }
 
-                & > div {
+                & .chart-container:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+                }
+
+                /* ALTERAÇÃO: Canvas - Chart.js gerencia dimensões internas, apenas definir estilo */
+                & canvas {
+                    max-width: 100%;
+                    max-height: 300px;
+                    display: block;
+                    box-sizing: border-box;
+                }
+
+                /* ALTERAÇÃO: Seletor mais específico para o header do card (título + link) */
+                & > div:first-child:not(.pedidos-container):not(.chart-container) {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -778,23 +789,20 @@ main {
                     }
                 }
 
-                & .pedidos-container {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-                    gap: 15px;
-                    max-height: 600px;
-                    overflow-y: auto;
-                    padding: 5px;
-                }
-
                 /* ALTERAÇÃO: Estilos específicos para lista de pedidos ativos do dashboard */
+                & .pedidos-container,
                 & #dashboard-pedidos-ativos-list {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+                    display: grid !important;
+                    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)) !important;
                     gap: 15px;
                     max-height: 600px;
                     overflow-y: auto;
+                    background-color: var(--cor-div-primary);
+                    box-shadow: var(--box-shadow);
+                    border-radius: var(--border-radius);
                     padding: 5px;
+                    width: 100%;
+                    box-sizing: border-box;
 
                     /* ALTERAÇÃO: Estado de loading/empty */
                     /* ALTERAÇÃO: Seletor mais específico para não afetar elementos dentro dos cards */
@@ -802,7 +810,6 @@ main {
                     /* ALTERAÇÃO: Limitar estilos apenas aos elementos diretos (i e p) para não afetar cards */
                     & > div:first-child:not(.order-card) {
                         grid-column: 1 / -1;
-                        box-shadow: 0 5px 5px 0 rgba(0, 0, 0, 0.1);
                         padding: 20px;
                         color: var(--color-texto-erased);
 
