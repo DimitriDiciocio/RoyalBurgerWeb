@@ -15,6 +15,7 @@ import { showError } from "./alerts.js";
 import * as settingsHelper from "../utils/settings-helper.js";
 import { escapeHTML } from "../utils/html-sanitizer.js";
 import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../utils/price-utils.js";
+import { socketService } from "../api/socket-client.js";
 
 (function initOrderHistory() {
   // Verificar se estamos na página de histórico de pedidos
@@ -31,7 +32,7 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
     },
     pagination: {
       currentPage: 1,
-      itemsPerPage: 5,
+      itemsPerPage: 50, // ALTERAÇÃO: Aumentado de 5 para 50 pedidos por página
       totalItems: 0,
     },
     loading: false,
@@ -275,7 +276,8 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
     state.error = null;
 
     try {
-      const result = await getMyOrders();
+      // ALTERAÇÃO: Passar parâmetros de paginação explicitamente (50 pedidos por página)
+      const result = await getMyOrders(state.pagination.currentPage, state.pagination.itemsPerPage);
 
       if (result.success) {
         // Suporta formatos: lista direta (legacy) ou objeto com items (paginação)
@@ -821,7 +823,7 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
                         <div class="order-id-status">
                             <div class="order-id">
                                 <span class="id-text">${confirmationCode}</span>
-                                <span class="status-badge status-${statusCssClass}">${statusText}</span>
+                                <span class="status-badge status-${statusCssClass}" id="status-text-${safeOrderId}">${statusText}</span>
                             </div>
                             <div class="order-time-estimate ${timeColorClass}">
                                 <i class="fa-solid fa-clock"></i>
@@ -984,6 +986,257 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
     return true;
   }
 
+  // Armazenar referências dos callbacks para poder removê-los depois
+  let socketCallbacks = {
+    orderCreated: null,
+    orderStatusChanged: null
+  };
+
+  /**
+   * Configura listeners de eventos WebSocket para atualização em tempo real
+   * ALTERAÇÃO: Melhorado para garantir que os listeners sejam configurados corretamente
+   */
+  function setupSocketListeners() {
+    // ALTERAÇÃO: Garantir que o socket está conectado
+    // Se não estiver, tentar conectar
+    if (!socketService.getConnected()) {
+      socketService.connect();
+    }
+
+    // ALTERAÇÃO: Remover listeners antigos se existirem (evita duplicatas)
+    if (socketCallbacks.orderCreated) {
+      socketService.off('order.created', socketCallbacks.orderCreated);
+    }
+    if (socketCallbacks.orderStatusChanged) {
+      socketService.off('order.status_changed', socketCallbacks.orderStatusChanged);
+    }
+
+    // 1. Listener para novo pedido criado (quando o cliente faz um pedido)
+    socketCallbacks.orderCreated = (orderData) => {
+      
+      const orderId = orderData.order_id;
+      
+      // Verifica se o pedido já existe na lista (evita duplicatas)
+      const existingIndex = state.orders.findIndex((o) => 
+        o.id === orderId || o.order_id === orderId
+      );
+      
+      if (existingIndex !== -1) {
+        // Se já existe, apenas atualiza e re-renderiza
+        applyFilters();
+        renderOrders();
+        return;
+      }
+      
+      // Buscar detalhes completos do pedido via API
+      getOrderDetails(orderId)
+        .then((response) => {
+          const fullOrder = response?.success ? response.data : response;
+          
+          if (fullOrder) {
+            // Garantir que o ID está correto
+            if (!fullOrder.id) {
+              fullOrder.id = orderId;
+            }
+            if (!fullOrder.order_id) {
+              fullOrder.order_id = orderId;
+            }
+            
+            // Adiciona o novo pedido ao início da lista
+            state.orders.unshift(fullOrder);
+            
+            // Aplica filtros
+            applyFilters();
+            
+            // Renderiza a lista atualizada
+            renderOrders();
+            
+            // Adiciona animação de destaque
+            setTimeout(() => {
+              const newCard = document.querySelector(`[data-order-id="${orderId}"]`);
+              if (newCard) {
+                newCard.classList.add('highlight-new-order');
+                setTimeout(() => {
+                  newCard.classList.remove('highlight-new-order');
+                }, 3000);
+              }
+            }, 100);
+          }
+        })
+        .catch((error) => {
+          // Em caso de erro, recarrega a lista completa
+          loadOrders();
+        });
+    };
+    
+    // Registrar o listener
+    socketService.on('order.created', socketCallbacks.orderCreated);
+
+    // 2. Listener para mudança de status do pedido (apenas para pedidos do usuário atual)
+    socketCallbacks.orderStatusChanged = (data) => {
+      // ALTERAÇÃO: A API envia: { order_id, new_status, old_status, user_id }
+      const orderId = data.order_id;
+      const newStatus = data.new_status;
+      
+      // ALTERAÇÃO: Garantir que orderId seja processado no mesmo formato usado na renderização
+      // Na renderização: orderIdNum = parseInt(String(orderId), 10) e safeOrderId = escapeHTML(String(orderIdNum))
+      // Mas para IDs de elementos HTML, não precisamos escapeHTML, apenas garantir que seja string válida
+      const orderIdNum = parseInt(String(orderId || ''), 10);
+      if (isNaN(orderIdNum) || orderIdNum <= 0) {
+        return;
+      }
+      // Usar o mesmo formato da renderização (escapeHTML é usado apenas para segurança, mas IDs são numéricos)
+      const safeOrderId = String(orderIdNum);
+      
+      // Buscar o elemento de status diretamente no DOM (atualização sem recarregar lista)
+      const statusElement = document.getElementById(`status-text-${safeOrderId}`);
+      const containerElement = document.querySelector(`[data-order-id="${safeOrderId}"]`);
+      
+      // Atualizar elemento de status se existir
+      if (statusElement) {
+        // Traduzir o status usando formatOrderStatus (mesma função usada na renderização)
+        let statusText = formatOrderStatus(newStatus);
+        
+        // ALTERAÇÃO: Aplicar mesma lógica da renderização (pending -> "Recebido")
+        if (newStatus === "pending") {
+          statusText = "Recebido";
+        }
+        
+        // Atualizar texto do status
+        statusElement.textContent = statusText;
+        
+        // Atualizar classe CSS do badge (remover todas as classes de status e adicionar a nova)
+        const statusClasses = ['status-pending', 'status-preparing', 'status-ready', 'status-in_progress', 
+                              'status-on_the_way', 'status-delivered', 'status-completed', 'status-cancelled', 'status-paid'];
+        statusElement.classList.remove(...statusClasses);
+        statusElement.classList.add(`status-${newStatus}`);
+        statusElement.classList.add('status-badge'); // Garantir que a classe base está presente
+      }
+      
+      // Atualizar classes do container/card se existir
+      if (containerElement) {
+        // Remove classes antigas de status
+        containerElement.classList.remove('status-pending', 'status-preparing', 'status-ready', 
+                                         'status-in_progress', 'status-on_the_way', 'status-delivered', 
+                                         'status-completed', 'status-cancelled', 'status-paid');
+        // Adiciona nova classe de status
+        containerElement.classList.add(`status-${newStatus}`);
+        
+        // Adicionar animação de destaque
+        containerElement.classList.add('order-status-changed');
+        containerElement.style.animation = 'pulse 0.5s ease-in-out';
+        
+        setTimeout(() => {
+          containerElement.classList.remove('order-status-changed');
+          containerElement.style.animation = '';
+        }, 2000);
+      }
+      
+      // ALTERAÇÃO: Atualizar o estado interno também (sem recarregar a lista)
+      const orderIndex = state.orders.findIndex(
+        (order) => (order.id === orderId || order.order_id === orderId)
+      );
+      
+      if (orderIndex !== -1) {
+        // Atualiza o status do pedido no estado
+        state.orders[orderIndex].status = newStatus;
+        
+        // Garantir que o pedido tenha os IDs corretos
+        if (!state.orders[orderIndex].id) {
+          state.orders[orderIndex].id = orderId;
+        }
+        if (!state.orders[orderIndex].order_id) {
+          state.orders[orderIndex].order_id = orderId;
+        }
+        
+        // ALTERAÇÃO: Aplicar filtros locais apenas se necessário (sem recarregar da API)
+        // Se houver filtro ativo, verificar se o pedido ainda deve aparecer
+        if (state.filters.status) {
+          const shouldShow = state.filters.status === newStatus;
+          const isInFiltered = state.filteredOrders.some(
+            (order) => (order.id === orderId || order.order_id === orderId)
+          );
+          
+          // Se o pedido não deve mais aparecer com o novo status, remover dos filtrados
+          if (!shouldShow && isInFiltered) {
+            state.filteredOrders = state.filteredOrders.filter(
+              (order) => !(order.id === orderId || order.order_id === orderId)
+            );
+            // Remover o card do DOM se não deve mais aparecer
+            if (containerElement) {
+              containerElement.style.transition = 'opacity 0.3s ease-out';
+              containerElement.style.opacity = '0';
+              setTimeout(() => {
+                containerElement.remove();
+              }, 300);
+            }
+          } 
+          // Se o pedido deve aparecer mas não está nos filtrados, adicionar
+          else if (shouldShow && !isInFiltered) {
+            state.filteredOrders.push(state.orders[orderIndex]);
+            // Re-renderizar apenas este pedido (ou recarregar se necessário)
+            renderOrders();
+          }
+        }
+      } else {
+        // Se o pedido não estiver na lista, pode ser um novo pedido ou um que não foi carregado
+        // Tenta buscar o pedido e adicionar à lista
+        getOrderDetails(orderId)
+          .then((response) => {
+            const fullOrder = response?.success ? response.data : response;
+            if (fullOrder) {
+              // Adiciona o pedido à lista (mesmo que seja concluído)
+              state.orders.unshift(fullOrder);
+              
+              // Aplica filtros
+              applyFilters();
+              
+              // Renderiza a lista atualizada
+              renderOrders();
+              
+              // Adiciona animação
+              setTimeout(() => {
+                // ALTERAÇÃO: Processar orderId no mesmo formato usado na renderização
+                const orderIdNum = parseInt(String(orderId || ''), 10);
+                if (!isNaN(orderIdNum) && orderIdNum > 0) {
+                  const safeOrderId = String(orderIdNum);
+                  const newCard = document.querySelector(`[data-order-id="${safeOrderId}"]`);
+                  if (newCard) {
+                    newCard.classList.add('order-status-changed');
+                    newCard.style.animation = 'pulse 0.5s ease-in-out';
+                    setTimeout(() => {
+                      newCard.classList.remove('order-status-changed');
+                      newCard.style.animation = '';
+                    }, 2000);
+                  }
+                }
+              }, 100);
+            } else {
+              // Se não conseguir buscar, recarrega a lista completa
+              loadOrders();
+            }
+          })
+          .catch((error) => {
+            // Em caso de erro, recarrega a lista completa
+            loadOrders();
+          });
+      }
+    };
+    
+    // Registrar o listener
+    socketService.on('order.status_changed', socketCallbacks.orderStatusChanged);
+
+    // ALTERAÇÃO: Reconfigurar listeners se o socket reconectar
+    window.addEventListener('socket:reconnected', () => {
+      setupSocketListeners();
+    });
+
+    // ALTERAÇÃO: Reconfigurar listeners quando o socket conectar
+    window.addEventListener('socket:connected', () => {
+      setupSocketListeners();
+    });
+  }
+
   // Inicializar
   async function init() {
     if (!checkUserLogin()) return;
@@ -995,6 +1248,30 @@ import { calculatePriceWithPromotion, formatPrice, isPromotionActive } from "../
 
     attachEvents();
     await loadOrders();
+    
+    // ALTERAÇÃO: Configurar listeners WebSocket após carregar pedidos
+    // Garantir que o socket está conectado antes de configurar
+    if (socketService.getConnected()) {
+      setupSocketListeners();
+    } else {
+      // Se não estiver conectado, tentar conectar e configurar depois
+      socketService.connect();
+      
+      // Aguardar conexão ou configurar imediatamente se já estiver conectado
+      const checkConnection = setInterval(() => {
+        if (socketService.getConnected()) {
+          clearInterval(checkConnection);
+          setupSocketListeners();
+        }
+      }, 100);
+      
+      // Timeout de segurança (5 segundos)
+      setTimeout(() => {
+        clearInterval(checkConnection);
+        // Tentar configurar mesmo assim (o socket pode estar configurando)
+        setupSocketListeners();
+      }, 5000);
+    }
   }
 
   // Inicializar quando DOM estiver pronto

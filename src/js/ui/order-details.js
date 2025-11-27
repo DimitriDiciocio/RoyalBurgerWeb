@@ -15,6 +15,7 @@ import * as settingsHelper from '../utils/settings-helper.js';
 
 // Importar sistema de alertas customizado
 import { showError, showSuccess } from './alerts.js';
+import { socketService } from '../api/socket-client.js';
 
 // Constantes
 const VISIBILITY_DELAY_MS = 500; // Delay para exibição de alerta antes de redirecionamento
@@ -160,7 +161,7 @@ const isDevelopment = () => {
 
     // Buscar preço adicional de um ingrediente pelo ID
     // Valida tipo e existência antes de buscar no cache
-    function agetIngredientPrice(ingredientId) {
+    function getIngredientPrice(ingredientId) {
         if (!state.ingredientsCache || !ingredientId) {
             return null; // ALTERAÇÃO: Retornar null em vez de 0 para diferenciar "não encontrado" de "preço zero"
         }
@@ -555,8 +556,16 @@ const isDevelopment = () => {
             'cancelled': 'Seu pedido foi cancelado.'
         };
 
+        const messageText = statusMessages[status] || 'Status desconhecido';
+
         if (el.orderStatusMessage) {
-            el.orderStatusMessage.textContent = statusMessages[status] || 'Status desconhecido';
+            el.orderStatusMessage.textContent = messageText;
+        } else {
+            // Tentar buscar novamente
+            el.orderStatusMessage = document.getElementById('order-status-message');
+            if (el.orderStatusMessage) {
+                el.orderStatusMessage.textContent = messageText;
+            }
         }
 
         // Atualizar etapas do progresso
@@ -580,12 +589,25 @@ const isDevelopment = () => {
 
         const stepConfig = steps[status] || steps['pending'];
 
+        // ALTERAÇÃO: Re-buscar elementos se não estiverem disponíveis
+        if (!el.stepPending) {
+            el.stepPending = document.getElementById('step-pending');
+        }
+        if (!el.stepPreparing) {
+            el.stepPreparing = document.getElementById('step-preparing');
+        }
+        if (!el.stepDelivered) {
+            el.stepDelivered = document.getElementById('step-delivered');
+        }
+
         if (el.stepPending) {
             el.stepPending.classList.toggle('completo', stepConfig.pending);
         }
+        
         if (el.stepPreparing) {
             el.stepPreparing.classList.toggle('completo', stepConfig.preparing);
         }
+        
         if (el.stepDelivered) {
             el.stepDelivered.classList.toggle('completo', stepConfig.delivered);
         }
@@ -1283,6 +1305,73 @@ const isDevelopment = () => {
         return true;
     }
 
+    /**
+     * Configura listeners de eventos WebSocket para atualização em tempo real
+     * ALTERAÇÃO: Atualiza status diretamente no DOM sem recarregar tudo
+     */
+    function setupSocketListeners() {
+        // ALTERAÇÃO: Remover listener antigo se existir para evitar duplicatas
+        if (window._orderDetailsStatusListener) {
+            socketService.off('order.status_changed', window._orderDetailsStatusListener);
+        }
+        
+        // Listener para mudança de status do pedido (apenas para o pedido atual)
+        window._orderDetailsStatusListener = (data) => {
+            // Verifica se é o pedido que está sendo visualizado
+            const currentOrderId = state.orderId || state.order?.id || state.order?.order_id;
+            const receivedOrderId = data.order_id;
+            
+            // Normalizar IDs para comparação (pode ser string ou número)
+            const normalizedCurrentId = String(currentOrderId || '').trim();
+            const normalizedReceivedId = String(receivedOrderId || '').trim();
+            
+            // ALTERAÇÃO: Comparar também como números para garantir compatibilidade
+            const currentIdNum = parseInt(normalizedCurrentId, 10);
+            const receivedIdNum = parseInt(normalizedReceivedId, 10);
+            const idsMatch = normalizedCurrentId === normalizedReceivedId || 
+                           (!isNaN(currentIdNum) && !isNaN(receivedIdNum) && currentIdNum === receivedIdNum);
+            
+            if (idsMatch && normalizedCurrentId && normalizedReceivedId) {
+                const newStatus = data.new_status;
+                
+                // ALTERAÇÃO: Re-buscar elementos se não estiverem disponíveis
+                if (!el.orderStatusMessage || !el.stepPending || !el.stepPreparing || !el.stepDelivered) {
+                    initElements();
+                }
+                
+                // Atualizar status no estado
+                if (state.order) {
+                    state.order.status = newStatus;
+                }
+                
+                // Atualizar status e progresso diretamente no DOM (sem recarregar tudo)
+                updateOrderStatus(newStatus);
+                
+                // Atualizar ações do pedido (pode mudar com o status)
+                updateOrderActions(newStatus);
+                
+                // Adiciona animação visual de atualização
+                if (el.orderStatusMessage) {
+                    el.orderStatusMessage.classList.add('order-status-changed');
+                    el.orderStatusMessage.style.animation = 'pulse 0.5s ease-in-out';
+                    setTimeout(() => {
+                        el.orderStatusMessage.classList.remove('order-status-changed');
+                        el.orderStatusMessage.style.animation = '';
+                    }, 2000);
+                }
+                
+                // Se o pedido foi concluído, atualizar pontos no header
+                if (newStatus === 'completed' || newStatus === 'delivered') {
+                    if (typeof window.updateHeaderState === 'function') {
+                        window.updateHeaderState();
+                    }
+                }
+            }
+        };
+        
+        socketService.on('order.status_changed', window._orderDetailsStatusListener);
+    }
+
     // Inicializar
     async function init() {
         debugLog('DOMContentLoaded -> init() chamado');
@@ -1303,6 +1392,34 @@ const isDevelopment = () => {
         state.orderId = orderId;
         initElements();
         attachEvents();
+        
+        // ALTERAÇÃO: Configurar listeners WebSocket após garantir que o socket está conectado
+        if (socketService.getConnected()) {
+            setupSocketListeners();
+        } else {
+            // Se não estiver conectado, tentar conectar e configurar depois
+            socketService.connect();
+            
+            // Aguardar conexão ou configurar imediatamente se já estiver conectado
+            const checkConnection = setInterval(() => {
+                if (socketService.getConnected()) {
+                    clearInterval(checkConnection);
+                    setupSocketListeners();
+                }
+            }, 100);
+            
+            // Timeout de segurança (5 segundos)
+            setTimeout(() => {
+                clearInterval(checkConnection);
+                // Tentar configurar mesmo assim (o socket pode estar configurando)
+                setupSocketListeners();
+            }, 5000);
+            
+            // Também escutar evento de conexão
+            window.addEventListener('socket:connected', () => {
+                setupSocketListeners();
+            }, { once: true });
+        }
         
         // Carregar cache de ingredientes antes de carregar o pedido
         await loadIngredientsCache();

@@ -6401,3 +6401,60 @@ main {
         max-width: 95vw;
     }
 }
+
+/* ============================================================================
+   Animações para Atualizações em Tempo Real (WebSocket)
+   ============================================================================ */
+
+/* Animação de pulso para destacar novos pedidos ou mudanças de status */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
+/* Destaque para novo pedido */
+.order-card.highlight-new-order {
+    animation: pulse 0.6s ease-in-out;
+    border-left: 4px solid #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+    transition: all 0.3s ease;
+}
+
+/* Destaque para mudança de status */
+.order-card.order-status-changed {
+    animation: pulse 0.5s ease-in-out;
+    border-left: 4px solid #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+/* Alerta de estoque baixo */
+.card-ingrediente.stock-alert {
+    animation: pulse 0.5s ease-in-out;
+    transition: all 0.3s ease;
+}
+
+.card-ingrediente.stock-low {
+    border-left: 4px solid #ffc107;
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.card-ingrediente.stock-out {
+    border-left: 4px solid #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Classe Bootstrap para linha vermelha (estoque crítico) */
+.table-danger {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}

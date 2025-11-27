@@ -25,6 +25,7 @@ import RelatoriosManager from './relatorios-manager.js';
 import { showToast } from '../alerts.js';
 import { fetchMe } from '../../api/auth.js';
 import { reaplicarGerenciamentoInputs, gerenciarInputsEspecificos } from '../../utils.js';
+import { socketService } from '../../api/socket-client.js';
 
 /**
  * Configurações do painel administrativo
@@ -107,6 +108,9 @@ class AdminPanelManager {
                 return;
             }
 
+            // Conectar ao WebSocket para notificações em tempo real
+            this.initializeSocket();
+            
             // Configurar navegação
             this.setupNavigation();
             
@@ -204,6 +208,112 @@ class AdminPanelManager {
         const normalizedRole = roleMapping[role] || 'cliente';
         
         return normalizedRole;
+    }
+
+    /**
+     * Inicializa a conexão WebSocket para notificações em tempo real
+     */
+    initializeSocket() {
+        try {
+            // Conectar ao socket
+            socketService.connect();
+
+            // Ouvinte Global de Alertas (Estoque, Erros, Avisos)
+            // ALTERAÇÃO: Removido alerta de estoque baixo - apenas atualiza a interface sem mostrar toast
+            socketService.on('stock.alert', (data) => {
+                // Exemplo: { ingredient_id: 5, name: 'Bacon', status: 'low' }
+                // ALTERAÇÃO: Apenas loga no console, não mostra toast na tela
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    const statusText = data.status === 'out_of_stock' ? 'Sem Estoque' : 'Estoque Baixo';
+                    console.log(`⚠️ ${statusText}: ${data.name} atingiu o nível mínimo!`);
+                }
+                // A atualização visual da interface é feita pelo insumos-gerenciamento.js
+            });
+
+            socketService.on('order.created', (data) => {
+                // Notificação visual rápida
+                showToast(`🔔 Novo Pedido #${data.order_id} recebido!`, {
+                    type: 'success',
+                    autoClose: 5000
+                });
+                
+                // Tocar som (opcional - se tiver arquivo de som)
+                try {
+                    const audio = new Audio('/assets/sounds/notification.mp3');
+                    audio.volume = 0.5;
+                    audio.play().catch(e => {
+                        // Ignora erro se o arquivo não existir ou autoplay for bloqueado
+                        console.debug('Não foi possível tocar som de notificação:', e);
+                    });
+                } catch(e) {
+                    // Ignora erro silenciosamente
+                }
+                
+                // Atualizar contador global no Header (se existir um badge de notificação)
+                this.updateHeaderNotificationCount();
+            });
+
+            socketService.on('order.status_changed', (data) => {
+                // Notificação quando status do pedido muda
+                const statusMessages = {
+                    'preparing': 'Em preparo',
+                    'ready': 'Pronto',
+                    'on_the_way': 'Saindo para entrega',
+                    'delivered': 'Entregue',
+                    'cancelled': 'Cancelado'
+                };
+                const statusText = statusMessages[data.new_status] || data.new_status;
+                showToast(`📦 Pedido #${data.order_id} atualizado: ${statusText}`, {
+                    type: 'info',
+                    autoClose: 4000
+                });
+            });
+
+            socketService.on('table.status_changed', (data) => {
+                // Notificação quando status da mesa muda
+                const statusMessages = {
+                    'available': 'Disponível',
+                    'occupied': 'Ocupada',
+                    'cleaning': 'Em limpeza',
+                    'reserved': 'Reservada'
+                };
+                const statusText = statusMessages[data.new_status] || data.new_status;
+                showToast(`🪑 Mesa ${data.table_name || data.table_id} está ${statusText.toLowerCase()}`, {
+                    type: 'info',
+                    autoClose: 3000
+                });
+            });
+
+            // Eventos de conexão/desconexão
+            window.addEventListener('socket:connected', () => {
+                console.log('✅ Socket conectado com sucesso');
+            });
+
+            window.addEventListener('socket:disconnected', (e) => {
+                console.warn('⚠️ Socket desconectado:', e.detail.reason);
+            });
+
+            window.addEventListener('socket:error', (e) => {
+                console.error('❌ Erro no socket:', e.detail.error);
+            });
+
+        } catch (error) {
+            console.error('Erro ao inicializar WebSocket:', error);
+            // Não bloqueia a inicialização do painel se o socket falhar
+        }
+    }
+
+    /**
+     * Atualiza contador de notificações no header
+     */
+    updateHeaderNotificationCount() {
+        // Lógica para somar +1 no ícone de sino do header.html, se houver
+        const notificationBadge = document.querySelector('.notification-badge, .header-notification-count');
+        if (notificationBadge) {
+            const currentCount = parseInt(notificationBadge.textContent) || 0;
+            notificationBadge.textContent = currentCount + 1;
+            notificationBadge.style.display = 'block';
+        }
     }
 
     /**

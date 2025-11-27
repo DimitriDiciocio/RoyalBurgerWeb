@@ -8,10 +8,7 @@ import { showToast } from '../alerts.js';
 import { renderFinancialMovementCards } from '../components/financial-card.js';
 import { cacheManager } from '../../utils/cache-manager.js';
 import { formatDateForAPI } from '../../utils/date-formatter.js';
-// ALTERAÇÃO: Importar utilities compartilhadas para reduzir duplicação
-import { openRelatedEntityModal, refreshPurchasesIfNeeded } from '../../utils/financial-entity-utils.js';
-// ALTERAÇÃO: Importar cliente de eventos em tempo real
-import { getRealtimeClient } from '../../utils/realtime-events.js';
+import { socketService } from '../../api/socket-client.js';
 
 export class FinancialDashboard {
     constructor(containerId) {
@@ -44,8 +41,7 @@ export class FinancialDashboard {
         this.render();
         await this.loadData();
         this.setupEventListeners();
-        // ALTERAÇÃO: Configurar eventos em tempo real
-        this.setupRealtimeEvents();
+        this.setupSocketListeners();
     }
 
     /**
@@ -587,6 +583,101 @@ export class FinancialDashboard {
                 this.loadData();
             });
         }
+    }
+
+    /**
+     * Configura listeners de eventos WebSocket para atualização em tempo real
+     */
+    setupSocketListeners() {
+        // Ouve novo pedido para atualizar métricas
+        socketService.on('order.created', (data) => {
+            console.log('📊 Atualizando Dashboard com novo pedido...', data);
+            
+            // Atualiza contador de pedidos (IDs do HTML: dashboard-pedidos-hoje)
+            const elPedidosHoje = document.getElementById('dashboard-pedidos-hoje');
+            if (elPedidosHoje) {
+                let count = parseInt(elPedidosHoje.textContent) || 0;
+                elPedidosHoje.textContent = count + 1;
+                
+                // Efeito visual (piscar verde)
+                elPedidosHoje.style.color = '#28a745';
+                elPedidosHoje.style.transition = 'color 0.3s ease';
+                setTimeout(() => {
+                    elPedidosHoje.style.color = '';
+                }, 1000);
+            }
+
+            // Atualiza receita (ID do HTML: dashboard-receita-dia)
+            const elFaturamento = document.getElementById('dashboard-receita-dia');
+            if (elFaturamento && data.total) {
+                // Remove 'R$', espaços e troca vírgula por ponto para somar
+                let currentText = elFaturamento.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+                let currentVal = parseFloat(currentText) || 0;
+                
+                let newVal = currentVal + parseFloat(data.total);
+                
+                // Formata de volta para BRL
+                elFaturamento.textContent = newVal.toLocaleString('pt-BR', { 
+                    style: 'currency', 
+                    currency: 'BRL' 
+                });
+                
+                // Efeito visual (piscar verde)
+                elFaturamento.style.color = '#28a745';
+                elFaturamento.style.transition = 'color 0.3s ease';
+                setTimeout(() => {
+                    elFaturamento.style.color = '';
+                }, 1000);
+            }
+
+            // Recarrega dados do dashboard para atualizar gráficos
+            // Usa debounce para evitar múltiplas atualizações simultâneas
+            if (this.refreshTimeout) {
+                clearTimeout(this.refreshTimeout);
+            }
+            this.refreshTimeout = setTimeout(() => {
+                this.loadData();
+            }, 1000);
+        });
+
+        // Ouve mudança de status de pedido (pode afetar métricas)
+        socketService.on('order.status_changed', (data) => {
+            // Se o pedido foi concluído, pode atualizar receita
+            if (data.new_status === 'delivered' || data.new_status === 'completed') {
+                // Recarrega dados após um pequeno delay
+                if (this.refreshTimeout) {
+                    clearTimeout(this.refreshTimeout);
+                }
+                this.refreshTimeout = setTimeout(() => {
+                    this.loadData();
+                }, 1000);
+            }
+        });
+    }
+
+    /**
+     * Atualiza o DOM do elemento de receita
+     * @param {number} newTotal - Novo valor a ser adicionado
+     */
+    updateRevenueDOM(newTotal) {
+        const elRevenue = document.getElementById('dash-revenue');
+        if (!elRevenue) return;
+
+        // Remove 'R$', espaços e converte para número
+        const currentText = elRevenue.textContent || 'R$ 0,00';
+        const currentValue = parseFloat(
+            currentText
+                .replace('R$', '')
+                .replace(/\./g, '')
+                .replace(',', '.')
+                .trim()
+        ) || 0;
+
+        // Soma o novo valor
+        const newValue = currentValue + parseFloat(newTotal || 0);
+
+        // Formata de volta
+        elRevenue.textContent = this.formatCurrency(newValue);
     }
 
     /**

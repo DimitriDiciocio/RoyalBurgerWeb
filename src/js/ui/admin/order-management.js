@@ -21,6 +21,7 @@ import { showSuccess, showError, showConfirm } from "../alerts.js";
 import { debounce } from "../../utils/performance-utils.js";
 import { escapeHTML as escapeHTMLCentralized } from "../../utils/html-sanitizer.js";
 import { showLoadingOverlay, hideLoadingOverlay } from "../../utils/loading-indicator.js";
+import { socketService } from "../../api/socket-client.js";
 
 // Constantes
 const MAX_CONCURRENT_REQUESTS = 10;
@@ -117,6 +118,20 @@ const isDevelopment = () => {
       // Lista de pedidos
       ordersList: document.getElementById("orders-list"),
     };
+    
+    // ALTERAÇÃO: Verificar se elementos críticos foram encontrados
+    if (!el.ordersList) {
+      console.error('❌ Erro: Elemento orders-list não encontrado no DOM');
+      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+        console.error('Elementos disponíveis:', {
+          secaoPedidos: document.getElementById('secao-pedidos'),
+          ordersList: document.getElementById('orders-list'),
+          pedidosContainer: document.querySelector('.pedidos-container')
+        });
+      }
+    } else {
+      console.log('✅ Elemento orders-list encontrado:', el.ordersList);
+    }
   }
 
   // ============================================================================
@@ -756,6 +771,8 @@ const isDevelopment = () => {
 
       const result = await getAllOrders(options);
 
+      console.log('📦 Resultado de getAllOrders:', result);
+
       if (result.success) {
         // ALTERAÇÃO: Usar normalizador de paginação para garantir compatibilidade
         const { normalizePaginationResponse, getItemsFromResponse, getPaginationFromResponse } = await import('../../utils/pagination-utils.js');
@@ -866,21 +883,26 @@ const isDevelopment = () => {
         state.orders = enrichedOrders;
         state.filteredOrders = enrichedOrders;
 
+        console.log('✅ Pedidos carregados com sucesso. Total:', state.orders.length, 'Filtrados:', state.filteredOrders.length);
         renderOrders();
         renderPagination(); // ALTERAÇÃO: Renderizar paginação
         updateMetricsDisplay(dashboardMetrics);
       } else {
+        console.error('❌ Erro ao carregar pedidos:', result.error);
         state.error = result.error;
+        state.orders = [];
+        state.filteredOrders = [];
+        renderOrders(); // ALTERAÇÃO: Renderizar estado vazio mesmo em caso de erro
         showError(
           "Erro ao carregar pedidos: " + (result.error || "Erro desconhecido")
         );
       }
     } catch (error) {
-      // ALTERAÇÃO: Log condicional apenas em modo debug
-      if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-        console.error("Erro ao carregar pedidos:", error);
-      }
+      console.error("❌ Erro ao carregar pedidos (catch):", error);
       state.error = error.message;
+      state.orders = [];
+      state.filteredOrders = [];
+      renderOrders(); // ALTERAÇÃO: Renderizar estado vazio mesmo em caso de erro
       showError("Erro ao carregar pedidos: " + error.message);
     } finally {
       state.loading = false;
@@ -940,11 +962,55 @@ const isDevelopment = () => {
    * Aplicar filtros nos pedidos
    * ALTERAÇÃO: Agora apenas reseta a página e recarrega da API (filtros são feitos no backend)
    */
-  function applyFilters() {
-    // ALTERAÇÃO: Resetar para primeira página ao aplicar filtros
-    state.pagination.currentPage = 1;
-    // Recarregar pedidos da API com os novos filtros
-    loadOrders();
+  function applyFilters(updateFromAPI = true) {
+    // ALTERAÇÃO: Se updateFromAPI for false, apenas re-aplica filtros locais sem recarregar da API
+    // Isso é útil quando atualizamos via WebSocket e queremos apenas atualizar a visualização
+    if (updateFromAPI) {
+      // Resetar para primeira página ao aplicar filtros
+      state.pagination.currentPage = 1;
+      // Recarregar pedidos da API com os novos filtros
+      loadOrders();
+    } else {
+      // Apenas re-aplicar filtros locais nos pedidos já carregados
+      // (útil para atualizações via WebSocket)
+      let filtered = [...state.orders];
+      
+      // Aplicar filtros locais se houver
+      if (state.filters.search && state.filters.search.trim() !== "") {
+        const searchTerm = state.filters.search.trim().toLowerCase();
+        filtered = filtered.filter((order) => {
+          const orderId = String(order.id || order.order_id || "");
+          const confirmationCode = String(order.confirmation_code || "").toLowerCase();
+          const customerName = String(order.customer_name || order.customer?.name || "").toLowerCase();
+          return (
+            orderId.includes(searchTerm) ||
+            confirmationCode.includes(searchTerm) ||
+            customerName.includes(searchTerm)
+          );
+        });
+      }
+      
+      if (state.filters.status && state.filters.status !== "" && state.filters.status !== "todos") {
+        filtered = filtered.filter((order) => order.status === state.filters.status);
+      }
+      
+      if (state.filters.channel && state.filters.channel !== "" && state.filters.channel !== "todos") {
+        const channelMap = {
+          delivery: "delivery",
+          pickup: "pickup",
+          on_site: "on_site"
+        };
+        const expectedType = channelMap[state.filters.channel];
+        if (expectedType) {
+          filtered = filtered.filter((order) => {
+            const orderType = (order.order_type || "").toLowerCase();
+            return orderType === expectedType;
+          });
+        }
+      }
+      
+      state.filteredOrders = filtered;
+    }
   }
 
   /**
@@ -1251,13 +1317,25 @@ const isDevelopment = () => {
    * Apenas renderização do DOM - não faz chamadas à API
    */
   function renderOrders() {
-    if (!el.ordersList) return;
+    console.log('🎨 renderOrders chamado. el.ordersList:', el.ordersList, 'filteredOrders:', state.filteredOrders?.length);
+    
+    if (!el.ordersList) {
+      console.error('❌ renderOrders: el.ordersList não encontrado!');
+      // ALTERAÇÃO: Tentar encontrar o elemento novamente
+      el.ordersList = document.getElementById("orders-list");
+      if (!el.ordersList) {
+        console.error('❌ renderOrders: Não foi possível encontrar orders-list após tentativa de recuperação');
+        return;
+      }
+      console.log('✅ renderOrders: Elemento orders-list recuperado');
+    }
 
     // ALTERAÇÃO: Limpar o container primeiro para garantir que não fiquem itens antigos
     el.ordersList.innerHTML = "";
 
     // ALTERAÇÃO: Garantir que filteredOrders seja sempre um array válido e atualizado
     if (!state.filteredOrders || state.filteredOrders.length === 0) {
+      console.log('📭 renderOrders: Nenhum pedido para exibir, mostrando mensagem vazia');
       el.ordersList.innerHTML = `
                 <div style="text-align: center; padding: 48px; color: #666;">
                     <i class="fa-solid fa-clipboard-list" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
@@ -1266,6 +1344,8 @@ const isDevelopment = () => {
             `;
       return;
     }
+    
+    console.log('📋 renderOrders: Renderizando', state.filteredOrders.length, 'pedidos');
 
     const ordersHtml = state.filteredOrders
       .map((order) => {
@@ -1576,8 +1656,22 @@ const isDevelopment = () => {
       .filter((html) => html !== "")
       .join("");
 
+    // ALTERAÇÃO: Verificar se ordersHtml não está vazio antes de atualizar DOM
+    if (!ordersHtml || ordersHtml.trim() === "") {
+      console.warn('⚠️ renderOrders: ordersHtml está vazio, mostrando mensagem de vazio');
+      el.ordersList.innerHTML = `
+                <div style="text-align: center; padding: 48px; color: #666;">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;" aria-hidden="true"></i>
+                    <p style="font-size: 16px;">Nenhum pedido encontrado</p>
+                </div>
+            `;
+      return;
+    }
+
     // Atualizar DOM
+    console.log('📝 renderOrders: Atualizando DOM com', ordersHtml.length, 'caracteres de HTML');
     el.ordersList.innerHTML = ordersHtml;
+    console.log('✅ renderOrders: DOM atualizado. Elementos filhos:', el.ordersList.children.length);
 
     // Carregar informações financeiras para cada pedido
     state.filteredOrders.forEach((order) => {
@@ -1719,23 +1813,52 @@ const isDevelopment = () => {
   /**
    * Configurar auto-refresh
    */
+  /**
+   * Inicia atualização automática dos pedidos
+   * Atualiza a lista de pedidos a cada 30 segundos quando a seção está visível
+   * Segue o mesmo padrão do dashboard-manager.js
+   */
   function setupAutoRefresh() {
-    if (state.autoRefresh && !state.refreshInterval) {
-      state.refreshInterval = setInterval(async () => {
-        if (!state.loading && isSectionVisible()) {
-          await loadOrders();
+    // ALTERAÇÃO: Limpar intervalo anterior se existir (evita múltiplos intervalos)
+    if (state.refreshInterval) {
+      clearInterval(state.refreshInterval);
+      state.refreshInterval = null;
+    }
+
+    // ALTERAÇÃO: Atualizar pedidos a cada 30 segundos
+    // Verifica se página está visível e se não está carregando (padrão do dashboard)
+    state.refreshInterval = setInterval(async () => {
+      // ALTERAÇÃO: Verificar se página está visível e seção está visível
+      // Mesma lógica do dashboard-manager.js
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible" &&
+        !state.loading &&
+        isSectionVisible()
+      ) {
+        if (typeof window !== "undefined" && window.DEBUG_MODE) {
+          console.log('🔄 Auto-refresh: Recarregando pedidos...');
         }
-      }, AUTO_REFRESH_INTERVAL);
+        await loadOrders();
+      }
+    }, AUTO_REFRESH_INTERVAL);
+    
+    if (typeof window !== "undefined" && window.DEBUG_MODE) {
+      console.log('✅ Auto-refresh: Iniciado (intervalo de 30s)');
     }
   }
 
   /**
-   * Parar auto-refresh
+   * Para atualização automática
+   * Limpa o intervalo de atualização
+   * Segue o mesmo padrão do dashboard-manager.js
    */
   function stopAutoRefresh() {
+    // ALTERAÇÃO: Parar intervalo de atualização
     if (state.refreshInterval) {
       clearInterval(state.refreshInterval);
       state.refreshInterval = null;
+      console.log('⏸️ Auto-refresh: Parado');
     }
   }
 
@@ -2049,22 +2172,43 @@ const isDevelopment = () => {
    * Otimizado para usar MutationObserver em vez de setInterval
    */
   async function init() {
+    console.log('🔧 init() chamado. Seção visível?', isSectionVisible());
+    
+    // ALTERAÇÃO: Sempre inicializar elementos e eventos, mesmo se a seção não estiver visível
+    // Isso garante que tudo esteja pronto quando a seção for exibida
+    initElements();
+    attachEvents();
+    
     if (!isSectionVisible()) {
+      console.log('⏳ Seção não está visível, aguardando...');
+      
       // ALTERAÇÃO: Usar MutationObserver para detectar mudanças na visibilidade da seção
       // Mais eficiente que setInterval
       const section = document.getElementById('secao-pedidos');
       if (!section) {
+        console.error('❌ Seção secao-pedidos não encontrada');
         return;
       }
 
       const observer = new MutationObserver((mutations) => {
         if (isSectionVisible()) {
+          console.log('✅ Seção ficou visível, inicializando...');
           observer.disconnect();
           if (state.visibilityCheckInterval) {
             clearInterval(state.visibilityCheckInterval);
             state.visibilityCheckInterval = null;
           }
-          initializeSection();
+          // ALTERAÇÃO: Carregar pedidos quando a seção ficar visível
+          loadOrders().catch(error => {
+            console.error('❌ Erro ao carregar pedidos:', error);
+            if (el.ordersList) {
+              renderOrders();
+            }
+          });
+          setupSocketListeners();
+          if (isSectionVisible()) {
+            setupAutoRefresh();
+          }
         }
       });
 
@@ -2079,10 +2223,22 @@ const isDevelopment = () => {
       state.visibilityCheckInterval = setInterval(() => {
         attempts++;
         if (isSectionVisible()) {
+          console.log('✅ Seção ficou visível (fallback), inicializando...');
           observer.disconnect();
           clearVisibilityCheck();
-          initializeSection();
+          // ALTERAÇÃO: Carregar pedidos quando a seção ficar visível
+          loadOrders().catch(error => {
+            console.error('❌ Erro ao carregar pedidos:', error);
+            if (el.ordersList) {
+              renderOrders();
+            }
+          });
+          setupSocketListeners();
+          if (isSectionVisible()) {
+            setupAutoRefresh();
+          }
         } else if (attempts >= MAX_VISIBILITY_CHECK_ATTEMPTS) {
+          console.log('⏱️ Timeout de verificação de visibilidade atingido');
           observer.disconnect();
           clearVisibilityCheck();
         }
@@ -2093,20 +2249,271 @@ const isDevelopment = () => {
       return;
     }
 
-    initializeSection();
+    // ALTERAÇÃO: Se a seção já está visível, inicializar completamente
+    console.log('✅ Seção já está visível, inicializando completamente...');
+    await initializeSection();
   }
 
   /**
    * Inicializar seção completa
    */
   async function initializeSection() {
+    console.log('🚀 Inicializando seção de pedidos...');
+    
     initElements();
+    
+    // ALTERAÇÃO: Verificar se elementos críticos foram inicializados
+    if (!el.ordersList) {
+      console.error('❌ Erro crítico: orders-list não encontrado após initElements()');
+      // Tentar novamente após um pequeno delay
+      setTimeout(() => {
+        el.ordersList = document.getElementById("orders-list");
+        if (el.ordersList) {
+          console.log('✅ orders-list encontrado após retry');
+          attachEvents();
+          loadOrders();
+          setupSocketListeners();
+        } else {
+          console.error('❌ Erro: orders-list ainda não encontrado após retry');
+          // Mostrar mensagem de erro no container se existir
+          const secaoPedidos = document.getElementById('secao-pedidos');
+          if (secaoPedidos) {
+            secaoPedidos.innerHTML = '<div style="padding: 20px; color: red;">Erro: Container de pedidos não encontrado. Recarregue a página.</div>';
+          }
+        }
+      }, 100);
+      return;
+    }
+    
     attachEvents();
-    await loadOrders();
+    
+    try {
+      await loadOrders();
+    } catch (error) {
+      console.error('❌ Erro ao carregar pedidos na inicialização:', error);
+      // Garantir que renderiza estado vazio mesmo em caso de erro
+      if (el.ordersList) {
+        renderOrders();
+      }
+    }
+    
+    setupSocketListeners(); // Configurar listeners WebSocket
 
     if (isSectionVisible()) {
       setupAutoRefresh();
     }
+    
+    console.log('✅ Seção de pedidos inicializada');
+  }
+
+  // Armazenar referências dos callbacks para poder removê-los depois
+  let socketCallbacks = {
+    orderCreated: null,
+    orderStatusChanged: null
+  };
+
+  /**
+   * Configura listeners de eventos WebSocket para atualização em tempo real
+   */
+  function setupSocketListeners() {
+    // Remove listeners antigos se existirem (evita duplicatas)
+    if (socketCallbacks.orderCreated) {
+      socketService.off('order.created', socketCallbacks.orderCreated);
+    }
+    if (socketCallbacks.orderStatusChanged) {
+      socketService.off('order.status_changed', socketCallbacks.orderStatusChanged);
+    }
+
+    // 1. Novo Pedido Chegando
+    socketCallbacks.orderCreated = (orderData) => {
+      console.log('📦 Novo pedido recebido via WebSocket:', orderData);
+      
+      // IMPORTANTE: Processar eventos mesmo se a seção não estiver visível
+      // para manter o estado atualizado quando o usuário voltar
+      // Apenas não renderizar se não estiver visível
+      const shouldRender = isSectionVisible();
+
+      // Adiciona o novo pedido ao estado
+      if (orderData.order_id) {
+        const orderId = orderData.order_id;
+        
+        // Verifica se o pedido já existe na lista (evita duplicatas)
+        const existingIndex = state.orders.findIndex((o) => 
+          o.id === orderId || o.order_id === orderId
+        );
+        
+        if (existingIndex !== -1) {
+          // Se já existe, apenas atualiza e re-renderiza
+          applyFilters();
+          renderOrders();
+          updateMetricsDisplay();
+          return;
+        }
+        
+        // Buscar detalhes completos do pedido via API
+        getOrderDetails(orderId)
+          .then((response) => {
+            // getOrderDetails pode retornar o objeto diretamente ou { success: true, data: ... }
+            const fullOrder = response?.success ? response.data : response;
+            
+            if (fullOrder) {
+              // Garantir que o ID está correto
+              if (!fullOrder.id) {
+                fullOrder.id = orderId;
+              }
+              if (!fullOrder.order_id) {
+                fullOrder.order_id = orderId;
+              }
+              
+              // Adiciona ao início da lista
+              state.orders.unshift(fullOrder);
+              
+              // Aplica filtros locais (sem recarregar da API)
+              applyFilters(false);
+              
+              // Renderiza apenas se a seção estiver visível
+              if (shouldRender) {
+                renderOrders();
+                
+                // Adiciona animação de destaque ao novo card
+                setTimeout(() => {
+                  const newCard = document.querySelector(`[data-order-id="${orderId}"]`);
+                  if (newCard) {
+                    newCard.classList.add('highlight-new-order');
+                    setTimeout(() => {
+                      newCard.classList.remove('highlight-new-order');
+                    }, 3000);
+                  }
+                }, 100);
+              }
+              
+              // Atualiza métricas (sempre, mesmo se não renderizar)
+              updateMetricsDisplay();
+            }
+          })
+          .catch((error) => {
+            console.error('Erro ao buscar detalhes do novo pedido:', error);
+            // Mesmo assim, recarrega a lista
+            loadOrders();
+          });
+      } else {
+        // Se não tiver order_id completo, recarrega a lista
+        loadOrders();
+      }
+    };
+    
+    // Registrar o listener
+    socketService.on('order.created', socketCallbacks.orderCreated);
+
+    // 2. Mudança de Status (Ex: Cozinha mudou para "Pronto")
+    socketCallbacks.orderStatusChanged = (data) => {
+      console.log('🔄 Status do pedido alterado via WebSocket:', data);
+      
+      // IMPORTANTE: Processar eventos mesmo se a seção não estiver visível
+      // para manter o estado atualizado quando o usuário voltar
+      // Apenas não renderizar se não estiver visível
+      const shouldRender = isSectionVisible();
+
+      const orderId = data.order_id;
+      const newStatus = data.new_status;
+
+      // Encontrar o pedido no estado (verifica tanto id quanto order_id)
+      const orderIndex = state.orders.findIndex((o) => 
+        o.id === orderId || o.order_id === orderId
+      );
+      
+      if (orderIndex !== -1) {
+        const oldStatus = state.orders[orderIndex].status;
+        
+        console.log(`📝 Admin: Atualizando pedido ${orderId} de ${oldStatus} para ${newStatus}`);
+        
+        // Atualiza o status do pedido
+        // IMPORTANTE: NUNCA remover o pedido de state.orders, apenas atualizar o status
+        state.orders[orderIndex].status = newStatus;
+        
+        // Garantir que o pedido tenha os IDs corretos
+        if (!state.orders[orderIndex].id) {
+          state.orders[orderIndex].id = orderId;
+        }
+        if (!state.orders[orderIndex].order_id) {
+          state.orders[orderIndex].order_id = orderId;
+        }
+        
+        // Aplica filtros locais (sem recarregar da API) para atualizar a visualização
+        applyFilters(false);
+        
+        // Renderiza apenas se a seção estiver visível
+        if (shouldRender) {
+          renderOrders();
+        }
+        
+        console.log(`✅ Admin: Pedido ${orderId} atualizado. Total de pedidos na lista: ${state.orders.length}`);
+        
+        // Adiciona animação de destaque no novo card após renderização
+        setTimeout(() => {
+          const newCard = document.querySelector(`[data-order-id="${orderId}"]`);
+          if (newCard) {
+            // Adiciona classe de animação para destacar mudança
+            newCard.classList.add('order-status-changed');
+            
+            // Adiciona efeito de "pulse" visual
+            newCard.style.animation = 'pulse 0.5s ease-in-out';
+            
+            setTimeout(() => {
+              newCard.classList.remove('order-status-changed');
+              newCard.style.animation = '';
+            }, 2000);
+          }
+        }, 100);
+        
+        // Atualiza métricas
+        updateMetricsDisplay();
+      } else {
+        // Se o pedido não estiver na lista, tenta buscar e adicionar
+        // (pode ser um pedido que não foi carregado ainda ou está em outra página)
+        getOrderDetails(orderId)
+          .then((response) => {
+            const fullOrder = response?.success ? response.data : response;
+            if (fullOrder) {
+              // Adiciona o pedido à lista
+              state.orders.unshift(fullOrder);
+              
+              // Aplica filtros locais (sem recarregar da API)
+              applyFilters(false);
+              
+              // Renderiza a lista atualizada (sempre, pois acabamos de adicionar)
+              renderOrders();
+              
+              // Atualiza métricas
+              updateMetricsDisplay();
+              
+              // Adiciona animação
+              setTimeout(() => {
+                const newCard = document.querySelector(`[data-order-id="${orderId}"]`);
+                if (newCard) {
+                  newCard.classList.add('order-status-changed');
+                  newCard.style.animation = 'pulse 0.5s ease-in-out';
+                  setTimeout(() => {
+                    newCard.classList.remove('order-status-changed');
+                    newCard.style.animation = '';
+                  }, 2000);
+                }
+              }, 100);
+            } else {
+              // Se não conseguir buscar, recarrega tudo
+              loadOrders();
+            }
+          })
+          .catch((error) => {
+            console.error('Erro ao buscar pedido atualizado:', error);
+            // Em caso de erro, recarrega tudo
+            loadOrders();
+          });
+      }
+    };
+    
+    // Registrar o listener
+    socketService.on('order.status_changed', socketCallbacks.orderStatusChanged);
   }
 
   /**
@@ -2115,19 +2522,38 @@ const isDevelopment = () => {
   function cleanup() {
     stopAutoRefresh();
     clearVisibilityCheck();
+    
+    // NÃO remover listeners do socket aqui - eles devem permanecer ativos
+    // mesmo quando a seção não está visível, para que quando voltar a ficar visível
+    // os eventos já estejam sendo capturados
+    // Se necessário remover, fazer apenas quando sair completamente da página
   }
 
   // Limpar recursos ao sair da página
   window.addEventListener("beforeunload", cleanup);
 
-  // Limpar recursos quando a página fica oculta (evita requisições desnecessárias)
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      stopAutoRefresh();
-    } else if (isSectionVisible()) {
-      setupAutoRefresh();
-    }
-  });
+  // ALTERAÇÃO: Pausar atualização quando a página não está visível
+  // Usa Page Visibility API para otimizar performance (mesmo padrão do dashboard)
+  // ALTERAÇÃO: Verificar se Page Visibility API está disponível
+  if (typeof document !== "undefined" && "visibilityState" in document) {
+    document.addEventListener("visibilitychange", () => {
+      // ALTERAÇÃO: Verificar estado de visibilidade
+      if (document.visibilityState === "hidden") {
+        // ALTERAÇÃO: Pausar atualizações quando página não está visível
+        stopAutoRefresh();
+      } else if (
+        document.visibilityState === "visible" &&
+        isSectionVisible()
+      ) {
+        // ALTERAÇÃO: Retomar atualizações quando página volta a ficar visível
+        setupAutoRefresh();
+        // ALTERAÇÃO: Recarregar dados ao voltar (garantir dados atualizados)
+        if (!state.loading) {
+          loadOrders();
+        }
+      }
+    });
+  }
 
   // Inicializar quando DOM estiver pronto
   if (document.readyState === "loading") {

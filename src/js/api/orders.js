@@ -215,9 +215,17 @@ export async function calculateOrderTotal(items, points_to_redeem = 0, order_typ
  * Busca pedidos do usuário logado
  * @returns {Promise<Object>} Lista de pedidos
  */
-export async function getMyOrders() {
+export async function getMyOrders(page = 1, page_size = 50) {
     try {
-        const data = await apiRequest('/api/orders/', { method: 'GET' });
+        // ALTERAÇÃO: Passar parâmetros de paginação explicitamente
+        const params = new URLSearchParams();
+        if (page) params.append('page', page);
+        if (page_size) params.append('page_size', page_size);
+        
+        const queryString = params.toString();
+        const url = `/api/orders/${queryString ? `?${queryString}` : ''}`;
+        
+        const data = await apiRequest(url, { method: 'GET' });
 
         return {
             success: true,

@@ -331,6 +331,7 @@ class InsumoManager {
       await this.loadInsumos();
       await this.loadResumoEstoque();
       this.setupEventListeners();
+      this.setupSocketListeners();
     } catch (error) {
       // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== 'undefined' && window.DEBUG_MODE) {
@@ -347,6 +348,82 @@ class InsumoManager {
     this.setupInsumoHandlers();
     this.setupFilterHandlers();
     this.setupSearchHandlers();
+  }
+
+  /**
+   * Configura listeners de eventos WebSocket para atualização em tempo real
+   */
+  setupSocketListeners() {
+    // Importar socketService dinamicamente para evitar dependência circular
+    import('../../api/socket-client.js').then(({ socketService }) => {
+      // Listener para alertas de estoque baixo
+      socketService.on('stock.alert', (data) => {
+        console.log('⚠️ Alerta de estoque recebido via WebSocket:', data);
+        
+        // data = { ingredient_id: 10, name: 'Carne', status: 'low', current_stock: 2.5, min_threshold: 5.0 }
+        
+        // Procura a linha/card do ingrediente na interface
+        const card = document.querySelector(`[data-ingredient-id="${data.ingredient_id}"]`);
+        
+        if (card) {
+          // Atualiza a quantidade de estoque exibida
+          const stockQtyElement = card.querySelector('.quantidade');
+          if (stockQtyElement && data.current_stock !== undefined) {
+            // Busca a unidade do card atual ou usa padrão
+            const currentText = stockQtyElement.textContent || '';
+            const unitMatch = currentText.match(/\s+(\w+)$/);
+            const unit = unitMatch ? unitMatch[1] : 'un';
+            const formattedStock = this.formatStockValue(data.current_stock);
+            stockQtyElement.textContent = `${formattedStock} ${unit}`;
+          }
+          
+          // Atualiza a barra de progresso
+          const progressBar = card.querySelector('.progresso');
+          if (progressBar && data.current_stock !== undefined) {
+            // Busca os valores min e max do card para recalcular progresso
+            const minText = card.querySelector('.limites span:first-child')?.textContent;
+            const maxText = card.querySelector('.limites span:last-child')?.textContent;
+            
+            if (minText && maxText) {
+              const min = parseFloat(minText.replace('Min:', '').trim()) || 0;
+              const max = parseFloat(maxText.replace('Max:', '').trim()) || 100;
+              
+              // Calcula porcentagem de progresso
+              const progress = max > 0 ? Math.min(100, (data.current_stock / max) * 100) : 0;
+              progressBar.style.width = `${progress}%`;
+            }
+          }
+          
+          // Adiciona classe de alerta visual (vermelho para estoque baixo)
+          card.classList.add('stock-alert');
+          if (data.status === 'low') {
+            card.classList.add('stock-low');
+            // Adiciona classe Bootstrap para linha vermelha
+            card.classList.add('table-danger');
+          } else if (data.status === 'out_of_stock') {
+            card.classList.add('stock-out');
+            card.classList.add('table-danger');
+          }
+          
+          // Remove a classe após alguns segundos (opcional)
+          setTimeout(() => {
+            card.classList.remove('stock-alert');
+          }, 5000);
+          
+          // Recarrega o resumo de estoque se estiver visível
+          const resumoSection = document.getElementById('resumo-estoque');
+          if (resumoSection && resumoSection.style.display !== 'none') {
+            this.loadResumoEstoque();
+          }
+        } else {
+          // Se o card não estiver visível, recarrega a lista completa
+          // (pode estar em outra página ou filtrado)
+          this.loadInsumos();
+        }
+      });
+    }).catch((error) => {
+      console.warn('Não foi possível carregar socketService para atualizações de estoque:', error);
+    });
   }
 
   /**
