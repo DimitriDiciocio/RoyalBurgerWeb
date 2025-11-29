@@ -126,7 +126,7 @@ class AdminPanelManager {
             this.isInitialized = true;
             
         } catch (error) {
-            console.error('Erro ao inicializar painel administrativo:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Erro ao inicializar painel administrativo');
         }
     }
@@ -173,7 +173,7 @@ class AdminPanelManager {
                 return false;
             }
         } catch (error) {
-            console.error('Erro ao verificar permissões:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente ou re-thrown
             if (error.message === 'TOKEN_EXPIRED') {
                 throw error; // Re-throw para ser tratado como token expirado
             }
@@ -222,11 +222,7 @@ class AdminPanelManager {
             // ALTERAÇÃO: Removido alerta de estoque baixo - apenas atualiza a interface sem mostrar toast
             socketService.on('stock.alert', (data) => {
                 // Exemplo: { ingredient_id: 5, name: 'Bacon', status: 'low' }
-                // ALTERAÇÃO: Apenas loga no console, não mostra toast na tela
-                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                    const statusText = data.status === 'out_of_stock' ? 'Sem Estoque' : 'Estoque Baixo';
-                    console.log(`⚠️ ${statusText}: ${data.name} atingiu o nível mínimo!`);
-                }
+                // ALTERAÇÃO: Apenas atualiza a interface, não mostra toast na tela
                 // A atualização visual da interface é feita pelo insumos-gerenciamento.js
             });
 
@@ -241,9 +237,8 @@ class AdminPanelManager {
                 try {
                     const audio = new Audio('/assets/sounds/notification.mp3');
                     audio.volume = 0.5;
-                    audio.play().catch(e => {
+                    audio.play().catch(() => {
                         // Ignora erro se o arquivo não existir ou autoplay for bloqueado
-                        console.debug('Não foi possível tocar som de notificação:', e);
                     });
                 } catch(e) {
                     // Ignora erro silenciosamente
@@ -286,19 +281,19 @@ class AdminPanelManager {
 
             // Eventos de conexão/desconexão
             window.addEventListener('socket:connected', () => {
-                console.log('✅ Socket conectado com sucesso');
+                // Socket conectado - sem necessidade de log em produção
             });
 
             window.addEventListener('socket:disconnected', (e) => {
-                console.warn('⚠️ Socket desconectado:', e.detail.reason);
+                // ALTERAÇÃO: Removido console.warn - desconexão será tratada silenciosamente
             });
 
             window.addEventListener('socket:error', (e) => {
-                console.error('❌ Erro no socket:', e.detail.error);
+                // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
             });
 
         } catch (error) {
-            console.error('Erro ao inicializar WebSocket:', error);
+            // ALTERAÇÃO: Removido console.error - erro não bloqueia inicialização do painel
             // Não bloqueia a inicialização do painel se o socket falhar
         }
     }
@@ -320,7 +315,7 @@ class AdminPanelManager {
      * Trata erro de autenticação
      */
     handleAuthError(message) {
-        console.error('Erro de autenticação:', message);
+        // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
         this.showErrorMessage(message);
         
         // Redirecionar para login após 3 segundos
@@ -341,7 +336,7 @@ class AdminPanelManager {
      * Trata erro de token expirado
      */
     handleTokenExpired() {
-        console.warn('Token expirado detectado');
+        // ALTERAÇÃO: Removido console.warn - token expirado será tratado silenciosamente
         
         // Limpar dados do usuário e token
         localStorage.removeItem('rb.token');
@@ -379,7 +374,7 @@ class AdminPanelManager {
                 if (sectionId) {
                     this.showSection(sectionId);
                 } else {
-                    console.error('❌ Nenhuma seção mapeada para:', item.id);
+                    // ALTERAÇÃO: Removido console.error - seção não mapeada será ignorada silenciosamente
                 }
             });
         });
@@ -411,10 +406,8 @@ class AdminPanelManager {
         try {
             // Validar seção
             if (!this.isValidSection(sectionId)) {
-                // ALTERAÇÃO: Log condicional apenas em modo debug
-                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                    console.error('❌ Seção inválida:', sectionId);
-                }
+                // ALTERAÇÃO: Log apenas em modo debug
+                // ALTERAÇÃO: Removido console.error - seção inválida será tratada silenciosamente
                 return;
             }
 
@@ -460,10 +453,7 @@ class AdminPanelManager {
             this.currentSection = sectionId;
             
         } catch (error) {
-            // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.error('❌ Erro ao mostrar seção:', error);
-            }
+            // ALTERAÇÃO: Removido console.error - erro será tratado por handleSectionError
             this.handleSectionError(sectionId, error);
         }
     }
@@ -486,7 +476,7 @@ class AdminPanelManager {
             if (section) {
                 section.style.display = 'none';
             } else {
-                console.warn('⚠️ Seção não encontrada:', sectionId);
+                // ALTERAÇÃO: Removido console.warn - seção não encontrada será tratada silenciosamente
             }
         });
     }
@@ -500,7 +490,7 @@ class AdminPanelManager {
         if (targetSection) {
             targetSection.style.display = 'block';
         } else {
-            console.error('❌ Seção não encontrada:', targetSectionId);
+            // ALTERAÇÃO: Removido console.error - seção não encontrada será ignorada silenciosamente
         }
     }
 
@@ -511,7 +501,7 @@ class AdminPanelManager {
         try {
             localStorage.setItem(ADMIN_CONFIG.storage.activeSection, sectionId);
         } catch (error) {
-            console.warn('Erro ao salvar seção ativa:', error);
+            // ALTERAÇÃO: Removido console.warn - erro ao salvar seção será tratado silenciosamente
         }
     }
 
@@ -526,7 +516,7 @@ class AdminPanelManager {
             
             await this.showSection(sectionToLoad);
         } catch (error) {
-            console.error('Erro ao carregar seção ativa:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente, carregando dashboard padrão
             await this.showSection('dashboard');
         }
     }
@@ -558,12 +548,15 @@ class AdminPanelManager {
                 case 'relatorios':
                     await this.initializeRelatoriosSection();
                     break;
+                case 'pedidos':
+                    await this.initializePedidosSection();
+                    break;
                 default:
                     // Seção não requer inicialização específica
                     break;
             }
         } catch (error) {
-            console.error(`❌ Erro ao inicializar seção ${sectionId}:`, error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado por handleSectionError
             this.handleSectionError(sectionId, error);
         }
     }
@@ -603,6 +596,53 @@ class AdminPanelManager {
      */
     async initializePromocoesSection() {
         await initPromocoesManager();
+    }
+
+    /**
+     * Inicializa seção de pedidos
+     * ALTERAÇÃO: Garante que os pedidos sejam carregados quando a seção for exibida
+     */
+    async initializePedidosSection() {
+        try {
+            const secaoPedidos = document.getElementById('secao-pedidos');
+            if (!secaoPedidos) {
+                // ALTERAÇÃO: Log apenas em modo debug
+                if (typeof window !== 'undefined' && window.DEBUG_MODE) {
+                    // ALTERAÇÃO: Removido console.warn - seção de pedidos não encontrada será tratada silenciosamente
+                }
+                return;
+            }
+
+            // ALTERAÇÃO: Aguardar um pequeno delay para garantir que o DOM está pronto
+            // e que a seção está realmente visível
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            // ALTERAÇÃO: Disparar evento customizado para que order-management.js detecte
+            // que a seção ficou visível e carregue os pedidos
+            const visibilityEvent = new CustomEvent('section:pedidos:visible', {
+                detail: { section: secaoPedidos, forceLoad: true }
+            });
+            window.dispatchEvent(visibilityEvent);
+
+            // ALTERAÇÃO: Verificar se o container de pedidos está vazio após o evento
+            // Se estiver vazio, pode ser que o order-management.js ainda não tenha processado
+            // o evento. Aguardar um pouco mais e verificar novamente
+            setTimeout(() => {
+                const ordersList = document.getElementById('orders-list');
+                if (ordersList) {
+                    const hasContent = ordersList.children.length > 0 || 
+                                     ordersList.innerHTML.trim() !== '';
+                    
+                    if (!hasContent) {
+                        // ALTERAÇÃO: Se ainda estiver vazio, disparar evento novamente
+                        window.dispatchEvent(visibilityEvent);
+                    }
+                }
+            }, 500);
+        } catch (error) {
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
+            this.showErrorMessage('Erro ao carregar seção de pedidos');
+        }
     }
 
     /**
@@ -662,7 +702,7 @@ class AdminPanelManager {
                 }
             }
         } catch (error) {
-            console.error('Erro ao inicializar seção financeira:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showToast
             showToast('Erro ao carregar módulo financeiro', { 
                 type: 'error',
                 title: 'Erro'
@@ -754,42 +794,63 @@ class AdminPanelManager {
     async initializeFinancialTab(tabId) {
         switch (tabId) {
             case 'dashboard':
-                // Dashboard já é inicializado no initializeFinancialSection
+                // ALTERAÇÃO: Recarregar dados do dashboard quando a tab é aberta
+                if (this.managers.dashboardFinanceiro) {
+                    await this.managers.dashboardFinanceiro.loadData();
+                    await this.managers.dashboardFinanceiro.loadRecentMovements();
+                }
                 break;
             case 'movimentacoes':
-                // Inicializar lista de movimentações
+                // ALTERAÇÃO: Inicializar ou recarregar lista de movimentações
                 if (!this.managers.movementsList) {
                     this.managers.movementsList = new MovementsList('movimentacoes-list-container');
+                    await this.managers.movementsList.init();
+                } else {
+                    // Se já existe, recarregar dados
+                    await this.managers.movementsList.loadMovements();
                 }
-                await this.managers.movementsList.init();
                 break;
             case 'contas-pagar':
-                // Inicializar gerenciador de contas a pagar
+                // ALTERAÇÃO: Inicializar ou recarregar gerenciador de contas a pagar
                 if (!this.managers.contasPagarManager) {
                     this.managers.contasPagarManager = new ContasPagarManager('contas-pagar-container');
+                    await this.managers.contasPagarManager.init();
+                } else {
+                    // Se já existe, recarregar dados
+                    await this.managers.contasPagarManager.loadPendingPayments();
                 }
-                await this.managers.contasPagarManager.init();
                 break;
             case 'compras':
-                // Inicializar gerenciador de compras
+                // ALTERAÇÃO: Inicializar ou recarregar gerenciador de compras
                 if (!this.managers.comprasManager) {
                     this.managers.comprasManager = new ComprasManager('compras-container');
+                    await this.managers.comprasManager.init();
+                } else {
+                    // Se já existe, recarregar dados
+                    await this.managers.comprasManager.loadInvoices();
                 }
-                await this.managers.comprasManager.init();
                 break;
             case 'recorrencias':
-                // Inicializar gerenciador de recorrências
+                // ALTERAÇÃO: Inicializar ou recarregar gerenciador de recorrências
                 if (!this.managers.recorrenciasManager) {
                     this.managers.recorrenciasManager = new RecorrenciasManager('recorrencias-container');
+                    await this.managers.recorrenciasManager.init();
+                } else {
+                    // Se já existe, recarregar dados
+                    await this.managers.recorrenciasManager.loadRules();
                 }
-                await this.managers.recorrenciasManager.init();
                 break;
             case 'conciliacao':
-                // Inicializar gerenciador de conciliação bancária
+                // ALTERAÇÃO: Inicializar ou recarregar gerenciador de conciliação bancária
                 if (!this.managers.conciliacaoBancariaManager) {
                     this.managers.conciliacaoBancariaManager = new ConciliacaoBancariaManager('conciliacao-container');
+                    await this.managers.conciliacaoBancariaManager.init();
+                } else {
+                    // Se já existe, recarregar dados se houver método disponível
+                    if (typeof this.managers.conciliacaoBancariaManager.loadData === 'function') {
+                        await this.managers.conciliacaoBancariaManager.loadData();
+                    }
                 }
-                await this.managers.conciliacaoBancariaManager.init();
                 break;
         }
     }
@@ -812,9 +873,9 @@ class AdminPanelManager {
             await this.managers.dashboard.init();
         } catch (error) {
             // ALTERAÇÃO: Tratar erro de forma consistente
-            // ALTERAÇÃO: Log condicional apenas em modo debug
+            // ALTERAÇÃO: Log apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.error('Erro ao inicializar dashboard:', error);
+                // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             }
             this.showErrorMessage('Erro ao carregar dashboard');
         }
@@ -838,10 +899,7 @@ class AdminPanelManager {
             await this.managers.relatorios.init();
         } catch (error) {
             // ALTERAÇÃO: Tratar erro de forma consistente
-            // ALTERAÇÃO: Log condicional apenas em modo debug
-            if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.error('Erro ao inicializar seção de relatórios:', error);
-            }
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Erro ao carregar seção de relatórios');
         }
     }
@@ -866,9 +924,9 @@ class AdminPanelManager {
             await this.managers.dashboard.loadAllData();
         } catch (error) {
             // ALTERAÇÃO: Tratar erro de forma consistente
-            // ALTERAÇÃO: Log condicional apenas em modo debug
+            // ALTERAÇÃO: Log apenas em modo debug
             if (typeof window !== 'undefined' && window.DEBUG_MODE) {
-                console.error('Erro ao carregar dados do dashboard:', error);
+                // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             }
             // ALTERAÇÃO: Não mostrar erro ao usuário (DashboardManager já trata erros internamente)
         }
@@ -901,7 +959,7 @@ class AdminPanelManager {
         try {
             // Inicializar módulos conforme necessário
         } catch (error) {
-            console.error('Erro ao inicializar módulos:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
         }
     }
 
@@ -918,13 +976,13 @@ class AdminPanelManager {
 
         // Event listener para erros globais
         window.addEventListener('error', (event) => {
-            console.error('Erro global capturado:', event.error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Ocorreu um erro inesperado. Tente recarregar a página.');
         });
 
         // Event listener para erros de promise não tratados
         window.addEventListener('unhandledrejection', (event) => {
-            console.error('Promise rejeitada não tratada:', event.reason);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Ocorreu um erro inesperado. Tente novamente.');
         });
 
@@ -956,7 +1014,7 @@ class AdminPanelManager {
             // Abrir modal de categorias
             await this.managers.categorias.openCategoriasModalPublic();
         } catch (error) {
-            console.error('Erro ao abrir modal de categorias:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Erro ao abrir modal de categorias');
         }
     }
@@ -975,7 +1033,7 @@ class AdminPanelManager {
             // Abrir modal de grupos de insumos
             this.managers.gruposInsumos.abrirModalGrupos();
         } catch (error) {
-            console.error('Erro ao abrir modal de grupos de insumos:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Erro ao abrir modal de grupos de insumos');
         }
     }
@@ -990,7 +1048,7 @@ class AdminPanelManager {
                 this.refreshCurrentSection();
             }
         } catch (error) {
-            console.error('Erro ao atualizar seção visível:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
         }
     }
 
@@ -1003,7 +1061,7 @@ class AdminPanelManager {
                 await this.initializeSection(this.currentSection);
             }
         } catch (error) {
-            console.error('Erro ao atualizar seção atual:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
         }
     }
 
@@ -1011,7 +1069,7 @@ class AdminPanelManager {
      * Trata erro de seção
      */
     handleSectionError(sectionId, error) {
-        console.error(`Erro na seção ${sectionId}:`, error);
+        // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
         this.showErrorMessage(`Erro ao carregar seção ${sectionId}. Tente novamente.`);
         
         // Fallback para dashboard em caso de erro
@@ -1075,7 +1133,7 @@ class AdminPanelManager {
                 }
             });
         } catch (error) {
-            console.error('Erro ao limpar cache:', error);
+            // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
         }
     }
 
@@ -1088,7 +1146,7 @@ class AdminPanelManager {
             await this.refreshCurrentSection();
             this.showSuccessMessage('Dados recarregados com sucesso!');
         } catch (error) {
-            console.error('Erro ao recarregar dados:', error);
+            // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showErrorMessage
             this.showErrorMessage('Erro ao recarregar dados. Tente novamente.');
         }
     }
@@ -1134,7 +1192,7 @@ class EventSystem {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error(`Erro ao executar callback do evento ${eventName}:`, error);
+                    // ALTERAÇÃO: Removido console.error - erro será tratado silenciosamente
                 }
             });
         }
@@ -1198,7 +1256,7 @@ let adminPanel = null;
 function initializeAdminPanel() {
     try {
         if (adminPanel) {
-            console.warn('Painel administrativo já inicializado');
+            // ALTERAÇÃO: Removido console.warn - painel já inicializado será ignorado silenciosamente
             return;
         }
 
@@ -1209,7 +1267,7 @@ function initializeAdminPanel() {
         window.adminPanel = adminPanel;
         
     } catch (error) {
-        console.error('Erro ao inicializar painel administrativo:', error);
+        // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showToast
         showToast('Erro ao inicializar painel administrativo', { type: 'error', title: 'Erro' });
     }
 }
@@ -1259,7 +1317,7 @@ function handleLogout() {
         // Redirecionar para login
         window.location.href = '/login.html';
     } catch (error) {
-        console.error('Erro ao fazer logout:', error);
+        // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via showToast
         showToast('Erro ao fazer logout', { type: 'error', title: 'Erro' });
     }
 }
@@ -1509,9 +1567,7 @@ class ProdutoFormManager {
         if (this.validateCurrentPart()) {
             this.saveCurrentPartData();
             
-            // Simular salvamento
-            console.log('Dados do produto:', this.formData);
-            
+            // ALTERAÇÃO: Removido log desnecessário
             showToast('Produto salvo com sucesso!', { 
                 type: 'success', 
                 title: 'Sucesso' 
@@ -1527,7 +1583,7 @@ class ProdutoFormManager {
         if (typeof window.fecharModal === 'function') {
             window.fecharModal('modal-produto');
         } else {
-            console.error('Função fecharModal não encontrada');
+            // ALTERAÇÃO: Removido console.error - função não encontrada será tratada silenciosamente
         }
         this.resetForm();
     }
@@ -1537,7 +1593,7 @@ class ProdutoFormManager {
         if (typeof window.abrirModal === 'function') {
             window.abrirModal('modal-produto');
         } else {
-            console.error('Função abrirModal não encontrada');
+            // ALTERAÇÃO: Removido console.error - função não encontrada será tratada silenciosamente
         }
     }
 

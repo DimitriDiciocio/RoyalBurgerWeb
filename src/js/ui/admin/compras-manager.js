@@ -889,8 +889,15 @@ export class ComprasManager {
             // ALTERAÇÃO: Fechar modal usando sistema modais.js
             fecharModal('modal-compra-editar');
 
-            // Recarregar lista
-            await this.loadInvoices();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: false,
+                updateDashboard: true,
+                updatePendingPayments: true,
+                updatePurchases: true,
+                updateRecurrences: false
+            });
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             const errorMessage = error.message || 'Erro ao atualizar nota fiscal';
@@ -945,8 +952,15 @@ export class ComprasManager {
                 title: 'Sucesso'
             });
 
-            // Recarregar lista para atualizar o card
-            await this.loadInvoices();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: false,
+                updateDashboard: true,
+                updatePendingPayments: true,
+                updatePurchases: true,
+                updateRecurrences: false
+            });
         } catch (error) {
             const errorMessage = error.message || 'Erro ao marcar nota fiscal como paga';
             showToast(errorMessage, {
@@ -1743,8 +1757,15 @@ export class ComprasManager {
                 title: 'Sucesso'
             });
 
-            // Recarregar lista
-            await this.loadInvoices();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: false,
+                updateDashboard: true,
+                updatePendingPayments: true,
+                updatePurchases: true,
+                updateRecurrences: false
+            });
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             const errorMessage = error.message || 'Erro ao excluir nota fiscal';
@@ -1872,6 +1893,11 @@ export class ComprasManager {
 
         client.on('purchase.updated', async (data) => {
             // Recarregar lista de compras quando atualizada
+            await this.loadInvoices();
+        });
+
+        client.on('purchase.deleted', async (data) => {
+            // Recarregar lista de compras quando excluída
             await this.loadInvoices();
         });
     }

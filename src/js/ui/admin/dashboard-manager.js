@@ -9,8 +9,6 @@
 import {
   getDashboardMetrics,
   formatCurrency,
-  formatTime,
-  formatNumber,
   getMenuDashboardMetrics,
   getStockDashboardMetrics,
   getPromotionsDashboardMetrics,
@@ -21,7 +19,6 @@ import {
   getOrderDetails,
   updateOrderStatus,
   formatOrderStatus,
-  getStatusColor,
 } from "../../api/orders.js";
 import {
   getCashFlowSummary,
@@ -181,10 +178,7 @@ export default class DashboardManager {
       .then(({ socketService }) => {
         // Listener para novo pedido criado
         socketService.on("order.created", async (orderData) => {
-          console.log(
-            "📦 Dashboard: Novo pedido recebido via WebSocket:",
-            orderData
-          );
+          // ALTERAÇÃO: Log removido para produção - apenas em modo debug se necessário
 
           // Verifica se a seção do dashboard está visível
           if (!this.container || this.container.style.display === "none") {
@@ -249,10 +243,13 @@ export default class DashboardManager {
                 }
               }
             } catch (error) {
-              console.error(
-                "Erro ao processar novo pedido no dashboard:",
-                error
-              );
+              // ALTERAÇÃO: Log condicional apenas em modo debug
+              if (typeof window !== "undefined" && window.DEBUG_MODE) {
+                console.error(
+                  "[Dashboard] Erro ao processar novo pedido:",
+                  error
+                );
+              }
               // Em caso de erro, recarrega a lista completa
               this.loadActiveOrders();
             }
@@ -261,10 +258,7 @@ export default class DashboardManager {
 
         // Listener para mudança de status de pedido
         socketService.on("order.status_changed", async (data) => {
-          console.log(
-            "🔄 Dashboard: Status do pedido alterado via WebSocket:",
-            data
-          );
+          // ALTERAÇÃO: Log removido para produção - apenas em modo debug se necessário
 
           // Verifica se a seção do dashboard está visível
           if (!this.container || this.container.style.display === "none") {
@@ -355,19 +349,25 @@ export default class DashboardManager {
                 }
               }
             } catch (error) {
-              console.error(
-                "Erro ao adicionar pedido atualizado no dashboard:",
-                error
-              );
+              // ALTERAÇÃO: Log condicional apenas em modo debug
+              if (typeof window !== "undefined" && window.DEBUG_MODE) {
+                console.error(
+                  "[Dashboard] Erro ao adicionar pedido atualizado:",
+                  error
+                );
+              }
             }
           }
         });
       })
       .catch((error) => {
-        console.warn(
-          "Não foi possível carregar socketService para atualizações do dashboard:",
-          error
-        );
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== "undefined" && window.DEBUG_MODE) {
+          console.warn(
+            "[Dashboard] Não foi possível carregar socketService:",
+            error
+          );
+        }
       });
   }
 
@@ -459,6 +459,7 @@ export default class DashboardManager {
           }),
         ]);
 
+      // ALTERAÇÃO: API agora filtra corretamente por data - não precisa filtrar no frontend
       const todayMovements =
         todayMovementsResponse.items || todayMovementsResponse || [];
       const yesterdayMovements =
@@ -479,12 +480,24 @@ export default class DashboardManager {
         "dashboard-receita-dia",
         formatCurrency(todayRevenue || 0)
       );
-      this.updateElement(
-        "dashboard-receita-variacao",
-        `${revenueVariation >= 0 ? "+" : ""}${revenueVariation.toFixed(
+      
+      // ALTERAÇÃO: Formatar variação - mostrar porcentagem calculada (inclui 100% quando não havia dados ontem)
+      // ALTERAÇÃO: Normalizar valores para comparação correta
+      const normalizedYesterdayRevenue = parseFloat(yesterdayRevenue) || 0;
+      const normalizedTodayRevenue = parseFloat(todayRevenue) || 0;
+      
+      let variationText = "";
+      if (normalizedYesterdayRevenue === 0 && normalizedTodayRevenue === 0) {
+        // Ambos zerados - sem dados para comparação
+        variationText = "Sem dados para comparação";
+      } else {
+        // Mostrar porcentagem calculada (100% quando yesterdayRevenue === 0 e todayRevenue > 0)
+        variationText = `${revenueVariation >= 0 ? "+" : ""}${revenueVariation.toFixed(
           1
-        )}% vs ontem`
-      );
+        )}% vs ontem`;
+      }
+      
+      this.updateElement("dashboard-receita-variacao", variationText);
 
       // ALTERAÇÃO: Receita mensal - Usar getCashFlowSummary (mesma API do módulo financeiro)
       try {
@@ -538,16 +551,29 @@ export default class DashboardManager {
         ticketMedio,
         yesterdayTicket
       );
+      
       this.updateElement(
         "dashboard-ticket-medio",
         formatCurrency(ticketMedio || 0)
       );
-      this.updateElement(
-        "dashboard-ticket-variacao",
-        `${ticketVariation >= 0 ? "+" : ""}${ticketVariation.toFixed(
+      
+      // ALTERAÇÃO: Formatar variação - mostrar porcentagem calculada (inclui 100% quando não havia dados ontem)
+      // ALTERAÇÃO: Normalizar valores para comparação correta
+      const normalizedYesterdayTicket = parseFloat(yesterdayTicket) || 0;
+      const normalizedTicketMedio = parseFloat(ticketMedio) || 0;
+      
+      let ticketVariationText = "";
+      if (normalizedYesterdayTicket === 0 && normalizedTicketMedio === 0) {
+        // Ambos zerados - sem dados para comparação
+        ticketVariationText = "Sem dados para comparação";
+      } else {
+        // Mostrar porcentagem calculada (100% quando yesterdayTicket === 0 e ticketMedio > 0)
+        ticketVariationText = `${ticketVariation >= 0 ? "+" : ""}${ticketVariation.toFixed(
           1
-        )}% vs ontem`
-      );
+        )}% vs ontem`;
+      }
+      
+      this.updateElement("dashboard-ticket-variacao", ticketVariationText);
     } catch (error) {
       // ALTERAÇÃO: Log condicional apenas em modo debug
       if (typeof window !== "undefined" && window.DEBUG_MODE) {
@@ -790,15 +816,26 @@ export default class DashboardManager {
 
     // ALTERAÇÃO: Somar apenas movimentações de receita com status Paid
     const paidRevenues = movements.filter((movement) => {
-      return (
-        movement.type === "REVENUE" &&
-        (movement.payment_status === "Paid" ||
-          movement.payment_status === "PAID")
-      );
+      // ALTERAÇÃO: Verificar múltiplos formatos possíveis de type e payment_status
+      const movementType = (movement.type || movement.movement_type || "").toUpperCase();
+      const paymentStatus = (movement.payment_status || movement.paymentStatus || "").toUpperCase();
+      
+      const isRevenue = movementType === "REVENUE";
+      const isPaid = paymentStatus === "PAID" || paymentStatus === "PAGO";
+      
+      return isRevenue && isPaid;
     });
 
     const revenue = paidRevenues.reduce((total, movement) => {
-      const value = parseFloat(movement.value || movement.amount || 0);
+      // ALTERAÇÃO: Verificar múltiplos campos possíveis para o valor
+      const value = parseFloat(
+        movement.value || 
+        movement.amount || 
+        movement.financial_value || 
+        movement.financialValue ||
+        0
+      );
+      
       return total + (isNaN(value) ? 0 : value);
     }, 0);
 
@@ -1190,6 +1227,7 @@ export default class DashboardManager {
 
   /**
    * Calcula variação percentual entre dois valores
+   * ALTERAÇÃO: Melhorado tratamento de casos edge (valores zerados, null, undefined)
    *
    * @param {number} current - Valor atual
    * @param {number} previous - Valor anterior
@@ -1197,12 +1235,30 @@ export default class DashboardManager {
    * @private
    */
   calculateVariation(current, previous) {
-    if (!previous || previous === 0) {
-      return current > 0 ? 100 : 0;
+    // ALTERAÇÃO: Normalizar valores para números válidos
+    // ALTERAÇÃO: Garantir que valores null/undefined sejam tratados como 0
+    const currentValue = current !== null && current !== undefined ? parseFloat(current) : 0;
+    const previousValue = previous !== null && previous !== undefined ? parseFloat(previous) : 0;
+    
+    // ALTERAÇÃO: Garantir que NaN seja tratado como 0
+    const normalizedCurrent = isNaN(currentValue) ? 0 : currentValue;
+    const normalizedPrevious = isNaN(previousValue) ? 0 : previousValue;
+
+    // ALTERAÇÃO: Caso não há dados anteriores (previous === 0)
+    if (normalizedPrevious === 0 || normalizedPrevious <= 0) {
+      // Se há dados hoje, mostra crescimento (100% quando não havia dados antes)
+      return normalizedCurrent > 0 ? 100 : 0;
     }
 
-    const variation = ((current - previous) / previous) * 100;
-    return isNaN(variation) ? 0 : variation;
+    // ALTERAÇÃO: Calcular variação normal: ((atual - anterior) / anterior) * 100
+    const variation = ((normalizedCurrent - normalizedPrevious) / normalizedPrevious) * 100;
+    
+    // ALTERAÇÃO: Garantir que retornamos um número válido
+    if (isNaN(variation) || !isFinite(variation)) {
+      return 0;
+    }
+
+    return variation;
   }
 
   /**
@@ -2506,10 +2562,12 @@ export default class DashboardManager {
       }
 
       if (typeof Chart === "undefined") {
-        // ALTERAÇÃO: Erro crítico sempre deve ser logado (não condicionado a DEBUG_MODE)
-        console.error(
-          "[Dashboard] Chart.js não foi carregado após 5 segundos. Verifique a conexão ou bloqueadores de conteúdo."
-        );
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== "undefined" && window.DEBUG_MODE) {
+          console.error(
+            "[Dashboard] Chart.js não foi carregado após 5 segundos. Verifique a conexão ou bloqueadores de conteúdo."
+          );
+        }
         return;
       }
       // ALTERAÇÃO: Log apenas em modo debug
@@ -2573,8 +2631,10 @@ export default class DashboardManager {
             this.createSalesChart();
           };
           script.onerror = () => {
-            // ALTERAÇÃO: Erro crítico sempre deve ser logado (não condicionado a DEBUG_MODE)
-            console.error("[Dashboard] Erro ao carregar Chart.js do CDN.");
+            // ALTERAÇÃO: Log condicional apenas em modo debug
+            if (typeof window !== "undefined" && window.DEBUG_MODE) {
+              console.error("[Dashboard] Erro ao carregar Chart.js do CDN.");
+            }
           };
           document.head.appendChild(script);
         }
@@ -2583,10 +2643,12 @@ export default class DashboardManager {
 
       const canvas = document.getElementById("chart-vendas-semana");
       if (!canvas) {
-        // ALTERAÇÃO: Erro crítico sempre deve ser logado (não condicionado a DEBUG_MODE)
-        console.error(
-          "[Dashboard] Canvas chart-vendas-semana não encontrado no DOM."
-        );
+        // ALTERAÇÃO: Log condicional apenas em modo debug
+        if (typeof window !== "undefined" && window.DEBUG_MODE) {
+          console.error(
+            "[Dashboard] Canvas chart-vendas-semana não encontrado no DOM."
+          );
+        }
         return;
       }
 
@@ -2950,11 +3012,14 @@ export default class DashboardManager {
         const dayName = date.toLocaleDateString("pt-BR", { weekday: "short" });
         days.push(dayName.charAt(0).toUpperCase() + dayName.slice(1));
 
-        // ALTERAÇÃO: Calcular início e fim do dia
+        // ALTERAÇÃO: Calcular início e fim do dia (padronizado com loadFinancialMetrics)
+        // start_date: início do dia (00:00:00)
+        // end_date: início do próximo dia (00:00:00) - para filtro exclusivo
         const dayStart = new Date(date);
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
+        dayEnd.setDate(dayEnd.getDate() + 1); // Próximo dia
+        dayEnd.setHours(0, 0, 0, 0); // Início do próximo dia
 
         // ALTERAÇÃO: Buscar movimentações financeiras do dia
         try {

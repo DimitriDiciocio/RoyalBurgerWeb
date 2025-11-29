@@ -30,6 +30,8 @@ export function createFinancialMovementCard(movement, options = {}) {
     const senderReceiver = movement.sender_receiver || movement.sender || movement.receiver || '';
     const relatedEntityType = movement.related_entity_type || '';
     const relatedEntityId = movement.related_entity_id || '';
+    // ALTERAÇÃO: Verificar se é uma movimentação de recorrência
+    const isRecurrence = relatedEntityType && relatedEntityType.toLowerCase() === 'recurrence_rule';
 
     // ALTERAÇÃO: Formatar método de pagamento para exibição
     const formatPaymentMethod = (method) => {
@@ -136,7 +138,7 @@ export function createFinancialMovementCard(movement, options = {}) {
                         <span>Marcar como Pago</span>
                     </button>
                 ` : ''}
-                ${relatedEntityType && relatedEntityId ? `
+                ${!isRecurrence && relatedEntityType && relatedEntityId ? `
                     <button type="button" class="related-link financial-btn financial-btn-secondary" 
                             data-entity-type="${escapeHtml(relatedEntityType)}" 
                             data-entity-id="${relatedEntityId}"
@@ -146,7 +148,7 @@ export function createFinancialMovementCard(movement, options = {}) {
                         <i class="fa-solid fa-eye" aria-hidden="true"></i>
                         <span>Ver mais</span>
                     </button>
-                ` : `
+                ` : !isRecurrence ? `
                     <button type="button" class="view-details-link financial-btn financial-btn-secondary" 
                             data-action="view-details"
                             data-movement-id="${id}"
@@ -154,7 +156,7 @@ export function createFinancialMovementCard(movement, options = {}) {
                         <i class="fa-solid fa-eye" aria-hidden="true"></i>
                         <span>Ver mais</span>
                     </button>
-                `}
+                ` : ''}
             </div>
         </div>
     `;

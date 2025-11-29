@@ -381,8 +381,20 @@ export class RecorrenciasManager {
                 }
             );
             
-            // Recarregar regras para atualizar status
+            // ALTERAÇÃO: Invalidar cache antes de recarregar
+            cacheManager.delete('recurrence_rules_active');
+            // ALTERAÇÃO: Recarregar regras diretamente para garantir que os cards sejam atualizados
             await this.loadRules();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros após gerar movimentações (forçar atualização)
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: true,
+                updateDashboard: true,
+                updatePendingPayments: true,
+                updatePurchases: false,
+                updateRecurrences: true,
+                forceUpdate: true
+            });
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao gerar movimentações', { 
@@ -659,7 +671,20 @@ export class RecorrenciasManager {
             fecharModal('modal-recorrencia-editar');
             // ALTERAÇÃO: Cleanup após fechar modal
             this.cleanupModalListeners('editRule');
+            // ALTERAÇÃO: Invalidar cache antes de recarregar
+            cacheManager.delete('recurrence_rules_active');
+            // ALTERAÇÃO: Recarregar regras diretamente para garantir que os cards sejam atualizados
             await this.loadRules();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros (forçar atualização)
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: false,
+                updateDashboard: false,
+                updatePendingPayments: false,
+                updatePurchases: false,
+                updateRecurrences: true,
+                forceUpdate: true
+            });
         } catch (error) {
             // ALTERAÇÃO: Melhorar tratamento de erros na API
             let errorMessage = 'Erro ao atualizar regra';
@@ -766,7 +791,21 @@ export class RecorrenciasManager {
             fecharModal('modal-recorrencia-nova');
             // ALTERAÇÃO: Cleanup após fechar modal
             this.cleanupModalListeners('newRule');
+            // ALTERAÇÃO: Invalidar cache antes de recarregar
+            const { cacheManager } = await import('../../utils/cache-manager.js');
+            cacheManager.delete('recurrence_rules_active');
+            // ALTERAÇÃO: Recarregar regras diretamente para garantir que os cards sejam exibidos
             await this.loadRules();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros (forçar atualização)
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: false,
+                updateDashboard: false,
+                updatePendingPayments: false,
+                updatePurchases: false,
+                updateRecurrences: true,
+                forceUpdate: true
+            });
         } catch (error) {
             // ALTERAÇÃO: Melhorar tratamento de erros na API
             let errorMessage = 'Erro ao criar regra';
@@ -817,7 +856,20 @@ export class RecorrenciasManager {
                 type: 'success',
                 title: 'Sucesso'
             });
+            // ALTERAÇÃO: Invalidar cache antes de recarregar
+            cacheManager.delete('recurrence_rules_active');
+            // ALTERAÇÃO: Recarregar regras diretamente para garantir que os cards sejam atualizados
             await this.loadRules();
+            // ALTERAÇÃO: Atualizar todos os managers financeiros (forçar atualização)
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: false,
+                updateDashboard: false,
+                updatePendingPayments: false,
+                updatePurchases: false,
+                updateRecurrences: true,
+                forceUpdate: true
+            });
         } catch (error) {
             // ALTERAÇÃO: Removido console.error - erro já é exibido ao usuário via toast
             showToast('Erro ao desativar regra', { 

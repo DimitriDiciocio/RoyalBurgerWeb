@@ -3,12 +3,16 @@
  * Exibe métricas e gráficos do fluxo de caixa
  */
 
-import { getCashFlowSummary, getFinancialMovements, updatePaymentStatus, getFinancialMovementById } from '../../api/financial-movements.js';
+import { getCashFlowSummary, getFinancialMovements, updatePaymentStatus, getFinancialMovementById, deleteFinancialMovement } from '../../api/financial-movements.js';
 import { showToast } from '../alerts.js';
 import { renderFinancialMovementCards } from '../components/financial-card.js';
 import { cacheManager } from '../../utils/cache-manager.js';
 import { formatDateForAPI } from '../../utils/date-formatter.js';
 import { socketService } from '../../api/socket-client.js';
+// ALTERAÇÃO: Import adicionado para corrigir erro de função não definida
+import { openRelatedEntityModal } from '../../utils/financial-entity-utils.js';
+// ALTERAÇÃO: Import adicionado para eventos em tempo real
+import { getRealtimeClient } from '../../utils/realtime-events.js';
 
 export class FinancialDashboard {
     constructor(containerId) {
@@ -42,6 +46,8 @@ export class FinancialDashboard {
         await this.loadData();
         this.setupEventListeners();
         this.setupSocketListeners();
+        // ALTERAÇÃO: Configurar eventos em tempo real para atualização automática
+        this.setupRealtimeEvents();
     }
 
     /**
@@ -479,7 +485,15 @@ export class FinancialDashboard {
                             type: 'success',
                             title: 'Sucesso'
                         });
-                        await this.loadRecentMovements();
+                        // ALTERAÇÃO: Atualizar todos os managers financeiros
+                        const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+                        await refreshAllFinancialManagers({
+                            updateMovements: true,
+                            updateDashboard: true,
+                            updatePendingPayments: true,
+                            updatePurchases: false,
+                            updateRecurrences: false
+                        });
                     } catch (error) {
                         // ALTERAÇÃO: Extrair mensagem de erro do backend corretamente
                         let errorMessage = 'Erro ao excluir movimentação';
@@ -491,7 +505,15 @@ export class FinancialDashboard {
                                 type: 'success',
                                 title: 'Sucesso'
                             });
-                            await this.loadRecentMovements();
+                            // ALTERAÇÃO: Atualizar todos os managers financeiros mesmo em caso de 404
+                            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+                            await refreshAllFinancialManagers({
+                                updateMovements: true,
+                                updateDashboard: true,
+                                updatePendingPayments: true,
+                                updatePurchases: false,
+                                updateRecurrences: false
+                            });
                             return;
                         }
                         
@@ -533,8 +555,15 @@ export class FinancialDashboard {
                             title: 'Sucesso'
                         });
                         
-                        // Recarregar dados para atualizar os cards
-                        await this.loadRecentMovements();
+                        // ALTERAÇÃO: Atualizar todos os managers financeiros
+                        const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+                        await refreshAllFinancialManagers({
+                            updateMovements: true,
+                            updateDashboard: true,
+                            updatePendingPayments: true,
+                            updatePurchases: false,
+                            updateRecurrences: false
+                        });
                         
                         // ALTERAÇÃO: Usar utility compartilhada para atualizar compras se necessário
                         await refreshPurchasesIfNeeded(relatedEntityType, relatedEntityId);
@@ -591,7 +620,7 @@ export class FinancialDashboard {
     setupSocketListeners() {
         // Ouve novo pedido para atualizar métricas
         socketService.on('order.created', (data) => {
-            console.log('📊 Atualizando Dashboard com novo pedido...', data);
+            // ALTERAÇÃO: Removido console.log - log desnecessário em produção
             
             // Atualiza contador de pedidos (IDs do HTML: dashboard-pedidos-hoje)
             const elPedidosHoje = document.getElementById('dashboard-pedidos-hoje');
@@ -721,30 +750,63 @@ export class FinancialDashboard {
     setupRealtimeEvents() {
         const client = getRealtimeClient();
         
-        // ALTERAÇÃO: Escutar eventos de compras criadas/atualizadas
+        // ALTERAÇÃO: Escutar eventos de compras criadas/atualizadas/excluídas
         client.on('purchase.created', async (data) => {
             // Invalidar cache e recarregar dados
             cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
             await this.loadData();
+            await this.loadRecentMovements();
         });
 
         client.on('purchase.updated', async (data) => {
             // Invalidar cache e recarregar dados
             cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
             await this.loadData();
+            await this.loadRecentMovements();
         });
 
-        // ALTERAÇÃO: Escutar eventos de movimentações financeiras
+        client.on('purchase.deleted', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+            await this.loadRecentMovements();
+        });
+
+        // ALTERAÇÃO: Escutar eventos de movimentações financeiras (criadas/atualizadas/excluídas)
         client.on('financial_movement.created', async (data) => {
             // Invalidar cache e recarregar dados
             cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
             await this.loadData();
+            await this.loadRecentMovements();
+        });
+
+        client.on('financial_movement.updated', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+            await this.loadRecentMovements();
+        });
+
+        client.on('financial_movement.deleted', async (data) => {
+            // Invalidar cache e recarregar dados
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+            await this.loadRecentMovements();
         });
 
         client.on('financial_movement.payment_status_updated', async (data) => {
             // Invalidar cache e recarregar dados
             cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
             await this.loadData();
+            await this.loadRecentMovements();
+        });
+
+        // ALTERAÇÃO: Escutar eventos de recorrências (geração de movimentações)
+        client.on('recurrence.movements_generated', async (data) => {
+            // Invalidar cache e recarregar dados quando movimentações são geradas
+            cacheManager.delete(`dashboard_summary_${this.currentPeriod}_${this.includePending}`);
+            await this.loadData();
+            await this.loadRecentMovements();
         });
     }
 }

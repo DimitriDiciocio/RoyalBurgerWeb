@@ -3,15 +3,15 @@
  * Gerencia criação e edição de movimentações
  */
 
-import { createFinancialMovement, getFinancialMovementById, updateFinancialMovement, getFinancialMovements } from '../../api/financial-movements.js';
+import { createFinancialMovement, getFinancialMovementById, updateFinancialMovement } from '../../api/financial-movements.js';
 import { getCategories } from '../../api/categories.js';
 import { showToast } from '../alerts.js';
 import { escapeHTML } from '../../utils/html-sanitizer.js';
-import { formatDateForAPI, formatDateForDisplay, parseDateFromAPI } from '../../utils/date-formatter.js';
+import { formatDateForAPI, parseDateFromAPI } from '../../utils/date-formatter.js';
 import { cacheManager } from '../../utils/cache-manager.js';
 import { abrirModal, fecharModal } from '../modais.js';
 import { gerenciarInputsEspecificos } from '../../utils.js';
-import { validateRequired, validateNumber, validateLength, applyFieldValidation, clearFieldValidation } from '../../utils/validators.js';
+import { validateRequired, validateLength, applyFieldValidation, clearFieldValidation } from '../../utils/validators.js';
 
 export class MovimentacaoForm {
     constructor(modalId) {
@@ -445,7 +445,17 @@ export class MovimentacaoForm {
 
             this.hideModal();
             
-            // Chamar callback de sucesso se fornecido
+            // ALTERAÇÃO: Atualizar todos os managers financeiros após criar/editar
+            const { refreshAllFinancialManagers } = await import('../../utils/financial-entity-utils.js');
+            await refreshAllFinancialManagers({
+                updateMovements: true,
+                updateDashboard: true,
+                updatePendingPayments: true,
+                updatePurchases: false,
+                updateRecurrences: false
+            });
+            
+            // Chamar callback de sucesso se fornecido (para compatibilidade)
             if (this.onSuccess) {
                 this.onSuccess();
             }

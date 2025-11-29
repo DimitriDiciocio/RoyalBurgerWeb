@@ -151,6 +151,97 @@ export async function refreshPurchasesIfNeeded(relatedEntityType, relatedEntityI
 }
 
 /**
+ * ALTERAÇÃO: Verifica se uma tab financeira está ativa
+ * @param {string} tabId - ID da tab (dashboard, movimentacoes, contas-pagar, compras, recorrencias)
+ * @returns {boolean} True se a tab estiver ativa
+ */
+function isFinancialTabActive(tabId) {
+    const tabElement = document.querySelector(`.financeiro-tab[data-tab="${tabId}"]`);
+    const contentElement = document.getElementById(`tab-${tabId}`);
+    
+    return tabElement?.classList.contains('active') && 
+           contentElement?.classList.contains('active');
+}
+
+/**
+ * ALTERAÇÃO: Atualiza todos os managers financeiros após operações CRUD
+ * Garante que todas as seções sejam atualizadas sem necessidade de reload
+ * Atualiza apenas as tabs que estão ativas ou forçadas via options
+ * @param {Object} options - Opções de atualização
+ * @param {boolean} options.updateMovements - Atualizar lista de movimentações (default: true)
+ * @param {boolean} options.updateDashboard - Atualizar dashboard financeiro (default: true)
+ * @param {boolean} options.updatePendingPayments - Atualizar contas a pagar (default: true)
+ * @param {boolean} options.updatePurchases - Atualizar compras (default: false)
+ * @param {boolean} options.updateRecurrences - Atualizar recorrências (default: false)
+ * @param {boolean} options.forceUpdate - Forçar atualização mesmo se tab não estiver ativa (default: false)
+ */
+export async function refreshAllFinancialManagers(options = {}) {
+    const {
+        updateMovements = true,
+        updateDashboard = true,
+        updatePendingPayments = true,
+        updatePurchases = false,
+        updateRecurrences = false,
+        forceUpdate = false
+    } = options;
+
+    if (!window.adminPanel || !window.adminPanel.managers) {
+        return;
+    }
+
+    const managers = window.adminPanel.managers;
+    const updatePromises = [];
+
+    // ALTERAÇÃO: Verificar se a seção financeira está visível
+    const financeiroSection = document.getElementById('secao-financeiro');
+    const isFinanceiroVisible = financeiroSection && 
+                                window.getComputedStyle(financeiroSection).display !== 'none';
+
+    // Se a seção financeira não estiver visível e não for forçado, não atualizar
+    if (!isFinanceiroVisible && !forceUpdate) {
+        return;
+    }
+
+    // Atualizar lista de movimentações (se tab estiver ativa ou forçado)
+    // ALTERAÇÃO: Verificar ambos os nomes possíveis do manager
+    const movementsListManager = managers.movementsList || managers.movimentacoesList;
+    if (updateMovements && movementsListManager && 
+        (forceUpdate || isFinancialTabActive('movimentacoes'))) {
+        updatePromises.push(movementsListManager.loadMovements());
+    }
+
+    // Atualizar dashboard financeiro (se tab estiver ativa ou forçado)
+    if (updateDashboard && managers.dashboardFinanceiro && 
+        (forceUpdate || isFinancialTabActive('dashboard'))) {
+        updatePromises.push(managers.dashboardFinanceiro.loadData());
+        updatePromises.push(managers.dashboardFinanceiro.loadRecentMovements());
+    }
+
+    // Atualizar contas a pagar (se tab estiver ativa ou forçado)
+    // ALTERAÇÃO: Verificar ambos os nomes possíveis do manager
+    const contasPagarManager = managers.contasPagar || managers.contasPagarManager;
+    if (updatePendingPayments && contasPagarManager && 
+        (forceUpdate || isFinancialTabActive('contas-pagar'))) {
+        updatePromises.push(contasPagarManager.loadPendingPayments());
+    }
+
+    // Atualizar compras (se tab estiver ativa ou forçado)
+    if (updatePurchases && managers.comprasManager && 
+        (forceUpdate || isFinancialTabActive('compras'))) {
+        updatePromises.push(managers.comprasManager.loadInvoices());
+    }
+
+    // Atualizar recorrências (se tab estiver ativa ou forçado)
+    if (updateRecurrences && managers.recorrenciasManager && 
+        (forceUpdate || isFinancialTabActive('recorrencias'))) {
+        updatePromises.push(managers.recorrenciasManager.loadRules());
+    }
+
+    // Executar todas as atualizações em paralelo
+    await Promise.allSettled(updatePromises);
+}
+
+/**
  * ALTERAÇÃO: Abre modal de edição baseada no tipo de entidade relacionada
  * @param {number} movementId - ID da movimentação financeira
  * @returns {Promise<boolean>} True se o modal foi aberto com sucesso
@@ -250,16 +341,18 @@ export async function openEditModalForMovement(movementId) {
                 // Recarregar dados após edição
                 if (window.adminPanel && window.adminPanel.managers) {
                     // Recarregar movimentações se houver um manager de movimentações
-                    if (window.adminPanel.managers.movimentacoesList) {
-                        await window.adminPanel.managers.movimentacoesList.loadMovements();
+                    const movementsListManager = window.adminPanel.managers.movementsList || window.adminPanel.managers.movimentacoesList;
+                    if (movementsListManager) {
+                        await movementsListManager.loadMovements();
                     }
                     // Recarregar dashboard se estiver aberto
                     if (window.adminPanel.managers.dashboardFinanceiro) {
                         await window.adminPanel.managers.dashboardFinanceiro.loadRecentMovements();
                     }
                     // Recarregar contas a pagar se estiver aberto
-                    if (window.adminPanel.managers.contasPagar) {
-                        await window.adminPanel.managers.contasPagar.loadPendingPayments();
+                    const contasPagarManager = window.adminPanel.managers.contasPagar || window.adminPanel.managers.contasPagarManager;
+                    if (contasPagarManager) {
+                        await contasPagarManager.loadPendingPayments();
                     }
                 }
             });
