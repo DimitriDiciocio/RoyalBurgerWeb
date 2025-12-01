@@ -1,294 +1,190 @@
 // src/js/utils.js
 
 /**
- * Função para gerenciar o estado dos inputs e selects
- * Controla a animação dos labels e cores baseado no foco e valor
+ * Tipos de inputs que sempre devem ter label ativo
  */
-export function gerenciarEstadoInputs() {
-  // Selecionar todos os inputs e selects dentro de formulários
-  const inputs = document.querySelectorAll("input, select, textarea");
+const TIPOS_SEMPRE_ATIVOS = ["date", "time", "datetime-local", "month", "week"];
 
-  inputs.forEach((input) => {
-    // ALTERAÇÃO: Função corrigida para verificar corretamente valores e placeholders
-    function temValorOuPlaceholder() {
-      // Para SELECT: verificar se tem valor válido (não vazio)
-      if (input.tagName === "SELECT") {
-        return input.value !== "" && input.value !== null && input.value !== undefined;
-      }
-      
-      const valor = (input.value || "").trim();
-      
-      // ALTERAÇÃO: Não considerar placeholder com apenas espaço como placeholder válido
-      const temPlaceholder = input.placeholder && 
-                            input.placeholder.trim() !== "" && 
-                            input.placeholder.trim() !== " ";
-      
-      // ALTERAÇÃO: Para inputs de data, verificar se tem valor de fato
-      const tipoComPlaceholder = [
-        "date",
-        "time",
-        "datetime-local",
-        "month",
-        "week",
-      ].includes(input.type);
-      
-      // Para tipos com placeholder nativo, verificar se tem valor real
-      if (tipoComPlaceholder) {
-        return valor !== "" && valor !== null;
-      }
+/**
+ * Tipos de inputs de texto que usam evento 'input'
+ */
+const TIPOS_TEXTO = ["text", "email", "tel", "password", "search", "url"];
 
-      return valor !== "" || temPlaceholder;
-    }
+/**
+ * Tipos de inputs que usam eventos 'change' e 'input'
+ */
+const TIPOS_ESPECIAIS = ["date", "time", "datetime-local", "month", "week", "number"];
 
-    // Função para atualizar o estado do label
-    function atualizarEstadoLabel() {
-      const label = input.closest(".div-input")?.querySelector("label");
-      if (!label) return;
+/**
+ * Verifica se um input tem valor ou placeholder válido
+ * @param {HTMLElement} input - Elemento input/select/textarea
+ * @returns {boolean}
+ */
+function temValorOuPlaceholder(input) {
+  // SELECT: verificar se tem valor válido
+  if (input.tagName === "SELECT") {
+    return input.value !== "" && input.value != null;
+  }
 
-      const temValor = temValorOuPlaceholder();
-      const estaFocado = document.activeElement === input;
+  const valor = (input.value || "").trim();
+  const temPlaceholder = input.placeholder?.trim() && input.placeholder.trim() !== " ";
 
-      // ALTERAÇÃO: SELECT sempre deve ter label no estado ativo
-      // ALTERAÇÃO: Inputs de data também devem sempre ter label no estado ativo
-      const tiposData = ["date", "time", "datetime-local", "month", "week"];
-      const ehInputData = tiposData.includes(input.type);
-      
-      if (input.tagName === "SELECT" || ehInputData) {
-        label.classList.add("active");
-      } else {
-        // Adicionar/remover classe 'active' baseado no valor para outros inputs
-        if (temValor) {
-          label.classList.add("active");
-        } else {
-          label.classList.remove("active");
-        }
-      }
+  // Inputs de data: verificar se tem valor real
+  if (TIPOS_SEMPRE_ATIVOS.includes(input.type)) {
+    return valor !== "" && valor != null;
+  }
 
-      // Adicionar/remover classe 'focused' baseado no foco
-      if (estaFocado) {
-        label.classList.add("focused");
-      } else {
-        label.classList.remove("focused");
-      }
-    }
-
-    // Eventos para inputs de texto, email, tel, etc.
-    if (
-      ["text", "email", "tel", "password", "search", "url"].includes(input.type)
-    ) {
-      input.addEventListener("input", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-    }
-
-    // Eventos para selects
-    if (input.tagName === "SELECT") {
-      input.addEventListener("change", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-    }
-
-    // Eventos para textareas
-    if (input.tagName === "TEXTAREA") {
-      input.addEventListener("input", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-    }
-
-    // Eventos para inputs com placeholder nativo (date, time, etc.)
-    if (
-      ["date", "time", "datetime-local", "month", "week", "number"].includes(
-        input.type
-      )
-    ) {
-      input.addEventListener("change", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-      input.addEventListener("input", atualizarEstadoLabel);
-    }
-
-    // Verificar estado inicial
-    atualizarEstadoLabel();
-
-    try {
-      // Usar eventos nativos do input para mudanças de valor (mais eficiente)
-      // O MutationObserver será usado apenas como fallback para mudanças programáticas
-      let ultimoValor = input.value;
-
-      // Observer para mudanças no atributo 'value' (mudanças programáticas)
-      const observer = new MutationObserver(() => {
-        if (!document.body.contains(input)) {
-          observer.disconnect();
-          return;
-        }
-        if (input.value !== ultimoValor) {
-          ultimoValor = input.value;
-          atualizarEstadoLabel();
-        }
-      });
-
-      // Observar apenas mudanças no atributo value
-      observer.observe(input, {
-        attributes: true,
-        attributeFilter: ["value"],
-        childList: false,
-        subtree: false,
-      });
-
-      // Armazenar observer no elemento para cleanup posterior se necessário
-      input._valueObserver = observer;
-      
-      // TODO: REVISAR - Cleanup de MutationObserver
-      // Os observers criados não são desconectados automaticamente quando
-      // os inputs são removidos do DOM. Considerar implementar cleanup
-      // quando elementos são removidos (usar MutationObserver no container pai
-      // ou WeakMap para rastrear observers).
-    } catch (_e) {
-      // Fallback silencioso se MutationObserver não estiver disponível
-    }
-  });
+  return valor !== "" || !!temPlaceholder;
 }
 
 /**
- * Função para inicializar o gerenciamento de inputs em uma página específica
- * @param {string} seletor - Seletor CSS para o container dos inputs (opcional)
+ * Atualiza o estado visual do label associado ao input
+ * @param {HTMLElement} input - Elemento input/select/textarea
+ */
+function atualizarEstadoLabel(input) {
+  const label = input.closest(".div-input")?.querySelector("label");
+  if (!label) return;
+
+  const temValor = temValorOuPlaceholder(input);
+  const estaFocado = document.activeElement === input;
+  const ehSelect = input.tagName === "SELECT";
+  const ehInputData = TIPOS_SEMPRE_ATIVOS.includes(input.type);
+
+  // SELECT e inputs de data sempre ativos
+  if (ehSelect || ehInputData) {
+    label.classList.add("active");
+  } else {
+    label.classList.toggle("active", temValor);
+  }
+
+  label.classList.toggle("focused", estaFocado);
+}
+
+/**
+ * Adiciona event listeners apropriados ao input
+ * @param {HTMLElement} input - Elemento input/select/textarea
+ */
+function adicionarEventListeners(input) {
+  const atualizar = () => atualizarEstadoLabel(input);
+
+  // Eventos comuns para todos
+  input.addEventListener("focus", atualizar);
+  input.addEventListener("blur", atualizar);
+
+  // Eventos específicos por tipo
+  if (input.tagName === "SELECT") {
+    input.addEventListener("change", atualizar);
+  } else if (input.tagName === "TEXTAREA") {
+    input.addEventListener("input", atualizar);
+  } else if (TIPOS_TEXTO.includes(input.type)) {
+    input.addEventListener("input", atualizar);
+  } else if (TIPOS_ESPECIAIS.includes(input.type)) {
+    input.addEventListener("change", atualizar);
+    input.addEventListener("input", atualizar);
+  }
+
+  // Estado inicial
+  atualizarEstadoLabel(input);
+}
+
+/**
+ * Configura MutationObserver para detectar mudanças programáticas no valor
+ * @param {HTMLElement} input - Elemento input/select/textarea
+ */
+function configurarObserver(input) {
+  if (typeof MutationObserver === "undefined") return;
+
+  let ultimoValor = input.value;
+
+  const observer = new MutationObserver(() => {
+    if (!document.body.contains(input)) {
+      observer.disconnect();
+      return;
+    }
+    if (input.value !== ultimoValor) {
+      ultimoValor = input.value;
+      atualizarEstadoLabel(input);
+    }
+  });
+
+  observer.observe(input, {
+    attributes: true,
+    attributeFilter: ["value"],
+  });
+
+  // Armazenar para possível cleanup futuro
+  input._valueObserver = observer;
+}
+
+/**
+ * Gerenciar estado de um input específico
+ * @param {HTMLElement} input - Elemento input/select/textarea
+ */
+function gerenciarInput(input) {
+  // Evitar processar o mesmo input múltiplas vezes
+  if (input._gerenciado) return;
+  input._gerenciado = true;
+
+  adicionarEventListeners(input);
+  configurarObserver(input);
+}
+
+/**
+ * Gerenciar estado de todos os inputs, selects e textareas
+ * @param {string|null} seletor - Seletor CSS opcional para limitar o escopo
+ */
+export function gerenciarEstadoInputs(seletor = null) {
+  const container = seletor ? document.querySelector(seletor) : document;
+  if (!container) return;
+
+  const inputs = container.querySelectorAll("input, select, textarea");
+  inputs.forEach(gerenciarInput);
+}
+
+/**
+ * Inicializar o gerenciamento de inputs
+ * @param {string|null} seletor - Seletor CSS opcional para o container
  */
 export function inicializarGerenciamentoInputs(seletor = null) {
-  // Aguardar o DOM estar pronto
+  const inicializar = () => gerenciarEstadoInputs(seletor);
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      if (seletor) {
-        const container = document.querySelector(seletor);
-        if (container) {
-          gerenciarEstadoInputs();
-        }
-      } else {
-        gerenciarEstadoInputs();
-      }
-    });
+    document.addEventListener("DOMContentLoaded", inicializar);
   } else {
-    if (seletor) {
-      const container = document.querySelector(seletor);
-      if (container) {
-        gerenciarEstadoInputs();
-      }
-    } else {
-      gerenciarEstadoInputs();
-    }
+    inicializar();
   }
 }
 
 /**
- * Função para reaplicar o gerenciamento após mudanças dinâmicas no DOM
+ * Reaplicar o gerenciamento após mudanças dinâmicas no DOM
  * Útil quando novos inputs são adicionados via JavaScript
+ * @param {string|null} seletor - Seletor CSS opcional para limitar o escopo
  */
-export function reaplicarGerenciamentoInputs() {
-  gerenciarEstadoInputs();
+export function reaplicarGerenciamentoInputs(seletor = null) {
+  // Resetar flag para permitir reprocessamento
+  const container = seletor ? document.querySelector(seletor) : document;
+  if (!container) return;
+
+  const inputs = container.querySelectorAll("input, select, textarea");
+  inputs.forEach((input) => {
+    input._gerenciado = false;
+  });
+
+  gerenciarEstadoInputs(seletor);
 }
 
 /**
- * Função para gerenciar inputs específicos
- * @param {NodeList|Array} inputs - Lista de inputs para gerenciar
+ * Gerenciar inputs específicos passados como parâmetro
+ * @param {NodeList|Array|HTMLElement} inputs - Lista de inputs ou input único
  */
 export function gerenciarInputsEspecificos(inputs) {
-  if (!inputs || inputs.length === 0) return;
+  if (!inputs) return;
 
-  inputs.forEach((input) => {
-    // ALTERAÇÃO: Lógica corrigida para verificar corretamente valores e placeholders
-    function temValorOuPlaceholder() {
-      // Para SELECT: verificar se tem valor válido (não vazio)
-      if (input.tagName === "SELECT") {
-        return input.value !== "" && input.value !== null && input.value !== undefined;
-      }
-      
-      const valor = (input.value || "").trim();
-      
-      // ALTERAÇÃO: Não considerar placeholder com apenas espaço como placeholder válido
-      const temPlaceholder = input.placeholder && 
-                            input.placeholder.trim() !== "" && 
-                            input.placeholder.trim() !== " ";
-      
-      // ALTERAÇÃO: Para inputs de data, verificar se tem valor de fato
-      const tipoComPlaceholder = [
-        "date",
-        "time",
-        "datetime-local",
-        "month",
-        "week",
-      ].includes(input.type);
-      
-      // Para tipos com placeholder nativo, verificar se tem valor real
-      if (tipoComPlaceholder) {
-        return valor !== "" && valor !== null;
-      }
+  const lista = Array.isArray(inputs) || inputs instanceof NodeList
+    ? Array.from(inputs)
+    : [inputs];
 
-      return valor !== "" || temPlaceholder;
-    }
-
-    function atualizarEstadoLabel() {
-      const label = input.closest(".div-input")?.querySelector("label");
-      if (!label) return;
-
-      const temValor = temValorOuPlaceholder();
-      const estaFocado = document.activeElement === input;
-
-      // ALTERAÇÃO: SELECT sempre deve ter label no estado ativo
-      // ALTERAÇÃO: Inputs de data também devem sempre ter label no estado ativo
-      const tiposData = ["date", "time", "datetime-local", "month", "week"];
-      const ehInputData = tiposData.includes(input.type);
-      
-      if (input.tagName === "SELECT" || ehInputData) {
-        label.classList.add("active");
-      } else {
-        // Adicionar/remover classe 'active' baseado no valor para outros inputs
-        if (temValor) {
-          label.classList.add("active");
-        } else {
-          label.classList.remove("active");
-        }
-      }
-
-      if (estaFocado) {
-        label.classList.add("focused");
-      } else {
-        label.classList.remove("focused");
-      }
-    }
-
-    // Adicionar eventos baseado no tipo
-    if (
-      ["text", "email", "tel", "password", "search", "url"].includes(input.type)
-    ) {
-      input.addEventListener("input", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-    }
-
-    if (input.tagName === "SELECT") {
-      input.addEventListener("change", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-    }
-
-    if (input.tagName === "TEXTAREA") {
-      input.addEventListener("input", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-    }
-
-    if (
-      ["date", "time", "datetime-local", "month", "week", "number"].includes(
-        input.type
-      )
-    ) {
-      input.addEventListener("change", atualizarEstadoLabel);
-      input.addEventListener("focus", atualizarEstadoLabel);
-      input.addEventListener("blur", atualizarEstadoLabel);
-      input.addEventListener("input", atualizarEstadoLabel);
-    }
-
-    atualizarEstadoLabel();
-  });
+  lista.forEach(gerenciarInput);
 }
 
 // Auto-inicializar quando o módulo for carregado
